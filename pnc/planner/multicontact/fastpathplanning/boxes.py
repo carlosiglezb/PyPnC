@@ -184,7 +184,7 @@ class BoxCollection:
         plt.xlim(plot_box[:, 0])
         plt.ylim(plot_box[:, 1])
 
-    def plot3d(self, ax, color=(1, 0, 0, 0.5), subset=None):
+    def plot3d(self, ax, color=(1, 0, 0, 0.1), subset=None):
 
         for i, box in enumerate(self.boxes):
             if subset is None or i in subset:

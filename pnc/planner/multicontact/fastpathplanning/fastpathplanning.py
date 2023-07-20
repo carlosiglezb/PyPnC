@@ -1,7 +1,7 @@
 import numpy as np
-from fastpathplanning.boxes import Box, BoxCollection
-from fastpathplanning.polygonal import iterative_planner
-from fastpathplanning.smooth import optimize_bezier_with_retiming
+from pnc.planner.multicontact.fastpathplanning.boxes import Box, BoxCollection
+from pnc.planner.multicontact.fastpathplanning.polygonal import iterative_planner
+from pnc.planner.multicontact.fastpathplanning.smooth import optimize_bezier_with_retiming
 
 class SafeSet:
 
