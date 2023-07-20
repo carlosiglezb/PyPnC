@@ -24,4 +24,8 @@ dependencies:
       - yapf==0.30.0
       - open3d
       - imageio
-prefix: /home/seunghyeonbang/anaconda3/envs/pypnc
+      - scipy
+      - networkx
+      - cvxpy
+      - clarabel
+# prefix: /home/seunghyeonbang/anaconda3/envs/pypnc
