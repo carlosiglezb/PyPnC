@@ -1,4 +1,4 @@
-name: pypnc
+name: pypnc-cig
 channels:
   - anaconda
   - conda-forge
@@ -6,7 +6,7 @@ dependencies:
   - libcblas=3.9.0
   - liblapack=3.9.0
   - pinocchio=2.5.5
-  - python=3.8
+  - python=3.9
   - pip
   - pip:
       - casadi==3.5.5
@@ -19,13 +19,14 @@ dependencies:
       - pybullet==3.0.8
       - qpsolvers
       - ruamel.yaml
-      - tensorflow==2.3.0
+      - tensorflow
       - tqdm==4.56.0
       - yapf==0.30.0
+      - quadprog
       - open3d
       - imageio
       - scipy
       - networkx
       - cvxpy
       - clarabel
-# prefix: /home/seunghyeonbang/anaconda3/envs/pypnc
+#prefix: /home/carlos/anaconda3/envs/pypnc-cig
