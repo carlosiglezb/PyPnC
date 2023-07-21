@@ -20,6 +20,10 @@ sys.path.append(cwd)
 # Robot model libraries
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 
+# YAML
+from ruamel.yaml import YAML
+from copy import deepcopy
+
 b_visualize_hulls = False
 decimation_triangles = 30
 N_samples = 10000
@@ -70,9 +74,13 @@ for n in range(N_samples):
 # Define path to save convex hull
 save_loc = cwd + '/pnc/reachability_map/output/'
 
-# Create convex hulls
+# Create convex hulls and save plane equation coefficients
+yaml = YAML()
+plane_dict = {'a': 0., 'b': 0., 'c': 0., 'd': 0.}
 mesh_simplified = OrderedDict()
 for ee_name, rs in reach_space.items():
+    plane_coeffs_list = []
+
     pcl = o3d.geometry.PointCloud()
     pcl.points = o3d.utility.Vector3dVector(rs)
     hull, _ = pcl.compute_convex_hull()
@@ -84,7 +92,26 @@ for ee_name, rs in reach_space.items():
                                           mesh_show_wireframe=True)
 
     # compute triangle normals and save meshes as STL
-    filename = 'draco3_' + ee_name + '.stl'
+    filename = 'draco3_' + ee_name
     mesh_simplified[ee_name] = o3d.geometry.TriangleMesh.\
         compute_triangle_normals(mesh_simplified[ee_name])
-    o3d.io.write_triangle_mesh(save_loc + filename, mesh_simplified[ee_name])
+    o3d.io.write_triangle_mesh(save_loc + filename + '.stl', mesh_simplified[ee_name])
+
+    # get plane information
+    triangles = np.asarray(mesh_simplified[ee_name].triangles)
+    normals = np.asarray(mesh_simplified[ee_name].triangle_normals)
+    vertices = np.asarray(mesh_simplified[ee_name].vertices)
+
+    # construct equation coefficients (offset was missing)
+    for tr in range(len(triangles)):
+        coeffs = np.zeros((4,))
+        coeffs[:3] = normals[tr]
+        x_plane = vertices[triangles[tr][0]]        # [x,y,z] point at vertex of triangle/plane
+        coeffs[3] = -coeffs[:3] @ x_plane
+        plane_dict['a'], plane_dict['b'] = float(coeffs[0]), float(coeffs[1])
+        plane_dict['c'], plane_dict['d'] = float(coeffs[2]), float(coeffs[3])
+        plane_coeffs_list.append(deepcopy(plane_dict))
+
+    with open(save_loc + filename + '.yaml', 'w') as f:
+        yaml.dump(plane_coeffs_list, f)
+
