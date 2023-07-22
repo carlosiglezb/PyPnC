@@ -1,13 +1,3 @@
-import numpy as np
-import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
-import matplotlib.pyplot as plt
-
-from itertools import product
-
-#
-# offline preprocessing
-#
-
 r"""
 Note: we assume the bounds are given from a vision processing algorithm (e.g., using SDP)
 The navy door is located such that all points:
@@ -22,6 +12,13 @@ are inside the door (i.e., not in the safe region).
 r"""
 Note: we assume the kinematic constraint has been specified/learned as convex polytopes
 """
+import numpy as np
+import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
+import matplotlib.pyplot as plt
+
+##############################
+# offline preprocessing
+##############################
 
 # lower bounds of the safe boxes (LF)
 """
@@ -42,13 +39,13 @@ L_rf = np.array([
 ])
 L_lh = np.array([
     [-0.1, -0.1, 0.7],      # prevent leg-crossing
-    [-0.1, -0.1, 0.7],     # prevent leg-crossing
+    [-0.1, 0.0, 0.7],     # prevent leg-crossing
     [0.2,  -0.1, 0.7]      # prevent leg-crossing
 ])
 L_rh = np.array([
-    [-0.1, -0.3, 0.0],      # prevent leg-crossing
-    [-0.1, -0.3, 0.4],     # prevent leg-crossing
-    [ 0.2, -0.3, 0.0]      # prevent leg-crossing
+    [-0.1, -0.3, 0.7],      # prevent leg-crossing
+    [-0.1, -0.3, 0.7],     # prevent leg-crossing
+    [ 0.2, -0.3, 0.7]      # prevent leg-crossing
 ])
 
 # upper bounds of the safe boxes
@@ -69,7 +66,7 @@ U_lh = np.array([
 ])
 U_rh = np.array([
     [0.1, 0.1, 1.3],      # prevent leg-crossing
-    [0.4, 0.1, 1.3],     # prevent leg-crossing
+    [0.4, 0.0, 1.3],     # prevent leg-crossing
     [0.5, 0.1, 1.3]      # prevent leg-crossing
 ])
 
@@ -78,7 +75,9 @@ S_rf = fpp.SafeSet(L_rf, U_rf, verbose=True)
 S_lh = fpp.SafeSet(L_lh, U_lh, verbose=True)
 S_rh = fpp.SafeSet(L_rh, U_rh, verbose=True)
 
+##############################
 # online path planning
+##############################
 T = 3                                   # traversal time
 alpha = [0, 0, 1]                       # cost weights
 
@@ -112,8 +111,6 @@ S_lf.plot3d(ax)                     # plot safe set
 S_rf.plot3d(ax)                     # plot safe set
 S_lh.plot3d(ax)                     # plot safe set
 S_rh.plot3d(ax)                     # plot safe set
-# plt.xlim([np.min(L_lf[:, 0], axis=0), np.max(U_lf[:, 0], axis=0)])
-# plt.ylim([np.min(L_rf[:, 1], axis=0), np.max(U_lf[:, 1], axis=0)])
 
 # Planned path
 p_lf.plot3d(ax)                     # plot smooth path
