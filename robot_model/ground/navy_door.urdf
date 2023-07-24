@@ -1,6 +1,6 @@
 <?xml version="0.0" ?>
 <robot name="navy_door">
-  <link name="door">
+  <link name="door_frame">
   <contact>
       <lateral_friction value="1"/>
   </contact>
@@ -12,7 +12,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="navy_door_765x1450.stl" scale="1 1 1"/>
+        <mesh filename="package://navy_door_765x1450.stl" scale="1 1 1"/>
       </geometry>
        <material name="grey">
         <color rgba="0.6 0.6 0.6 1"/>
