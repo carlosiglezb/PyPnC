@@ -21,8 +21,8 @@ def convert_rgba_to_meshcat_obj(obj, color_rgb):
 
 
 class FrameTraversableRegion:
-    def __init__(self, frame_name, reachable_stl_path,
-                 convex_hull_halfspace_path,
+    def __init__(self, frame_name, reachable_stl_path=None,
+                 convex_hull_halfspace_path=None,
                  visualizer=None, b_visualize=False):
         if visualizer is not None:
             b_visualize = True
@@ -37,16 +37,17 @@ class FrameTraversableRegion:
                 if visualizer is not None:
                     # see if using Pinocchio's MeshcatVisualizer
                     if hasattr(visualizer, 'model'):
-                        print("Using Pinocchio Meshcat Visualizer for Frame Traversable Region")
+                        print("Using existing visualizer for Frame Traversable Region")
                         self._vis = visualizer.viewer
                 else:
                     self._vis = meshcat.Visualizer() if visualizer is None else visualizer
                     self._vis.open()
                     self._vis.wait()
 
-                obj = g.Mesh(g.StlMeshGeometry.from_file(reachable_stl_path))
-                convert_rgba_to_meshcat_obj(obj.material, [0.9, 0.9, 0.9, 0.2])
-                self._vis["traversable_regions"]["reachable"][frame_name].set_object(obj)
+                if reachable_stl_path is not None:
+                    obj = g.Mesh(g.StlMeshGeometry.from_file(reachable_stl_path))
+                    convert_rgba_to_meshcat_obj(obj.material, [0.9, 0.9, 0.9, 0.2])
+                    self._vis["traversable_regions"]["reachable"][frame_name].set_object(obj)
 
             except ImportError as err:
                 print(
@@ -56,13 +57,19 @@ class FrameTraversableRegion:
                 sys.exit(0)
 
         # Retrieve halfspace coefficients defining the convex hull
-        with open(convex_hull_halfspace_path, 'r') as f:
-            yml = YAML().load(f)
-            self._plane_coeffs = []
-            for i_plane in range(len(yml)):
-                self._plane_coeffs.append(yml[i_plane])
+        if convex_hull_halfspace_path is not None:
+            with open(convex_hull_halfspace_path, 'r') as f:
+                yml = YAML().load(f)
+                self._plane_coeffs = []
+                for i_plane in range(len(yml)):
+                    self._plane_coeffs.append(yml[i_plane])
+        else:
+            print(f"Convex hull not specified for {frame_name}")
 
-        self._origin_pos = np.zeros((3,))    # [x,y,z] of torso
+        # set the origin of the reachable space (i.e., origin of torso w.r.t. world)
+        self._origin_pos = np.zeros((3,))               # [x,y,z] of torso w.r.t. world
+        self._origin_ori_direction = np.zeros((3,))     # w.r.t. world frame
+        self._origin_ori_angle = 0.                     # about ori_direction
 
         # initialize list for collision-free safe set (boxes) for planning
         self._plan_safe_box_list = []       # safe boxes per frame
@@ -76,12 +83,14 @@ class FrameTraversableRegion:
         if origin_ori_direction is None:
             origin_ori_direction = np.array([0., 0., 1.])
 
-        if self._b_visualize:
+        if self._b_visualize and self._reachable_stl_path is not None:
             self._update_reachable_viewer(origin_pos,
                           origin_ori_angle, origin_ori_direction)
 
         # save new origin
         self._origin_pos = origin_pos
+        self._origin_ori_angle = origin_ori_angle
+        self._origin_ori_direction = origin_ori_direction
 
     def _update_reachable_viewer(self, origin_pos,
                                  origin_ori_angle,

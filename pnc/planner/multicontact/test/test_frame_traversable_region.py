@@ -15,11 +15,18 @@ sys.path.append(cwd)
 
 class TestFrameTraversableRegion(unittest.TestCase):
     def setUp(self):
-        self.frame_name = 'RF'
-        self.frame_stl_path = cwd + '/pnc/reachability_map/output/draco3_' +\
-                    self.frame_name + '.stl'
-        self.poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' +\
-                    self.frame_name + '.yaml'
+        self.torso_frame_name = 'torso'
+        self.rf_frame_name = 'RF'
+        self.rf_frame_stl_path = cwd + '/pnc/reachability_map/output/draco3_' + \
+                                 self.rf_frame_name + '.stl'
+        self.rf_poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' + \
+                                      self.rf_frame_name + '.yaml'
+
+        self.lf_frame_name = 'LF'
+        self.lf_frame_stl_path = cwd + '/pnc/reachability_map/output/draco3_' + \
+                                 self.lf_frame_name + '.stl'
+        self.lf_poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' + \
+                                      self.lf_frame_name + '.yaml'
 
     def get_draco3_default_initial_pose(self):
         q0 = np.zeros(35, )
@@ -70,7 +77,6 @@ class TestFrameTraversableRegion(unittest.TestCase):
         quat = util.util.rot_to_quat(R)
         return np.concatenate((pos, quat))
 
-
     def get_sample_collision_free_boxes(self):
         L_lf = np.array([
             [-0.1, -0.1, 0.0],  # prevent leg-crossing
@@ -119,8 +125,9 @@ class TestFrameTraversableRegion(unittest.TestCase):
         return box_llim, box_ulim
 
     def get_navy_door_collision_free_boxes(self):
+        # lower bounds of end-effectors safe boxes
         L_lf = np.array([
-            [-0.1, 0.0, 0.0],  # prevent leg-crossing
+            [-0.2, 0.0, 0.0],  # prevent leg-crossing
             [-0.1, 0.0, 0.4],  # prevent leg-crossing
             [0.4, 0.0, 0.0]  # prevent leg-crossing
         ])
@@ -138,6 +145,11 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [-0.2, -0.4, 0.7],  # prevent leg-crossing
             [-0.1, -0.4, 0.7],  # prevent leg-crossing
             [0.4, -0.4, 0.7]  # prevent leg-crossing
+        ])
+        L_torso = np.array([
+            [-0.2, -0.3, 0.5],  # prevent leg-crossing
+            [-0.1, -0.3, 0.5],  # prevent leg-crossing
+            [0.1, -0.3, 0.5]  # prevent leg-crossing
         ])
 
         # upper bounds of the safe boxes
@@ -161,14 +173,19 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [0.6, 0.0, 1.3],  # prevent leg-crossing
             [0.6, 0.0, 1.3]  # prevent leg-crossing
         ])
-        box_llim=[L_lf, L_rf, L_lh, L_rh]
-        box_ulim=[U_lf, U_rf, U_lh, U_rh]
+        U_torso = np.array([
+            [0.2, 0.3, 0.9],  # prevent leg-crossing
+            [0.4, 0.3, 0.9],  # prevent leg-crossing
+            [0.6, 0.3, 0.9]  # prevent leg-crossing
+        ])
+        box_llim=[L_torso, L_lf, L_rf, L_lh, L_rh]
+        box_ulim=[U_torso, U_lf, U_rf, U_lh, U_rh]
         return box_llim, box_ulim
 
     def test_visualizing_reachable_region(self):
-        test_region = FrameTraversableRegion(self.frame_name,
-                              self.frame_stl_path, self.poly_halfspace_path,
-                              b_visualize=True)
+        test_region = FrameTraversableRegion(self.rf_frame_name,
+                                             self.rf_frame_stl_path, self.rf_poly_halfspace_path,
+                                             b_visualize=True)
 
         # translate to new origin
         new_origin = np.array([0., 0., 0.6])
@@ -194,9 +211,9 @@ class TestFrameTraversableRegion(unittest.TestCase):
         vis_q = pin.neutral(model)
         visualizer.display(vis_q)
 
-        test_region = FrameTraversableRegion(self.frame_name,
-                              self.frame_stl_path, self.poly_halfspace_path,
-                              visualizer=visualizer)
+        test_region = FrameTraversableRegion(self.rf_frame_name,
+                                             self.rf_frame_stl_path, self.rf_poly_halfspace_path,
+                                             visualizer=visualizer)
         self.assertEqual(True, True)
 
         # move to standing height
@@ -225,9 +242,9 @@ class TestFrameTraversableRegion(unittest.TestCase):
         vis_q = self.get_draco3_default_initial_pose()
         visualizer.display(vis_q)
 
-        test_region = FrameTraversableRegion(self.frame_name,
-                              self.frame_stl_path, self.poly_halfspace_path,
-                              visualizer=visualizer)
+        test_region = FrameTraversableRegion(self.rf_frame_name,
+                                             self.rf_frame_stl_path, self.rf_poly_halfspace_path,
+                                             visualizer=visualizer)
         self.assertEqual(True, True)
 
         # move to standing height
@@ -269,19 +286,33 @@ class TestFrameTraversableRegion(unittest.TestCase):
         door_vis_q = self.get_navy_door_default_initial_pose()
         door_vis.display(door_vis_q)
 
-        test_region = FrameTraversableRegion(self.frame_name,
-                              self.frame_stl_path, self.poly_halfspace_path,
-                              visualizer=visualizer)
+        #
+        # right foot
+        #
+        rf_traversable_region = FrameTraversableRegion(self.rf_frame_name,
+                                             self.rf_frame_stl_path, self.rf_poly_halfspace_path,
+                                             visualizer=visualizer)
         self.assertEqual(True, True)
 
         # move to standing height
         standing_pos = vis_q[:3]
-        test_region.update_origin_pose(standing_pos)
+        rf_traversable_region.update_origin_pose(standing_pos)
         self.assertEqual(True, True)
 
         # collision-free boxes
         box_llim, box_ulim = self.get_navy_door_collision_free_boxes()
-        test_region.load_collision_free_boxes(box_llim[1], box_ulim[1])
+        rf_traversable_region.load_collision_free_boxes(box_llim[2], box_ulim[2])
+
+        #
+        # torso
+        #
+        torso_traversable_region = FrameTraversableRegion(self.torso_frame_name, visualizer=visualizer)
+        self.assertEqual(True, True)
+
+        # collision-free boxes
+        box_llim, box_ulim = self.get_navy_door_collision_free_boxes()
+        torso_traversable_region.load_collision_free_boxes(box_llim[0], box_ulim[0])
+
 
 if __name__ == '__main__':
     unittest.main()
