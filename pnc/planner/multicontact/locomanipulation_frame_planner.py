@@ -2,7 +2,6 @@ import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
 from collections import OrderedDict
 from pnc.planner.multicontact.frame_traversable_region import convert_rgba_to_meshcat_obj
 
-import matplotlib.pyplot as plt
 import meshcat.geometry as g
 import meshcat.transformations as tf
 
@@ -30,21 +29,26 @@ class LocomanipulationFramePlanner:
             bezier_curve = self.path[frame]
             self.visualize_bezier_points(visualizer, frame, bezier_curve)
 
-        # ax = plt.figure().add_subplot(projection='3d')
-        # self.path.plot3d(ax)
-        # plt.show()
-
-    def visualize_bezier_points(self, visualizer, frame, bezier_curve):
-        color = [0., 1., 0., 0.6]
+    @staticmethod
+    def visualize_bezier_points(visualizer, frame, bezier_curve):
+        color_waypoint = [0., 1., 0., 0.6]      # blue
+        color_transition = [1., 1., 0., 0.6]    # yellow
         r_bezier_pts = 0.01
-        pt_number = 0
+        pt_number, seg_number = 0, 1
         for bez in bezier_curve.beziers:
             t, points = bez.get_sample_points()
             for p in points:
                 obj = g.Sphere(r_bezier_pts)
                 tf_pos = tf.translation_matrix(p)
-                convert_rgba_to_meshcat_obj(obj, color)
+
+                # check if "in-between" waypoint or "transition" waypoint
+                if (pt_number == seg_number*(len(points))-1) or (pt_number == (seg_number-1) * (len(points))):
+                    convert_rgba_to_meshcat_obj(obj, color_transition)
+                else:
+                    convert_rgba_to_meshcat_obj(obj, color_waypoint)
                 visualizer.viewer["traversable_regions"]["path"][frame][str(pt_number)].set_object(
                     obj, g.MeshLambertMaterial(color=obj.color))
                 visualizer.viewer["traversable_regions"]["path"][frame][str(pt_number)].set_transform(tf_pos)
+
                 pt_number += 1
+            seg_number += 1

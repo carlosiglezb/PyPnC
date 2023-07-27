@@ -177,9 +177,9 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [0.6, 0.0, 1.3]  # prevent leg-crossing
         ])
         U_torso = np.array([
-            [0.1, 0.3, 0.8],  # prevent leg-crossing
-            [0.3, 0.3, 0.8],  # prevent leg-crossing
-            [0.6, 0.3, 0.8]  # prevent leg-crossing
+            [0.1, 0.3, 0.9],  # prevent leg-crossing
+            [0.3, 0.3, 0.9],  # prevent leg-crossing
+            [0.6, 0.3, 0.9]  # prevent leg-crossing
         ])
         box_llim=[L_torso, L_lf, L_rf, L_lh, L_rh]
         box_ulim=[U_torso, U_lf, U_rf, U_lh, U_rh]
@@ -296,7 +296,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         #
         # left foot
         #
-        lf_init = np.array([0.05, 0.1, 0.])   # TODO: use fwd kin
+        lf_init = np.array([0.06, 0.14, 0.])   # TODO: use fwd kin
         lf_end = lf_init + np.array([0.45, 0., 0.])
         lf_traversable_region = FrameTraversableRegion(self.lf_frame_name,
                                                        self.lf_frame_stl_path, self.lf_poly_halfspace_path,
@@ -317,7 +317,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         #
         # right foot
         #
-        rf_init = np.array([0.05, -0.1, 0.])   # TODO: use fwd kin
+        rf_init = np.array([0.06, -0.14, 0.])   # TODO: use fwd kin
         rf_end = rf_init + np.array([0.45, 0., 0.])
         rf_traversable_region = FrameTraversableRegion(self.rf_frame_name,
                                                        self.rf_frame_stl_path, self.rf_poly_halfspace_path,
@@ -366,7 +366,6 @@ class TestFrameTraversableRegion(unittest.TestCase):
         frame_planner = LocomanipulationFramePlanner(traversable_regions)
         frame_planner.plan(p_init, p_end, T, alpha)
         frame_planner.plot(visualizer=visualizer)
-
 
 
 if __name__ == '__main__':
