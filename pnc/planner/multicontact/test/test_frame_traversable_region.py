@@ -1,13 +1,16 @@
 import unittest
+from collections import OrderedDict
 
 import util.util
 from pnc.planner.multicontact.frame_traversable_region import FrameTraversableRegion
+from pnc.planner.multicontact.locomanipulation_frame_planner import LocomanipulationFramePlanner
 
 import os
 import sys
 import numpy as np
 from pinocchio.visualize import MeshcatVisualizer
 import pinocchio as pin
+
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -147,9 +150,9 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [0.4, -0.4, 0.7]  # prevent leg-crossing
         ])
         L_torso = np.array([
-            [-0.2, -0.3, 0.5],  # prevent leg-crossing
             [-0.1, -0.3, 0.5],  # prevent leg-crossing
-            [0.1, -0.3, 0.5]  # prevent leg-crossing
+            [0.05, -0.3, 0.5],  # prevent leg-crossing
+            [0.2, -0.3, 0.5]  # prevent leg-crossing
         ])
 
         # upper bounds of the safe boxes
@@ -174,9 +177,9 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [0.6, 0.0, 1.3]  # prevent leg-crossing
         ])
         U_torso = np.array([
-            [0.2, 0.3, 0.9],  # prevent leg-crossing
-            [0.4, 0.3, 0.9],  # prevent leg-crossing
-            [0.6, 0.3, 0.9]  # prevent leg-crossing
+            [0.1, 0.3, 0.8],  # prevent leg-crossing
+            [0.3, 0.3, 0.8],  # prevent leg-crossing
+            [0.6, 0.3, 0.8]  # prevent leg-crossing
         ])
         box_llim=[L_torso, L_lf, L_rf, L_lh, L_rh]
         box_ulim=[U_torso, U_lf, U_rf, U_lh, U_rh]
@@ -185,7 +188,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
     def test_visualizing_reachable_region(self):
         test_region = FrameTraversableRegion(self.rf_frame_name,
                                              self.rf_frame_stl_path, self.rf_poly_halfspace_path,
-                                             b_visualize=True)
+                                             b_visualize_reach=True)
 
         # translate to new origin
         new_origin = np.array([0., 0., 0.6])
@@ -257,41 +260,70 @@ class TestFrameTraversableRegion(unittest.TestCase):
         test_region.load_collision_free_boxes(box_llim[1], box_ulim[1])
 
     def test_visualize_navy_door_paths(self):
+        b_visualize = True
         # load robot
         rob_model, rob_collision_model, rob_visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
             cwd + "/robot_model/draco3", pin.JointModelFreeFlyer())
-        visualizer = MeshcatVisualizer(rob_model, rob_collision_model, rob_visual_model)
-
-        try:
-            visualizer.initViewer(open=True)
-            visualizer.viewer.wait()
-        except ImportError as err:
-            print(
-                "Error while initializing the viewer. It seems you should install Python meshcat"
-            )
-            print(err)
-            sys.exit(0)
-        visualizer.loadViewerModel(rootNodeName="draco3")
         vis_q = self.get_draco3_default_initial_pose()
-        visualizer.display(vis_q)
 
-        # load door to visualizer
         door_model, door_collision_model, door_visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/ground/navy_door.urdf",
             cwd + "/robot_model/ground", pin.JointModelFreeFlyer())
-        door_vis = MeshcatVisualizer(door_model, door_collision_model, door_visual_model)
-        door_vis.initViewer(visualizer.viewer)
-        door_vis.loadViewerModel(rootNodeName="door")
-        door_vis_q = self.get_navy_door_default_initial_pose()
-        door_vis.display(door_vis_q)
+
+        if b_visualize:
+            visualizer = MeshcatVisualizer(rob_model, rob_collision_model, rob_visual_model)
+
+            try:
+                visualizer.initViewer(open=True)
+                visualizer.viewer.wait()
+            except ImportError as err:
+                print(
+                    "Error while initializing the viewer. It seems you should install Python meshcat"
+                )
+                print(err)
+                sys.exit(0)
+            visualizer.loadViewerModel(rootNodeName="draco3")
+            visualizer.display(vis_q)
+
+            # load door to visualizer
+            door_vis = MeshcatVisualizer(door_model, door_collision_model, door_visual_model)
+            door_vis.initViewer(visualizer.viewer)
+            door_vis.loadViewerModel(rootNodeName="door")
+            door_vis_q = self.get_navy_door_default_initial_pose()
+            door_vis.display(door_vis_q)
+
+        #
+        # left foot
+        #
+        lf_init = np.array([0.05, 0.1, 0.])   # TODO: use fwd kin
+        lf_end = lf_init + np.array([0.45, 0., 0.])
+        lf_traversable_region = FrameTraversableRegion(self.lf_frame_name,
+                                                       self.lf_frame_stl_path, self.lf_poly_halfspace_path,
+                                                       b_visualize_reach=b_visualize,
+                                                       b_visualize_safe=b_visualize,
+                                                       visualizer=visualizer)
+        self.assertEqual(True, True)
+
+        # move to standing height
+        standing_pos = vis_q[:3]
+        lf_traversable_region.update_origin_pose(standing_pos)
+        self.assertEqual(True, True)
+
+        # collision-free boxes
+        box_llim, box_ulim = self.get_navy_door_collision_free_boxes()
+        lf_traversable_region.load_collision_free_boxes(box_llim[1], box_ulim[1])
 
         #
         # right foot
         #
+        rf_init = np.array([0.05, -0.1, 0.])   # TODO: use fwd kin
+        rf_end = rf_init + np.array([0.45, 0., 0.])
         rf_traversable_region = FrameTraversableRegion(self.rf_frame_name,
-                                             self.rf_frame_stl_path, self.rf_poly_halfspace_path,
-                                             visualizer=visualizer)
+                                                       self.rf_frame_stl_path, self.rf_poly_halfspace_path,
+                                                       b_visualize_reach=b_visualize,
+                                                       b_visualize_safe=b_visualize,
+                                                       visualizer=visualizer)
         self.assertEqual(True, True)
 
         # move to standing height
@@ -306,12 +338,35 @@ class TestFrameTraversableRegion(unittest.TestCase):
         #
         # torso
         #
-        torso_traversable_region = FrameTraversableRegion(self.torso_frame_name, visualizer=visualizer)
+        torso_init = standing_pos
+        torso_end = standing_pos + np.array([0.4, 0., 0.])
+        torso_traversable_region = FrameTraversableRegion(self.torso_frame_name,
+                                                          b_visualize_reach=b_visualize,
+                                                          b_visualize_safe=b_visualize,
+                                                          visualizer=visualizer)
         self.assertEqual(True, True)
 
         # collision-free boxes
         box_llim, box_ulim = self.get_navy_door_collision_free_boxes()
         torso_traversable_region.load_collision_free_boxes(box_llim[0], box_ulim[0])
+
+        # make multi-trajectory planner
+        p_init = OrderedDict()
+        p_init[torso_traversable_region._frame_name] = torso_init
+        p_init[lf_traversable_region._frame_name] = lf_init
+        p_init[rf_traversable_region._frame_name] = rf_init
+
+        p_end = OrderedDict()
+        p_end[torso_traversable_region._frame_name] = torso_end
+        p_end[lf_traversable_region._frame_name] = lf_end
+        p_end[rf_traversable_region._frame_name] = rf_end
+        T = 3
+        alpha = [0, 0, 1]
+        traversable_regions = [torso_traversable_region, lf_traversable_region, rf_traversable_region]
+        frame_planner = LocomanipulationFramePlanner(traversable_regions)
+        frame_planner.plan(p_init, p_end, T, alpha)
+        frame_planner.plot(visualizer=visualizer)
+
 
 
 if __name__ == '__main__':

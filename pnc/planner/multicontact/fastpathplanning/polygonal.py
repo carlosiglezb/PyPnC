@@ -25,6 +25,48 @@ def solve_min_distance(B, box_seq, start, goal):
 
     return traj, length, solver_time
 
+
+def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal):
+
+    # we write the problem as
+    # x = [p_torso, p_lfoot, p_rfoot]
+    first_box = next(iter(safe_boxes.values()))
+    d = first_box.B.d
+    num_boxes = np.max([len(bs) for bs in box_seq.values()])
+    x = cp.Variable((num_boxes+1, d*len(safe_boxes)))
+
+    # check dimensions of start and goal
+    x_init, x_goal = [], []
+    for x0 in start.values():
+        x_init = np.concatenate((x_init, x0))
+    for xf in goal.values():
+        x_goal = np.concatenate((x_goal, xf))
+    assert len(x_init) == x.shape[1]
+    assert len(x_goal) == x.shape[1]
+
+    # organize lower and upper state limits
+    l = np.zeros((num_boxes-1, d*len(safe_boxes)))
+    u = np.zeros((num_boxes-1, d*len(safe_boxes)))
+    ee_idx = 0
+    for frame, ee_box in safe_boxes.items():
+        boxes = [ee_box.B.boxes[i] for i in box_seq[frame]]
+        l[:, ee_idx:ee_idx+d] = np.array([np.maximum(b.l, c.l) for b, c in zip(boxes[:-1], boxes[1:])])
+        u[:, ee_idx:ee_idx+d] = np.array([np.minimum(b.u, c.u) for b, c in zip(boxes[:-1], boxes[1:])])
+        ee_idx += d
+
+    cost = cp.sum(cp.norm(x[1:] - x[:-1], 2, axis=1))
+
+    constr = [x[0] == x_init, x[1:-1] >= l, x[1:-1] <= u, x[-1] == x_goal]
+
+    prob = cp.Problem(cp.Minimize(cost), constr)
+    prob.solve(solver='CLARABEL')
+
+    length = prob.value
+    traj = x.value
+    solver_time = prob.solver_stats.solve_time
+
+    return traj, length, solver_time
+
 def log(s1, size=10):
     s1 = str(s1)
     s0 = list('|' + ' ' * size + '|')
@@ -100,7 +142,83 @@ def iterative_planner(B, start, goal, box_seq, verbose=True, tol=1e-5, **kwargs)
                 print(f'Solver time was {np.round(solver_time, 5)}')
             return list(box_seq), traj, length, solver_time
 
+
+def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=True, tol=1e-5, **kwargs):
+
+    if verbose:
+        init_log()
+
+    # box_seq = np.array(box_seq)
+    solver_time = 0
+    n_iters = 0
+    while True:
+        n_iters += 1
+
+        for frame, bs in box_seq.items():
+            box_seq[frame] = jump_box_repetitions(np.array(bs))
+        traj, length, solver_time_i = solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, **kwargs)
+        solver_time += solver_time_i
+
+        # TODO: from here on, deal with each end effector separately
+    # for frame, b_seq in box_seq.items():
+        B = safe_boxes[frame].B
+
+        if verbose:
+            update_log(n_iters, length, len(box_seq[frame]))
+
+        # box_seq[frame], traj = merge_overlaps_multiple(box_seq, traj, tol)
+
+        kinks = find_kinks(traj, tol)
+
+        insert_k = []
+        insert_i = []
+        # for k in kinks:
+        #
+        #     i1 = box_seq[k - 1]
+        #     i2 = box_seq[k]
+        #     B1 = B.boxes[i1]
+        #     B2 = B.boxes[i2]
+        #     cached_finf = 0
+        #
+        #     subset = list(B.inters[i1] & B.inters[i2])
+        #     for i in B.contain(traj[k], tol, subset):
+        #         B3 = B.boxes[i]
+        #         B13 = B1.intersect(B3)
+        #         B23 = B2.intersect(B3)
+        #         f = dual_box_insertion(*traj[k-1:k+2], B13, B23, tol)
+        #         f2 = np.linalg.norm(f)
+        #         finf = np.linalg.norm(f, ord=np.inf)
+        #
+        #         if f2 > 1 + tol and finf > cached_finf + tol:
+        #             cached_i = i
+        #             cached_finf = finf
+        #
+        #     if cached_finf > 0:
+        #         insert_k.append(k)
+        #         insert_i.append(cached_i)
+
+        if len(insert_k) > 0:
+            b_seq = np.insert(b_seq, insert_k, insert_i)
+        else:
+            if verbose:
+                term_log()
+                print(f'Polygonal phase terminated in {n_iters} iterations')
+                print(f'Final length is ' + '{:.3e}'.format(length))
+                print(f'Solver time was {np.round(solver_time, 5)}')
+            # if frame == 'RF':
+                return box_seq, traj, length, solver_time
+
+
 def merge_overlaps(box_seq, traj, tol):
+
+    keep = list(np.linalg.norm(traj[:-1] - traj[1:], axis=1) > tol)
+    box_seq = box_seq[keep]
+    traj = traj[keep + [True]]
+
+    return box_seq, traj
+
+
+def merge_overlaps_multiple(box_seq, traj, tol):
 
     keep = list(np.linalg.norm(traj[:-1] - traj[1:], axis=1) > tol)
     box_seq = box_seq[keep]

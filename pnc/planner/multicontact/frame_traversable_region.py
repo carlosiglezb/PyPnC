@@ -23,16 +23,18 @@ def convert_rgba_to_meshcat_obj(obj, color_rgb):
 class FrameTraversableRegion:
     def __init__(self, frame_name, reachable_stl_path=None,
                  convex_hull_halfspace_path=None,
-                 visualizer=None, b_visualize=False):
+                 visualizer=None,
+                 b_visualize_reach=False,
+                 b_visualize_safe=False):
         if visualizer is not None:
-            b_visualize = True
+            b_visualize_reach = True
 
         self._frame_name = frame_name
         self._reachable_stl_path = reachable_stl_path
-        self._b_visualize = b_visualize
+        self._b_visualize_reach = b_visualize_reach
 
         # Visualize convex hull (reachable region)
-        if b_visualize:
+        if b_visualize_reach:
             try:
                 if visualizer is not None:
                     # see if using Pinocchio's MeshcatVisualizer
@@ -72,10 +74,11 @@ class FrameTraversableRegion:
         self._origin_ori_angle = 0.                     # about ori_direction
 
         # initialize list for collision-free safe set (boxes) for planning
-        self._plan_safe_box_list = []       # safe boxes per frame
+        self._plan_safe_box_list = None       # safe boxes per frame
         self._plan_T = []
         self._plan_alpha = [0, 0, 1]    # cost weights [pos, vel, acc, ...]
         self._N_boxes = 0
+        self._b_visualize_safe = b_visualize_safe
 
     def update_origin_pose(self, origin_pos, origin_ori_angle=0.,
                            origin_ori_direction=None):
@@ -83,7 +86,7 @@ class FrameTraversableRegion:
         if origin_ori_direction is None:
             origin_ori_direction = np.array([0., 0., 1.])
 
-        if self._b_visualize and self._reachable_stl_path is not None:
+        if self._b_visualize_reach and self._reachable_stl_path is not None:
             self._update_reachable_viewer(origin_pos,
                           origin_ori_angle, origin_ori_direction)
 
@@ -102,12 +105,12 @@ class FrameTraversableRegion:
         tf_new = tf.concatenate_matrices(tf_trans, tf_ori)
         self._vis["traversable_regions"]["reachable"][self._frame_name].set_transform(tf_new)
 
-    def load_collision_free_boxes(self, box_llim, box_ulim, b_visualize=True):
-        self._plan_safe_box_list.append(fpp.SafeSet(
-            box_llim, box_ulim, verbose=True))
+    def load_collision_free_boxes(self, box_llim, box_ulim):
+        self._plan_safe_box_list = fpp.SafeSet(
+            box_llim, box_ulim, verbose=True)
 
         # set visualization
-        if b_visualize:
+        if self._b_visualize_safe:
             for box_ll, box_ul in zip(box_llim, box_ulim):
                 box_dims = box_ul - box_ll
                 box = g.Box(box_dims)

@@ -77,6 +77,11 @@ class BezierCurve:
         t = np.linspace(self.a, self.b, samples)
         ax.plot(*self(t).T, **options)
 
+    def get_sample_points(self, samples=11):
+        t = np.linspace(self.a, self.b, samples)
+        points = self(t).astype(np.float32)
+        return t, points
+
     def scatter2d(self, **kwargs):
 
         import matplotlib.pyplot as plt

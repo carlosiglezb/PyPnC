@@ -79,7 +79,7 @@ S_rh = fpp.SafeSet(L_rh, U_rh, verbose=True)
 # online path planning
 ##############################
 T = 3                                   # traversal time
-alpha = [0, 0, 1]                       # cost weights
+alpha = [0, 0, 1]                       # cost weights (derivatives)
 
 # Left Foot
 p_lf_init = np.array([0.0, 0.1, 0.0])     # initial point
