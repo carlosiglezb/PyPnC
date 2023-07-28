@@ -35,6 +35,16 @@ def generate_random_joint_dict(joint_id):
         zero_qdot_dict[k] = 0.
 
 
+def generate_t_pose_joint_dict(joint_id):
+    for k, v in joint_id.items():
+        if k == 'l_shoulder_aa':
+            q_t_pose[k] = np.pi/2.
+        elif k == 'r_shoulder_aa':
+            q_t_pose[k] = -np.pi/2.
+        else:
+            q_t_pose[k] = 0.
+
+
 # Load Draco3 robot model
 robot = PinocchioRobotSystem(
                 cwd + "/robot_model/draco3/draco3.urdf",
@@ -42,7 +52,7 @@ robot = PinocchioRobotSystem(
 
 joint_id = robot.joint_id
 nq = robot.n_q
-q_dict = OrderedDict()
+q_dict, q_t_pose = OrderedDict(), OrderedDict()
 zero_qdot_dict = OrderedDict()
 q_lims = robot.joint_pos_limit
 q_llim, q_ulim = q_lims[:, 0],  q_lims[:, 1]
@@ -73,6 +83,12 @@ for n in range(N_samples):
 
 # Define path to save convex hull
 save_loc = cwd + '/pnc/reachability_map/output/'
+
+# get zero position of robot to get reachable space of torso
+generate_t_pose_joint_dict(q_dict)
+robot.update_system(None, None, None, None,
+                    None, None, None, None,
+                    q_t_pose, zero_qdot_dict)
 
 # Create convex hulls and save plane equation coefficients
 yaml = YAML()
@@ -114,4 +130,16 @@ for ee_name, rs in reach_space.items():
 
     with open(save_loc + filename + '.yaml', 'w') as f:
         yaml.dump(plane_coeffs_list, f)
+
+p_ee_offsets_dict = {}
+xyz_offset_dict = {'x': 0., 'y': 0., 'z': 0.}
+# save reachability of torso w.r.t. end effector
+for (ee_name, rs), contact_name in zip(reach_space.items(), end_effector_names):
+    xyz_offset_dict['x'] = float(robot.get_link_iso(contact_name)[0, 3])
+    xyz_offset_dict['y'] = float(robot.get_link_iso(contact_name)[1, 3])
+    xyz_offset_dict['z'] = float(robot.get_link_iso(contact_name)[2, 3])
+    p_ee_offsets_dict[ee_name] = deepcopy(xyz_offset_dict)
+
+with open(save_loc + 'draco3_ee_offsets.yaml', 'w') as f:
+    yaml.dump(p_ee_offsets_dict, f)
 
