@@ -7,6 +7,7 @@ import meshcat.transformations as tf
 import numpy as np
 from ruamel.yaml import YAML
 
+
 class LocomanipulationFramePlanner:
     def __init__(self, traversable_regions_list, ee_offset_file_path,
                  starting_stance_foot='LF'):
@@ -23,6 +24,8 @@ class LocomanipulationFramePlanner:
             # do the torso at the very end to get reachability from contact frames
             if region._frame_name != 'torso':
                 H, d_prime = self.extract_plane_eqn_from_coeffs(region._plane_coeffs)
+                d_prime = self.update_plane_offset_from_root(region._origin_pos,
+                                                                H, d_prime)
                 self.reachability_planes[region._frame_name] = {'H': H, 'd': d_prime}
 
         # the torso must be reachable based on the frame in contact
@@ -41,17 +44,6 @@ class LocomanipulationFramePlanner:
                 torso_p_contact_offset[2] = float(yml[frame_name]['z'])
         d_prime = d_vec + H @ torso_p_contact_offset  # grab all the 'd' coefficients
         return H, d_prime
-
-    @staticmethod
-    def extract_plane_eqn_from_coeffs(coeffs):
-        H = np.zeros((len(coeffs), 3))
-        d_vec = np.zeros((len(coeffs),))
-        i = 0
-        for h in coeffs:
-            H[i] = np.array([h['a'], h['b'], h['c']])
-            d_vec[i] = h['d']
-            i += 1
-        return H, d_vec
 
     def plan(self, p_init, p_term, T, alpha, der_init={}, der_term={}, verbose=True):
         S = self.safe_boxes
@@ -87,3 +79,18 @@ class LocomanipulationFramePlanner:
 
                 pt_number += 1
             seg_number += 1
+
+    @staticmethod
+    def extract_plane_eqn_from_coeffs(coeffs):
+        H = np.zeros((len(coeffs), 3))
+        d_vec = np.zeros((len(coeffs),))
+        i = 0
+        for h in coeffs:
+            H[i] = np.array([h['a'], h['b'], h['c']])
+            d_vec[i] = h['d']
+            i += 1
+        return H, d_vec
+
+    @staticmethod
+    def update_plane_offset_from_root(_origin_pos, H, d):
+        return d - H @ _origin_pos

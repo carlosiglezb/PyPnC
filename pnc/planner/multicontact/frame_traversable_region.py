@@ -26,6 +26,29 @@ class FrameTraversableRegion:
                  visualizer=None,
                  b_visualize_reach=False,
                  b_visualize_safe=False):
+        r"""Creates a convex polyhedron composed of :
+        (1) the reachable space of a frame w.r.t. root, and
+        (2) the safe, collision-free region specified for the frame
+
+        Arguments
+        ---------
+        frame_name : String
+            Name of the frame for which TraversableRegion is made for.
+        reachable_stl_path : String
+            Path to the stl (convex polygon) describing the reachable space of the frame
+        convex_hull_halfspace_path : String
+            Path to hyperplane parameters, e.g., of (a, b, c, d) in
+                .. math::
+                    ax + by + cz + d = 0
+            of STL in reachable_stl_path. Parameters are
+            specified w.r.t. root (e.g., torso frame)
+        visualizer : Meshcat.Visualizer
+            Viewer window for displaying reachable and safe regions
+        b_visualize_reach : Bool
+            Whether we want to visualize the reachable region or not
+        b_visualize_safe : Bool
+            Whether we want to visualize the safe, collision-free region or not
+        """
         if visualizer is not None:
             b_visualize_reach = True
 
@@ -87,6 +110,9 @@ class FrameTraversableRegion:
             origin_ori_direction = np.array([0., 0., 1.])
 
         if self._b_visualize_reach and self._reachable_stl_path is not None:
+            # Note: this does NOT update the actual plane equations, it simply
+            # shifts the origin of the STL part to origin_pos. The equations
+            # update is currently being done in the LocomanipulationFramePlanner
             self._update_reachable_viewer(origin_pos,
                           origin_ori_angle, origin_ori_direction)
 

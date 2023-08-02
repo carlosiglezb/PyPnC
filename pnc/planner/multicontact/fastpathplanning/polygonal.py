@@ -27,7 +27,7 @@ def solve_min_distance(B, box_seq, start, goal):
 
 
 def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal):
-    stance_foot = 'RF'
+    stance_foot = 'LF'
 
     # Make copy of ee reachability region with only end effectors (e.g., excluding torso)
     ee_reach = {}
@@ -102,9 +102,9 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal):
     cost = cp.sum(cp.norm(x[d*n_f:] - x[:-d*n_f], 2))
 
     constr = [x[:d*n_f] == x_init,
-              x[d*n_f:-d*n_f] >= l,
-              x[d*n_f:-d*n_f] <= u,
-              # H @ x <= d_vec,
+              x[d*n_f:-d*n_f] >= l,     # safe, collision-free boxes (lower limit)
+              x[d*n_f:-d*n_f] <= u,     # safe, collision-free boxes (upper limit)
+              H @ x <= -d_vec,          # non-stance frame remains reachable
               x[-d*n_f:] == x_goal]
 
     prob = cp.Problem(cp.Minimize(cost), constr)
