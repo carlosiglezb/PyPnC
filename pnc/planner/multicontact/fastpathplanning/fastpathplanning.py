@@ -59,6 +59,7 @@ def plan(S, p_init, p_term, T, alpha, der_init={}, der_term={}, verbose=True):
 
     return path
 
+
 def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={}, verbose=True):
 
     if verbose:
@@ -69,7 +70,7 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={}, verb
         discrete_planner, runtime = boxes.G.shortest_path(p_term[frame])
         box_seq[frame], length, runtime = discrete_planner(p_init[frame])
         if box_seq[frame] is None:
-            print('Infeasible problem, initial and terminal points are disconnected.')
+            print('Infeasible safe problem, initial and terminal points are disconnected.')
             return
 
     box_seq, traj, length, solver_time = iterative_planner_multiple(S, R, p_init, p_term, box_seq, verbose)
@@ -91,8 +92,20 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={}, verb
         initial = {0: p_init[frame]} | der_init
         final = {0: p_term[frame]} | der_term
 
-        # Initialize transition times. TODO use dimension "d" instead of indices below
-        durations = np.linalg.norm(traj[ee_idx+1:ee_idx+4] - traj[ee_idx:ee_idx+3], axis=1)
+        # Initialize transition times.
+        num_boxes = len(i)
+        frame_idx = list(p_init.keys()).index(frame)
+        n_f = len(p_init)
+        d = S[frame].B.boxes[i[0]].d
+        # get indices of current frame for all curve points
+        for b in range(num_boxes+1):
+            if b == 0:
+                ee_traj_idx = np.linspace(frame_idx+b*d*n_f, frame_idx+d*(b*n_f+1)-1, d).astype(int)
+            else:
+                ee_traj_idx = np.vstack((ee_traj_idx, (np.linspace(frame_idx+b*d*n_f, frame_idx+d*(b*n_f+1)-1, d)).astype(int)))
+
+        ee_traj_change = traj[ee_traj_idx[1:]]-traj[ee_traj_idx[:-1]]
+        durations = np.linalg.norm(ee_traj_change, axis=1)
         durations *= T / sum(durations)
 
         path[frame], sol_stats[frame] = optimize_bezier_with_retiming(L, U, durations, alpha, initial, final, verbose=True)

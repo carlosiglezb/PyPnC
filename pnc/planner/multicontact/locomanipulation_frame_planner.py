@@ -4,19 +4,54 @@ from pnc.planner.multicontact.frame_traversable_region import convert_rgba_to_me
 
 import meshcat.geometry as g
 import meshcat.transformations as tf
+import numpy as np
+from ruamel.yaml import YAML
 
 class LocomanipulationFramePlanner:
-    def __init__(self, traversable_regions_list):
+    def __init__(self, traversable_regions_list, ee_offset_file_path,
+                 starting_stance_foot='LF'):
 
         self.safe_boxes = OrderedDict()
         self.reachability_planes = OrderedDict()
         self.path = []
         self.frame_names = []
+        self.starting_stance_foot = starting_stance_foot
         for region in traversable_regions_list:
             self.frame_names.append(region._frame_name)
             self.safe_boxes[region._frame_name] = region._plan_safe_box_list
+
+            # do the torso at the very end to get reachability from contact frames
             if region._frame_name != 'torso':
-                self.reachability_planes[region._frame_name] = region._plane_coeffs
+                H, d_prime = self.extract_plane_eqn_from_coeffs(region._plane_coeffs)
+                self.reachability_planes[region._frame_name] = {'H': H, 'd': d_prime}
+
+        # the torso must be reachable based on the frame in contact
+        H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path)
+        self.reachability_planes['torso'] = {'H': H, 'd': d_prime}
+
+    def add_offset_to_plane_eqn_from_file(self, frame_name, ee_offset_file_path):
+        H = self.reachability_planes[frame_name]['H']
+        d_vec = self.reachability_planes[frame_name]['d']
+        torso_p_contact_offset = np.zeros((3,))
+        if ee_offset_file_path is not None:
+            with open(ee_offset_file_path, 'r') as f:
+                yml = YAML().load(f)
+                torso_p_contact_offset[0] = float(yml[frame_name]['x'])
+                torso_p_contact_offset[1] = float(yml[frame_name]['y'])
+                torso_p_contact_offset[2] = float(yml[frame_name]['z'])
+        d_prime = d_vec + H @ torso_p_contact_offset  # grab all the 'd' coefficients
+        return H, d_prime
+
+    @staticmethod
+    def extract_plane_eqn_from_coeffs(coeffs):
+        H = np.zeros((len(coeffs), 3))
+        d_vec = np.zeros((len(coeffs),))
+        i = 0
+        for h in coeffs:
+            H[i] = np.array([h['a'], h['b'], h['c']])
+            d_vec[i] = h['d']
+            i += 1
+        return H, d_vec
 
     def plan(self, p_init, p_term, T, alpha, der_init={}, der_term={}, verbose=True):
         S = self.safe_boxes

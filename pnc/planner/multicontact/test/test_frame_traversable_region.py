@@ -31,6 +31,8 @@ class TestFrameTraversableRegion(unittest.TestCase):
         self.lf_poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' + \
                                       self.lf_frame_name + '.yaml'
 
+        self.ee_offsets_path = cwd + '/pnc/reachability_map/output/draco3_ee_offsets.yaml'
+
     def get_draco3_default_initial_pose(self):
         q0 = np.zeros(35, )
         hip_yaw_angle = 5
@@ -292,6 +294,8 @@ class TestFrameTraversableRegion(unittest.TestCase):
             door_vis.loadViewerModel(rootNodeName="door")
             door_vis_q = self.get_navy_door_default_initial_pose()
             door_vis.display(door_vis_q)
+        else:
+            visualizer = None
 
         #
         # left foot
@@ -363,7 +367,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         T = 3
         alpha = [0, 0, 1]
         traversable_regions = [torso_traversable_region, lf_traversable_region, rf_traversable_region]
-        frame_planner = LocomanipulationFramePlanner(traversable_regions)
+        frame_planner = LocomanipulationFramePlanner(traversable_regions, self.ee_offsets_path)
         frame_planner.plan(p_init, p_end, T, alpha)
         frame_planner.plot(visualizer=visualizer)
 
