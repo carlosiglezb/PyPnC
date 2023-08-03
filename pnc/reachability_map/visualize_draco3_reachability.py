@@ -32,7 +32,7 @@ vis_q = pin.neutral(model)
 viz.display(vis_q)
 
 # Display Reachable spaces
-ee_list = ['LF', 'RF', 'LH', 'RH']
+ee_list = ['LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
 for ee_name in ee_list:
     meshPath = cwd + "/pnc/reachability_map/output/draco3_" + ee_name + ".stl"
     filename = os.path.join(meshPath)
@@ -66,7 +66,7 @@ for ee_name in ee_list:
         z_ulim = 1.0
         z_llim = -0.1
     else:
-        print('End effector is not part of list')
+        print(f'Frame {ee_name} does not have specified limits for plotting in matplotlib')
 
     with open(plane_eqn_path + filename, 'r') as f:
         yml = YAML().load(f)

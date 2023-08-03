@@ -60,9 +60,19 @@ q_llim, q_ulim = q_lims[:, 0],  q_lims[:, 1]
 # Loop to generate end effector points
 reach_space = OrderedDict()
 # ee_links = OrderedDict()
-end_effectors = ['LF', 'RF', 'LH', 'RH']
-end_effector_names = ['l_foot_contact', 'r_foot_contact',
+end_effectors = ['LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
+end_effector_names = ['l_foot_contact', 'r_foot_contact', 'l_knee_fe_ld', 'r_knee_fe_ld',
                       'l_hand_contact', 'r_hand_contact']
+connected_frames_list = []
+connected_frames_list.append(
+    {'parent_frame': 'l_knee_fe_ld',
+    'child_frame': 'l_foot_contact',
+    'length': 0.})    # <-- this will be computed and saved later
+connected_frames_list.append(
+    {'parent_frame': 'r_knee_fe_ld',
+    'child_frame': 'r_foot_contact',
+    'length': 0.})    # <-- this will be computed and saved later
+
 for ee in end_effectors:
     reach_space[ee] = np.zeros((N_samples, 3))      # [x,y,z] for all samples
 
@@ -142,4 +152,16 @@ for (ee_name, rs), contact_name in zip(reach_space.items(), end_effector_names):
 
 with open(save_loc + 'draco3_ee_offsets.yaml', 'w') as f:
     yaml.dump(p_ee_offsets_dict, f)
+
+# save auxiliary frames
+it = 0
+for con_frame in connected_frames_list:
+    parent_frame = con_frame['parent_frame']
+    child_frame = con_frame['child_frame']
+    offset = robot.get_link_iso(parent_frame)[:3, -1] - robot.get_link_iso(child_frame)[:3, -1]
+    connected_frames_list[it]['length'] = float(np.linalg.norm(offset))
+    it += 1
+
+with open(save_loc + 'draco3_aux_frames.yaml', 'w') as f:
+    yaml.dump(connected_frames_list, f)
 

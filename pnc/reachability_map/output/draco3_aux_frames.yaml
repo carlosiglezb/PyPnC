@@ -1,0 +1,6 @@
+- parent_frame: l_knee_fe_ld
+  child_frame: l_foot_contact
+  length: 0.32428632635527505
+- parent_frame: r_knee_fe_ld
+  child_frame: r_foot_contact
+  length: 0.32428651122271485
