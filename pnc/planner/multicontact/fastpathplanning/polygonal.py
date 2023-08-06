@@ -26,7 +26,7 @@ def solve_min_distance(B, box_seq, start, goal):
     return traj, length, solver_time
 
 
-def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal):
+def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames=None):
     stance_foot = 'LF'
 
     # Make copy of ee reachability region with only end effectors (e.g., excluding torso)
@@ -45,7 +45,7 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal):
 
     # we write the problem as
     # x = [p_torso^{(i)}, p_lfoot^{(i)}, p_rfoot^{(i)}] for all "i" curve points
-    x = cp.Variable((d*n_f*(num_boxes+1), ))
+    x = cp.Variable(d*n_f*(num_boxes+1))
 
     # frame start and goal locations in terms of optimization variables
     x_init, x_goal = [], []
@@ -69,8 +69,8 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal):
             box_idx += 1
         ee_idx += d
 
-    # Construct end-effector reachability constraints (initial point is specified)
-    H = np.zeros((N_planes*(num_boxes-1)*(n_ee-1), d*n_f*(num_boxes+1)))
+    # Construct end-effector reachability constraints (initial & final points specified)
+    H = np.zeros((N_planes*(num_boxes-1), d*n_f*(num_boxes+1)))
     d_vec = np.zeros((N_planes*(num_boxes-1)*(n_ee-1), ))
     for frame_name, _ in start.items():
         # get corresponding index
@@ -99,15 +99,52 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal):
 
     # add feasibility of end curve point? Perhaps since it depends on torso
 
+    # knee-to-foot fixed distance constraint TODO generalize
+    cost_shin_len = 0.
+    if aux_frames is not None:
+        A_soc = []
+        d_soc = []
+
+        d_i = cp.Parameter(pos=True)
+        for fr in aux_frames:
+            if fr['parent_frame'] == 'l_knee_fe_ld' and fr['child_frame'] == 'l_foot_contact':
+                foot_idx = np.array([3, 4, 5])
+                knee_idx = np.array([9, 10, 11])
+            elif fr['parent_frame'] == 'r_knee_fe_ld' and fr['child_frame'] == 'r_foot_contact':
+                foot_idx = np.array([6, 7, 8])
+                knee_idx = np.array([12, 13, 14])
+            else:
+                print(f"Error: length from {fr['parent_frame']} to {fr['child_frame']} does not exist")
+
+            d_i.value = fr['length']
+
+            # apply constraint to all interior curve points
+            for p in range(1, num_boxes):
+                A_j = np.zeros((3, x.shape[0]))     # (x,y,z) of current curve point
+                start_idx_ft = d*n_f*p + foot_idx
+                start_idx_kn = d*n_f*p + knee_idx
+                A_j[:, start_idx_ft] = np.eye(3)
+                A_j[:, start_idx_kn] = -np.eye(3)
+                d_j = d_i.value * np.ones(d)
+                A_soc.append(A_j)
+                d_soc.append(d_j)
+
+        # write this as a cost term, instead? otherwise we just have inequality
+        soc_constraint = []
+        for Ai, di in zip(A_soc, d_soc):
+            soc_constraint.append(cp.SOC(di[0], Ai @ x))
+    else:
+        soc_constraint = []
+
     cost = cp.sum(cp.norm(x[d*n_f:] - x[:-d*n_f], 2))
 
     constr = [x[:d*n_f] == x_init,
               x[d*n_f:-d*n_f] >= l,     # safe, collision-free boxes (lower limit)
               x[d*n_f:-d*n_f] <= u,     # safe, collision-free boxes (upper limit)
-              H @ x <= -d_vec,          # non-stance frame remains reachable
+              # H @ x <= -d_vec,          # non-stance frame remains reachable
               x[-d*n_f:] == x_goal]
 
-    prob = cp.Problem(cp.Minimize(cost), constr)
+    prob = cp.Problem(cp.Minimize(cost), constr + soc_constraint)
     prob.solve(solver='CLARABEL')
 
     length = prob.value
@@ -192,7 +229,8 @@ def iterative_planner(B, start, goal, box_seq, verbose=True, tol=1e-5, **kwargs)
             return list(box_seq), traj, length, solver_time
 
 
-def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=True, tol=1e-5, **kwargs):
+def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=True,
+                               aux_frames=None, tol=1e-5, **kwargs):
 
     if verbose:
         init_log()
@@ -205,7 +243,8 @@ def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=
 
         for frame, bs in box_seq.items():
             box_seq[frame] = jump_box_repetitions(np.array(bs))
-        traj, length, solver_time_i = solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, **kwargs)
+        traj, length, solver_time_i = solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal,
+                                                               aux_frames, **kwargs)
         solver_time += solver_time_i
 
         # TODO: from here on, deal with each end effector separately

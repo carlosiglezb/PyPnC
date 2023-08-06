@@ -60,7 +60,8 @@ def plan(S, p_init, p_term, T, alpha, der_init={}, der_term={}, verbose=True):
     return path
 
 
-def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={}, verbose=True):
+def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
+                  verbose=True, A=None):
 
     if verbose:
         print('Polygonal phase:')
@@ -73,7 +74,8 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={}, verb
             print('Infeasible safe problem, initial and terminal points are disconnected.')
             return
 
-    box_seq, traj, length, solver_time = iterative_planner_multiple(S, R, p_init, p_term, box_seq, verbose)
+    box_seq, traj, length, solver_time = iterative_planner_multiple(S, R, p_init, p_term,
+                                                        box_seq, verbose, A)
 
     if verbose:
         print('\nSmooth phase:')

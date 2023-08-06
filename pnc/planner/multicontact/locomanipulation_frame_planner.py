@@ -10,7 +10,8 @@ from ruamel.yaml import YAML
 
 class LocomanipulationFramePlanner:
     def __init__(self, traversable_regions_list, ee_offset_file_path,
-                 starting_stance_foot='LF'):
+                 starting_stance_foot='LF',
+                 aux_frames_path=None):
 
         self.safe_boxes = OrderedDict()
         self.reachability_planes = OrderedDict()
@@ -32,6 +33,11 @@ class LocomanipulationFramePlanner:
         H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path)
         self.reachability_planes['torso'] = {'H': H, 'd': d_prime}
 
+        # auxiliary frames associated to one of the above initialized reachable regions
+        if aux_frames_path is not None:
+            self.aux_frames = self.add_fixed_distance_between_points(aux_frames_path)
+        else:
+            self.aux_frames = aux_frames_path
     def add_offset_to_plane_eqn_from_file(self, frame_name, ee_offset_file_path):
         H = self.reachability_planes[frame_name]['H']
         d_vec = self.reachability_planes[frame_name]['d']
@@ -45,16 +51,33 @@ class LocomanipulationFramePlanner:
         d_prime = d_vec + H @ torso_p_contact_offset  # grab all the 'd' coefficients
         return H, d_prime
 
+    # def add_reachable_frame_constraint(self, frame_name, associated_traversable_region):
+    #     new_frame_constr = {'name': frame_name,
+    #                         'constrained_to': associated_traversable_region}
+    #     self.aux_frames.append(new_frame_constr)
+
     def plan(self, p_init, p_term, T, alpha, der_init={}, der_term={}, verbose=True):
         S = self.safe_boxes
         R = self.reachability_planes
-        self.path = fpp.plan_multiple(S, R, p_init, p_term, T, alpha, der_init, der_term, verbose)
+        A = self.aux_frames
+        self.path = fpp.plan_multiple(S, R, p_init, p_term, T, alpha, der_init,
+                                      der_term, verbose, A)
 
     def plot(self, visualizer):
 
         for frame in self.frame_names:
             bezier_curve = self.path[frame]
             self.visualize_bezier_points(visualizer, frame, bezier_curve)
+
+    @staticmethod
+    def add_fixed_distance_between_points(path):
+        aux_frames = []
+        with open(path, 'r') as f:
+            yml = YAML().load(f)
+            for fr in range(len(yml)):
+                aux_frames.append(yml[fr])
+
+        return aux_frames
 
     @staticmethod
     def visualize_bezier_points(visualizer, frame, bezier_curve):

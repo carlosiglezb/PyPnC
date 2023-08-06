@@ -31,7 +31,21 @@ class TestFrameTraversableRegion(unittest.TestCase):
         self.lf_poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' + \
                                       self.lf_frame_name + '.yaml'
 
+        self.lknee_frame_name = 'L_knee'
+        self.lknee_frame_stl_path = cwd + '/pnc/reachability_map/output/draco3_' + \
+                                 self.lknee_frame_name + '.stl'
+        self.lknee_poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' + \
+                                      self.lknee_frame_name + '.yaml'
+
+        self.rknee_frame_name = 'R_knee'
+        self.rknee_frame_stl_path = cwd + '/pnc/reachability_map/output/draco3_' + \
+                                 self.rknee_frame_name + '.stl'
+        self.rknee_poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' + \
+                                      self.rknee_frame_name + '.yaml'
+
         self.ee_offsets_path = cwd + '/pnc/reachability_map/output/draco3_ee_offsets.yaml'
+
+        self.aux_frames_path = cwd + '/pnc/reachability_map/output/draco3_aux_frames.yaml'
 
     def get_draco3_default_initial_pose(self):
         q0 = np.zeros(35, )
@@ -161,12 +175,12 @@ class TestFrameTraversableRegion(unittest.TestCase):
         U_lf = np.array([
             [0.25, 0.35, 0.6],  # z stops at kin. limit
             [0.6, 0.4, 0.6],  # x stops at kin. limit
-            [0.6, 0.4, 0.6]  # x stops at kin. limit
+            [0.8, 0.4, 0.6]  # x stops at kin. limit
         ])
         U_rf = np.array([
             [0.25, 0.0, 0.6],  # prevent leg-crossing
             [0.6, 0.0, 0.6],  # prevent leg-crossing
-            [0.6, 0.0, 0.6]  # prevent leg-crossing
+            [0.8, 0.0, 0.6]  # prevent leg-crossing
         ])
         U_lh = np.array([
             [0.25, 0.4, 1.3],  # prevent leg-crossing
@@ -262,7 +276,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         test_region.load_collision_free_boxes(box_llim[1], box_ulim[1])
 
     def test_visualize_navy_door_paths(self):
-        b_visualize = True
+        b_visualize = False
         # load robot
         rob_model, rob_collision_model, rob_visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
@@ -319,6 +333,29 @@ class TestFrameTraversableRegion(unittest.TestCase):
         lf_traversable_region.load_collision_free_boxes(box_llim[1], box_ulim[1])
 
         #
+        # left knee
+        #
+        R = util.util.euler_to_rot([0., np.pi/6, 0.])
+        lknee_lf_offset = R @ np.array([0., -0.00599, 0.324231]) # rotate by 30deg about y
+        lknee_init = lf_init + lknee_lf_offset   # TODO: use fwd kin
+        lknee_end = lf_end + lknee_lf_offset
+        lknee_traversable_region = FrameTraversableRegion(self.lknee_frame_name,
+                                                       self.lknee_frame_stl_path,
+                                                       self.lknee_poly_halfspace_path,
+                                                       b_visualize_reach=b_visualize,
+                                                       b_visualize_safe=b_visualize,
+                                                       visualizer=visualizer)
+        self.assertEqual(True, True)
+
+        # move to standing height
+        standing_pos = vis_q[:3]
+        lknee_traversable_region.update_origin_pose(standing_pos)
+        self.assertEqual(True, True)
+
+        # collision-free boxes (same as LF)
+        lknee_traversable_region.load_collision_free_boxes(box_llim[1], box_ulim[1])
+
+        #
         # right foot
         #
         rf_init = np.array([0.06, -0.14, 0.])   # TODO: use fwd kin
@@ -340,6 +377,28 @@ class TestFrameTraversableRegion(unittest.TestCase):
         rf_traversable_region.load_collision_free_boxes(box_llim[2], box_ulim[2])
 
         #
+        # right knee
+        #
+        rknee_rf_offset = R @ np.array([0., 0.006, 0.324231])
+        rknee_init = rf_init + rknee_rf_offset   # TODO: use fwd kin
+        rknee_end = rf_end + rknee_rf_offset
+        rknee_traversable_region = FrameTraversableRegion(self.rknee_frame_name,
+                                                       self.rknee_frame_stl_path,
+                                                       self.rknee_poly_halfspace_path,
+                                                       b_visualize_reach=b_visualize,
+                                                       b_visualize_safe=b_visualize,
+                                                       visualizer=visualizer)
+        self.assertEqual(True, True)
+
+        # move to standing height
+        standing_pos = vis_q[:3]
+        rknee_traversable_region.update_origin_pose(standing_pos)
+        self.assertEqual(True, True)
+
+        # collision-free boxes (same as LF)
+        rknee_traversable_region.load_collision_free_boxes(box_llim[2], box_ulim[2])
+
+        #
         # torso
         #
         torso_init = standing_pos
@@ -359,17 +418,33 @@ class TestFrameTraversableRegion(unittest.TestCase):
         p_init[torso_traversable_region._frame_name] = torso_init
         p_init[lf_traversable_region._frame_name] = lf_init
         p_init[rf_traversable_region._frame_name] = rf_init
+        p_init[lknee_traversable_region._frame_name] = lknee_init
+        p_init[rknee_traversable_region._frame_name] = rknee_init
 
         p_end = OrderedDict()
         p_end[torso_traversable_region._frame_name] = torso_end
         p_end[lf_traversable_region._frame_name] = lf_end
         p_end[rf_traversable_region._frame_name] = rf_end
+        p_end[lknee_traversable_region._frame_name] = lknee_end
+        p_end[rknee_traversable_region._frame_name] = rknee_end
         T = 3
         alpha = [0, 0, 1]
-        traversable_regions = [torso_traversable_region, lf_traversable_region, rf_traversable_region]
-        frame_planner = LocomanipulationFramePlanner(traversable_regions, self.ee_offsets_path)
+        traversable_regions = [torso_traversable_region,
+                               lf_traversable_region,
+                               rf_traversable_region,
+                               lknee_traversable_region,
+                               rknee_traversable_region]
+        frame_planner = LocomanipulationFramePlanner(traversable_regions,
+                                                     self.ee_offsets_path,
+                                                     aux_frames_path=self.aux_frames_path)
         frame_planner.plan(p_init, p_end, T, alpha)
         frame_planner.plot(visualizer=visualizer)
+        self.assertEqual(True, True)
+
+        # add auxiliary collision-free frames
+        # aux_frame = 'R_knee'
+        # aux_frame_region = 'RF'
+        # frame_planner.add_reachable_frame_constraint(aux_frame, aux_frame_region)
 
 
 if __name__ == '__main__':
