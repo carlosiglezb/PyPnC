@@ -294,7 +294,7 @@ def retiming(kappa, costs, durations, retiming_weights, **kwargs):
         constr.append(eta[1:] - eta[:-1] <= kappa)
         constr.append(eta[:-1] - eta[1:] <= kappa)
         
-    # Solve SOCP and get new durarations.
+    # Solve SOCP and get new durations.
     prob = cp.Problem(cp.Minimize(cost), constr)
     prob.solve(solver='CLARABEL')
     new_durations = np.multiply(eta.value, durations)
