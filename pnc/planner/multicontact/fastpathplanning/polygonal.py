@@ -47,7 +47,7 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
     # x = [p_torso^{(i)}, p_lfoot^{(i)}, p_rfoot^{(i)}, p_lknee^{(i)}, p_rknee^{(i)}, ... , t^{(i)}]
     # containing all "i" curve points + auxiliary variables t^(i) that assimilate constant shin
     # lengths in paths for each leg
-    x = cp.Variable(d * n_f * (num_boxes + 1) + 2 * (num_boxes - 1))
+    x = cp.Variable(d * n_f * (num_boxes + 1))
 
     # frame start and goal locations in terms of optimization variables
     x_init, x_goal = [], []
@@ -58,7 +58,7 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
 
     # organize lower and upper state limits
     l = np.zeros((d * n_f * (num_boxes - 1),))
-    u = np.zeros((d * n_f * (num_boxes - 1) + 2 * (num_boxes - 1),))
+    u = np.zeros((d * n_f * (num_boxes - 1),))
     ee_idx = 0
     for frame, ee_box in safe_boxes.items():
         boxes = [ee_box.B.boxes[i] for i in box_seq[frame]]
@@ -102,13 +102,11 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
     # add feasibility of end curve point? Perhaps since it depends on torso
 
     # knee-to-foot fixed distance constraint TODO generalize
-    cost_shin_len = 0.
     if aux_frames is not None:
         A_soc = []
-        c_soc = []
 
         d_i = cp.Parameter(pos=True)
-        w_i = cp.Parameter(pos=True, value=20.)
+        w_i = cp.Parameter(pos=True, value=1.)
         fr_idx = 0
         for fr in aux_frames:
             if fr['parent_frame'] == 'l_knee_fe_ld' and fr['child_frame'] == 'l_foot_contact':
@@ -125,40 +123,31 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
             # apply constraint to all interior curve points
             for p in range(1, num_boxes):
                 A_j = np.zeros((3, x.shape[0]))  # (x,y,z) of current curve point
-                c_j = np.zeros((x.shape[0]))
                 start_idx_ft = d * n_f * p + foot_idx
                 start_idx_kn = d * n_f * p + knee_idx
                 A_j[:, start_idx_ft] = np.eye(3)
                 A_j[:, start_idx_kn] = -np.eye(3)
-                c_j[-2*(num_boxes-1) - 2 + (2 * fr_idx) + (p + 1)] = -1.
-                # d_j = d_i.value * np.ones(d)
                 A_soc.append(A_j)
-                c_soc.append(c_j)
-                # d_soc.append(d_j)
 
             fr_idx += 1
 
-        # upper and lower limits of t_{lshin}^(i), t_{rshin}^(i)
-        u[-2 * (num_boxes - 1):] = -d_i.value
-        # l[-2*(num_boxes-1):] = -2*d_i.value**2
-
         # write this as a cost term, instead? otherwise we just have inequality
         soc_constraint = []
-        for Ai, ci in zip(A_soc, c_soc):
-            soc_constraint.append(cp.SOC(ci.T @ x, Ai @ x))
+        cost_log_abs_list = []
+        for Ai in A_soc:
+            soc_constraint.append(cp.SOC(d_i, Ai @ x))
+            cost_log_abs_list.append(cp.log_det(cp.diag(Ai @ x)))
     else:
         soc_constraint = []
 
-    cost_log_abs = -(cp.sum(cp.log(-w_i * x[-2 * (num_boxes - 1):])))
-    cost = cp.sum(cp.norm(x[d * n_f:-2 * (num_boxes - 1)] - x[:-d * n_f - 2 * (num_boxes - 1)], 2)) + cost_log_abs
+    cost_log_abs = -w_i*(cp.sum(cost_log_abs_list))
+    cost = cp.sum(cp.norm(x[d * n_f:] - x[:-d * n_f], 2)) + cost_log_abs
 
     constr = [x[:d * n_f] == x_init,
-              x[d * n_f:-d * n_f - 2 * (num_boxes - 1)] >= l,  # safe, collision-free boxes (lower limit)
-              x[d * n_f:-d * n_f - 2 * (num_boxes - 1)] <= u[:-2 * (num_boxes - 1)],
-              # safe, collision-free boxes (upper limit)
-              # H @ x <= -d_vec,          # non-stance frame remains reachable
-              x[-2 * (num_boxes - 1):] <= u[-2 * (num_boxes - 1):],
-              x[-d * n_f - 2 * (num_boxes - 1):-2 * (num_boxes - 1)] == x_goal]
+              x[d * n_f:-d * n_f] >= l,     # safe, collision-free boxes (lower limit)
+              x[d * n_f:-d * n_f] <= u,     # safe, collision-free boxes (upper limit)
+              # H @ x <= -d_vec,            # non-stance frame remains reachable
+              x[-d * n_f:] == x_goal]
 
     prob = cp.Problem(cp.Minimize(cost), constr + soc_constraint)
     prob.solve(solver='SCS')
@@ -171,8 +160,12 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
     for Ai in A_soc:
         opt_shin_len_err = np.linalg.norm(Ai @ traj) - d_i.value
         print(f"Shin length discrepancy: {opt_shin_len_err}")
+        ft_idx = np.where(Ai[0] == 1)[0][0]
+        kn_idx = np.where(Ai[0] == -1)[0][0]
+        print(f"Optimized LF points: {traj[ft_idx:ft_idx+d]}")
+        print(f"Optimized LKnee points: {traj[kn_idx:kn_idx+d]}")
 
-    return traj[:-2 * (num_boxes - 1)], length, solver_time
+    return traj, length, solver_time
 
 
 def log(s1, size=10):
@@ -317,8 +310,7 @@ def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=
                 print(f'Polygonal phase terminated in {n_iters} iterations')
                 print(f'Final length is ' + '{:.3e}'.format(length))
                 print(f'Solver time was {np.round(solver_time, 5)}')
-                # if frame == 'RF':
-                return box_seq, traj, length, solver_time
+            return box_seq, traj, length, solver_time
 
 
 def merge_overlaps(box_seq, traj, tol):
