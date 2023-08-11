@@ -3,7 +3,7 @@ from collections import OrderedDict
 import numpy as np
 from pnc.planner.multicontact.fastpathplanning.boxes import Box, BoxCollection
 from pnc.planner.multicontact.fastpathplanning.polygonal import iterative_planner, iterative_planner_multiple
-from pnc.planner.multicontact.fastpathplanning.smooth import optimize_bezier_with_retiming
+from pnc.planner.multicontact.fastpathplanning.smooth import optimize_bezier_with_retiming, optimize_multiple_bezier_with_retiming
 
 class SafeSet:
 
@@ -81,18 +81,10 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
         print('\nSmooth phase:')
 
     # Fix box sequence.
-    ee_idx = 0
-    path, sol_stats = OrderedDict(), OrderedDict()
+    durations = {}
     for frame, i in box_seq.items():
-        L = np.array([S[frame].B.boxes[i[j]].l for j in i])
-        U = np.array([S[frame].B.boxes[i[j]].u for j in i])
-
         # Cost coefficients.
         alpha = {i + 1: ai for i, ai in enumerate(alpha)}
-
-        # Boundary conditions.
-        initial = {0: p_init[frame]} | der_init
-        final = {0: p_term[frame]} | der_term
 
         # Initialize transition times.
         num_boxes = len(i)
@@ -107,9 +99,9 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
                 ee_traj_idx = np.vstack((ee_traj_idx, (np.linspace(frame_idx+b*d*n_f, frame_idx+d*(b*n_f+1)-1, d)).astype(int)))
 
         ee_traj_change = traj[ee_traj_idx[1:]]-traj[ee_traj_idx[:-1]]
-        durations = np.linalg.norm(ee_traj_change, axis=1)
-        durations *= T / sum(durations)
+        durations[frame] = np.linalg.norm(ee_traj_change, axis=1)
+        durations[frame] *= T / sum(durations[frame])
 
-        path[frame], sol_stats[frame] = optimize_bezier_with_retiming(L, U, durations, alpha, initial, final, verbose=True)
+    path, sol_stats = optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, p_init, p_term, verbose=True)
 
     return path

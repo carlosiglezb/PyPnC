@@ -270,6 +270,141 @@ def optimize_bezier(L, U, durations, alpha, initial, final,
     return path, sol_stats
 
 
+def optimize_multiple_bezier(R, A, L, U, durations, alpha, initial, final,
+    n_points=None, **kwargs):
+
+    # number of frames
+    n_frames = len(R)
+
+    # Problem size. Assume for now same number of boxes for all frames
+    n_boxes, d = L[next(iter(L))].shape
+    D = max(alpha)
+
+    # Uncomment below when/if method with derivative inputs is implemented
+    # assert max(initial) <= D
+    # assert max(final) <= D
+
+    if n_points is None:
+        n_points = (D + 1) * 2
+
+    # Control points of the curves and their derivatives.
+    points = {}
+    for k in range(n_boxes * n_frames):
+        points[k] = {}
+        for i in range(D + 1):
+            size = (n_points - i, d)
+            points[k][i] = cp.Variable(size)
+
+    # Boundary conditions for all frames
+    constraints = []
+    for i, fr in zip(range(n_frames), initial.keys()):
+        # only position is provided, hence second entry is zero
+        constraints.append(points[n_boxes * i][0][0] == initial[fr])        # initial position
+        constraints.append(points[n_boxes * (i+1) - 1][0][-1] == final[fr]) # final position
+
+    # Loop through boxes.
+    cost = 0
+    continuity = {}
+    frame_list = list(initial.keys())
+    frame_idx, k_fr_box = 0, 0
+    frame_name = frame_list[frame_idx]
+    for k in range(n_boxes * n_frames):
+        continuity[k] = {}
+
+        # move on to next frame after n_boxes for each frame
+        if k != 0 and (k % n_boxes * n_frames) == 0:
+            frame_idx += 1
+            frame_name = frame_list[frame_idx]
+            k_fr_box = 0
+
+        # Box containment.
+        Lk = np.array([L[frame_name][k_fr_box]] * n_points)
+        Uk = np.array([U[frame_name][k_fr_box]] * n_points)
+        constraints.append(points[k][0] >= Lk)
+        constraints.append(points[k][0] <= Uk)
+
+        # Bezier dynamics.
+        for i in range(D):
+            h = n_points - i - 1
+            ci = durations[frame_name][k_fr_box] / h
+            constraints.append(points[k][i][1:] - points[k][i][:-1] == ci * points[k][i + 1])
+
+        # Continuity and differentiability.
+        if k_fr_box < n_boxes - 1:
+            for i in range(D + 1):
+                constraints.append(points[k][i][-1] == points[k + 1][i][0])
+                if i > 0:
+                    continuity[k][i] = constraints[-1]
+
+        # TODO add upper limit on distance for rigid links (e.g., shin link length) enforced
+        # either at end points or at all points
+
+        # Cost function. TODO add log terms to promote rigid link distance
+        for i, ai in alpha.items():
+            h = n_points - 1 - i
+            A = np.zeros((h + 1, h + 1))
+            for m in range(h + 1):
+                for n in range(h + 1):
+                    A[m, n] = binom(h, m) * binom(h, n) / binom(2 * h, m + n)
+            A *= durations[frame_name][k_fr_box] / (2 * h + 1)
+            A = np.kron(A, np.eye(d))
+            p = cp.vec(points[k][i], order='C')
+            cost += ai * cp.quad_form(p, A)
+        k_fr_box += 1
+
+    # Solve problem.
+    prob = cp.Problem(cp.Minimize(cost), constraints)
+    prob.solve(solver='CLARABEL')
+
+    # Reconstruct trajectory.
+    beziers = []
+    a = 0
+    k_fr_box, frame_idx = 0, 0
+    for k in range(n_boxes * n_frames):
+
+        # move on to next frame after n_boxes for each frame
+        if k != 0 and (k % n_boxes * n_frames) == 0:
+            frame_idx += 1
+            frame_name = frame_list[frame_idx]
+            k_fr_box = 0
+
+        b = a + durations[frame_name][k_fr_box]
+        beziers.append(BezierCurve(points[k][0].value, a, b))
+        a = b
+    path = CompositeBezierCurve(beziers)
+
+    retiming_weights = {}
+    n_box_counter = 0
+    for k in range(n_boxes * n_frames - 1):
+        retiming_weights[k] = {}
+        if k == 0 or k % ((n_boxes - 1) + n_box_counter * n_boxes) != 0:
+            for i in range(1, D + 1):
+                primal = points[k][i][-1].value
+                dual = continuity[k][i].dual_value
+                retiming_weights[k][i] = primal.dot(dual)
+        else:
+            n_box_counter += 1
+
+    # Reconstruct costs.
+    cost_breakdown = {}
+    for k in range(n_boxes * n_frames):
+        cost_breakdown[k] = {}
+        bez = beziers[k]
+        for i in range(1, D + 1):
+            bez = bez.derivative()
+            if i in alpha:
+                cost_breakdown[k][i] = alpha[i] * bez.l2_squared()
+
+    # Solution statistics.
+    sol_stats = {}
+    sol_stats['cost'] = prob.value
+    sol_stats['runtime'] = prob.solver_stats.solve_time
+    sol_stats['cost_breakdown'] = cost_breakdown
+    sol_stats['retiming_weights'] = retiming_weights
+
+    return path, sol_stats
+
+
 def retiming(kappa, costs, durations, retiming_weights, **kwargs):
 
     # Decision variables.
@@ -402,4 +537,94 @@ def optimize_bezier_with_retiming(L, U, durations, alpha, initial, final,
     sol_stats['retiming_runtimes'] = retiming_runtimes
     sol_stats['runtime'] = runtime
     
+    return path, sol_stats
+
+
+def optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, initial, final,
+    omega=3, kappa_min=1e-2, verbose=False, **kwargs):
+
+    L, U = {}, {}
+    for frame, i in box_seq.items():
+        L[frame] = np.array([S[frame].B.boxes[i[j]].l for j in i])
+        U[frame] = np.array([S[frame].B.boxes[i[j]].u for j in i])
+
+        # Boundary conditions.
+        # initial = {0: initial[frame]}
+        # final = {0: final[frame]}
+
+    # Solve initial Bezier problem.
+    # path, sol_stats = optimize_bezier(L[frame], U[frame], durations[frame], alpha, initial[frame], final[frame], **kwargs)
+    path, sol_stats = optimize_multiple_bezier(R, A, L, U, durations, alpha, initial, final, **kwargs)
+    cost = sol_stats['cost']
+    cost_breakdown = sol_stats['cost_breakdown']
+    retiming_weights = sol_stats['retiming_weights']
+
+    if verbose:
+        init_log()
+        update_log(0, cost, np.nan, np.inf, True)
+
+    # Lists to populate.
+    costs = [cost]
+    paths = [path]
+    durations_iter = [durations]
+    bez_runtimes = [sol_stats['runtime']]
+    retiming_runtimes = []
+
+    # Iterate retiming and Bezier.
+    kappa = 1
+    n_iters = 0
+    i = 1
+    while True:
+        n_iters += 1
+
+        # Retime.
+        new_durations, runtime, kappa_max = retiming(kappa, cost_breakdown,
+            durations, retiming_weights, **kwargs)
+        durations_iter.append(new_durations)
+        retiming_runtimes.append(runtime)
+
+        # Improve Bezier curves.
+        path_new, sol_stats = optimize_multiple_bezier(R, A, L, U, new_durations,
+            alpha, initial, final, **kwargs)
+        cost_new = sol_stats['cost']
+        costs.append(cost_new)
+        paths.append(path_new)
+        bez_runtimes.append(sol_stats['runtime'])
+
+        decr = cost_new - cost
+        accept = decr < 0
+        if verbose:
+            update_log(i, cost_new, decr, kappa, accept)
+
+        # If retiming improved the trajectory.
+        if accept:
+            durations = new_durations
+            path = path_new
+            cost = cost_new
+            cost_breakdown = sol_stats['cost_breakdown']
+            retiming_weights = sol_stats['retiming_weights']
+
+        if kappa < kappa_min:
+            break
+        kappa = kappa_max / omega
+        i += 1
+
+    runtime = sum(bez_runtimes) + sum(retiming_runtimes)
+    if verbose:
+        term_log()
+        print(f'Smooth phase terminated in {i} iterations')
+        print(f'Final cost is ' + '{:.3e}'.format(cost))
+        print(f'Solver time was {np.round(runtime, 5)}')
+
+    # Solution statistics.
+    sol_stats = {}
+    sol_stats['cost'] = cost
+    sol_stats['n_iters'] = n_iters
+    sol_stats['costs'] = costs
+    sol_stats['paths'] = paths
+    sol_stats['durations_iter'] = durations_iter
+    sol_stats['bez_runtimes'] = bez_runtimes
+    sol_stats['retiming_runtimes'] = retiming_runtimes
+    sol_stats['runtime'] = runtime
+
     return path, sol_stats
