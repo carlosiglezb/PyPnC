@@ -38,6 +38,8 @@ class LocomanipulationFramePlanner:
             self.aux_frames = self.add_fixed_distance_between_points(aux_frames_path)
         else:
             self.aux_frames = aux_frames_path
+
+
     def add_offset_to_plane_eqn_from_file(self, frame_name, ee_offset_file_path):
         H = self.reachability_planes[frame_name]['H']
         d_vec = self.reachability_planes[frame_name]['d']
@@ -65,9 +67,11 @@ class LocomanipulationFramePlanner:
 
     def plot(self, visualizer):
 
-        for frame in self.frame_names:
-            bezier_curve = self.path[frame]
-            self.visualize_bezier_points(visualizer, frame, bezier_curve)
+        bezier_curve = self.path
+        self.visualize_bezier_points(visualizer, 'LF', bezier_curve)
+        # for frame in self.frame_names:
+        #     bezier_curve = self.path[frame]
+        #     self.visualize_bezier_points(visualizer, frame, bezier_curve)
 
     @staticmethod
     def add_fixed_distance_between_points(path):

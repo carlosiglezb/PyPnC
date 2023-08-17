@@ -5,6 +5,8 @@ from itertools import accumulate
 from bisect import bisect
 from scipy.special import binom
 
+from pnc.planner.multicontact.cvx_mfpp_tools import create_cvx_norm_eq_relaxation
+
 
 def solve_min_distance(B, box_seq, start, goal):
     x = cp.Variable((len(box_seq) + 1, B.d))
@@ -101,46 +103,14 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
 
     # add feasibility of end curve point? Perhaps since it depends on torso
 
-    # knee-to-foot fixed distance constraint TODO generalize
+    # knee-to-foot fixed distance constraint
     if aux_frames is not None:
-        A_soc = []
-
-        d_i = cp.Parameter(pos=True)
-        w_i = cp.Parameter(pos=True, value=1.)
-        fr_idx = 0
-        for fr in aux_frames:
-            if fr['parent_frame'] == 'l_knee_fe_ld' and fr['child_frame'] == 'l_foot_contact':
-                foot_idx = np.array([3, 4, 5])
-                knee_idx = np.array([9, 10, 11])
-            elif fr['parent_frame'] == 'r_knee_fe_ld' and fr['child_frame'] == 'r_foot_contact':
-                foot_idx = np.array([6, 7, 8])
-                knee_idx = np.array([12, 13, 14])
-            else:
-                print(f"Error: length from {fr['parent_frame']} to {fr['child_frame']} does not exist")
-
-            d_i.value = fr['length']
-
-            # apply constraint to all interior curve points
-            for p in range(1, num_boxes):
-                A_j = np.zeros((3, x.shape[0]))  # (x,y,z) of current curve point
-                start_idx_ft = d * n_f * p + foot_idx
-                start_idx_kn = d * n_f * p + knee_idx
-                A_j[:, start_idx_ft] = np.eye(3)
-                A_j[:, start_idx_kn] = -np.eye(3)
-                A_soc.append(A_j)
-
-            fr_idx += 1
-
-        # write this as a cost term, instead? otherwise we just have inequality
-        soc_constraint = []
-        cost_log_abs_list = []
-        for Ai in A_soc:
-            soc_constraint.append(cp.SOC(d_i, Ai @ x))
-            cost_log_abs_list.append(cp.log_det(cp.diag(Ai @ x)))
+        cost_log_abs, soc_constraint, A_soc = create_cvx_norm_eq_relaxation(
+                                                        aux_frames, num_boxes, d*n_f, x)
     else:
         soc_constraint = []
+        cost_log_abs = 0.
 
-    cost_log_abs = -w_i*(cp.sum(cost_log_abs_list))
     cost = cp.sum(cp.norm(x[d * n_f:] - x[:-d * n_f], 2)) + cost_log_abs
 
     constr = [x[:d * n_f] == x_init,
@@ -158,7 +128,7 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
 
     # check distance of knee and foot points at each curve point
     for Ai in A_soc:
-        opt_shin_len_err = np.linalg.norm(Ai @ traj) - d_i.value
+        opt_shin_len_err = np.linalg.norm(Ai @ traj) - 0.32428632635527505
         print(f"Shin length discrepancy: {opt_shin_len_err}")
         ft_idx = np.where(Ai[0] == 1)[0][0]
         kn_idx = np.where(Ai[0] == -1)[0][0]

@@ -5,6 +5,9 @@ from itertools import accumulate
 from bisect import bisect
 from scipy.special import binom
 
+from pnc.planner.multicontact.cvx_mfpp_tools import create_cvx_norm_eq_relaxation, create_bezier_cvx_norm_eq_relaxation
+
+
 class BezierCurve:
 
     def __init__(self, points, a=0, b=1):
@@ -270,7 +273,7 @@ def optimize_bezier(L, U, durations, alpha, initial, final,
     return path, sol_stats
 
 
-def optimize_multiple_bezier(R, A, L, U, durations, alpha, initial, final,
+def optimize_multiple_bezier(R, aux_frames, L, U, durations, alpha, initial, final,
     n_points=None, **kwargs):
 
     # number of frames
@@ -336,10 +339,7 @@ def optimize_multiple_bezier(R, A, L, U, durations, alpha, initial, final,
                 if i > 0:
                     continuity[k][i] = constraints[-1]
 
-        # TODO add upper limit on distance for rigid links (e.g., shin link length) enforced
-        # either at end points or at all points
-
-        # Cost function. TODO add log terms to promote rigid link distance
+        # Cost function
         for i, ai in alpha.items():
             h = n_points - 1 - i
             A = np.zeros((h + 1, h + 1))
@@ -352,9 +352,56 @@ def optimize_multiple_bezier(R, A, L, U, durations, alpha, initial, final,
             cost += ai * cp.quad_form(p, A)
         k_fr_box += 1
 
+    # WIP: adding upper limit on distance for rigid links (e.g., shin link length) enforced
+    # either at end points or at all points
+    soc_constraint, cost_log_abs = [], []
+    if aux_frames is not None:
+        prox_fr_idx, dist_fr_idx = 0, 0
+        for aux_fr in aux_frames:
+            if aux_fr['parent_frame'] == 'l_knee_fe_ld':
+                prox_fr_idx = int(3 * n_boxes)
+                dist_fr_idx = int(1 * n_boxes)
+            elif aux_fr['parent_frame'] == 'r_knee_fe_ld':
+                prox_fr_idx = int(4 * n_boxes)
+                dist_fr_idx = int(2 * n_boxes)
+            else:
+                print(f'Parent frame index for bezier smoothing unknown')
+            link_length = aux_fr['length']
+
+            # loop through all safe boxes
+            for nb in range(1, n_boxes):
+                for pnt in range(n_points-1):
+                    link_proximal_point = points[prox_fr_idx+nb][0][pnt]
+                    link_distal_point = points[dist_fr_idx+nb][0][pnt]
+                    create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
+                                             link_distal_point, soc_constraint, cost_log_abs)
+
+                    # knee should mostly be above the foot
+                    soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
+
+            # apply constraint only to first and last bezier points
+            # link_proximal_point = points[prox_fr_idx+1][0][0]
+            # link_distal_point = points[dist_fr_idx+1][0][0]
+            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
+            #                                      link_distal_point, soc_constraint, cost_log_abs)
+            # link_proximal_point = points[prox_fr_idx+1][0][7]
+            # link_distal_point = points[dist_fr_idx+1][0][7]
+            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
+            #                                      link_distal_point, soc_constraint, cost_log_abs)
+            # link_proximal_point = points[prox_fr_idx+2][0][1]
+            # link_distal_point = points[dist_fr_idx+2][0][1]
+            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
+            #                                      link_distal_point, soc_constraint, cost_log_abs)
+            # link_proximal_point = points[prox_fr_idx+2][0][6]
+            # link_distal_point = points[dist_fr_idx+2][0][6]
+            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
+            #                                      link_distal_point, soc_constraint, cost_log_abs)
+
+        cost_log_abs_sum = -(cp.sum(cost_log_abs))
+
     # Solve problem.
-    prob = cp.Problem(cp.Minimize(cost), constraints)
-    prob.solve(solver='CLARABEL')
+    prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
+    prob.solve(solver='SCS', eps_abs=1e-3, eps_rel=1e-3, verbose=True)
 
     # Reconstruct trajectory.
     beziers = []
@@ -574,40 +621,40 @@ def optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, i
     kappa = 1
     n_iters = 0
     i = 1
-    while True:
-        n_iters += 1
-
-        # Retime.
-        new_durations, runtime, kappa_max = retiming(kappa, cost_breakdown,
-            durations, retiming_weights, **kwargs)
-        durations_iter.append(new_durations)
-        retiming_runtimes.append(runtime)
-
-        # Improve Bezier curves.
-        path_new, sol_stats = optimize_multiple_bezier(R, A, L, U, new_durations,
-            alpha, initial, final, **kwargs)
-        cost_new = sol_stats['cost']
-        costs.append(cost_new)
-        paths.append(path_new)
-        bez_runtimes.append(sol_stats['runtime'])
-
-        decr = cost_new - cost
-        accept = decr < 0
-        if verbose:
-            update_log(i, cost_new, decr, kappa, accept)
-
-        # If retiming improved the trajectory.
-        if accept:
-            durations = new_durations
-            path = path_new
-            cost = cost_new
-            cost_breakdown = sol_stats['cost_breakdown']
-            retiming_weights = sol_stats['retiming_weights']
-
-        if kappa < kappa_min:
-            break
-        kappa = kappa_max / omega
-        i += 1
+    # while True:
+    #     n_iters += 1
+    #
+    #     # Retime.
+    #     new_durations, runtime, kappa_max = retiming(kappa, cost_breakdown,
+    #         durations, retiming_weights, **kwargs)
+    #     durations_iter.append(new_durations)
+    #     retiming_runtimes.append(runtime)
+    #
+    #     # Improve Bezier curves.
+    #     path_new, sol_stats = optimize_multiple_bezier(R, A, L, U, new_durations,
+    #         alpha, initial, final, **kwargs)
+    #     cost_new = sol_stats['cost']
+    #     costs.append(cost_new)
+    #     paths.append(path_new)
+    #     bez_runtimes.append(sol_stats['runtime'])
+    #
+    #     decr = cost_new - cost
+    #     accept = decr < 0
+    #     if verbose:
+    #         update_log(i, cost_new, decr, kappa, accept)
+    #
+    #     # If retiming improved the trajectory.
+    #     if accept:
+    #         durations = new_durations
+    #         path = path_new
+    #         cost = cost_new
+    #         cost_breakdown = sol_stats['cost_breakdown']
+    #         retiming_weights = sol_stats['retiming_weights']
+    #
+    #     if kappa < kappa_min:
+    #         break
+    #     kappa = kappa_max / omega
+    #     i += 1
 
     runtime = sum(bez_runtimes) + sum(retiming_runtimes)
     if verbose:
