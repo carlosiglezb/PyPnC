@@ -357,6 +357,7 @@ def optimize_multiple_bezier(R, aux_frames, L, U, durations, alpha, initial, fin
     soc_constraint, cost_log_abs = [], []
     if aux_frames is not None:
         prox_fr_idx, dist_fr_idx = 0, 0
+        link_based_weights = [0.1621, 0.006, 0.2808]
         for aux_fr in aux_frames:
             if aux_fr['parent_frame'] == 'l_knee_fe_ld':
                 prox_fr_idx = int(3 * n_boxes)
@@ -374,34 +375,17 @@ def optimize_multiple_bezier(R, aux_frames, L, U, durations, alpha, initial, fin
                     link_proximal_point = points[prox_fr_idx+nb][0][pnt]
                     link_distal_point = points[dist_fr_idx+nb][0][pnt]
                     create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-                                             link_distal_point, soc_constraint, cost_log_abs)
+                                             link_distal_point, soc_constraint, cost_log_abs,
+                                                         wi=link_based_weights)
 
                     # knee should mostly be above the foot
-                    soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
-
-            # apply constraint only to first and last bezier points
-            # link_proximal_point = points[prox_fr_idx+1][0][0]
-            # link_distal_point = points[dist_fr_idx+1][0][0]
-            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-            #                                      link_distal_point, soc_constraint, cost_log_abs)
-            # link_proximal_point = points[prox_fr_idx+1][0][7]
-            # link_distal_point = points[dist_fr_idx+1][0][7]
-            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-            #                                      link_distal_point, soc_constraint, cost_log_abs)
-            # link_proximal_point = points[prox_fr_idx+2][0][1]
-            # link_distal_point = points[dist_fr_idx+2][0][1]
-            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-            #                                      link_distal_point, soc_constraint, cost_log_abs)
-            # link_proximal_point = points[prox_fr_idx+2][0][6]
-            # link_distal_point = points[dist_fr_idx+2][0][6]
-            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-            #                                      link_distal_point, soc_constraint, cost_log_abs)
+                    # soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
 
         cost_log_abs_sum = -(cp.sum(cost_log_abs))
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-    prob.solve(solver='SCS', eps_abs=1e-3, eps_rel=1e-3, verbose=True)
+    prob.solve(solver='SCS', eps_abs=5e-3, eps_rel=5e-3, verbose=True)
 
     # Reconstruct trajectory.
     beziers = []
