@@ -130,11 +130,6 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
     for Ai in A_soc:
         opt_shin_len_err = np.linalg.norm(Ai @ traj) - 0.32428632635527505
         print(f"Shin length discrepancy: {opt_shin_len_err}")
-        ft_idx = np.where(Ai[0] == 1)[0][0]
-        kn_idx = np.where(Ai[0] == -1)[0][0]
-        print(f"Optimized LF points: {traj[ft_idx:ft_idx+d]}")
-        print(f"Optimized LKnee points: {traj[kn_idx:kn_idx+d]}")
-
     return traj, length, solver_time
 
 

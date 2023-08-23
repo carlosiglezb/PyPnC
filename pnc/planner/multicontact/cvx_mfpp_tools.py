@@ -33,7 +33,7 @@ def create_bezier_cvx_norm_eq_relaxation(link_length, x_var_first_point, x_var_s
     soc_constraint.append(cp.norm(x_var_first_point - x_var_second_point, 2) <= d_i)
 
     # add log det cost to encourage/apply relaxed rigid link constraint
-    cost_log_abs_list.append(cp.log_det(cp.diag(wi * (x_var_first_point - x_var_second_point))))
+    cost_log_abs_list.append(cp.log_det(cp.diag(wi @ (x_var_first_point - x_var_second_point))))
 
     return
 
