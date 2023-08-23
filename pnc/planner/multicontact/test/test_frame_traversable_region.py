@@ -447,5 +447,75 @@ class TestFrameTraversableRegion(unittest.TestCase):
         # frame_planner.add_reachable_frame_constraint(aux_frame, aux_frame_region)
 
 
+    def test_polytope_offset(self):
+        b_visualize = True
+        # load robot
+        rob_model, rob_collision_model, rob_visual_model = pin.buildModelsFromUrdf(
+            cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
+            cwd + "/robot_model/draco3", pin.JointModelFreeFlyer())
+        vis_q = self.get_draco3_default_initial_pose()
+
+        door_model, door_collision_model, door_visual_model = pin.buildModelsFromUrdf(
+            cwd + "/robot_model/ground/navy_door.urdf",
+            cwd + "/robot_model/ground", pin.JointModelFreeFlyer())
+
+        if b_visualize:
+            visualizer = MeshcatVisualizer(rob_model, rob_collision_model, rob_visual_model)
+
+            try:
+                visualizer.initViewer(open=True)
+                visualizer.viewer.wait()
+            except ImportError as err:
+                print(
+                    "Error while initializing the viewer. It seems you should install Python meshcat"
+                )
+                print(err)
+                sys.exit(0)
+            visualizer.loadViewerModel(rootNodeName="draco3")
+            visualizer.display(vis_q)
+        else:
+            visualizer = None
+
+        #
+        # left foot
+        #
+        lf_init = np.array([0.06, 0.14, 0.])   # TODO: use fwd kin
+        lf_end = lf_init + np.array([0.45, 0., 0.])
+        lf_traversable_region = FrameTraversableRegion(self.lf_frame_name,
+                                                       self.lf_frame_stl_path, self.lf_poly_halfspace_path,
+                                                       b_visualize_reach=b_visualize,
+                                                       b_visualize_safe=b_visualize,
+                                                       visualizer=visualizer)
+        self.assertEqual(True, True)
+
+        # move to standing height
+        standing_pos = vis_q[:3]
+        lf_traversable_region.update_origin_pose(standing_pos)
+        self.assertEqual(True, True)
+
+        #
+        # right foot
+        #
+        rf_init = np.array([0.06, -0.14, 0.])   # TODO: use fwd kin
+        rf_end = rf_init + np.array([0.45, 0., 0.])
+        rf_traversable_region = FrameTraversableRegion(self.rf_frame_name,
+                                                       self.rf_frame_stl_path, self.rf_poly_halfspace_path,
+                                                       b_visualize_reach=b_visualize,
+                                                       b_visualize_safe=b_visualize,
+                                                       visualizer=visualizer)
+        self.assertEqual(True, True)
+
+        # move to standing height
+        standing_pos = vis_q[:3]
+        rf_traversable_region.update_origin_pose(standing_pos)
+        self.assertEqual(True, True)
+
+
+        traversable_regions = [lf_traversable_region, rf_traversable_region]
+        frame_planner = LocomanipulationFramePlanner(traversable_regions,
+                                                     self.ee_offsets_path)
+        frame_planner.debug_sample_points(visualizer, self.rf_frame_name)
+        self.assertEqual(True, True)
+
 if __name__ == '__main__':
     unittest.main()

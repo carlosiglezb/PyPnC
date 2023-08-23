@@ -121,3 +121,23 @@ class LocomanipulationFramePlanner:
     @staticmethod
     def update_plane_offset_from_root(_origin_pos, H, d):
         return d - H @ _origin_pos
+
+    def debug_sample_points(self, visualizer, frame_name):
+        # sample random points in 3D within [-1, 1] on all axes
+        verts = 4.*np.random.random((10000, 3)).astype(np.float32) - 2.
+
+        # keep points inside reachable region
+        H = self.reachability_planes[frame_name]['H']
+        d = self.reachability_planes[frame_name]['d']
+        idx = 0
+        for p in verts:
+            if np.any(H @ p >= -d):
+                verts[idx] = np.NAN
+            else:
+                obj = g.Sphere(0.01)
+                tf_pos = tf.translation_matrix(p)
+                visualizer.viewer["traversable_regions"]["point_cloud"][frame_name][str(idx)].set_object(
+                    obj, g.MeshLambertMaterial())
+                visualizer.viewer["traversable_regions"]["point_cloud"][frame_name][str(idx)].set_transform(tf_pos)
+
+            idx += 1
