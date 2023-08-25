@@ -510,11 +510,19 @@ class TestFrameTraversableRegion(unittest.TestCase):
         rf_traversable_region.update_origin_pose(standing_pos)
         self.assertEqual(True, True)
 
+        #
+        # torso
+        #
+        torso_traversable_region = FrameTraversableRegion(self.torso_frame_name,
+                                                          b_visualize_reach=b_visualize,
+                                                          b_visualize_safe=b_visualize,
+                                                          visualizer=visualizer)
+        self.assertEqual(True, True)
 
-        traversable_regions = [lf_traversable_region, rf_traversable_region]
+        traversable_regions = [torso_traversable_region, lf_traversable_region, rf_traversable_region]
         frame_planner = LocomanipulationFramePlanner(traversable_regions,
                                                      self.ee_offsets_path)
-        frame_planner.debug_sample_points(visualizer, self.rf_frame_name)
+        frame_planner.debug_sample_points(visualizer, self.torso_frame_name)
         self.assertEqual(True, True)
 
 if __name__ == '__main__':

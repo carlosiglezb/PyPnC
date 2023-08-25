@@ -29,8 +29,12 @@ class LocomanipulationFramePlanner:
                                                                 H, d_prime)
                 self.reachability_planes[region._frame_name] = {'H': H, 'd': d_prime}
 
+            if region._frame_name == starting_stance_foot:
+                init_standing_pos = region._origin_pos
+
         # the torso must be reachable based on the frame in contact
-        H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path)
+        H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path,
+                                                            init_standing_pos)
         self.reachability_planes['torso'] = {'H': H, 'd': d_prime}
 
         # auxiliary frames associated to one of the above initialized reachable regions
@@ -40,7 +44,9 @@ class LocomanipulationFramePlanner:
             self.aux_frames = aux_frames_path
 
 
-    def add_offset_to_plane_eqn_from_file(self, frame_name, ee_offset_file_path):
+    def add_offset_to_plane_eqn_from_file(self, frame_name,
+                                          ee_offset_file_path,
+                                          init_standing_pos):
         H = self.reachability_planes[frame_name]['H']
         d_vec = self.reachability_planes[frame_name]['d']
         torso_p_contact_offset = np.zeros((3,))
@@ -50,7 +56,7 @@ class LocomanipulationFramePlanner:
                 torso_p_contact_offset[0] = float(yml[frame_name]['x'])
                 torso_p_contact_offset[1] = float(yml[frame_name]['y'])
                 torso_p_contact_offset[2] = float(yml[frame_name]['z'])
-        d_prime = d_vec + H @ torso_p_contact_offset  # grab all the 'd' coefficients
+        d_prime = d_vec + H @ (init_standing_pos + torso_p_contact_offset)  # grab all the 'd' coefficients
         return H, d_prime
 
     # def add_reachable_frame_constraint(self, frame_name, associated_traversable_region):
