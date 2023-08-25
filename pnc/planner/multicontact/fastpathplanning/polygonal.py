@@ -230,8 +230,8 @@ def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=
         solver_time += solver_time_i
 
         # TODO: from here on, deal with each end effector separately
-        # for frame, b_seq in box_seq.items():
-        B = safe_boxes[frame].B
+        for frame, b_seq in box_seq.items():
+            B = safe_boxes[frame].B
 
         if verbose:
             update_log(n_iters, length, len(box_seq[frame]))

@@ -386,9 +386,24 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
     # Reachability constraints
     fr_idx = 0
     for frame_name in frame_list:
-        if frame_name == 'torso' or frame_name == stance_foot:
+        if frame_name == 'torso':
+            coeffs = reach_region[frame_name]
+            H = coeffs['H']
+            d_vec = np.reshape(coeffs['d'], (len(H), 1))
+            d_mat = np.repeat(d_vec, n_points, axis=1)
+            for idx_box in range(1, n_boxes - 1):
+                # torso translation terms
+                z_t_prev = points[idx_box - 1][0]
+                z_t_post = points[idx_box][0]
+
+                # torso w.r.t. corresponding standing effector frame
+                z_stance_post = points[0][0]    # was points[fr_idx*n_boxes + idx_box][0]
+                # z_stance_post = points[n_boxes + idx_box][0]    # was points[fr_idx*n_boxes + idx_box][0]
+
+                # reachable constraint
+                constraints.append(H @ z_t_prev.T - 2 * H @ z_t_post.T + H @ z_stance_post.T <= -d_mat)
             fr_idx += 1
-            pass
+
         else:
             coeffs = reach_region[frame_name]
             H = coeffs['H']
