@@ -66,12 +66,12 @@ class LocomanipulationFramePlanner:
                                       der_term, verbose, A)
 
     def plot(self, visualizer):
-
-        bezier_curve = self.path
-        self.visualize_bezier_points(visualizer, 'LF', bezier_curve)
-        # for frame in self.frame_names:
-        #     bezier_curve = self.path[frame]
-        #     self.visualize_bezier_points(visualizer, frame, bezier_curve)
+        current_box = 0
+        for frame in self.frame_names:
+            frame_boxes = len(self.safe_boxes[frame].B.boxes)
+            bezier_curve = self.path.beziers[current_box:current_box+frame_boxes]
+            self.visualize_bezier_points(visualizer, frame, bezier_curve)
+            current_box += frame_boxes
 
     @staticmethod
     def add_fixed_distance_between_points(path):
@@ -89,7 +89,7 @@ class LocomanipulationFramePlanner:
         color_transition = [1., 1., 0., 0.6]    # yellow
         r_bezier_pts = 0.01
         pt_number, seg_number = 0, 1
-        for bez in bezier_curve.beziers:
+        for bez in bezier_curve:
             t, points = bez.get_sample_points()
             for p in points:
                 obj = g.Sphere(r_bezier_pts)
