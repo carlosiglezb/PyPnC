@@ -130,11 +130,6 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
     for Ai in A_soc:
         opt_shin_len_err = np.linalg.norm(Ai @ traj) - 0.32428632635527505
         print(f"Shin length discrepancy: {opt_shin_len_err}")
-        ft_idx = np.where(Ai[0] == 1)[0][0]
-        kn_idx = np.where(Ai[0] == -1)[0][0]
-        print(f"Optimized LF points: {traj[ft_idx:ft_idx+d]}")
-        print(f"Optimized LKnee points: {traj[kn_idx:kn_idx+d]}")
-
     return traj, length, solver_time
 
 
@@ -235,8 +230,8 @@ def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=
         solver_time += solver_time_i
 
         # TODO: from here on, deal with each end effector separately
-        # for frame, b_seq in box_seq.items():
-        B = safe_boxes[frame].B
+        for frame, b_seq in box_seq.items():
+            B = safe_boxes[frame].B
 
         if verbose:
             update_log(n_iters, length, len(box_seq[frame]))

@@ -273,11 +273,12 @@ def optimize_bezier(L, U, durations, alpha, initial, final,
     return path, sol_stats
 
 
-def optimize_multiple_bezier(R, aux_frames, L, U, durations, alpha, initial, final,
-    n_points=None, **kwargs):
+def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, initial, final,
+                             n_points=None, **kwargs):
+    stance_foot = 'LF'
 
     # number of frames
-    n_frames = len(R)
+    n_frames = len(reach_region)
 
     # Problem size. Assume for now same number of boxes for all frames
     n_boxes, d = L[next(iter(L))].shape
@@ -352,11 +353,11 @@ def optimize_multiple_bezier(R, aux_frames, L, U, durations, alpha, initial, fin
             cost += ai * cp.quad_form(p, A)
         k_fr_box += 1
 
-    # WIP: adding upper limit on distance for rigid links (e.g., shin link length) enforced
-    # either at end points or at all points
+    # Rigid links (e.g., shin link length) constraint relaxation
     soc_constraint, cost_log_abs = [], []
     if aux_frames is not None:
         prox_fr_idx, dist_fr_idx = 0, 0
+        link_based_weights = [0.1621, 0.006, 0.2808]    # based on distance between foot-shin frames
         for aux_fr in aux_frames:
             if aux_fr['parent_frame'] == 'l_knee_fe_ld':
                 prox_fr_idx = int(3 * n_boxes)
@@ -374,34 +375,55 @@ def optimize_multiple_bezier(R, aux_frames, L, U, durations, alpha, initial, fin
                     link_proximal_point = points[prox_fr_idx+nb][0][pnt]
                     link_distal_point = points[dist_fr_idx+nb][0][pnt]
                     create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-                                             link_distal_point, soc_constraint, cost_log_abs)
+                                             link_distal_point, soc_constraint, cost_log_abs,
+                                                         wi=link_based_weights)
 
                     # knee should mostly be above the foot
-                    soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
-
-            # apply constraint only to first and last bezier points
-            # link_proximal_point = points[prox_fr_idx+1][0][0]
-            # link_distal_point = points[dist_fr_idx+1][0][0]
-            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-            #                                      link_distal_point, soc_constraint, cost_log_abs)
-            # link_proximal_point = points[prox_fr_idx+1][0][7]
-            # link_distal_point = points[dist_fr_idx+1][0][7]
-            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-            #                                      link_distal_point, soc_constraint, cost_log_abs)
-            # link_proximal_point = points[prox_fr_idx+2][0][1]
-            # link_distal_point = points[dist_fr_idx+2][0][1]
-            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-            #                                      link_distal_point, soc_constraint, cost_log_abs)
-            # link_proximal_point = points[prox_fr_idx+2][0][6]
-            # link_distal_point = points[dist_fr_idx+2][0][6]
-            # create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-            #                                      link_distal_point, soc_constraint, cost_log_abs)
+                    # soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
 
         cost_log_abs_sum = -(cp.sum(cost_log_abs))
 
+    # Reachability constraints
+    fr_idx = 0
+    for frame_name in frame_list:
+        if frame_name == 'torso':
+            coeffs = reach_region[frame_name]
+            H = coeffs['H']
+            d_vec = np.reshape(coeffs['d'], (len(H), 1))
+            d_mat = np.repeat(d_vec, n_points, axis=1)
+            for idx_box in range(1, n_boxes - 1):
+                # torso translation terms
+                z_t_prev = points[idx_box - 1][0]
+                z_t_post = points[idx_box][0]
+
+                # torso w.r.t. corresponding standing effector frame
+                z_stance_post = points[0][0]    # was points[fr_idx*n_boxes + idx_box][0]
+                # z_stance_post = points[n_boxes + idx_box][0]    # was points[fr_idx*n_boxes + idx_box][0]
+
+                # reachable constraint
+                constraints.append(H @ z_t_prev.T - 2 * H @ z_t_post.T + H @ z_stance_post.T <= -d_mat)
+            fr_idx += 1
+
+        else:
+            coeffs = reach_region[frame_name]
+            H = coeffs['H']
+            d_vec = np.reshape(coeffs['d'], (len(H), 1))
+            d_mat = np.repeat(d_vec, n_points, axis=1)
+            for idx_box in range(1, n_boxes - 1):
+                # torso translation terms
+                z_t_prev = points[idx_box - 1][0]
+                z_t_post = points[idx_box][0]
+
+                # corresponding end effector frame index
+                z_ee_post = points[fr_idx*n_boxes + idx_box][0]
+
+                # reachable constraint
+                constraints.append(H @ z_t_prev.T - H @ z_t_post.T + H @ z_ee_post.T <= -d_mat)
+            fr_idx += 1
+
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-    prob.solve(solver='SCS', eps_abs=1e-3, eps_rel=1e-3, verbose=True)
+    prob.solve(solver='SCS', eps_abs=5e-3, eps_rel=5e-3)
 
     # Reconstruct trajectory.
     beziers = []

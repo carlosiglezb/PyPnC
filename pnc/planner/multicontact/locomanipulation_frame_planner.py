@@ -29,8 +29,12 @@ class LocomanipulationFramePlanner:
                                                                 H, d_prime)
                 self.reachability_planes[region._frame_name] = {'H': H, 'd': d_prime}
 
+            if region._frame_name == starting_stance_foot:
+                init_standing_pos = region._origin_pos
+
         # the torso must be reachable based on the frame in contact
-        H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path)
+        H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path,
+                                                            init_standing_pos)
         self.reachability_planes['torso'] = {'H': H, 'd': d_prime}
 
         # auxiliary frames associated to one of the above initialized reachable regions
@@ -40,7 +44,9 @@ class LocomanipulationFramePlanner:
             self.aux_frames = aux_frames_path
 
 
-    def add_offset_to_plane_eqn_from_file(self, frame_name, ee_offset_file_path):
+    def add_offset_to_plane_eqn_from_file(self, frame_name,
+                                          ee_offset_file_path,
+                                          init_standing_pos):
         H = self.reachability_planes[frame_name]['H']
         d_vec = self.reachability_planes[frame_name]['d']
         torso_p_contact_offset = np.zeros((3,))
@@ -50,7 +56,7 @@ class LocomanipulationFramePlanner:
                 torso_p_contact_offset[0] = float(yml[frame_name]['x'])
                 torso_p_contact_offset[1] = float(yml[frame_name]['y'])
                 torso_p_contact_offset[2] = float(yml[frame_name]['z'])
-        d_prime = d_vec + H @ torso_p_contact_offset  # grab all the 'd' coefficients
+        d_prime = d_vec + H @ (init_standing_pos + torso_p_contact_offset)  # grab all the 'd' coefficients
         return H, d_prime
 
     # def add_reachable_frame_constraint(self, frame_name, associated_traversable_region):
@@ -121,3 +127,23 @@ class LocomanipulationFramePlanner:
     @staticmethod
     def update_plane_offset_from_root(_origin_pos, H, d):
         return d - H @ _origin_pos
+
+    def debug_sample_points(self, visualizer, frame_name):
+        # sample random points in 3D within [-1, 1] on all axes
+        verts = 4.*np.random.random((10000, 3)).astype(np.float32) - 2.
+
+        # keep points inside reachable region
+        H = self.reachability_planes[frame_name]['H']
+        d = self.reachability_planes[frame_name]['d']
+        idx = 0
+        for p in verts:
+            if np.any(H @ p >= -d):
+                verts[idx] = np.NAN
+            else:
+                obj = g.Sphere(0.01)
+                tf_pos = tf.translation_matrix(p)
+                visualizer.viewer["traversable_regions"]["point_cloud"][frame_name][str(idx)].set_object(
+                    obj, g.MeshLambertMaterial())
+                visualizer.viewer["traversable_regions"]["point_cloud"][frame_name][str(idx)].set_transform(tf_pos)
+
+            idx += 1

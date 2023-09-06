@@ -22,16 +22,18 @@ def create_cvx_norm_eq_relaxation(aux_frames, num_boxes, x_dim, x):
 
 
 def create_bezier_cvx_norm_eq_relaxation(link_length, x_var_first_point, x_var_second_point,
-                                         soc_constraint, cost_log_abs_list):
+                                         soc_constraint, cost_log_abs_list, wi=None):
+    if wi is None:
+        wi = [1., 1., 1.]
+
     d_i = cp.Parameter(pos=True, value=link_length)
-    w_i = cp.Parameter(pos=True, value=1.)
 
     # construct inequality constraints and log cost term to approximate norm equality
     # soc_constraint.append(cp.SOC(d_i, x_var_first_point - x_var_second_point))
     soc_constraint.append(cp.norm(x_var_first_point - x_var_second_point, 2) <= d_i)
 
-    # TODO change weight w_i to have larger distances along moving direction
-    cost_log_abs_list.append(w_i * cp.log_det(cp.diag(x_var_first_point - x_var_second_point)))
+    # add log det cost to encourage/apply relaxed rigid link constraint
+    cost_log_abs_list.append(cp.log_det(cp.diag(wi @ (x_var_first_point - x_var_second_point))))
 
     return
 
