@@ -11,7 +11,6 @@ import numpy as np
 from pinocchio.visualize import MeshcatVisualizer
 import pinocchio as pin
 
-
 cwd = os.getcwd()
 sys.path.append(cwd)
 
@@ -19,29 +18,15 @@ sys.path.append(cwd)
 class TestFrameTraversableRegion(unittest.TestCase):
     def setUp(self):
         self.torso_frame_name = 'torso'
-        self.rf_frame_name = 'RF'
-        self.rf_frame_stl_path = cwd + '/pnc/reachability_map/output/draco3_' + \
-                                 self.rf_frame_name + '.stl'
-        self.rf_poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' + \
-                                      self.rf_frame_name + '.yaml'
 
-        self.lf_frame_name = 'LF'
-        self.lf_frame_stl_path = cwd + '/pnc/reachability_map/output/draco3_' + \
-                                 self.lf_frame_name + '.stl'
-        self.lf_poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' + \
-                                      self.lf_frame_name + '.yaml'
-
-        self.lknee_frame_name = 'L_knee'
-        self.lknee_frame_stl_path = cwd + '/pnc/reachability_map/output/draco3_' + \
-                                 self.lknee_frame_name + '.stl'
-        self.lknee_poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' + \
-                                      self.lknee_frame_name + '.yaml'
-
-        self.rknee_frame_name = 'R_knee'
-        self.rknee_frame_stl_path = cwd + '/pnc/reachability_map/output/draco3_' + \
-                                 self.rknee_frame_name + '.stl'
-        self.rknee_poly_halfspace_path = cwd + '/pnc/reachability_map/output/draco3_' + \
-                                      self.rknee_frame_name + '.yaml'
+        self.frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee']
+        # self.frame_names = ['torso', 'RF', 'R_knee', 'LF', 'L_knee', 'LH', 'RH']
+        self.frame_stl_paths, self.poly_halfspace_paths = OrderedDict(), OrderedDict()
+        for fr in self.frame_names:
+            self.frame_stl_paths[fr] = (cwd +
+                                        '/pnc/reachability_map/output/draco3_' + fr + '.stl')
+            self.poly_halfspace_paths[fr] = (cwd +
+                                         '/pnc/reachability_map/output/draco3_' + fr + '.yaml')
 
         self.ee_offsets_path = cwd + '/pnc/reachability_map/output/draco3_ee_offsets.yaml'
 
@@ -92,118 +77,142 @@ class TestFrameTraversableRegion(unittest.TestCase):
     def get_navy_door_default_initial_pose(self):
         # rotates, then translates
         pos = np.array([0.3, 0., 0.])
-        R = util.util.euler_to_rot([0., 0., np.pi/2.])
+        R = util.util.euler_to_rot([0., 0., np.pi / 2.])
         quat = util.util.rot_to_quat(R)
         return np.concatenate((pos, quat))
 
     def get_sample_collision_free_boxes(self):
-        L_lf = np.array([
+        box_llim, box_ulim = OrderedDict(), OrderedDict()
+        box_llim['LF'] = np.array([
             [-0.1, -0.1, 0.0],  # prevent leg-crossing
             [-0.1, -0.1, 0.4],  # prevent leg-crossing
             [0.2, -0.1, 0.0]  # prevent leg-crossing
         ])
-        L_rf = np.array([
+        box_llim['RF'] = np.array([
             [-0.1, -0.3, 0.0],  # prevent leg-crossing
             [-0.1, -0.3, 0.4],  # prevent leg-crossing
             [0.2, -0.3, 0.0]  # prevent leg-crossing
         ])
-        L_lh = np.array([
+        box_llim['LH'] = np.array([
             [-0.1, -0.1, 0.7],  # prevent leg-crossing
             [-0.1, 0.0, 0.7],  # prevent leg-crossing
             [0.2, -0.1, 0.7]  # prevent leg-crossing
         ])
-        L_rh = np.array([
+        box_llim['RH'] = np.array([
             [-0.1, -0.3, 0.7],  # prevent leg-crossing
             [-0.1, -0.3, 0.7],  # prevent leg-crossing
             [0.2, -0.3, 0.7]  # prevent leg-crossing
         ])
 
         # upper bounds of the safe boxes
-        U_lf = np.array([
+        box_ulim['LF'] = np.array([
             [0.1, 0.3, 0.6],  # z stops at kin. limit
             [0.4, 0.3, 0.6],  # x stops at kin. limit
             [0.5, 0.3, 0.6]  # x stops at kin. limit
         ])
-        U_rf = np.array([
+        box_ulim['RF'] = np.array([
             [0.1, 0.1, 0.6],  # prevent leg-crossing
             [0.4, 0.1, 0.6],  # prevent leg-crossing
             [0.5, 0.1, 0.6]  # prevent leg-crossing
         ])
-        U_lh = np.array([
+        box_ulim['LH'] = np.array([
             [0.1, 0.3, 1.3],  # prevent leg-crossing
             [0.4, 0.3, 1.3],  # prevent leg-crossing
             [0.5, 0.3, 1.3]  # prevent leg-crossing
         ])
-        U_rh = np.array([
+        box_ulim['RH'] = np.array([
             [0.1, 0.1, 1.3],  # prevent leg-crossing
             [0.4, 0.0, 1.3],  # prevent leg-crossing
             [0.5, 0.1, 1.3]  # prevent leg-crossing
         ])
-        box_llim=[L_lf, L_rf, L_lh, L_rh]
-        box_ulim=[U_lf, U_rf, U_lh, U_rh]
         return box_llim, box_ulim
 
     def get_navy_door_collision_free_boxes(self):
+        # save safe box regions
+        box_llim, box_ulim = OrderedDict(), OrderedDict()
+
         # lower bounds of end-effectors safe boxes
-        L_lf = np.array([
-            [-0.2, 0.0, 0.0],  # prevent leg-crossing
-            [-0.1, 0.0, 0.4],  # prevent leg-crossing
-            [0.4, 0.0, 0.0]  # prevent leg-crossing
-        ])
-        L_rf = np.array([
-            [-0.2, -0.4, 0.0],  # prevent leg-crossing
-            [-0.1, -0.35, 0.4],  # prevent leg-crossing
-            [0.4, -0.4, 0.0]  # prevent leg-crossing
-        ])
-        L_lh = np.array([
-            [-0.2, 0.0, 0.7],  # prevent leg-crossing
-            [-0.1, 0.0, 0.7],  # prevent leg-crossing
-            [0.4, 0.0, 0.7]  # prevent leg-crossing
-        ])
-        L_rh = np.array([
-            [-0.2, -0.4, 0.7],  # prevent leg-crossing
-            [-0.1, -0.4, 0.7],  # prevent leg-crossing
-            [0.4, -0.4, 0.7]  # prevent leg-crossing
-        ])
-        L_torso = np.array([
+        box_llim['torso'] = np.array([
             [-0.1, -0.3, 0.5],  # prevent leg-crossing
             [0.05, -0.3, 0.5],  # prevent leg-crossing
             [0.2, -0.3, 0.5]  # prevent leg-crossing
         ])
+        box_llim['LF'] = np.array([
+            [-0.2, 0.0, 0.0],  # prevent leg-crossing
+            [-0.1, 0.0, 0.4],  # prevent leg-crossing
+            [0.4, 0.0, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['RF'] = np.array([
+            [-0.2, -0.4, 0.0],  # prevent leg-crossing
+            [-0.1, -0.35, 0.4],  # prevent leg-crossing
+            [0.4, -0.4, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['L_knee'] = np.array([
+            [-0.2, 0.0, 0.0],  # prevent leg-crossing
+            [-0.1, 0.0, 0.4],  # prevent leg-crossing
+            [0.4, 0.0, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['R_knee'] = np.array([
+            [-0.2, -0.4, 0.0],  # prevent leg-crossing
+            [-0.1, -0.35, 0.4],  # prevent leg-crossing
+            [0.4, -0.4, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['LH'] = np.array([
+            [-0.2, 0.0, 0.7],  # prevent leg-crossing
+            [-0.1, 0.0, 0.7],  # prevent leg-crossing
+            [0.4, 0.0, 0.7]  # prevent leg-crossing
+        ])
+        box_llim['RH'] = np.array([
+            [-0.2, -0.4, 0.7],  # prevent leg-crossing
+            [-0.1, -0.4, 0.7],  # prevent leg-crossing
+            [0.4, -0.4, 0.7]  # prevent leg-crossing
+        ])
 
         # upper bounds of the safe boxes
-        U_lf = np.array([
-            [0.25, 0.35, 0.6],  # z stops at kin. limit
-            [0.6, 0.4, 0.6],  # x stops at kin. limit
-            [0.8, 0.4, 0.6]  # x stops at kin. limit
-        ])
-        U_rf = np.array([
-            [0.25, 0.0, 0.6],  # prevent leg-crossing
-            [0.6, 0.0, 0.6],  # prevent leg-crossing
-            [0.8, 0.0, 0.6]  # prevent leg-crossing
-        ])
-        U_lh = np.array([
-            [0.25, 0.4, 1.3],  # prevent leg-crossing
-            [0.6, 0.4, 1.3],  # prevent leg-crossing
-            [0.6, 0.4, 1.3]  # prevent leg-crossing
-        ])
-        U_rh = np.array([
-            [0.25, 0.0, 1.3],  # prevent leg-crossing
-            [0.6, 0.0, 1.3],  # prevent leg-crossing
-            [0.6, 0.0, 1.3]  # prevent leg-crossing
-        ])
-        U_torso = np.array([
+        box_ulim['torso'] = np.array([
             [0.1, 0.3, 0.9],  # prevent leg-crossing
             [0.3, 0.3, 0.9],  # prevent leg-crossing
             [0.6, 0.3, 0.9]  # prevent leg-crossing
         ])
-        box_llim=[L_torso, L_lf, L_rf, L_lh, L_rh]
-        box_ulim=[U_torso, U_lf, U_rf, U_lh, U_rh]
+        box_ulim['LF'] = np.array([
+            [0.25, 0.35, 0.6],  # z stops at kin. limit
+            [0.6, 0.4, 0.6],  # x stops at kin. limit
+            [0.8, 0.4, 0.6]  # x stops at kin. limit
+        ])
+        box_ulim['RF'] = np.array([
+            [0.25, 0.0, 0.6],  # prevent leg-crossing
+            [0.6, 0.0, 0.6],  # prevent leg-crossing
+            [0.8, 0.0, 0.6]  # prevent leg-crossing
+        ])
+        box_ulim['L_knee'] = np.array([
+            [0.25, 0.35, 0.6],  # z stops at kin. limit
+            [0.6, 0.4, 0.6],  # x stops at kin. limit
+            [0.8, 0.4, 0.6]  # x stops at kin. limit
+        ])
+        box_ulim['R_knee'] = np.array([
+            [0.25, 0.0, 0.6],  # prevent leg-crossing
+            [0.6, 0.0, 0.6],  # prevent leg-crossing
+            [0.8, 0.0, 0.6]  # prevent leg-crossing
+        ])
+        box_ulim['LH'] = np.array([
+            [0.25, 0.4, 1.3],  # prevent leg-crossing
+            [0.6, 0.4, 1.3],  # prevent leg-crossing
+            [0.6, 0.4, 1.3]  # prevent leg-crossing
+        ])
+        box_ulim['RH'] = np.array([
+            [0.25, 0.0, 1.3],  # prevent leg-crossing
+            [0.6, 0.0, 1.3],  # prevent leg-crossing
+            [0.6, 0.0, 1.3]  # prevent leg-crossing
+        ])
+        # box_llim = [L_torso, L_lf, L_rf, L_lh, L_rh]
+        # box_ulim = [U_torso, U_lf, U_rf, U_lh, U_rh]
         return box_llim, box_ulim
 
     def test_visualizing_reachable_region(self):
-        test_region = FrameTraversableRegion(self.rf_frame_name,
-                                             self.rf_frame_stl_path, self.rf_poly_halfspace_path,
+        frame_name = 'RF'
+        test_region = FrameTraversableRegion(frame_name,
+                                             self.frame_stl_paths[frame_name],
+                                             self.poly_halfspace_paths[frame_name],
                                              b_visualize_reach=True)
 
         # translate to new origin
@@ -212,6 +221,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         self.assertEqual(True, True)
 
     def test_visualize_region_with_robot_model(self):
+        frame_name = 'RF'
         model, collision_model, visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
             cwd + "/robot_model/draco3", pin.JointModelFreeFlyer())
@@ -230,9 +240,12 @@ class TestFrameTraversableRegion(unittest.TestCase):
         vis_q = pin.neutral(model)
         visualizer.display(vis_q)
 
-        test_region = FrameTraversableRegion(self.rf_frame_name,
-                                             self.rf_frame_stl_path, self.rf_poly_halfspace_path,
-                                             visualizer=visualizer)
+        test_region = FrameTraversableRegion(frame_name,
+                                             self.frame_stl_paths[frame_name],
+                                             self.poly_halfspace_paths[frame_name],
+                                             visualizer=visualizer,
+                                             b_visualize_reach=True,
+                                             b_visualize_safe=True)
         self.assertEqual(True, True)
 
         # move to standing height
@@ -243,6 +256,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         self.assertEqual(True, True)
 
     def test_visualize_region_and_ee_paths(self):
+        frame_name = 'RF'
         model, collision_model, visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
             cwd + "/robot_model/draco3", pin.JointModelFreeFlyer())
@@ -261,9 +275,12 @@ class TestFrameTraversableRegion(unittest.TestCase):
         vis_q = self.get_draco3_default_initial_pose()
         visualizer.display(vis_q)
 
-        test_region = FrameTraversableRegion(self.rf_frame_name,
-                                             self.rf_frame_stl_path, self.rf_poly_halfspace_path,
-                                             visualizer=visualizer)
+        test_region = FrameTraversableRegion(frame_name,
+                                             self.frame_stl_paths[frame_name],
+                                             self.poly_halfspace_paths[frame_name],
+                                             visualizer=visualizer,
+                                             b_visualize_safe=True,
+                                             b_visualize_reach=True)
         self.assertEqual(True, True)
 
         # move to standing height
@@ -273,10 +290,10 @@ class TestFrameTraversableRegion(unittest.TestCase):
 
         # collision-free boxes
         box_llim, box_ulim = self.get_sample_collision_free_boxes()
-        test_region.load_collision_free_boxes(box_llim[1], box_ulim[1])
+        test_region.load_collision_free_boxes(box_llim[frame_name], box_ulim[frame_name])
 
     def test_visualize_navy_door_paths(self):
-        b_visualize = False
+        b_visualize = True
         # load robot
         rob_model, rob_collision_model, rob_visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
@@ -311,129 +328,75 @@ class TestFrameTraversableRegion(unittest.TestCase):
         else:
             visualizer = None
 
-        #
-        # left foot
-        #
-        lf_init = np.array([0.06, 0.14, 0.])   # TODO: use fwd kin
-        lf_end = lf_init + np.array([0.45, 0., 0.])
-        lf_traversable_region = FrameTraversableRegion(self.lf_frame_name,
-                                                       self.lf_frame_stl_path, self.lf_poly_halfspace_path,
-                                                       b_visualize_reach=b_visualize,
-                                                       b_visualize_safe=b_visualize,
-                                                       visualizer=visualizer)
-        self.assertEqual(True, True)
-
-        # move to standing height
+        # standing height
         standing_pos = vis_q[:3]
-        lf_traversable_region.update_origin_pose(standing_pos)
-        self.assertEqual(True, True)
 
         # collision-free boxes
         box_llim, box_ulim = self.get_navy_door_collision_free_boxes()
-        lf_traversable_region.load_collision_free_boxes(box_llim[1], box_ulim[1])
 
-        #
-        # left knee
-        #
-        R = util.util.euler_to_rot([0., np.pi/6, 0.])
-        lknee_lf_offset = R @ np.array([0., -0.00599, 0.324231]) # rotate by 30deg about y
-        lknee_init = lf_init + lknee_lf_offset   # TODO: use fwd kin
-        lknee_end = lf_end + lknee_lf_offset
-        lknee_traversable_region = FrameTraversableRegion(self.lknee_frame_name,
-                                                       self.lknee_frame_stl_path,
-                                                       self.lknee_poly_halfspace_path,
-                                                       b_visualize_reach=b_visualize,
-                                                       b_visualize_safe=b_visualize,
-                                                       visualizer=visualizer)
+        # generate all frame traversable regions
+        traversable_regions_dict = OrderedDict()
+        for fr in self.frame_names:
+            if fr == 'torso':
+                traversable_regions_dict[fr] = FrameTraversableRegion(fr,
+                                                                      b_visualize_reach=b_visualize,
+                                                                      b_visualize_safe=b_visualize,
+                                                                      visualizer=visualizer)
+            else:
+                traversable_regions_dict[fr] = FrameTraversableRegion(fr,
+                                                                      self.frame_stl_paths[fr],
+                                                                      self.poly_halfspace_paths[fr],
+                                                                      b_visualize_reach=b_visualize,
+                                                                      b_visualize_safe=b_visualize,
+                                                                      visualizer=visualizer)
+                traversable_regions_dict[fr].update_origin_pose(standing_pos)
+            traversable_regions_dict[fr].load_collision_free_boxes(box_llim[fr], box_ulim[fr])
         self.assertEqual(True, True)
 
-        # move to standing height
-        standing_pos = vis_q[:3]
-        lknee_traversable_region.update_origin_pose(standing_pos)
-        self.assertEqual(True, True)
+        # initial and desired final positions for each frame
+        p_init, p_end = {}, {}
+        #
+        # torso
+        #
+        p_init['torso'] = standing_pos
+        p_end['torso'] = standing_pos + np.array([0.4, 0., 0.])
 
-        # collision-free boxes (same as LF)
-        lknee_traversable_region.load_collision_free_boxes(box_llim[1], box_ulim[1])
+        #
+        # left foot
+        #
+        p_init['LF'] = np.array([0.06, 0.14, 0.])  # TODO: use fwd kin
+        p_end['LF'] = p_init['LF'] + np.array([0.45, 0., 0.])
 
         #
         # right foot
         #
-        rf_init = np.array([0.06, -0.14, 0.])   # TODO: use fwd kin
-        rf_end = rf_init + np.array([0.45, 0., 0.])
-        rf_traversable_region = FrameTraversableRegion(self.rf_frame_name,
-                                                       self.rf_frame_stl_path, self.rf_poly_halfspace_path,
-                                                       b_visualize_reach=b_visualize,
-                                                       b_visualize_safe=b_visualize,
-                                                       visualizer=visualizer)
-        self.assertEqual(True, True)
+        p_init['RF'] = np.array([0.06, -0.14, 0.])  # TODO: use fwd kin
+        p_end['RF'] = p_init['RF'] + np.array([0.45, 0., 0.])
 
-        # move to standing height
-        standing_pos = vis_q[:3]
-        rf_traversable_region.update_origin_pose(standing_pos)
-        self.assertEqual(True, True)
-
-        # collision-free boxes
-        box_llim, box_ulim = self.get_navy_door_collision_free_boxes()
-        rf_traversable_region.load_collision_free_boxes(box_llim[2], box_ulim[2])
+        #
+        # left knee
+        #
+        R = util.util.euler_to_rot([0., np.pi / 6, 0.])
+        lknee_lf_offset = R @ np.array([0., -0.00599, 0.324231])  # rotate by 30deg about y
+        p_init['L_knee'] = p_init['LF'] + lknee_lf_offset  # TODO: use fwd kin
+        p_end['L_knee'] = p_end['LF'] + lknee_lf_offset
 
         #
         # right knee
         #
         rknee_rf_offset = R @ np.array([0., 0.006, 0.324231])
-        rknee_init = rf_init + rknee_rf_offset   # TODO: use fwd kin
-        rknee_end = rf_end + rknee_rf_offset
-        rknee_traversable_region = FrameTraversableRegion(self.rknee_frame_name,
-                                                       self.rknee_frame_stl_path,
-                                                       self.rknee_poly_halfspace_path,
-                                                       b_visualize_reach=b_visualize,
-                                                       b_visualize_safe=b_visualize,
-                                                       visualizer=visualizer)
-        self.assertEqual(True, True)
+        p_init['R_knee'] = p_init['RF'] + rknee_rf_offset  # TODO: use fwd kin
+        p_end['R_knee'] = p_end['RF'] + rknee_rf_offset
 
-        # move to standing height
-        standing_pos = vis_q[:3]
-        rknee_traversable_region.update_origin_pose(standing_pos)
-        self.assertEqual(True, True)
-
-        # collision-free boxes (same as LF)
-        rknee_traversable_region.load_collision_free_boxes(box_llim[2], box_ulim[2])
-
-        #
-        # torso
-        #
-        torso_init = standing_pos
-        torso_end = standing_pos + np.array([0.4, 0., 0.])
-        torso_traversable_region = FrameTraversableRegion(self.torso_frame_name,
-                                                          b_visualize_reach=b_visualize,
-                                                          b_visualize_safe=b_visualize,
-                                                          visualizer=visualizer)
-        self.assertEqual(True, True)
-
-        # collision-free boxes
-        box_llim, box_ulim = self.get_navy_door_collision_free_boxes()
-        torso_traversable_region.load_collision_free_boxes(box_llim[0], box_ulim[0])
 
         # make multi-trajectory planner
-        p_init = OrderedDict()
-        p_init[torso_traversable_region._frame_name] = torso_init
-        p_init[lf_traversable_region._frame_name] = lf_init
-        p_init[rf_traversable_region._frame_name] = rf_init
-        p_init[lknee_traversable_region._frame_name] = lknee_init
-        p_init[rknee_traversable_region._frame_name] = rknee_init
-
-        p_end = OrderedDict()
-        p_end[torso_traversable_region._frame_name] = torso_end
-        p_end[lf_traversable_region._frame_name] = lf_end
-        p_end[rf_traversable_region._frame_name] = rf_end
-        p_end[lknee_traversable_region._frame_name] = lknee_end
-        p_end[rknee_traversable_region._frame_name] = rknee_end
         T = 3
         alpha = [0, 0, 1]
-        traversable_regions = [torso_traversable_region,
-                               lf_traversable_region,
-                               rf_traversable_region,
-                               lknee_traversable_region,
-                               rknee_traversable_region]
+        traversable_regions = [traversable_regions_dict['torso'],
+                               traversable_regions_dict['LF'],
+                               traversable_regions_dict['RF'],
+                               traversable_regions_dict['L_knee'],
+                               traversable_regions_dict['R_knee']]
         frame_planner = LocomanipulationFramePlanner(traversable_regions,
                                                      self.ee_offsets_path,
                                                      aux_frames_path=self.aux_frames_path)
@@ -443,9 +406,9 @@ class TestFrameTraversableRegion(unittest.TestCase):
 
         # add auxiliary collision-free frames
         # aux_frame = 'R_knee'
+        # aux_frame = 'R_knee'
         # aux_frame_region = 'RF'
         # frame_planner.add_reachable_frame_constraint(aux_frame, aux_frame_region)
-
 
     def test_polytope_offset(self):
         b_visualize = True
@@ -479,7 +442,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         #
         # left foot
         #
-        lf_init = np.array([0.06, 0.14, 0.])   # TODO: use fwd kin
+        lf_init = np.array([0.06, 0.14, 0.])  # TODO: use fwd kin
         lf_end = lf_init + np.array([0.45, 0., 0.])
         lf_traversable_region = FrameTraversableRegion(self.lf_frame_name,
                                                        self.lf_frame_stl_path, self.lf_poly_halfspace_path,
@@ -496,7 +459,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         #
         # right foot
         #
-        rf_init = np.array([0.06, -0.14, 0.])   # TODO: use fwd kin
+        rf_init = np.array([0.06, -0.14, 0.])  # TODO: use fwd kin
         rf_end = rf_init + np.array([0.45, 0., 0.])
         rf_traversable_region = FrameTraversableRegion(self.rf_frame_name,
                                                        self.rf_frame_stl_path, self.rf_poly_halfspace_path,
@@ -524,6 +487,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
                                                      self.ee_offsets_path)
         frame_planner.debug_sample_points(visualizer, self.torso_frame_name)
         self.assertEqual(True, True)
+
 
 if __name__ == '__main__':
     unittest.main()
