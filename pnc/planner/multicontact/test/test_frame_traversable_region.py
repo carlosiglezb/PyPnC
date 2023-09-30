@@ -19,8 +19,8 @@ class TestFrameTraversableRegion(unittest.TestCase):
     def setUp(self):
         self.torso_frame_name = 'torso'
 
-        self.frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee']
-        # self.frame_names = ['torso', 'RF', 'R_knee', 'LF', 'L_knee', 'LH', 'RH']
+        # self.frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee']
+        self.frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
         self.frame_stl_paths, self.poly_halfspace_paths = OrderedDict(), OrderedDict()
         for fr in self.frame_names:
             self.frame_stl_paths[fr] = (cwd +
@@ -158,14 +158,14 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [0.4, -0.4, 0.0]  # prevent leg-crossing
         ])
         box_llim['LH'] = np.array([
-            [-0.2, 0.0, 0.7],  # prevent leg-crossing
             [-0.1, 0.0, 0.7],  # prevent leg-crossing
-            [0.4, 0.0, 0.7]  # prevent leg-crossing
+            [0.15, 0.0, 0.7],  # prevent leg-crossing
+            [0.3, 0.0, 0.7]  # prevent leg-crossing
         ])
         box_llim['RH'] = np.array([
-            [-0.2, -0.4, 0.7],  # prevent leg-crossing
             [-0.1, -0.4, 0.7],  # prevent leg-crossing
-            [0.4, -0.4, 0.7]  # prevent leg-crossing
+            [0.15, -0.35, 0.7],  # prevent leg-crossing
+            [0.3, -0.4, 0.7]  # prevent leg-crossing
         ])
 
         # upper bounds of the safe boxes
@@ -195,14 +195,14 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [0.8, 0.0, 0.6]  # prevent leg-crossing
         ])
         box_ulim['LH'] = np.array([
-            [0.25, 0.4, 1.3],  # prevent leg-crossing
-            [0.6, 0.4, 1.3],  # prevent leg-crossing
-            [0.6, 0.4, 1.3]  # prevent leg-crossing
+            [0.15, 0.4, 1.3],  # prevent leg-crossing
+            [0.3, 0.35, 1.3],  # prevent leg-crossing
+            [0.65, 0.4, 1.3]  # prevent leg-crossing
         ])
         box_ulim['RH'] = np.array([
-            [0.25, 0.0, 1.3],  # prevent leg-crossing
-            [0.6, 0.0, 1.3],  # prevent leg-crossing
-            [0.6, 0.0, 1.3]  # prevent leg-crossing
+            [0.15, 0.0, 1.3],  # prevent leg-crossing
+            [0.3, 0.0, 1.3],  # prevent leg-crossing
+            [0.65, 0.0, 1.3]  # prevent leg-crossing
         ])
         # box_llim = [L_torso, L_lf, L_rf, L_lh, L_rh]
         # box_ulim = [U_torso, U_lf, U_rf, U_lh, U_rh]
@@ -388,6 +388,17 @@ class TestFrameTraversableRegion(unittest.TestCase):
         p_init['R_knee'] = p_init['RF'] + rknee_rf_offset  # TODO: use fwd kin
         p_end['R_knee'] = p_end['RF'] + rknee_rf_offset
 
+        #
+        # left hand
+        #
+        p_init['LH'] = np.array([0.14, 0.25, standing_pos[2]])  # TODO: use fwd kin
+        p_end['LH'] = p_init['LH'] + np.array([0.45, 0., 0.])
+
+        #
+        # right hand
+        #
+        p_init['RH'] = np.array([0.14, -0.25, standing_pos[2]])  # TODO: use fwd kin
+        p_end['RH'] = p_init['RH'] + np.array([0.45, 0., 0.])
 
         # make multi-trajectory planner
         T = 3
@@ -396,7 +407,10 @@ class TestFrameTraversableRegion(unittest.TestCase):
                                traversable_regions_dict['LF'],
                                traversable_regions_dict['RF'],
                                traversable_regions_dict['L_knee'],
-                               traversable_regions_dict['R_knee']]
+                               traversable_regions_dict['R_knee'],
+                               traversable_regions_dict['LH'],
+                               traversable_regions_dict['RH']]
+
         frame_planner = LocomanipulationFramePlanner(traversable_regions,
                                                      self.ee_offsets_path,
                                                      aux_frames_path=self.aux_frames_path)
