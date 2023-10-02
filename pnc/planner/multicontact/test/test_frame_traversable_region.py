@@ -46,7 +46,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         q0[8] = np.pi / 6  # l_shoulder_aa
         q0[9] = 0.  # l_shoulder_ie
         q0[10] = -np.pi / 2  # l_elbow_fe
-        q0[11] = 0.  # l_wrist_ps
+        q0[11] = -np.pi/3.  # l_wrist_ps
         q0[12] = 0.  # l_wrist_pitch
         q0[13] = 0.  # left_ezgripper_knuckle_palm_L1_1
         q0[14] = 0.  # left_ezgripper_knuckle_L1_L2_1
@@ -64,7 +64,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         q0[26] = -np.pi / 6  # r_shoulder_aa
         q0[27] = 0.  # r_shoulder_ie
         q0[28] = -np.pi / 2  # r_elbow_fe
-        q0[29] = 0.  # r_wrist_ps
+        q0[29] = np.pi/3.   # r_wrist_ps
         q0[30] = 0.  # r_wrist_pitch
         q0[31] = 0.  # right_ezgripper_knuckle_palm_L1_1
         q0[32] = 0.  # right_ezgripper_knuckle_L1_L2_1
@@ -158,14 +158,14 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [0.4, -0.4, 0.0]  # prevent leg-crossing
         ])
         box_llim['LH'] = np.array([
-            [-0.1, 0.0, 0.7],  # prevent leg-crossing
-            [0.15, 0.0, 0.7],  # prevent leg-crossing
-            [0.3, 0.0, 0.7]  # prevent leg-crossing
+            [0.1, 0.0, 0.7],  # prevent leg-crossing
+            [0.25, 0.0, 0.7],  # prevent leg-crossing
+            [0.5, 0.0, 0.7]  # prevent leg-crossing
         ])
         box_llim['RH'] = np.array([
-            [-0.1, -0.4, 0.7],  # prevent leg-crossing
-            [0.15, -0.35, 0.7],  # prevent leg-crossing
-            [0.3, -0.4, 0.7]  # prevent leg-crossing
+            [0.1, -0.4, 0.7],  # prevent leg-crossing
+            [0.25, -0.35, 0.7],  # prevent leg-crossing
+            [0.5, -0.4, 0.7]  # prevent leg-crossing
         ])
 
         # upper bounds of the safe boxes
@@ -195,17 +195,15 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [0.8, 0.0, 0.6]  # prevent leg-crossing
         ])
         box_ulim['LH'] = np.array([
-            [0.15, 0.4, 1.3],  # prevent leg-crossing
-            [0.3, 0.35, 1.3],  # prevent leg-crossing
-            [0.65, 0.4, 1.3]  # prevent leg-crossing
+            [0.25, 0.4, 1.3],  # prevent leg-crossing
+            [0.55, 0.35, 1.3],  # prevent leg-crossing
+            [0.8, 0.4, 1.3]  # prevent leg-crossing
         ])
         box_ulim['RH'] = np.array([
-            [0.15, 0.0, 1.3],  # prevent leg-crossing
-            [0.3, 0.0, 1.3],  # prevent leg-crossing
-            [0.65, 0.0, 1.3]  # prevent leg-crossing
+            [0.25, 0.0, 1.3],  # prevent leg-crossing
+            [0.55, 0.0, 1.3],  # prevent leg-crossing
+            [0.8, 0.0, 1.3]  # prevent leg-crossing
         ])
-        # box_llim = [L_torso, L_lf, L_rf, L_lh, L_rh]
-        # box_ulim = [U_torso, U_lf, U_rf, U_lh, U_rh]
         return box_llim, box_ulim
 
     def test_visualizing_reachable_region(self):
@@ -353,25 +351,26 @@ class TestFrameTraversableRegion(unittest.TestCase):
             traversable_regions_dict[fr].load_collision_free_boxes(box_llim[fr], box_ulim[fr])
         self.assertEqual(True, True)
 
+        step_length = 0.45
         # initial and desired final positions for each frame
         p_init, p_end = {}, {}
         #
         # torso
         #
         p_init['torso'] = standing_pos
-        p_end['torso'] = standing_pos + np.array([0.4, 0., 0.])
+        p_end['torso'] = standing_pos + np.array([step_length, 0., 0.])
 
         #
         # left foot
         #
         p_init['LF'] = np.array([0.06, 0.14, 0.])  # TODO: use fwd kin
-        p_end['LF'] = p_init['LF'] + np.array([0.45, 0., 0.])
+        p_end['LF'] = p_init['LF'] + np.array([step_length, 0., 0.])
 
         #
         # right foot
         #
         p_init['RF'] = np.array([0.06, -0.14, 0.])  # TODO: use fwd kin
-        p_end['RF'] = p_init['RF'] + np.array([0.45, 0., 0.])
+        p_end['RF'] = p_init['RF'] + np.array([step_length, 0., 0.])
 
         #
         # left knee
@@ -391,14 +390,14 @@ class TestFrameTraversableRegion(unittest.TestCase):
         #
         # left hand
         #
-        p_init['LH'] = np.array([0.14, 0.25, standing_pos[2]])  # TODO: use fwd kin
-        p_end['LH'] = p_init['LH'] + np.array([0.45, 0., 0.])
+        p_init['LH'] = np.array([0.22, 0.3, standing_pos[2]])  # TODO: use fwd kin
+        p_end['LH'] = p_init['LH'] + np.array([step_length, 0., 0.])
 
         #
         # right hand
         #
-        p_init['RH'] = np.array([0.14, -0.25, standing_pos[2]])  # TODO: use fwd kin
-        p_end['RH'] = p_init['RH'] + np.array([0.45, 0., 0.])
+        p_init['RH'] = np.array([0.22, -0.3, standing_pos[2]])  # TODO: use fwd kin
+        p_end['RH'] = p_init['RH'] + np.array([step_length, 0., 0.])
 
         # make multi-trajectory planner
         T = 3
