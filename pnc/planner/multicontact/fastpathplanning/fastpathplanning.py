@@ -94,9 +94,9 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
         # get indices of current frame for all curve points
         for b in range(num_boxes+1):
             if b == 0:
-                ee_traj_idx = np.linspace(frame_idx+b*d*n_f, frame_idx+d*(b*n_f+1)-1, d).astype(int)
+                ee_traj_idx = np.linspace(d*frame_idx+b*d*n_f, d*frame_idx+d*(b*n_f+1)-1, d).astype(int)
             else:
-                ee_traj_idx = np.vstack((ee_traj_idx, (np.linspace(frame_idx+b*d*n_f, frame_idx+d*(b*n_f+1)-1, d)).astype(int)))
+                ee_traj_idx = np.vstack((ee_traj_idx, (np.linspace(d*frame_idx+b*d*n_f, d*frame_idx+d*(b*n_f+1)-1, d)).astype(int)))
 
         ee_traj_change = traj[ee_traj_idx[1:]]-traj[ee_traj_idx[:-1]]
         durations[frame] = np.linalg.norm(ee_traj_change, axis=1)

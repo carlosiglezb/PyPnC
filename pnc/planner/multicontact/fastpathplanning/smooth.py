@@ -315,8 +315,8 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
     for k in range(n_boxes * n_frames):
         continuity[k] = {}
 
-        # move on to next frame after n_boxes for each frame
-        if k != 0 and (k % n_boxes * n_frames) == 0:
+        # move on to next frame after n_boxes on current frame
+        if k != 0 and (k % n_boxes == 0):
             frame_idx += 1
             frame_name = frame_list[frame_idx]
             k_fr_box = 0
@@ -355,16 +355,21 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
 
     # Rigid links (e.g., shin link length) constraint relaxation
     soc_constraint, cost_log_abs = [], []
+    cost_log_abs_sum = 0.
     if aux_frames is not None:
         prox_fr_idx, dist_fr_idx = 0, 0
         link_based_weights = [0.1621, 0.006, 0.2808]    # based on distance between foot-shin frames
         for aux_fr in aux_frames:
             if aux_fr['parent_frame'] == 'l_knee_fe_ld':
-                prox_fr_idx = int(3 * n_boxes)
-                dist_fr_idx = int(1 * n_boxes)
+                L_kn_frame_idx = np.where(np.array(frame_list) == 'L_knee')[0][0]
+                LF_frame_idx = np.where(np.array(frame_list) == 'LF')[0][0]
+                prox_fr_idx = int(L_kn_frame_idx * n_boxes)
+                dist_fr_idx = int(LF_frame_idx * n_boxes)
             elif aux_fr['parent_frame'] == 'r_knee_fe_ld':
-                prox_fr_idx = int(4 * n_boxes)
-                dist_fr_idx = int(2 * n_boxes)
+                R_kn_frame_idx = np.where(np.array(frame_list) == 'R_knee')[0][0]
+                RF_frame_idx = np.where(np.array(frame_list) == 'RF')[0][0]
+                prox_fr_idx = int(R_kn_frame_idx * n_boxes)
+                dist_fr_idx = int(RF_frame_idx * n_boxes)
             else:
                 print(f'Parent frame index for bezier smoothing unknown')
             link_length = aux_fr['length']
@@ -382,6 +387,7 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
                     # soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
 
         cost_log_abs_sum = -(cp.sum(cost_log_abs))
+        # cost_log_abs_sum = 0.
 
     # Reachability constraints
     fr_idx = 0
