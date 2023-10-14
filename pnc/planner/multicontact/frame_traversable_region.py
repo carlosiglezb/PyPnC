@@ -52,7 +52,7 @@ class FrameTraversableRegion:
         if visualizer is not None:
             b_visualize_reach = True
 
-        self._frame_name = frame_name
+        self.frame_name = frame_name
         self._reachable_stl_path = reachable_stl_path
         self._b_visualize_reach = b_visualize_reach
 
@@ -129,7 +129,7 @@ class FrameTraversableRegion:
 
         # first translate, then rotate
         tf_new = tf.concatenate_matrices(tf_trans, tf_ori)
-        self._vis["traversable_regions"]["reachable"][self._frame_name].set_transform(tf_new)
+        self._vis["traversable_regions"]["reachable"][self.frame_name].set_transform(tf_new)
 
     def load_collision_free_boxes(self, box_llim, box_ulim):
         self._plan_safe_box_list = fpp.SafeSet(
@@ -145,9 +145,9 @@ class FrameTraversableRegion:
                 # convert RGBA to meshcat convention and visualize
                 obj = g.MeshPhongMaterial()
                 convert_rgba_to_meshcat_obj(obj, box_color_rgba)
-                self._vis["traversable_regions"]["safe"][self._frame_name][str(self._N_boxes)].set_object(box, obj)
+                self._vis["traversable_regions"]["safe"][self.frame_name][str(self._N_boxes)].set_object(box, obj)
                 box_center = tf.translation_matrix((box_ul + box_ll) / 2.)
-                self._vis["traversable_regions"]["safe"][self._frame_name][str(self._N_boxes)].set_transform(box_center)
+                self._vis["traversable_regions"]["safe"][self.frame_name][str(self._N_boxes)].set_transform(box_center)
                 self._N_boxes += 1
 
 

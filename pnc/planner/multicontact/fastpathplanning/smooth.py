@@ -274,6 +274,7 @@ def optimize_bezier(L, U, durations, alpha, initial, final,
 
 
 def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, initial, final,
+                             fixed_frames=None, motion_frames=None,
                              n_points=None, **kwargs):
     stance_foot = 'LF'
 
@@ -358,7 +359,7 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
     cost_log_abs_sum = 0.
     if aux_frames is not None:
         prox_fr_idx, dist_fr_idx = 0, 0
-        link_based_weights = [0.1621, 0.006, 0.2808]    # based on distance between foot-shin frames
+        link_based_weights = 0.01 * np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
         for aux_fr in aux_frames:
             if aux_fr['parent_frame'] == 'l_knee_fe_ld':
                 L_kn_frame_idx = np.where(np.array(frame_list) == 'L_knee')[0][0]
@@ -429,7 +430,7 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-    prob.solve(solver='SCS', eps_abs=5e-3, eps_rel=5e-3)
+    prob.solve(solver='SCS', eps_abs=5e-2, eps_rel=5e-2)
 
     # Reconstruct trajectory.
     beziers = []
@@ -616,8 +617,8 @@ def optimize_bezier_with_retiming(L, U, durations, alpha, initial, final,
 
 
 def optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, initial, final,
-    omega=3, kappa_min=1e-2, verbose=False, **kwargs):
-
+                                           fixed_frames=None, motion_frames=None,
+                                           omega=3, kappa_min=1e-2, verbose=False, **kwargs):
     L, U = {}, {}
     for frame, i in box_seq.items():
         L[frame] = np.array([S[frame].B.boxes[i[j]].l for j in i])
@@ -629,7 +630,8 @@ def optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, i
 
     # Solve initial Bezier problem.
     # path, sol_stats = optimize_bezier(L[frame], U[frame], durations[frame], alpha, initial[frame], final[frame], **kwargs)
-    path, sol_stats = optimize_multiple_bezier(R, A, L, U, durations, alpha, initial, final, **kwargs)
+    path, sol_stats = optimize_multiple_bezier(R, A, L, U, durations, alpha, initial, final,
+                                               fixed_frames, motion_frames, **kwargs)
     cost = sol_stats['cost']
     cost_breakdown = sol_stats['cost_breakdown']
     retiming_weights = sol_stats['retiming_weights']

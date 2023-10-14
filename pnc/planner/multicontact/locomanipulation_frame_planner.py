@@ -11,7 +11,12 @@ from ruamel.yaml import YAML
 class LocomanipulationFramePlanner:
     def __init__(self, traversable_regions_list, ee_offset_file_path,
                  starting_stance_foot='LF',
-                 aux_frames_path=None):
+                 aux_frames_path=None,
+                 fixed_frames=None,
+                 motion_frames=None):
+
+        # fixed, motion, and free frames filled out in the creation of hyperplanes
+        self.fixed_frames, self.motion_frames, self.free_frames = [], [], []
 
         self.safe_boxes = OrderedDict()
         self.reachability_planes = OrderedDict()
@@ -19,18 +24,29 @@ class LocomanipulationFramePlanner:
         self.frame_names = []
         self.starting_stance_foot = starting_stance_foot
         for region in traversable_regions_list:
-            self.frame_names.append(region._frame_name)
-            self.safe_boxes[region._frame_name] = region._plan_safe_box_list
+            self.frame_names.append(region.frame_name)
+            self.safe_boxes[region.frame_name] = region._plan_safe_box_list
 
             # do the torso at the very end to get reachability from contact frames
-            if region._frame_name != 'torso':
+            if region.frame_name != 'torso':
                 H, d_prime = self.extract_plane_eqn_from_coeffs(region._plane_coeffs)
                 d_prime = self.update_plane_offset_from_root(region._origin_pos,
                                                                 H, d_prime)
-                self.reachability_planes[region._frame_name] = {'H': H, 'd': d_prime}
+                self.reachability_planes[region.frame_name] = {'H': H, 'd': d_prime}
 
-            if region._frame_name == starting_stance_foot:
+            if region.frame_name == starting_stance_foot:
                 init_standing_pos = region._origin_pos
+
+            # save if fixed, motion, or free frame at initial contact sequence
+            if fixed_frames is not None:
+                if region.frame_name in fixed_frames[0]:
+                    self.fixed_frames.append(region.frame_name)
+                elif region.frame_name in motion_frames[0]:
+                    self.motion_frames.append(region.frame_name)
+                else:
+                    self.free_frames.append(region.frame_name)
+
+        # check fixed and motion frames do not conflict
 
         # the torso must be reachable based on the frame in contact
         H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path,
@@ -68,8 +84,10 @@ class LocomanipulationFramePlanner:
         S = self.safe_boxes
         R = self.reachability_planes
         A = self.aux_frames
+        fixed_frames = self.fixed_frames
+        motion_frames = self.motion_frames
         self.path = fpp.plan_multiple(S, R, p_init, p_term, T, alpha, der_init,
-                                      der_term, verbose, A)
+                                      der_term, verbose, A, fixed_frames, motion_frames)
 
     def plot(self, visualizer):
         current_box = 0

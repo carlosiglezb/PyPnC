@@ -62,16 +62,19 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
     l = np.zeros((d * n_f * (num_boxes - 1),))
     u = np.zeros((d * n_f * (num_boxes - 1),))
     ee_idx = 0
-    for frame, ee_box in safe_boxes.items():
-        boxes = [ee_box.B.boxes[i] for i in box_seq[frame]]
-        llim_current_ee = np.array([np.maximum(b.l, c.l) for b, c in zip(boxes[:-1], boxes[1:])])
-        ulim_current_ee = np.array([np.minimum(b.u, c.u) for b, c in zip(boxes[:-1], boxes[1:])])
-        box_idx = 0
-        for p in range(num_boxes - 1):
-            l[p * d * n_f + ee_idx:p * d * n_f + d + ee_idx] = llim_current_ee[box_idx]
-            u[p * d * n_f + ee_idx:p * d * n_f + d + ee_idx] = ulim_current_ee[box_idx]
-            box_idx += 1
-        ee_idx += d
+    if num_boxes > 2:
+        for frame, ee_box in safe_boxes.items():
+            boxes = [ee_box.B.boxes[i] for i in box_seq[frame]]
+            # llim_current_ee = np.array([np.maximum(b.l, c.l) for b, c in zip(boxes[:-1], boxes[1:])])
+            # ulim_current_ee = np.array([np.minimum(b.u, c.u) for b, c in zip(boxes[:-1], boxes[1:])])
+            # box_idx = 0
+            for p in range(1, num_boxes):
+                l[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].l
+                u[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].u
+                # l[p * d * n_f + ee_idx:p * d * n_f + d + ee_idx] = llim_current_ee[box_idx]
+                # u[p * d * n_f + ee_idx:p * d * n_f + d + ee_idx] = ulim_current_ee[box_idx]
+                # box_idx += 1
+            ee_idx += d
 
     # Construct end-effector reachability constraints (initial & final points specified)
     H = np.zeros((N_planes * (num_boxes - 1), d * n_f * (num_boxes + 1)))
@@ -103,21 +106,29 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames
 
     # add feasibility of end curve point? Perhaps since it depends on torso
 
-    # knee-to-foot fixed distance constraint
-    if aux_frames is not None:
+    # knee-to-foot fixed distance constraint (this should be trivially satisfied when 2 boxes)
+    if (num_boxes != 2) and (aux_frames is not None):
         cost_log_abs, soc_constraint, A_soc = create_cvx_norm_eq_relaxation(
                                                         aux_frames, num_boxes, d*n_f, x)
     else:
         soc_constraint = []
+        A_soc = []
         cost_log_abs = 0.
 
     cost = cp.sum(cp.norm(x[d * n_f:] - x[:-d * n_f], 2)) + cost_log_abs
 
     constr = [x[:d * n_f] == x_init,
-              x[d * n_f:-d * n_f] >= l,     # safe, collision-free boxes (lower limit)
-              x[d * n_f:-d * n_f] <= u,     # safe, collision-free boxes (upper limit)
+              # x[d * n_f:-d * n_f] >= l,     # safe, collision-free boxes (lower limit)
+              # x[d * n_f:-d * n_f] <= u,     # safe, collision-free boxes (upper limit)
               # H @ x <= -d_vec,            # non-stance frame remains reachable
               x[-d * n_f:] == x_goal]
+
+    # add limits if more than 2 boxes
+    if num_boxes > 2:
+        constr.append([
+            x[d * n_f:-d * n_f] >= l,  # safe, collision-free boxes (lower limit)
+            x[d * n_f:-d * n_f] <= u,  # safe, collision-free boxes (upper limit)
+        ])
 
     prob = cp.Problem(cp.Minimize(cost), constr + soc_constraint)
     prob.solve(solver='SCS')
@@ -223,8 +234,8 @@ def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=
     while True:
         n_iters += 1
 
-        for frame, bs in box_seq.items():
-            box_seq[frame] = jump_box_repetitions(np.array(bs))
+        # for frame, bs in box_seq.items():
+        #     box_seq[frame] = jump_box_repetitions(np.array(bs))
         traj, length, solver_time_i = solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal,
                                                                aux_frames, **kwargs)
         solver_time += solver_time_i
@@ -233,8 +244,8 @@ def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=
         for frame, b_seq in box_seq.items():
             B = safe_boxes[frame].B
 
-        if verbose:
-            update_log(n_iters, length, len(box_seq[frame]))
+            if verbose:
+                update_log(n_iters, length, len(box_seq[frame]))
 
         # box_seq[frame], traj = merge_overlaps_multiple(box_seq, traj, tol)
 

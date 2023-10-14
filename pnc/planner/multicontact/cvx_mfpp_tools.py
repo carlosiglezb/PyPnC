@@ -76,7 +76,7 @@ def populate_rigid_link_constraint(aux_frame, A_soc, d_soc, x_dim, num_boxes):
 
     # create constraint for all interior curve points
     for p in range(1, num_boxes):
-        A_j = np.zeros((3, x_dim * (num_boxes + 1)))  # (x,y,z) of current curve point
+        A_j = np.zeros((3, x_dim * num_boxes))  # (x,y,z) of current curve point
         start_idx_ft = x_dim * p + foot_idx
         start_idx_kn = x_dim * p + knee_idx
         A_j[:, start_idx_ft] = np.eye(3)

@@ -61,18 +61,30 @@ def plan(S, p_init, p_term, T, alpha, der_init={}, der_term={}, verbose=True):
 
 
 def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
-                  verbose=True, A=None):
+                  verbose=True, A=None, fixed_frames=None, motion_frames=None):
 
     if verbose:
         print('Polygonal phase:')
 
     box_seq = OrderedDict()
     for frame, boxes in S.items():
-        discrete_planner, runtime = boxes.G.shortest_path(p_term[frame])
-        box_seq[frame], length, runtime = discrete_planner(p_init[frame])
-        if box_seq[frame] is None:
-            print('Infeasible safe problem, initial and terminal points are disconnected.')
-            return
+        # discrete_planner, runtime = boxes.G.shortest_path(p_term[frame])
+        # box_seq[frame], length, runtime = discrete_planner(p_init[frame])
+        # if box_seq[frame] is None:
+        #     print('Infeasible safe problem, initial and terminal points are disconnected.')
+        #     return
+
+        # If no fixed frames are provided, find the shortest paths for all frames
+        # Also find the shortest path for all non-fixed frames
+        if (fixed_frames is None) or (fixed_frames is not None and frame not in fixed_frames):
+            discrete_planner, runtime = boxes.G.shortest_path(p_term[frame])
+            box_seq[frame], length, runtime = discrete_planner(p_init[frame])
+            if box_seq[frame] is None:
+                print('Infeasible safe problem, initial and terminal points are disconnected.')
+                return
+        else:
+            if frame in fixed_frames:
+                box_seq[frame] = [0] * 2   # assume point is stationary on first box TODO generalize *2
 
     box_seq, traj, length, solver_time = iterative_planner_multiple(S, R, p_init, p_term,
                                                         box_seq, verbose, A)
@@ -100,8 +112,12 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
 
         ee_traj_change = traj[ee_traj_idx[1:]]-traj[ee_traj_idx[:-1]]
         durations[frame] = np.linalg.norm(ee_traj_change, axis=1)
+        #TODO deal with case where any of durations[frame] == 0
         durations[frame] *= T / sum(durations[frame])
 
-    path, sol_stats = optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, p_init, p_term, verbose=True)
+    path, sol_stats = optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations,
+                                                             alpha, p_init, p_term,
+                                                             fixed_frames, motion_frames,
+                                                             verbose=verbose)
 
     return path
