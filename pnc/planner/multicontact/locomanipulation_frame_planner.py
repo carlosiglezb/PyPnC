@@ -21,6 +21,7 @@ class LocomanipulationFramePlanner:
         self.safe_boxes = OrderedDict()
         self.reachability_planes = OrderedDict()
         self.path = []
+        self.box_seq = []
         self.frame_names = []
         self.starting_stance_foot = starting_stance_foot
         for region in traversable_regions_list:
@@ -37,16 +38,18 @@ class LocomanipulationFramePlanner:
             if region.frame_name == starting_stance_foot:
                 init_standing_pos = region._origin_pos
 
-            # save if fixed, motion, or free frame at initial contact sequence
-            if fixed_frames is not None:
-                if region.frame_name in fixed_frames[0]:
-                    self.fixed_frames.append(region.frame_name)
-                elif region.frame_name in motion_frames[0]:
-                    self.motion_frames.append(region.frame_name)
-                else:
-                    self.free_frames.append(region.frame_name)
+            # # save if fixed, motion, or free frame at initial contact sequence
+            # if fixed_frames is not None:
+            #     if region.frame_name in fixed_frames[0]:
+            #         self.fixed_frames.append(region.frame_name)
+            #     elif region.frame_name in motion_frames[0]:
+            #         self.motion_frames.append(region.frame_name)
+            #     else:
+            #         self.free_frames.append(region.frame_name)
 
         # check fixed and motion frames do not conflict
+        self.fixed_frames = fixed_frames
+        self.motion_frames = motion_frames
 
         # the torso must be reachable based on the frame in contact
         H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path,
@@ -86,16 +89,32 @@ class LocomanipulationFramePlanner:
         A = self.aux_frames
         fixed_frames = self.fixed_frames
         motion_frames = self.motion_frames
-        self.path = fpp.plan_multiple(S, R, p_init, p_term, T, alpha, der_init,
+        self.path, self.box_seq = fpp.plan_multiple(S, R, p_init, p_term, T, alpha, der_init,
                                       der_term, verbose, A, fixed_frames, motion_frames)
 
-    def plot(self, visualizer):
+    def plot(self, visualizer, static_html=False):
         current_box = 0
-        for frame in self.frame_names:
-            frame_boxes = len(self.safe_boxes[frame].B.boxes)
-            bezier_curve = self.path.beziers[current_box:current_box+frame_boxes]
-            self.visualize_bezier_points(visualizer, frame, bezier_curve)
+        for fr_name in self.safe_boxes.keys():
+            current_path_seg = 0
+            for p in self.path:
+                frame_boxes = len(self.box_seq[current_path_seg][fr_name])
+                bezier_curve = p.beziers[current_box:current_box+frame_boxes]
+                self.visualize_bezier_points(visualizer, fr_name, bezier_curve, current_path_seg)
+                current_path_seg += 1
             current_box += frame_boxes
+        # for frame in self.frame_names:
+        #     frame_boxes = len(self.safe_boxes[frame].B.boxes)
+        #     bezier_curve = self.path.beziers[current_box:current_box+frame_boxes]
+        #     self.visualize_bezier_points(visualizer, frame, bezier_curve)
+        #     current_box += frame_boxes
+
+        if static_html:
+            # create and save locally in static html form
+            res = visualizer.viewer.static_html()
+            save_file = './data/multi-contact-plan.html'
+            with open(save_file, "w") as f:
+                f.write(res)
+
 
     @staticmethod
     def add_fixed_distance_between_points(path):
@@ -108,7 +127,7 @@ class LocomanipulationFramePlanner:
         return aux_frames
 
     @staticmethod
-    def visualize_bezier_points(visualizer, frame, bezier_curve):
+    def visualize_bezier_points(visualizer, frame, bezier_curve, segment=0):
         color_waypoint = [0., 1., 0., 0.6]      # blue
         color_transition = [1., 1., 0., 0.6]    # yellow
         r_bezier_pts = 0.01
@@ -124,9 +143,9 @@ class LocomanipulationFramePlanner:
                     convert_rgba_to_meshcat_obj(obj, color_transition)
                 else:
                     convert_rgba_to_meshcat_obj(obj, color_waypoint)
-                visualizer.viewer["traversable_regions"]["path"][frame][str(pt_number)].set_object(
+                visualizer.viewer["traversable_regions"]["path"][frame][str(segment)][str(pt_number)].set_object(
                     obj, g.MeshLambertMaterial(color=obj.color))
-                visualizer.viewer["traversable_regions"]["path"][frame][str(pt_number)].set_transform(tf_pos)
+                visualizer.viewer["traversable_regions"]["path"][frame][str(segment)][str(pt_number)].set_transform(tf_pos)
 
                 pt_number += 1
             seg_number += 1

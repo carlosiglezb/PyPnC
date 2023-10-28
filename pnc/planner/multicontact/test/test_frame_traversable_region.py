@@ -566,11 +566,8 @@ class TestFrameTraversableRegion(unittest.TestCase):
 
         # set fixed and motion frame sets
         fixed_frames, motion_frames = [], []
-        fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-        # fixed_frames.append(['LF', 'RF'])   # frames that must not move
-        motion_frames.append(['LH'])        # frames that have a specified final position
 
-        step_length = 0.0
+        step_length = 0.35
         # initial and desired final positions for each frame
         p_init, p_end = {}, {}
         #
@@ -618,6 +615,27 @@ class TestFrameTraversableRegion(unittest.TestCase):
         p_init['RH'] = np.array([0.22, -0.3, standing_pos[2]])  # TODO: use fwd kin
         p_end['RH'] = p_init['RH']
 
+        # ---- Step 1: L hand to frame
+        # fixed_frames.append(['LF', 'RF'])   # frames that must not move
+        fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+        motion_frames.append({'LH': p_init['LH'] + np.array([0.08, 0.07, 0.15])})
+
+        # ---- Step 2: step through door with left foot
+        # fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
+        fixed_frames.append(['LF', 'L_knee', 'RF', 'R_knee', 'LH'])   # frames that must not move
+        # motion_frames.append({'LF': p_init['LF'] + np.array([step_length, 0., 0.]),
+        #                     'L_knee': p_init['L_knee'] + np.array([step_length, 0., 0.])})
+        ############## motion frame below is for testing only (remove later) #######################
+        motion_frames.append({'torso': p_init['torso'] + np.array([step_length/2., 0., 0.]),
+                            'RH': p_init['RH'] + np.array([step_length/2., 0., 0.])})
+        ##########################################################################################
+        # ---- Step 3: re-position L/R hands for more stability
+        # fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+        # motion_frames.append(['LH', 'RH'])        # frames that have a specified final position
+        # ---- Step 4: step through door with right foot
+        # fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
+        # motion_frames.append(['RF', 'R_knee'])        # frames that have a specified final position
+
         # make multi-trajectory planner
         T = 3
         alpha = [0, 0, 1]
@@ -635,7 +653,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
                                                      fixed_frames=fixed_frames,
                                                      motion_frames=motion_frames)
         frame_planner.plan(p_init, p_end, T, alpha, verbose=False)
-        frame_planner.plot(visualizer=visualizer)
+        frame_planner.plot(visualizer=visualizer, static_html=True)
         self.assertEqual(True, True)
 
     def test_polytope_offset(self):

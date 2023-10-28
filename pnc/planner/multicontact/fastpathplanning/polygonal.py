@@ -28,107 +28,127 @@ def solve_min_distance(B, box_seq, start, goal):
     return traj, length, solver_time
 
 
-def solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal, aux_frames=None):
+def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_frames=None):
     stance_foot = 'LF'
 
     # Make copy of ee reachability region with only end effectors (e.g., excluding torso)
     ee_reach = {}
-    for frame, coeffs in reach.items():
+    for frame in reach.keys():
         if frame != 'torso':
             ee_reach[frame] = reach[frame]
 
     # parameters needed for state dimensions
     first_box = next(iter(safe_boxes.values()))
     d = first_box.B.d
-    num_boxes = np.max([len(bs) for bs in box_seq.values()])
     N_planes = len(next(iter(reach.values()))['H'])
     n_ee = len(ee_reach)
     n_f = len(reach)
+
+    num_boxes_tot = 0
+    for bs_lst in box_seq:
+        num_boxes_tot += len(next(iter(bs_lst.values())))
+    # num_boxes = np.max([len(bs) for bs in box_seq.values()])
 
     # we write the problem as
     # x = [p_torso^{(i)}, p_lfoot^{(i)}, p_rfoot^{(i)}, p_lknee^{(i)}, p_rknee^{(i)}, ... , t^{(i)}]
     # containing all "i" curve points + auxiliary variables t^(i) that assimilate constant shin
     # lengths in paths for each leg
-    x = cp.Variable(d * n_f * (num_boxes + 1))
+    x = cp.Variable(d * n_f * (num_boxes_tot - 1))
 
-    # frame start and goal locations in terms of optimization variables
-    x_init, x_goal = [], []
-    for x0 in start.values():
-        x_init = np.concatenate((x_init, x0))
-    for xf in goal.values():
-        x_goal = np.concatenate((x_goal, xf))
+    constr = []
+    x_init_idx, idx = 0, 0
+    # re-write multi-stage goal points (locations) in terms of optimization variables
+    for sp_lst in safe_points_list:
+        j_idx = 0
+        for f_name in safe_boxes.keys():     # go in order (hence, refer to an OrderedDict)
+            if f_name in sp_lst:
+                constr.append(x[x_init_idx + j_idx:x_init_idx + j_idx + d] == sp_lst[f_name])
+            j_idx += d
+
+        # increase state index based on the number of boxes in between intermediate desired points
+        if idx != len(box_seq):     # if we haven't reached the last safe point (end state)
+            num_boxes_current = len(next(iter(box_seq[idx].values())))
+            x_init_idx += (num_boxes_current-1) * d * n_f
+            idx += 1
 
     # organize lower and upper state limits
-    l = np.zeros((d * n_f * (num_boxes - 1),))
-    u = np.zeros((d * n_f * (num_boxes - 1),))
+    l = np.zeros((d * n_f * (num_boxes_tot - 1),))
+    u = np.zeros((d * n_f * (num_boxes_tot - 1),))
     ee_idx = 0
-    if num_boxes > 2:
-        for frame, ee_box in safe_boxes.items():
-            boxes = [ee_box.B.boxes[i] for i in box_seq[frame]]
-            # llim_current_ee = np.array([np.maximum(b.l, c.l) for b, c in zip(boxes[:-1], boxes[1:])])
-            # ulim_current_ee = np.array([np.minimum(b.u, c.u) for b, c in zip(boxes[:-1], boxes[1:])])
-            # box_idx = 0
-            for p in range(1, num_boxes):
-                l[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].l
-                u[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].u
-                # l[p * d * n_f + ee_idx:p * d * n_f + d + ee_idx] = llim_current_ee[box_idx]
-                # u[p * d * n_f + ee_idx:p * d * n_f + d + ee_idx] = ulim_current_ee[box_idx]
-                # box_idx += 1
-            ee_idx += d
+    for bs_lst in box_seq:
+        num_boxes_current = len(next(iter(bs_lst.values())))
+        if num_boxes_current > 2:
+            for frame, ee_box in safe_boxes.items():
+                boxes = [ee_box.B.boxes[i] for i in box_seq[frame]]
+                # llim_current_ee = np.array([np.maximum(b.l, c.l) for b, c in zip(boxes[:-1], boxes[1:])])
+                # ulim_current_ee = np.array([np.minimum(b.u, c.u) for b, c in zip(boxes[:-1], boxes[1:])])
+                # box_idx = 0
+                for p in range(1, num_boxes_tot):
+                    l[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].l
+                    u[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].u
+                    # l[p * d * n_f + ee_idx:p * d * n_f + d + ee_idx] = llim_current_ee[box_idx]
+                    # u[p * d * n_f + ee_idx:p * d * n_f + d + ee_idx] = ulim_current_ee[box_idx]
+                    # box_idx += 1
+                ee_idx += d
 
     # Construct end-effector reachability constraints (initial & final points specified)
-    H = np.zeros((N_planes * (num_boxes - 1), d * n_f * (num_boxes + 1)))
-    d_vec = np.zeros((N_planes * (num_boxes - 1) * (n_ee - 1),))
-    for frame_name, _ in start.items():
-        # get corresponding index
-        frame_idx = list(start.keys()).index(frame_name)
-
-        if frame_name == 'torso' or frame_name == stance_foot:
-            pass
-        else:
-            coeffs = reach[frame_name]
-            for idx_box in range(num_boxes - 1):
-                # torso translation terms
-                torso_prev_start_idx = idx_box * d * n_f
-                torso_prev_end_idx = idx_box * d * n_f + d
-                torso_post_start_idx = (idx_box + 1) * d * n_f
-                torso_post_end_idx = (idx_box + 1) * d * n_f + d
-                H[N_planes * (idx_box):N_planes * (idx_box + 1), torso_prev_start_idx:torso_prev_end_idx] = -coeffs['H']
-                H[N_planes * (idx_box):N_planes * (idx_box + 1), torso_post_start_idx:torso_post_end_idx] = coeffs['H']
-
-                # term corresponding to current end effector
-                ee_start_idx = d * n_f * (idx_box + 1) + d * frame_idx
-                ee_end_idx = d * n_f * (idx_box + 1) + d * (frame_idx + 1)
-                H[N_planes * (idx_box):N_planes * (idx_box + 1), ee_start_idx:ee_end_idx] = coeffs['H']
-
-            # the 'd' term is the same for all planes since the shift is included in the torso term
-            d_vec = np.tile(coeffs['d'], num_boxes - 1)
+    # H = np.zeros((N_planes * (num_boxes_tot - 1), d * n_f * (num_boxes_tot + 1)))
+    # d_vec = np.zeros((N_planes * (num_boxes_tot - 1) * (n_ee - 1),))
+    # for sp_lst in safe_points_list:
+    #     for frame_name in safe_boxes.keys():    # go in order
+    #         # get corresponding index
+    #         frame_idx = list(sp_lst.keys()).index(frame_name)
+    #
+    #         if frame_name == 'torso' or frame_name == stance_foot:
+    #             pass
+    #         else:
+    #             coeffs = reach[frame_name]
+    #             for idx_box in range(num_boxes_tot - 1):
+    #                 # torso translation terms
+    #                 torso_prev_start_idx = idx_box * d * n_f
+    #                 torso_prev_end_idx = idx_box * d * n_f + d
+    #                 torso_post_start_idx = (idx_box + 1) * d * n_f
+    #                 torso_post_end_idx = (idx_box + 1) * d * n_f + d
+    #                 H[N_planes * (idx_box):N_planes * (idx_box + 1), torso_prev_start_idx:torso_prev_end_idx] = -coeffs['H']
+    #                 H[N_planes * (idx_box):N_planes * (idx_box + 1), torso_post_start_idx:torso_post_end_idx] = coeffs['H']
+    #
+    #                 # term corresponding to current end effector
+    #                 ee_start_idx = d * n_f * (idx_box + 1) + d * frame_idx
+    #                 ee_end_idx = d * n_f * (idx_box + 1) + d * (frame_idx + 1)
+    #                 H[N_planes * (idx_box):N_planes * (idx_box + 1), ee_start_idx:ee_end_idx] = coeffs['H']
+    #
+    #             # the 'd' term is the same for all planes since the shift is included in the torso term
+    #             d_vec = np.tile(coeffs['d'], num_boxes_tot - 1)
 
     # add feasibility of end curve point? Perhaps since it depends on torso
 
     # knee-to-foot fixed distance constraint (this should be trivially satisfied when 2 boxes)
-    if (num_boxes != 2) and (aux_frames is not None):
-        cost_log_abs, soc_constraint, A_soc = create_cvx_norm_eq_relaxation(
-                                                        aux_frames, num_boxes, d*n_f, x)
-    else:
-        soc_constraint = []
-        A_soc = []
-        cost_log_abs = 0.
+    for bs_lst in box_seq:
+        num_boxes_current = len(next(iter(bs_lst.values())))
+        if (num_boxes_current != 2) and (aux_frames is not None):
+            cost_log_abs, soc_constraint, A_soc = create_cvx_norm_eq_relaxation(
+                                                            aux_frames, num_boxes_tot, d*n_f, x)
+        else:
+            soc_constraint = []
+            A_soc = []
+            cost_log_abs = 0.
 
     cost = cp.sum(cp.norm(x[d * n_f:] - x[:-d * n_f], 2)) + cost_log_abs
 
-    constr = [x[:d * n_f] == x_init,
-              # x[d * n_f:-d * n_f] >= l,     # safe, collision-free boxes (lower limit)
-              # x[d * n_f:-d * n_f] <= u,     # safe, collision-free boxes (upper limit)
-              # H @ x <= -d_vec,            # non-stance frame remains reachable
-              x[-d * n_f:] == x_goal]
+    # constr = [x[:d * n_f] == x_init,
+    #           # x[d * n_f:-d * n_f] >= l,     # safe, collision-free boxes (lower limit)
+    #           # x[d * n_f:-d * n_f] <= u,     # safe, collision-free boxes (upper limit)
+    #           # H @ x <= -d_vec,            # non-stance frame remains reachable
+    #           x[-d * n_f:] == x_goal]
 
     # add limits if more than 2 boxes
-    if num_boxes > 2:
-        constr.append([
-            x[d * n_f:-d * n_f] >= l,  # safe, collision-free boxes (lower limit)
-            x[d * n_f:-d * n_f] <= u,  # safe, collision-free boxes (upper limit)
-        ])
+    for bs_lst in box_seq:
+        num_boxes_current = len(next(iter(bs_lst.values())))
+        if num_boxes_current > 2:
+            constr.append([
+                x[d * n_f:-d * n_f] >= l,  # safe, collision-free boxes (lower limit)
+                x[d * n_f:-d * n_f] <= u,  # safe, collision-free boxes (upper limit)
+            ])
 
     prob = cp.Problem(cp.Minimize(cost), constr + soc_constraint)
     prob.solve(solver='SCS')
@@ -223,7 +243,7 @@ def iterative_planner(B, start, goal, box_seq, verbose=True, tol=1e-5, **kwargs)
             return list(box_seq), traj, length, solver_time
 
 
-def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=True,
+def iterative_planner_multiple(safe_boxes, reach, safe_points_list, box_seq, verbose=True,
                                aux_frames=None, tol=1e-5, **kwargs):
     if verbose:
         init_log()
@@ -236,16 +256,16 @@ def iterative_planner_multiple(safe_boxes, reach, start, goal, box_seq, verbose=
 
         # for frame, bs in box_seq.items():
         #     box_seq[frame] = jump_box_repetitions(np.array(bs))
-        traj, length, solver_time_i = solve_min_reach_distance(reach, safe_boxes, box_seq, start, goal,
-                                                               aux_frames, **kwargs)
+        traj, length, solver_time_i = solve_min_reach_distance(reach, safe_boxes, box_seq,
+                                                               safe_points_list, aux_frames, **kwargs)
         solver_time += solver_time_i
 
         # TODO: from here on, deal with each end effector separately
-        for frame, b_seq in box_seq.items():
-            B = safe_boxes[frame].B
-
-            if verbose:
-                update_log(n_iters, length, len(box_seq[frame]))
+        # for frame, b_seq in box_seq.items():
+        #     B = safe_boxes[frame].B
+        #
+        #     if verbose:
+        #         update_log(n_iters, length, len(box_seq[frame]))
 
         # box_seq[frame], traj = merge_overlaps_multiple(box_seq, traj, tol)
 

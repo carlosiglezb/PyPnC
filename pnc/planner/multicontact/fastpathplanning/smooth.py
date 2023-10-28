@@ -305,12 +305,15 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
     for i, fr in zip(range(n_frames), initial.keys()):
         # only position is provided, hence second entry is zero
         constraints.append(points[n_boxes * i][0][0] == initial[fr])        # initial position
-        constraints.append(points[n_boxes * (i+1) - 1][0][-1] == final[fr]) # final position
+
+        # add desired end position for both fixed and motion frames
+        if fr in (fixed_frames + motion_frames):
+            constraints.append(points[n_boxes * (i+1) - 1][0][-1] == final[fr]) # final position
 
     # Loop through boxes.
     cost = 0
     continuity = {}
-    frame_list = list(initial.keys())
+    frame_list = list(L.keys())
     frame_idx, k_fr_box = 0, 0
     frame_name = frame_list[frame_idx]
     for k in range(n_boxes * n_frames):
@@ -353,6 +356,24 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
             p = cp.vec(points[k][i], order='C')
             cost += ai * cp.quad_form(p, A)
         k_fr_box += 1
+
+    # Fixed frames constraints
+    if fixed_frames is not None:
+        frame_idx, k_fr_box = 0, 0
+        frame_name = frame_list[frame_idx]
+        for k in range(n_boxes * n_frames):
+            # move on to next frame after n_boxes on current frame
+            if k != 0 and (k % n_boxes == 0):
+                frame_idx += 1
+                frame_name = frame_list[frame_idx]
+                k_fr_box = 0
+
+            if frame_name in fixed_frames:
+                if k_fr_box < n_boxes:
+                    # for corresponding box k, constrain the position [0] of all knots
+                    fixed_frame_pos_mat = np.repeat(np.array([initial[frame_name]]), n_points, axis=0)
+                    constraints.append(points[k][0] == fixed_frame_pos_mat)
+                    # constraints.append(points[k][0][0] == initial.get(frame_name))
 
     # Rigid links (e.g., shin link length) constraint relaxation
     soc_constraint, cost_log_abs = [], []
