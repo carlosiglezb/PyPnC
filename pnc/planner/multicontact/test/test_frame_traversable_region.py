@@ -653,7 +653,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
                                                      fixed_frames=fixed_frames,
                                                      motion_frames=motion_frames)
         frame_planner.plan(p_init, p_end, T, alpha, verbose=False)
-        frame_planner.plot(visualizer=visualizer, static_html=True)
+        frame_planner.plot(visualizer=visualizer, static_html=False)
         self.assertEqual(True, True)
 
     def test_polytope_offset(self):

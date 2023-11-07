@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import cvxpy as cp
 from time import time
@@ -273,7 +275,7 @@ def optimize_bezier(L, U, durations, alpha, initial, final,
     return path, sol_stats
 
 
-def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, initial, final,
+def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, safe_points_lst,
                              fixed_frames=None, motion_frames=None,
                              n_points=None, **kwargs):
     stance_foot = 'LF'
@@ -282,7 +284,10 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
     n_frames = len(reach_region)
 
     # Problem size. Assume for now same number of boxes for all frames
-    n_boxes, d = L[next(iter(L))].shape
+    _, d = L[0][next(iter(L[0]))].shape
+    num_boxes_tot = 0
+    for bs_lst in L:
+        num_boxes_tot += len(next(iter(bs_lst.values())))
     D = max(alpha)
 
     # Uncomment below when/if method with derivative inputs is implemented
@@ -294,132 +299,166 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
 
     # Control points of the curves and their derivatives.
     points = {}
-    for k in range(n_boxes * n_frames):
+    for k in range((num_boxes_tot - 1) * n_frames):
         points[k] = {}
         for i in range(D + 1):
             size = (n_points - i, d)
             points[k][i] = cp.Variable(size)
 
-    # Boundary conditions for all frames
-    constraints = []
-    for i, fr in zip(range(n_frames), initial.keys()):
-        # only position is provided, hence second entry is zero
-        constraints.append(points[n_boxes * i][0][0] == initial[fr])        # initial position
+    frame_list = list(safe_points_lst[0].keys())
 
-        # add desired end position for both fixed and motion frames
-        if fr in (fixed_frames + motion_frames):
-            constraints.append(points[n_boxes * (i+1) - 1][0][-1] == final[fr]) # final position
+    # Boundary conditions for all frames
+    num_safe_points = len(safe_points_lst)
+    constraints = []
+    seg_box_idx = 0
+    for f_name in safe_points_lst[0].keys():  # go in order
+        for sp_lst in safe_points_lst:      # go by segments
+            # num_boxes_current, _ = L[seg_idx][f_name].shape
+            if f_name in sp_lst:
+                if (seg_box_idx+1) % num_safe_points != 0:
+                    constraints.append(points[seg_box_idx][0][0] == sp_lst[f_name])  # position
+                else:
+                    constraints.append(points[seg_box_idx][0][-1] == sp_lst[f_name])  # final position
+            seg_box_idx += 1
 
     # Loop through boxes.
     cost = 0
     continuity = {}
-    frame_list = list(L.keys())
+    num_segs = len(L)
     frame_idx, k_fr_box = 0, 0
-    frame_name = frame_list[frame_idx]
-    for k in range(n_boxes * n_frames):
+    f_name, prev_f_name = frame_list[frame_idx], frame_list[frame_idx]
+    seg_idx, k = 0, 0
+    for k in range((num_boxes_tot - 1) * n_frames):
+    # for f_name in safe_points_lst[0].keys():  # go in order
         continuity[k] = {}
 
-        # move on to next frame after n_boxes on current frame
-        if k != 0 and (k % n_boxes == 0):
-            frame_idx += 1
-            frame_name = frame_list[frame_idx]
-            k_fr_box = 0
+        # move on to next segment after n_boxes on current frame
+        num_boxes_current, _ = L[seg_idx][f_name].shape
 
-        # Box containment.
-        Lk = np.array([L[frame_name][k_fr_box]] * n_points)
-        Uk = np.array([U[frame_name][k_fr_box]] * n_points)
-        constraints.append(points[k][0] >= Lk)
-        constraints.append(points[k][0] <= Uk)
+        # Adjust frame name, segment and box numbers, then add box constraints.
+        if k != 0 and (k+1) % num_safe_points == 0:
+            Lk = np.array([L[-1][f_name][-1]] * n_points)
+            Uk = np.array([U[-1][f_name][-1]] * n_points)
+            constraints.append(points[k][0] >= Lk)
+            constraints.append(points[k][0] <= Uk)
+        else:           # move to next segment if this is the last box
+            if k != 0 and k_fr_box == (num_boxes_current - 1):   # or (k % num_boxes_current == 0)
+                k_fr_box = 0        # reset the box count
+                seg_idx += 1        # increase segment
+
+            # after going through all segments, reset segment index and move to next frame
+            if seg_idx != 0 and k % (num_boxes_tot - 1) == 0:    # seg_idx % num_segs == 0:
+                seg_idx = 0
+                k_fr_box = 0
+                frame_idx += 1
+                f_name = frame_list[frame_idx]
+
+            # Box containment.
+            Lk = np.array([L[seg_idx][f_name][k_fr_box]] * n_points)
+            Uk = np.array([U[seg_idx][f_name][k_fr_box]] * n_points)
+            constraints.append(points[k][0] >= Lk)
+            constraints.append(points[k][0] <= Uk)
 
         # Bezier dynamics.
         for i in range(D):
             h = n_points - i - 1
-            ci = durations[frame_name][k_fr_box] / h
+            ci = durations[seg_idx][f_name][k_fr_box] / h
             constraints.append(points[k][i][1:] - points[k][i][:-1] == ci * points[k][i + 1])
 
-        # Continuity and differentiability.
-        if k_fr_box < n_boxes - 1:
-            for i in range(D + 1):
-                constraints.append(points[k][i][-1] == points[k + 1][i][0])
-                if i > 0:
-                    continuity[k][i] = constraints[-1]
+        # if we are in the same frame, enforce dynamics, continuity, differentiability, and cost
+        # if f_name == prev_f_name:
+        if (k+1) % (num_boxes_tot-1) != 0:
+            # Continuity and differentiability.
+            if k_fr_box < num_boxes_current - 1:
+                for i in range(D + 1):
+                    constraints.append(points[k][i][-1] == points[k + 1][i][0])
+                    if i > 0:
+                        continuity[k][i] = constraints[-1]
 
-        # Cost function
-        for i, ai in alpha.items():
-            h = n_points - 1 - i
-            A = np.zeros((h + 1, h + 1))
-            for m in range(h + 1):
-                for n in range(h + 1):
-                    A[m, n] = binom(h, m) * binom(h, n) / binom(2 * h, m + n)
-            A *= durations[frame_name][k_fr_box] / (2 * h + 1)
-            A = np.kron(A, np.eye(d))
-            p = cp.vec(points[k][i], order='C')
-            cost += ai * cp.quad_form(p, A)
+            # Cost function
+            for i, ai in alpha.items():
+                h = n_points - 1 - i
+                A = np.zeros((h + 1, h + 1))
+                for m in range(h + 1):
+                    for n in range(h + 1):
+                        A[m, n] = binom(h, m) * binom(h, n) / binom(2 * h, m + n)
+                A *= durations[seg_idx][f_name][k_fr_box] / (2 * h + 1)
+                A = np.kron(A, np.eye(d))
+                p = cp.vec(points[k][i], order='C')
+                cost += ai * cp.quad_form(p, A)
         k_fr_box += 1
+        prev_f_name = copy.copy(f_name)
 
     # Fixed frames constraints
     if fixed_frames is not None:
-        frame_idx, k_fr_box = 0, 0
+        frame_idx, k_fr_box, seg_idx = 0, 0, 0
         frame_name = frame_list[frame_idx]
-        for k in range(n_boxes * n_frames):
-            # move on to next frame after n_boxes on current frame
-            if k != 0 and (k % n_boxes == 0):
+        for k in range((num_boxes_tot - 1) * n_frames):
+            # skip the final positions, those are assigned later
+            if (k+1) % (num_boxes_tot-1) == 0:
+                k_fr_box = 0        # might be redundant
+                continue
+
+            # move on to next frame after all boxes are handled on current frame
+            if k != 0 and (k % (num_boxes_tot - 1) == 0):
+                # move to next frame
                 frame_idx += 1
                 frame_name = frame_list[frame_idx]
                 k_fr_box = 0
 
-            if frame_name in fixed_frames:
-                if k_fr_box < n_boxes:
+            if frame_name in fixed_frames[k_fr_box]:
+                if k_fr_box < (num_boxes_tot - 1):
                     # for corresponding box k, constrain the position [0] of all knots
-                    fixed_frame_pos_mat = np.repeat(np.array([initial[frame_name]]), n_points, axis=0)
+                    fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[k_fr_box][frame_name]]), n_points, axis=0)
                     constraints.append(points[k][0] == fixed_frame_pos_mat)
-                    # constraints.append(points[k][0][0] == initial.get(frame_name))
+            k_fr_box += 1
 
     # Rigid links (e.g., shin link length) constraint relaxation
     soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
-    if aux_frames is not None:
-        prox_fr_idx, dist_fr_idx = 0, 0
-        link_based_weights = 0.01 * np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
-        for aux_fr in aux_frames:
-            if aux_fr['parent_frame'] == 'l_knee_fe_ld':
-                L_kn_frame_idx = np.where(np.array(frame_list) == 'L_knee')[0][0]
-                LF_frame_idx = np.where(np.array(frame_list) == 'LF')[0][0]
-                prox_fr_idx = int(L_kn_frame_idx * n_boxes)
-                dist_fr_idx = int(LF_frame_idx * n_boxes)
-            elif aux_fr['parent_frame'] == 'r_knee_fe_ld':
-                R_kn_frame_idx = np.where(np.array(frame_list) == 'R_knee')[0][0]
-                RF_frame_idx = np.where(np.array(frame_list) == 'RF')[0][0]
-                prox_fr_idx = int(R_kn_frame_idx * n_boxes)
-                dist_fr_idx = int(RF_frame_idx * n_boxes)
-            else:
-                print(f'Parent frame index for bezier smoothing unknown')
-            link_length = aux_fr['length']
-
-            # loop through all safe boxes
-            for nb in range(1, n_boxes):
-                for pnt in range(n_points-1):
-                    link_proximal_point = points[prox_fr_idx+nb][0][pnt]
-                    link_distal_point = points[dist_fr_idx+nb][0][pnt]
-                    create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-                                             link_distal_point, soc_constraint, cost_log_abs,
-                                                         wi=link_based_weights)
-
-                    # knee should mostly be above the foot
-                    # soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
-
-        cost_log_abs_sum = -(cp.sum(cost_log_abs))
-        # cost_log_abs_sum = 0.
+    # if aux_frames is not None:
+    #     prox_fr_idx, dist_fr_idx = 0, 0
+    #     link_based_weights = 0.01 * np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
+    #     for aux_fr in aux_frames:
+    #         if aux_fr['parent_frame'] == 'l_knee_fe_ld':
+    #             L_kn_frame_idx = np.where(np.array(frame_list) == 'L_knee')[0][0]
+    #             LF_frame_idx = np.where(np.array(frame_list) == 'LF')[0][0]
+    #             prox_fr_idx = int(L_kn_frame_idx * n_boxes)
+    #             dist_fr_idx = int(LF_frame_idx * n_boxes)
+    #         elif aux_fr['parent_frame'] == 'r_knee_fe_ld':
+    #             R_kn_frame_idx = np.where(np.array(frame_list) == 'R_knee')[0][0]
+    #             RF_frame_idx = np.where(np.array(frame_list) == 'RF')[0][0]
+    #             prox_fr_idx = int(R_kn_frame_idx * n_boxes)
+    #             dist_fr_idx = int(RF_frame_idx * n_boxes)
+    #         else:
+    #             print(f'Parent frame index for bezier smoothing unknown')
+    #         link_length = aux_fr['length']
+    #
+    #         # loop through all safe boxes
+    #         for nb in range(1, n_boxes):
+    #             for pnt in range(n_points-1):
+    #                 link_proximal_point = points[prox_fr_idx+nb][0][pnt]
+    #                 link_distal_point = points[dist_fr_idx+nb][0][pnt]
+    #                 create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
+    #                                          link_distal_point, soc_constraint, cost_log_abs,
+    #                                                      wi=link_based_weights)
+    #
+    #                 # knee should mostly be above the foot
+    #                 # soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
+    #
+    #     cost_log_abs_sum = -(cp.sum(cost_log_abs))
+    #     # cost_log_abs_sum = 0.
 
     # Reachability constraints
-    fr_idx = 0
+    fr_idx, k_fr_box = 0, 0
     for frame_name in frame_list:
         if frame_name == 'torso':
             coeffs = reach_region[frame_name]
             H = coeffs['H']
             d_vec = np.reshape(coeffs['d'], (len(H), 1))
             d_mat = np.repeat(d_vec, n_points, axis=1)
-            for idx_box in range(1, n_boxes - 1):
+            num_boxes_current, _ = L[k_fr_box][frame_name].shape
+            for idx_box in range(1, num_boxes_current - 1):
                 # torso translation terms
                 z_t_prev = points[idx_box - 1][0]
                 z_t_post = points[idx_box][0]
@@ -437,13 +476,14 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
             H = coeffs['H']
             d_vec = np.reshape(coeffs['d'], (len(H), 1))
             d_mat = np.repeat(d_vec, n_points, axis=1)
-            for idx_box in range(1, n_boxes - 1):
+            num_boxes_current, _ = L[k_fr_box][frame_name].shape
+            for idx_box in range(1, num_boxes_current - 1):
                 # torso translation terms
                 z_t_prev = points[idx_box - 1][0]
                 z_t_post = points[idx_box][0]
 
                 # corresponding end effector frame index
-                z_ee_post = points[fr_idx*n_boxes + idx_box][0]
+                z_ee_post = points[fr_idx*num_boxes_current + idx_box][0]
 
                 # reachable constraint
                 constraints.append(H @ z_t_prev.T - H @ z_t_post.T + H @ z_ee_post.T <= -d_mat)
@@ -454,43 +494,52 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, i
     prob.solve(solver='SCS', eps_abs=5e-2, eps_rel=5e-2)
 
     # Reconstruct trajectory.
-    beziers = []
+    beziers, path = [], []
     a = 0
-    k_fr_box, frame_idx = 0, 0
-    for k in range(n_boxes * n_frames):
+    k_fr_box, frame_idx, seg_idx = 0, 0, 0
+    frame_name = frame_list[frame_idx]
+    for k in range((num_boxes_tot - 1) * n_frames):
+        # skip the final positions, those are assigned later
+        if (k + 1) % (num_boxes_tot - 1) == 0:
+            k_fr_box = 0  # might be redundant
+            path.append(copy.deepcopy(CompositeBezierCurve(beziers)))
+            beziers.clear()
+            a = 0
+            continue
 
-        # move on to next frame after n_boxes for each frame
-        if k != 0 and (k % n_boxes * n_frames) == 0:
+        # move on to next frame after all boxes processed for each frame
+        if k != 0 and (k % (num_boxes_tot - 1)) == 0:
             frame_idx += 1
             frame_name = frame_list[frame_idx]
             k_fr_box = 0
 
-        b = a + durations[frame_name][k_fr_box]
+        b = a + durations[0][frame_name][k_fr_box]
         beziers.append(BezierCurve(points[k][0].value, a, b))
         a = b
-    path = CompositeBezierCurve(beziers)
+        k_fr_box += 1
+    # path = CompositeBezierCurve(beziers)
 
     retiming_weights = {}
-    n_box_counter = 0
-    for k in range(n_boxes * n_frames - 1):
-        retiming_weights[k] = {}
-        if k == 0 or k % ((n_boxes - 1) + n_box_counter * n_boxes) != 0:
-            for i in range(1, D + 1):
-                primal = points[k][i][-1].value
-                dual = continuity[k][i].dual_value
-                retiming_weights[k][i] = primal.dot(dual)
-        else:
-            n_box_counter += 1
+    # n_box_counter = 0
+    # for k in range(num_boxes_tot * n_frames - 1):
+    #     retiming_weights[k] = {}
+    #     if k == 0 or k % ((n_boxes - 1) + n_box_counter * n_boxes) != 0:
+    #         for i in range(1, D + 1):
+    #             primal = points[k][i][-1].value
+    #             dual = continuity[k][i].dual_value
+    #             retiming_weights[k][i] = primal.dot(dual)
+    #     else:
+    #         n_box_counter += 1
 
     # Reconstruct costs.
     cost_breakdown = {}
-    for k in range(n_boxes * n_frames):
-        cost_breakdown[k] = {}
-        bez = beziers[k]
-        for i in range(1, D + 1):
-            bez = bez.derivative()
-            if i in alpha:
-                cost_breakdown[k][i] = alpha[i] * bez.l2_squared()
+    # for k in range((num_boxes_tot - 1) * n_frames):
+    #     cost_breakdown[k] = {}
+    #     bez = beziers[k]
+    #     for i in range(1, D + 1):
+    #         bez = bez.derivative()
+    #         if i in alpha:
+    #             cost_breakdown[k][i] = alpha[i] * bez.l2_squared()
 
     # Solution statistics.
     sol_stats = {}
@@ -637,13 +686,18 @@ def optimize_bezier_with_retiming(L, U, durations, alpha, initial, final,
     return path, sol_stats
 
 
-def optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, initial, final,
+def optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, safe_points_lst,
                                            fixed_frames=None, motion_frames=None,
                                            omega=3, kappa_min=1e-2, verbose=False, **kwargs):
-    L, U = {}, {}
-    for frame, i in box_seq.items():
-        L[frame] = np.array([S[frame].B.boxes[i[j]].l for j in i])
-        U[frame] = np.array([S[frame].B.boxes[i[j]].u for j in i])
+    L, U = [], []
+    b_i = 0
+    for bs in box_seq:
+        L.append({})
+        U.append({})
+        for frame, i in bs.items():
+            L[b_i][frame] = np.array([S[frame].B.boxes[i[j]].l for j in i])
+            U[b_i][frame] = np.array([S[frame].B.boxes[i[j]].u for j in i])
+        b_i += 1
 
         # Boundary conditions.
         # initial = {0: initial[frame]}
@@ -651,7 +705,7 @@ def optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, i
 
     # Solve initial Bezier problem.
     # path, sol_stats = optimize_bezier(L[frame], U[frame], durations[frame], alpha, initial[frame], final[frame], **kwargs)
-    path, sol_stats = optimize_multiple_bezier(R, A, L, U, durations, alpha, initial, final,
+    path, sol_stats = optimize_multiple_bezier(R, A, L, U, durations, alpha, safe_points_lst,
                                                fixed_frames, motion_frames, **kwargs)
     cost = sol_stats['cost']
     cost_breakdown = sol_stats['cost_breakdown']

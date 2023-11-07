@@ -93,20 +93,13 @@ class LocomanipulationFramePlanner:
                                       der_term, verbose, A, fixed_frames, motion_frames)
 
     def plot(self, visualizer, static_html=False):
-        current_box = 0
-        for fr_name in self.safe_boxes.keys():
-            current_path_seg = 0
-            for p in self.path:
-                frame_boxes = len(self.box_seq[current_path_seg][fr_name])
-                bezier_curve = p.beziers[current_box:current_box+frame_boxes]
-                self.visualize_bezier_points(visualizer, fr_name, bezier_curve, current_path_seg)
-                current_path_seg += 1
-            current_box += frame_boxes
-        # for frame in self.frame_names:
-        #     frame_boxes = len(self.safe_boxes[frame].B.boxes)
-        #     bezier_curve = self.path.beziers[current_box:current_box+frame_boxes]
-        #     self.visualize_bezier_points(visualizer, frame, bezier_curve)
-        #     current_box += frame_boxes
+        i = 0
+        for p in self.path:
+            for seg in range(len(p.beziers)):
+                bezier_curve = [p.beziers[seg]]
+                fr_name = self.frame_names[i]
+                self.visualize_bezier_points(visualizer, fr_name, bezier_curve, seg)
+            i += 1
 
         if static_html:
             # create and save locally in static html form

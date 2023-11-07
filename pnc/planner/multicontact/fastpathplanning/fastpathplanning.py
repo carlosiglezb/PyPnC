@@ -190,12 +190,9 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
             durations[bs_i][frame] *= T / sum(durations[bs_i][frame])
         bs_i += 1
 
-    num_boxes_tot = 2
-    paths, sol_stats = [0]*num_boxes_tot, [0]*num_boxes_tot
-    for i in range(num_boxes_tot):
-        paths[i], sol_stats[i] = optimize_multiple_bezier_with_retiming(S, R, A, box_seq[i], durations[i],
-                                                                 alpha, safe_pnt_lst[i], safe_pnt_lst[i+1],
-                                                                 fixed_frames, motion_frames,
-                                                                 verbose=verbose)
+    paths, sol_stats = optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations,
+                                                             alpha, safe_pnt_lst,
+                                                             fixed_frames, motion_frames,
+                                                             verbose=verbose)
 
     return paths, box_seq

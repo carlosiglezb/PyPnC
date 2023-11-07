@@ -80,15 +80,9 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
         if num_boxes_current > 2:
             for frame, ee_box in safe_boxes.items():
                 boxes = [ee_box.B.boxes[i] for i in box_seq[frame]]
-                # llim_current_ee = np.array([np.maximum(b.l, c.l) for b, c in zip(boxes[:-1], boxes[1:])])
-                # ulim_current_ee = np.array([np.minimum(b.u, c.u) for b, c in zip(boxes[:-1], boxes[1:])])
-                # box_idx = 0
                 for p in range(1, num_boxes_tot):
                     l[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].l
                     u[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].u
-                    # l[p * d * n_f + ee_idx:p * d * n_f + d + ee_idx] = llim_current_ee[box_idx]
-                    # u[p * d * n_f + ee_idx:p * d * n_f + d + ee_idx] = ulim_current_ee[box_idx]
-                    # box_idx += 1
                 ee_idx += d
 
     # Construct end-effector reachability constraints (initial & final points specified)
