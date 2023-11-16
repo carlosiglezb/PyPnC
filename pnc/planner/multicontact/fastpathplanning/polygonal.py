@@ -56,34 +56,47 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
     x = cp.Variable(d * n_f * (num_boxes_tot - 1))
 
     constr = []
-    x_init_idx, idx = 0, 0
+    x_init_idx = 0
     # re-write multi-stage goal points (locations) in terms of optimization variables
-    for sp_lst in safe_points_list:
-        j_idx = 0
-        for f_name in safe_boxes.keys():     # go in order (hence, refer to an OrderedDict)
+    for f_name in safe_boxes.keys():  # go in order (hence, refer to an OrderedDict)
+        idx = 0
+        for sp_lst in safe_points_list:
             if f_name in sp_lst:
-                constr.append(x[x_init_idx + j_idx:x_init_idx + j_idx + d] == sp_lst[f_name])
-            j_idx += d
-
-        # increase state index based on the number of boxes in between intermediate desired points
-        if idx != len(box_seq):     # if we haven't reached the last safe point (end state)
+                constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
+            if idx == len(box_seq):     # we have reached the end position
+                x_init_idx += d
+                continue
             num_boxes_current = len(next(iter(box_seq[idx].values())))
-            x_init_idx += (num_boxes_current-1) * d * n_f
+            x_init_idx += (num_boxes_current - 1) * d
             idx += 1
 
-    # organize lower and upper state limits
+        # increase state index based on the number of boxes in between intermediate desired points
+        # if idx != len(box_seq):     # if we haven't reached the last safe point (end state)
+        #     num_boxes_current = len(next(iter(box_seq[idx].values())))
+        #     x_init_idx += (num_boxes_current-1) * d * n_f
+        #     idx += 1
+
+    # organize lower and upper state limits (include initial and final state bounds)
     l = np.zeros((d * n_f * (num_boxes_tot - 1),))
     u = np.zeros((d * n_f * (num_boxes_tot - 1),))
-    ee_idx = 0
-    for bs_lst in box_seq:
-        num_boxes_current = len(next(iter(bs_lst.values())))
-        if num_boxes_current > 2:
-            for frame, ee_box in safe_boxes.items():
-                boxes = [ee_box.B.boxes[i] for i in box_seq[frame]]
-                for p in range(1, num_boxes_tot):
-                    l[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].l
-                    u[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].u
-                ee_idx += d
+    x_init_idx = 0
+    for frame, ee_box in safe_boxes.items():
+        idx = 0
+        for bs_lst in box_seq:
+            num_boxes_current = len(next(iter(bs_lst.values())))
+            boxes = [ee_box.B.boxes[i] for i in bs_lst[frame]]
+            for p in range(0, num_boxes_current - 1):
+                # l[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].l
+                l[x_init_idx:x_init_idx + d] = boxes[p].l
+                u[x_init_idx:x_init_idx + d] = boxes[p].u
+                x_init_idx += d
+            idx += 1
+            if idx == len(box_seq):     # we have reached the end position
+                p = num_boxes_current - 1
+                l[x_init_idx:x_init_idx + d] = boxes[p].l
+                u[x_init_idx:x_init_idx + d] = boxes[p].u
+                x_init_idx += d
+                continue
 
     # Construct end-effector reachability constraints (initial & final points specified)
     # H = np.zeros((N_planes * (num_boxes_tot - 1), d * n_f * (num_boxes_tot + 1)))
@@ -117,15 +130,18 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
     # add feasibility of end curve point? Perhaps since it depends on torso
 
     # knee-to-foot fixed distance constraint (this should be trivially satisfied when 2 boxes)
-    for bs_lst in box_seq:
-        num_boxes_current = len(next(iter(bs_lst.values())))
-        if (num_boxes_current != 2) and (aux_frames is not None):
-            cost_log_abs, soc_constraint, A_soc = create_cvx_norm_eq_relaxation(
-                                                            aux_frames, num_boxes_tot, d*n_f, x)
-        else:
-            soc_constraint = []
-            A_soc = []
-            cost_log_abs = 0.
+    # for bs_lst in box_seq:
+    #     num_boxes_current = len(next(iter(bs_lst.values())))
+    #     if (num_boxes_current != 2) and (aux_frames is not None):
+    #         cost_log_abs, soc_constraint, A_soc = create_cvx_norm_eq_relaxation(
+    #                                                         aux_frames, num_boxes_tot, d*n_f, x)
+    #     else:
+    #         soc_constraint = []
+    #         A_soc = []
+    #         cost_log_abs = 0.
+    cost_log_abs = 0.
+    soc_constraint = []
+    A_soc = []
 
     cost = cp.sum(cp.norm(x[d * n_f:] - x[:-d * n_f], 2)) + cost_log_abs
 
@@ -136,14 +152,21 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
     #           x[-d * n_f:] == x_goal]
 
     # add limits if more than 2 boxes
-    for bs_lst in box_seq:
-        num_boxes_current = len(next(iter(bs_lst.values())))
-        if num_boxes_current > 2:
-            constr.append([
-                x[d * n_f:-d * n_f] >= l,  # safe, collision-free boxes (lower limit)
-                x[d * n_f:-d * n_f] <= u,  # safe, collision-free boxes (upper limit)
-            ])
+    constr.append(l <= x)   # safe, collision-free boxes (lower limit)
+    constr.append(x <= u)   # safe, collision-free boxes (upper limit)
 
+    # start_idx = 0
+    # for frame in safe_boxes.keys():     # go in order
+    #     for bs_lst in box_seq:
+    #         num_boxes_current = len(next(iter(bs_lst.values())))
+    #         if num_boxes_current > 2:
+    #             constr.append([
+    #                 x[start_idx + d * n_f: -d * n_f] >= l,  # safe, collision-free boxes (lower limit)
+    #                 x[start_idx + d * n_f: -d * n_f] <= u,  # safe, collision-free boxes (upper limit)
+    #             ])
+    #         else:
+    #             start_idx += d * num_boxes_current
+    #
     prob = cp.Problem(cp.Minimize(cost), constr + soc_constraint)
     prob.solve(solver='SCS')
 

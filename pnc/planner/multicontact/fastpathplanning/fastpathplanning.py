@@ -73,8 +73,18 @@ def find_shortest_box_path(boxes, p_init, p_term):
     return box_seq
 
 
+def distribute_box_seq(box_seq_all_frames, b_max):
+    for frame, seq in box_seq_all_frames.items():
+        if len(seq) != b_max:
+            # if all values are the same, simply copy up to b_max
+            if np.mean(seq) == seq[-1]:
+                box_seq_all_frames[frame] = [seq[-1]] * b_max
+            else:
+                raise NotImplementedError
+
+
 def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
-                           p_init, p_term):
+                           p_init):
     box_seq_lst = []
     safe_points_lst = [p_init]
     d = safe_boxes[next(iter(safe_boxes))].B.boxes[0].d
@@ -135,6 +145,9 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
     box_seq_lst.append(copy.deepcopy(box_seq_dict))
 
     # re-assign block sequence (in case last motion frame changed b_max)
+    b_max_new = np.max([len(bs) for bs in box_seq_lst[-1].values()])
+    if b_max_new != b_max:
+        distribute_box_seq(box_seq_lst[-1], b_max_new)
 
     # fix box sequence list frames that had unassigned blocks (e.g., with nan entries)
     for f_list in box_seq_lst:
@@ -156,7 +169,7 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
     if verbose:
         print('Polygonal phase:')
 
-    box_seq, safe_pnt_lst = plan_mulistage_box_seq(S, fixed_frames, motion_frames, p_init, p_term)
+    box_seq, safe_pnt_lst = plan_mulistage_box_seq(S, fixed_frames, motion_frames, p_init)
     box_seq, traj, length, solver_time = iterative_planner_multiple(S, R, safe_pnt_lst,
                                                         box_seq, verbose, A)
 

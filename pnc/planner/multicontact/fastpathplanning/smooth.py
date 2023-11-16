@@ -312,19 +312,19 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
     constraints = []
     seg_box_idx = 0
     for f_name in safe_points_lst[0].keys():  # go in order
-        for sp_lst in safe_points_lst:      # go by segments
+        for box in range(num_boxes_tot-1):
+        # for sp_lst in safe_points_lst:      # go by segments
             # num_boxes_current, _ = L[seg_idx][f_name].shape
-            if f_name in sp_lst:
-                if (seg_box_idx+1) % num_safe_points != 0:
-                    constraints.append(points[seg_box_idx][0][0] == sp_lst[f_name])  # position
-                else:
-                    constraints.append(points[seg_box_idx][0][-1] == sp_lst[f_name])  # final position
+            if seg_box_idx % (num_boxes_tot - 1) == 0:
+                constraints.append(points[seg_box_idx][0][0] == safe_points_lst[0][f_name])  # initial position
+            elif (seg_box_idx + 1) % (num_boxes_tot - 1) == 0:
+                constraints.append(points[seg_box_idx][0][-1] == safe_points_lst[-1][f_name])  # final position
             seg_box_idx += 1
 
     # Loop through boxes.
     cost = 0
     continuity = {}
-    num_segs = len(L)
+    b_end_frame = False
     frame_idx, k_fr_box = 0, 0
     f_name, prev_f_name = frame_list[frame_idx], frame_list[frame_idx]
     seg_idx, k = 0, 0
@@ -333,25 +333,27 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
         continuity[k] = {}
 
         # move on to next segment after n_boxes on current frame
+        f_name = frame_list[frame_idx]
         num_boxes_current, _ = L[seg_idx][f_name].shape
 
         # Adjust frame name, segment and box numbers, then add box constraints.
-        if k != 0 and (k+1) % num_safe_points == 0:
+        if k != 0 and (k_fr_box+1) % num_safe_points == 0:
             Lk = np.array([L[-1][f_name][-1]] * n_points)
             Uk = np.array([U[-1][f_name][-1]] * n_points)
             constraints.append(points[k][0] >= Lk)
             constraints.append(points[k][0] <= Uk)
+            b_end_frame = True
         else:           # move to next segment if this is the last box
             if k != 0 and k_fr_box == (num_boxes_current - 1):   # or (k % num_boxes_current == 0)
                 k_fr_box = 0        # reset the box count
                 seg_idx += 1        # increase segment
 
             # after going through all segments, reset segment index and move to next frame
-            if seg_idx != 0 and k % (num_boxes_tot - 1) == 0:    # seg_idx % num_segs == 0:
-                seg_idx = 0
-                k_fr_box = 0
-                frame_idx += 1
-                f_name = frame_list[frame_idx]
+            # if seg_idx != 0 and k % (num_boxes_tot - 1) == 0:    # seg_idx % num_segs == 0:
+                # seg_idx = 0
+                # k_fr_box = 0
+                # frame_idx += 1
+                # f_name = frame_list[frame_idx]
 
             # Box containment.
             Lk = np.array([L[seg_idx][f_name][k_fr_box]] * n_points)
@@ -375,28 +377,39 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                     if i > 0:
                         continuity[k][i] = constraints[-1]
 
-            # Cost function
-            for i, ai in alpha.items():
-                h = n_points - 1 - i
-                A = np.zeros((h + 1, h + 1))
-                for m in range(h + 1):
-                    for n in range(h + 1):
-                        A[m, n] = binom(h, m) * binom(h, n) / binom(2 * h, m + n)
-                A *= durations[seg_idx][f_name][k_fr_box] / (2 * h + 1)
-                A = np.kron(A, np.eye(d))
-                p = cp.vec(points[k][i], order='C')
-                cost += ai * cp.quad_form(p, A)
+        # Cost function
+        for i, ai in alpha.items():
+            h = n_points - 1 - i
+            A = np.zeros((h + 1, h + 1))
+            for m in range(h + 1):
+                for n in range(h + 1):
+                    A[m, n] = binom(h, m) * binom(h, n) / binom(2 * h, m + n)
+            A *= durations[seg_idx][f_name][k_fr_box] / (2 * h + 1)
+            A = np.kron(A, np.eye(d))
+            p = cp.vec(points[k][i], order='C')
+            cost += ai * cp.quad_form(p, A)
         k_fr_box += 1
-        prev_f_name = copy.copy(f_name)
+        if b_end_frame:
+            frame_idx += 1
+            seg_idx = 0
+            k_fr_box = 0
+            b_end_frame = False
 
     # Fixed frames constraints
     if fixed_frames is not None:
         frame_idx, k_fr_box, seg_idx = 0, 0, 0
         frame_name = frame_list[frame_idx]
         for k in range((num_boxes_tot - 1) * n_frames):
+            num_boxes_current, _ = L[seg_idx][f_name].shape
+            # move on to next segment after the current number of safe boxes
+            if (k_fr_box != 0) and k_fr_box % (num_boxes_current-1) == 0:
+                seg_idx += 1
+                k_fr_box = 0
+
             # skip the final positions, those are assigned later
-            if (k+1) % (num_boxes_tot-1) == 0:
+            if (k+1) % (num_boxes_tot-1) == 0:      # equivalently, if seg_idx % len(L)
                 k_fr_box = 0        # might be redundant
+                seg_idx = 0
                 continue
 
             # move on to next frame after all boxes are handled on current frame
@@ -406,10 +419,10 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                 frame_name = frame_list[frame_idx]
                 k_fr_box = 0
 
-            if frame_name in fixed_frames[k_fr_box]:
-                if k_fr_box < (num_boxes_tot - 1):
+            if frame_name in fixed_frames[seg_idx]:
+                if seg_idx < (len(safe_points_lst) - 1):
                     # for corresponding box k, constrain the position [0] of all knots
-                    fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[k_fr_box][frame_name]]), n_points, axis=0)
+                    fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][frame_name]]), n_points, axis=0)
                     constraints.append(points[k][0] == fixed_frame_pos_mat)
             k_fr_box += 1
 
@@ -499,13 +512,11 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
     k_fr_box, frame_idx, seg_idx = 0, 0, 0
     frame_name = frame_list[frame_idx]
     for k in range((num_boxes_tot - 1) * n_frames):
-        # skip the final positions, those are assigned later
-        if (k + 1) % (num_boxes_tot - 1) == 0:
-            k_fr_box = 0  # might be redundant
-            path.append(copy.deepcopy(CompositeBezierCurve(beziers)))
-            beziers.clear()
-            a = 0
-            continue
+        num_boxes_current, _ = L[seg_idx][frame_name].shape
+        # move on to next segment after the current number of safe boxes
+        if (k_fr_box != 0) and k_fr_box % (num_boxes_current - 1) == 0 and seg_idx != (len(L)-1):
+            seg_idx += 1
+            k_fr_box = 0
 
         # move on to next frame after all boxes processed for each frame
         if k != 0 and (k % (num_boxes_tot - 1)) == 0:
@@ -513,10 +524,18 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
             frame_name = frame_list[frame_idx]
             k_fr_box = 0
 
-        b = a + durations[0][frame_name][k_fr_box]
+        b = a + durations[seg_idx][frame_name][k_fr_box]
         beziers.append(BezierCurve(points[k][0].value, a, b))
         a = b
         k_fr_box += 1
+        # skip the final positions, those are assigned later
+        if (k + 1) % (num_boxes_tot - 1) == 0:
+            k_fr_box = 0  # might be redundant
+            seg_idx = 0
+            path.append(copy.deepcopy(CompositeBezierCurve(beziers)))
+            beziers.clear()
+            a = 0
+
     # path = CompositeBezierCurve(beziers)
 
     retiming_weights = {}

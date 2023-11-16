@@ -621,13 +621,15 @@ class TestFrameTraversableRegion(unittest.TestCase):
         motion_frames.append({'LH': p_init['LH'] + np.array([0.08, 0.07, 0.15])})
 
         # ---- Step 2: step through door with left foot
-        # fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
-        fixed_frames.append(['LF', 'L_knee', 'RF', 'R_knee', 'LH'])   # frames that must not move
-        # motion_frames.append({'LF': p_init['LF'] + np.array([step_length, 0., 0.]),
-        #                     'L_knee': p_init['L_knee'] + np.array([step_length, 0., 0.])})
+        fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
+        # fixed_frames.append(['LF', 'L_knee', 'RF', 'R_knee', 'LH'])   # frames that must not move
+        motion_frames.append({'LF': p_init['LF'] + np.array([step_length, 0., 0.]),
+                            'L_knee': p_init['L_knee'] + np.array([step_length, 0., 0.]),
+                            'torso': p_init['torso'] + np.array([step_length, 0., 0.]),    # for testing only
+                            'RH': p_init['RH'] + np.array([step_length, 0., 0.]) })          # for testing only
         ############## motion frame below is for testing only (remove later) #######################
-        motion_frames.append({'torso': p_init['torso'] + np.array([step_length/2., 0., 0.]),
-                            'RH': p_init['RH'] + np.array([step_length/2., 0., 0.])})
+        # motion_frames.append({'torso': p_init['torso'] + np.array([step_length/2., 0., 0.]),
+        #                     'RH': p_init['RH'] + np.array([step_length/2., 0., 0.])})
         ##########################################################################################
         # ---- Step 3: re-position L/R hands for more stability
         # fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
