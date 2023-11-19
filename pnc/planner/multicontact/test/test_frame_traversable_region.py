@@ -243,7 +243,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         ])
         box_llim['RH'] = np.array([
             [0.1, -0.4, 0.7],  # prevent leg-crossing
-            [0.25, -0.35, 0.7],  # prevent leg-crossing
+            [0.25, -0.38, 0.7],  # prevent leg-crossing
             [0.5, -0.4, 0.7]  # prevent leg-crossing
         ])
 
@@ -504,7 +504,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         # frame_planner.add_reachable_frame_constraint(aux_frame, aux_frame_region)
 
     def test_use_fixed_and_motion_paths(self):
-        b_visualize = True
+        b_visualize = False
         # load robot
         rob_model, rob_collision_model, rob_visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
@@ -622,18 +622,16 @@ class TestFrameTraversableRegion(unittest.TestCase):
 
         # ---- Step 2: step through door with left foot
         fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
-        # fixed_frames.append(['LF', 'L_knee', 'RF', 'R_knee', 'LH'])   # frames that must not move
         motion_frames.append({'LF': p_init['LF'] + np.array([step_length, 0., 0.]),
-                            'L_knee': p_init['L_knee'] + np.array([step_length, 0., 0.]),
-                            'torso': p_init['torso'] + np.array([step_length, 0., 0.]),    # for testing only
-                            'RH': p_init['RH'] + np.array([step_length, 0., 0.]) })          # for testing only
-        ############## motion frame below is for testing only (remove later) #######################
-        # motion_frames.append({'torso': p_init['torso'] + np.array([step_length/2., 0., 0.]),
-        #                     'RH': p_init['RH'] + np.array([step_length/2., 0., 0.])})
+                            'L_knee': p_init['L_knee'] + np.array([step_length, 0., 0.])})
+                            # 'torso': p_init['torso'] + np.array([step_length, 0., 0.]),    # for testing only
+                            # 'RH': p_init['RH'] + np.array([step_length, 0., 0.]) })          # for testing only
         ##########################################################################################
         # ---- Step 3: re-position L/R hands for more stability
-        # fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-        # motion_frames.append(['LH', 'RH'])        # frames that have a specified final position
+        fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+        motion_frames.append({'LH': p_init['LH'] + np.array([0.09, 0.06, 0.18]),
+                             'RH': p_init['RH'] + np.array([0.09, -0.06, 0.18]),    # frames that have a specified final position
+                              'torso': p_init['torso'] + np.array([step_length, 0., 0.])})  # for testing only
         # ---- Step 4: step through door with right foot
         # fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
         # motion_frames.append(['RF', 'R_knee'])        # frames that have a specified final position

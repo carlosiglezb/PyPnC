@@ -83,6 +83,14 @@ def distribute_box_seq(box_seq_all_frames, b_max):
                 raise NotImplementedError
 
 
+def get_last_defined_point(safe_points_list, frame_name):
+    for sp in reversed(safe_points_list):
+        if frame_name in sp.keys():
+            return sp[frame_name]
+
+    # if we reach this point, the corresponding frame is never assigned
+    return 0
+
 def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
                            p_init):
     box_seq_lst = []
@@ -128,17 +136,20 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
         k_transition += 1
 
     # append terminal motion frames
-    # k_transition -= 1
     safe_points_lst.append({})
     for fm, pm_next in motion_frames[k_transition-1].items():
+        pm_init = get_last_defined_point(safe_points_lst, fm)
         safe_points_lst[k_transition][fm] = pm_next
-        pm_init = safe_points_lst[k_transition - 2][fm]     # TODO find last nan box
-        box_seq_dict[fm] = find_shortest_box_path(safe_boxes[fm], pm_init, pm_next)
+        # if pm_init and pm_next are on the same box, no need to find the shortest path
+        if safe_boxes[fm].B.contain(pm_next) == safe_boxes[fm].B.contain(pm_init):
+            box_seq_dict[fm] = list(safe_boxes[fm].B.contain(pm_next))
+        else:
+            box_seq_dict[fm] = find_shortest_box_path(safe_boxes[fm], pm_init, pm_next)
 
     # fill out last safe points based on fixed frames from last sequence
     b_max = np.max([len(bs) for bs in box_seq_lst[-1].values()])
     for ff in fixed_frames[-1]:
-        pf_prev = safe_points_lst[-2][ff]
+        pf_prev = get_last_defined_point(safe_points_lst, ff)
         safe_points_lst[-1][ff] = pf_prev
         box_pf_prev = next(iter((safe_boxes[ff].B.contain(pf_prev))))
         box_seq_dict[ff] = [box_pf_prev] * b_max
@@ -148,6 +159,10 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
     b_max_new = np.max([len(bs) for bs in box_seq_lst[-1].values()])
     if b_max_new != b_max:
         distribute_box_seq(box_seq_lst[-1], b_max_new)
+    b_min_new = np.min([len(bs) for bs in box_seq_lst[-1].values()])
+    if b_max_new != b_min_new:
+        distribute_box_seq(box_seq_lst[-1], b_max_new)
+
 
     # fix box sequence list frames that had unassigned blocks (e.g., with nan entries)
     for f_list in box_seq_lst:
