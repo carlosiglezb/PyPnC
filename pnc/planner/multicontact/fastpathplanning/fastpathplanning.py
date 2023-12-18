@@ -80,7 +80,10 @@ def distribute_box_seq(box_seq_all_frames, b_max):
             if np.mean(seq) == seq[-1]:
                 box_seq_all_frames[frame] = [seq[-1]] * b_max
             else:
-                raise NotImplementedError
+                # approach 1: repeat the last entry until we match the size b_max
+                last_box = seq[-1]
+                missing_entries = b_max - len(seq)
+                box_seq_all_frames[frame] = seq + missing_entries * [last_box]
 
 
 def get_last_defined_point(safe_points_list, frame_name):

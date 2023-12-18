@@ -133,7 +133,7 @@ class FrameTraversableRegion:
 
     def load_collision_free_boxes(self, box_llim, box_ulim):
         self._plan_safe_box_list = fpp.SafeSet(
-            box_llim, box_ulim, verbose=True)
+            box_llim, box_ulim, verbose=False)
 
         # set visualization
         if self._b_visualize_safe:
