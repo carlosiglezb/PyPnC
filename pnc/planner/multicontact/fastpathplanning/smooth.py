@@ -352,7 +352,7 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
             Uk = np.array([U[seg_idx][f_name][k_fr_box]] * n_points)
 
         #TODO figure out why infeasible when using LF and L_knee and k_fr_box == 1
-        # if f_name == 'LF' and k_fr_box == 1 and seg_idx == 1:
+        # if f_name != 'LF':`
         constraints.append(points[k][0] >= Lk)
         constraints.append(points[k][0] <= Uk)
 
@@ -396,17 +396,17 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                     if i > 0:
                         continuity[k][i] = constraints[-1]
 
-            # Cost function
-            for i, ai in alpha.items():
-                h = n_points - 1 - i
-                A = np.zeros((h + 1, h + 1))
-                for m in range(h + 1):
-                    for n in range(h + 1):
-                        A[m, n] = binom(h, m) * binom(h, n) / binom(2 * h, m + n)
-                A *= durations[seg_idx][f_name][k_fr_box] / (2 * h + 1)
-                A = np.kron(A, np.eye(d))
-                p = cp.vec(points[k][i], order='C')
-                cost += ai * cp.quad_form(p, A)
+        # Cost function
+        for i, ai in alpha.items():
+            h = n_points - 1 - i
+            A = np.zeros((h + 1, h + 1))
+            for m in range(h + 1):
+                for n in range(h + 1):
+                    A[m, n] = binom(h, m) * binom(h, n) / binom(2 * h, m + n)
+            A *= durations[seg_idx][f_name][k_fr_box] / (2 * h + 1)
+            A = np.kron(A, np.eye(d))
+            p = cp.vec(points[k][i], order='C')
+            cost += ai * cp.quad_form(p, A)
         k_fr_box += 1
         if b_end_frame:
             frame_idx += 1

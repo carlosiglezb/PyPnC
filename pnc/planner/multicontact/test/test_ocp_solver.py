@@ -52,15 +52,14 @@ class TestOCPSolver(unittest.TestCase):
         durations.append({'LF': np.array([[0.3], [0.3]])})
         durations.append({'LF': np.array([0.2] * 3)})
         durations.append({'LF': np.array([[0.3], [0.3]])})
-        alpha = {1:1, 2:2, 3:3}
+        alpha = {1: 1, 2: 2, 3: 3}
 
         # Safe points for initial and last positions
-        safe_points_lst.append({'LF': np.array([0., 0., 0.])})
-        safe_points_lst.append({'LF': np.array([0., 0., 0.])})
-        safe_points_lst.append({'LF': np.array([0.5, 0., 0.])})
+        safe_points_lst.append({'LF': np.array([0.06, 0.14, 0.])})
+        safe_points_lst.append({'LF': np.array([0.06, 0.14, 0.])})
+        safe_points_lst.append({'LF': np.array([0.5, 0.14, 0.])})
 
-        fixed_frames.append({})
-        fixed_frames.append({})
+        fixed_frames.append({'LF'})
         fixed_frames.append({})
 
         path, sol_stats = optimize_multiple_bezier(reach_region, None, L, U, durations, alpha, safe_points_lst, fixed_frames)
