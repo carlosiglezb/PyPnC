@@ -98,7 +98,7 @@ class LocomanipulationFramePlanner:
             for seg in range(len(p.beziers)):
                 bezier_curve = [p.beziers[seg]]
                 fr_name = self.frame_names[i]
-                self.visualize_bezier_points(visualizer, fr_name, bezier_curve, seg)
+                self.visualize_bezier_points(visualizer.viewer, fr_name, bezier_curve, seg)
             i += 1
 
         if static_html:
@@ -120,13 +120,15 @@ class LocomanipulationFramePlanner:
         return aux_frames
 
     @staticmethod
-    def visualize_bezier_points(visualizer, frame, bezier_curve, segment=0):
+    def visualize_bezier_points(vis_viewer, frame, bezier_curve, segment=0):
         color_waypoint = [0., 1., 0., 0.6]      # blue
         color_transition = [1., 1., 0., 0.6]    # yellow
         r_bezier_pts = 0.01
         pt_number, seg_number = 0, 1
         for bez in bezier_curve:
             t, points = bez.get_sample_points()
+            if np.ndim(points) == 3:
+                points = points[0, :]
             for p in points:
                 obj = g.Sphere(r_bezier_pts)
                 tf_pos = tf.translation_matrix(p)
@@ -136,9 +138,9 @@ class LocomanipulationFramePlanner:
                     convert_rgba_to_meshcat_obj(obj, color_transition)
                 else:
                     convert_rgba_to_meshcat_obj(obj, color_waypoint)
-                visualizer.viewer["traversable_regions"]["path"][frame][str(segment)][str(pt_number)].set_object(
+                vis_viewer["traversable_regions"]["path"][frame][str(segment)][str(pt_number)].set_object(
                     obj, g.MeshLambertMaterial(color=obj.color))
-                visualizer.viewer["traversable_regions"]["path"][frame][str(segment)][str(pt_number)].set_transform(tf_pos)
+                vis_viewer["traversable_regions"]["path"][frame][str(segment)][str(pt_number)].set_transform(tf_pos)
 
                 pt_number += 1
             seg_number += 1

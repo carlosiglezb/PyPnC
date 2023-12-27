@@ -57,7 +57,7 @@ class FrameTraversableRegion:
         self._b_visualize_reach = b_visualize_reach
 
         # Visualize convex hull (reachable region)
-        if b_visualize_reach:
+        if b_visualize_reach or b_visualize_safe:
             try:
                 if visualizer is not None:
                     # see if using Pinocchio's MeshcatVisualizer
@@ -65,7 +65,7 @@ class FrameTraversableRegion:
                         print("Using existing visualizer for Frame Traversable Region")
                         self._vis = visualizer.viewer
                 else:
-                    self._vis = meshcat.Visualizer() if visualizer is None else visualizer
+                    self._vis = meshcat.Visualizer()
                     self._vis.open()
                     self._vis.wait()
 
@@ -150,6 +150,7 @@ class FrameTraversableRegion:
                 self._vis["traversable_regions"]["safe"][self.frame_name][str(self._N_boxes)].set_transform(box_center)
                 self._N_boxes += 1
 
-
+    def get_visualizer(self):
+        return self._vis
 
 

@@ -94,6 +94,7 @@ def get_last_defined_point(safe_points_list, frame_name):
     # if we reach this point, the corresponding frame is never assigned
     return 0
 
+
 def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
                            p_init):
     box_seq_lst = []
