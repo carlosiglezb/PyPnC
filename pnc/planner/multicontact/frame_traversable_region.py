@@ -64,6 +64,8 @@ class FrameTraversableRegion:
                     if hasattr(visualizer, 'model'):
                         print("Using existing visualizer for Frame Traversable Region")
                         self._vis = visualizer.viewer
+                    else:   # using bare Meshcat
+                        self._vis = visualizer
                 else:
                     self._vis = meshcat.Visualizer()
                     self._vis.open()
