@@ -48,18 +48,15 @@ class TestOCPSolver(unittest.TestCase):
         box_llim, box_ulim = self.get_sample_collision_free_boxes()
 
         # manually assign lower limits
-        L.append({'LF': np.vstack([[box_llim['LF'][0]] * 2])})
+        L.append({'LF': np.vstack([[box_llim['LF'][0]]])})
         L.append({'LF': np.vstack([box_llim['LF'][0], box_llim['LF'][1], box_llim['LF'][2]])})
-        L.append({'LF': np.vstack([[box_llim['LF'][2]]])})
 
         # manually assign upper limits
-        U.append({'LF': np.vstack([box_ulim['LF'][0] * 2])})
+        U.append({'LF': np.vstack([box_ulim['LF'][0]])})
         U.append({'LF': np.vstack([box_ulim['LF'][0], box_ulim['LF'][1], box_ulim['LF'][2]])})
-        U.append({'LF': np.vstack([box_ulim['LF'][2]])})
 
-        durations.append({'LF': np.array([[0.3], [0.3]])})
+        durations.append({'LF': np.array([[0.6]])})
         durations.append({'LF': np.array([0.2] * 3)})
-        durations.append({'LF': np.array([[0.3], [0.3]])})
         alpha = {1: 1, 2: 2, 3: 3}
 
         # Safe points for initial and last positions
@@ -96,36 +93,30 @@ class TestOCPSolver(unittest.TestCase):
         box_llim, box_ulim = self.get_sample_collision_free_boxes()
 
         # manually assign lower limits
-        L.append({'LF': np.vstack([[box_llim['LF'][0]] * 2]),
-                  'LH': np.vstack([box_llim['LH'][1], box_llim['LH'][1]])})
+        L.append({'LF': np.vstack([box_llim['LF'][0]]),
+                  'LH': np.vstack([box_llim['LH'][1]])})
         L.append({'LF': np.vstack([box_llim['LF'][0], box_llim['LF'][1], box_llim['LF'][2]]),
                   'LH': np.vstack([[box_llim['LH'][1]] * 3])})
-        L.append({'LF': np.vstack([box_llim['LF'][2]]),
-                  'LH': np.vstack([box_llim['LH'][1]])})
 
         # manually assign upper limits
-        U.append({'LF': np.vstack([[box_ulim['LF'][0]] * 2]),
-                  'LH': np.vstack([box_ulim['LH'][1], box_llim['LH'][1]])})
+        U.append({'LF': np.vstack([box_ulim['LF'][0]]),
+                  'LH': np.vstack([box_ulim['LH'][1]])})
         U.append({'LF': np.vstack([box_ulim['LF'][0], box_ulim['LF'][1], box_ulim['LF'][2]]),
                   'LH': np.vstack([[box_ulim['LH'][1]] * 3])})
-        U.append({'LF': np.vstack([box_ulim['LF'][2]]),
-                  'LH': np.vstack([box_ulim['LH'][1]])})
 
-        durations.append({'LF': np.array([[0.3], [0.3]]),
-                          'LH': np.array([[0.3], [0.3]])})
+        durations.append({'LF': np.array([[0.6]]),
+                          'LH': np.array([[0.6]])})
         durations.append({'LF': np.array([0.2] * 3),
                           'LH': np.array([0.2] * 3)})
-        durations.append({'LF': np.array([[0.3], [0.3]]),
-                          'LH': np.array([[0.3], [0.3]])})
         alpha = {1: 1, 2: 2, 3: 3}
 
         # Safe points for initial and last positions
         safe_points_lst.append({'LF': np.array([0.06, 0.14, 0.]),
-                                'LH': np.array([0.22, 0.3, 0.74])})
+                                'LH': np.array([0.22, 0.3, 0.74])})     # initial stance
         safe_points_lst.append({'LF': np.array([0.06, 0.14, 0.]),
-                                'LH': np.array([0.3, 0.37, 0.89])})
+                                'LH': np.array([0.3, 0.37, 0.89])})     # end of interval 1
         safe_points_lst.append({'LF': np.array([0.5, 0.14, 0.]),
-                                'LH': np.array([0.3, 0.37, 0.89])})
+                                'LH': np.array([0.3, 0.37, 0.89])})     # end of interval 2
 
         fixed_frames.append({'LF'})
         fixed_frames.append({'LH'})
@@ -164,33 +155,27 @@ class TestOCPSolver(unittest.TestCase):
         box_llim, box_ulim = self.get_sample_collision_free_boxes()
 
         # manually assign lower limits
-        L.append({'LF': np.vstack([[box_llim['LF'][0]] * 2]),
-                  'LH': np.vstack([[box_llim['LH'][1]] * 2])})
+        L.append({'LF': np.vstack([[box_llim['LF'][0]]]),
+                  'LH': np.vstack([[box_llim['LH'][1]]])})
         L.append({'LF': np.vstack([box_llim['LF'][0], box_llim['LF'][1], box_llim['LF'][2]]),
                   'LH': np.vstack([[box_llim['LH'][1]] * 3])})
-        L.append({'LF': np.vstack([[box_llim['LF'][2]] * 2]),
-                  'LH': np.vstack([[box_llim['LH'][1]] * 2])})
         L.append({'LF': np.vstack([box_llim['LF'][2]]),
                   'LH': np.vstack([box_llim['LH'][1]])})
 
         # manually assign upper limits
-        U.append({'LF': np.vstack([[box_ulim['LF'][0]] * 2]),
-                  'LH': np.vstack([[box_ulim['LH'][1]] * 2])})
+        U.append({'LF': np.vstack([[box_ulim['LF'][0]]]),
+                  'LH': np.vstack([[box_ulim['LH'][1]]])})
         U.append({'LF': np.vstack([box_ulim['LF'][0], box_ulim['LF'][1], box_ulim['LF'][2]]),
                   'LH': np.vstack([[box_ulim['LH'][1]] * 3])})
-        U.append({'LF': np.vstack([[box_ulim['LF'][2]] * 2]),
-                  'LH': np.vstack([[box_ulim['LH'][1]] * 2])})
         U.append({'LF': np.vstack([box_ulim['LF'][2]]),
                   'LH': np.vstack([box_ulim['LH'][1]])})
 
-        durations.append({'LF': np.array([[0.3], [0.3]]),
-                          'LH': np.array([[0.3], [0.3]])})
+        durations.append({'LF': np.array([[0.6]]),
+                          'LH': np.array([[0.6]])})
         durations.append({'LF': np.array([0.2] * 3),
                           'LH': np.array([0.2] * 3)})
-        durations.append({'LF': np.array([[0.3], [0.3]]),
-                          'LH': np.array([[0.3], [0.3]])})
-        durations.append({'LF': np.array([[0.3], [0.3]]),
-                          'LH': np.array([[0.3], [0.3]])})
+        durations.append({'LF': np.array([[0.6]]),
+                          'LH': np.array([[0.6]])})
         alpha = {1: 1, 2: 2, 3: 3}
 
         # Safe points for initial and last positions
