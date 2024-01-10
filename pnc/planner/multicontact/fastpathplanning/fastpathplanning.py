@@ -65,7 +65,12 @@ def plan(S, p_init, p_term, T, alpha, der_init={}, der_term={}, verbose=True):
 def find_shortest_box_path(boxes, p_init, p_term):
     # find the shortest path for all non-fixed frames
     discrete_planner, runtime = boxes.G.shortest_path(p_term)
-    box_seq, length, runtime = discrete_planner(p_init)
+    box_p_init = boxes.B.contain(p_init)
+    if box_p_init == boxes.B.contain(p_term):
+        box_seq = list(box_p_init)
+    else:
+        box_seq, length, runtime = discrete_planner(p_init)
+
     if box_seq is None:
         print('Infeasible safe problem, initial and terminal points are disconnected.')
         return
@@ -93,6 +98,10 @@ def get_last_defined_point(safe_points_list, frame_name):
 
     # if we reach this point, the corresponding frame is never assigned
     return 0
+
+
+def distribute_free_frames(box_seq_lst):
+    raise NotImplementedError("Fix me")
 
 
 def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
@@ -150,6 +159,9 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
         else:
             box_seq_dict[fm] = find_shortest_box_path(safe_boxes[fm], pm_init, pm_next)
 
+    # check distribution of free motion frames over all segments/intervals
+    distribute_free_frames(box_seq_lst)
+
     # fill out last safe points based on fixed frames from last sequence
     b_max = np.max([len(bs) for bs in box_seq_lst[-1].values()])
     for ff in fixed_frames[-1]:
@@ -166,7 +178,6 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
     b_min_new = np.min([len(bs) for bs in box_seq_lst[-1].values()])
     if b_max_new != b_min_new:
         distribute_box_seq(box_seq_lst[-1], b_max_new)
-
 
     # fix box sequence list frames that had unassigned blocks (e.g., with nan entries)
     for f_list in box_seq_lst:
