@@ -53,50 +53,49 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
     # x = [p_torso^{(i)}, p_lfoot^{(i)}, p_rfoot^{(i)}, p_lknee^{(i)}, p_rknee^{(i)}, ... , t^{(i)}]
     # containing all "i" curve points + auxiliary variables t^(i) that assimilate constant shin
     # lengths in paths for each leg
-    x = cp.Variable(d * n_f * (num_boxes_tot - 1))
+    x = cp.Variable(d * n_f * (num_boxes_tot + 1))
 
     constr = []
     x_init_idx = 0
     # re-write multi-stage goal points (locations) in terms of optimization variables
     for f_name in safe_boxes.keys():  # go in order (hence, refer to an OrderedDict)
-        idx = 0
+        seg_idx = 0
         for sp_lst in safe_points_list:
-            if f_name in sp_lst:
+            # process initial positions when in new frame
+            if seg_idx == 0:
                 constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
-            if idx == len(box_seq):     # we have reached the end position
                 x_init_idx += d
+                seg_idx += 1
                 continue
-            num_boxes_current = len(next(iter(box_seq[idx].values())))
-            x_init_idx += (num_boxes_current - 1) * d
-            idx += 1
-
-        # increase state index based on the number of boxes in between intermediate desired points
-        # if idx != len(box_seq):     # if we haven't reached the last safe point (end state)
-        #     num_boxes_current = len(next(iter(box_seq[idx].values())))
-        #     x_init_idx += (num_boxes_current-1) * d * n_f
-        #     idx += 1
+            else:
+                if f_name in sp_lst:
+                    constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
+                if seg_idx == len(box_seq):     # we have reached the end position
+                    x_init_idx += d
+                    continue
+            num_boxes_current = len(next(iter(box_seq[seg_idx].values())))
+            x_init_idx += num_boxes_current * d
+            seg_idx += 1
 
     # organize lower and upper state limits (include initial and final state bounds)
-    l = np.zeros((d * n_f * (num_boxes_tot - 1),))
-    u = np.zeros((d * n_f * (num_boxes_tot - 1),))
+    l = np.zeros((d * n_f * (num_boxes_tot + 1),))
+    u = np.zeros((d * n_f * (num_boxes_tot + 1),))
     x_init_idx = 0
     for frame, ee_box in safe_boxes.items():
-        idx = 0
+        # initial ee state / position
+        l[x_init_idx:x_init_idx + d] = ee_box.B.boxes[box_seq[0][frame][0]].l
+        u[x_init_idx:x_init_idx + d] = ee_box.B.boxes[box_seq[0][frame][0]].u
+        x_init_idx += d
+        seg_idx = 1     # we can start from the first segment
         for bs_lst in box_seq:
             num_boxes_current = len(next(iter(bs_lst.values())))
             boxes = [ee_box.B.boxes[i] for i in bs_lst[frame]]
-            for p in range(0, num_boxes_current - 1):
-                # l[(p-1) * d * n_f + ee_idx:(p-1) * d * n_f + d + ee_idx] = boxes[p].l
+
+            for p in range(0, num_boxes_current):
                 l[x_init_idx:x_init_idx + d] = boxes[p].l
                 u[x_init_idx:x_init_idx + d] = boxes[p].u
                 x_init_idx += d
-            idx += 1
-            if idx == len(box_seq):     # we have reached the end position
-                p = num_boxes_current - 1
-                l[x_init_idx:x_init_idx + d] = boxes[p].l
-                u[x_init_idx:x_init_idx + d] = boxes[p].u
-                x_init_idx += d
-                continue
+            seg_idx += 1
 
     # Construct end-effector reachability constraints (initial & final points specified)
     # H = np.zeros((N_planes * (num_boxes_tot - 1), d * n_f * (num_boxes_tot + 1)))
@@ -143,7 +142,13 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
     soc_constraint = []
     A_soc = []
 
-    cost = cp.sum(cp.norm(x[d * n_f:] - x[:-d * n_f], 2)) + cost_log_abs
+    cost = 0
+    for fr in range(n_f):
+        start_idx = fr * d * (num_boxes_tot + 1)
+        end_idx = start_idx + d * (num_boxes_tot + 1)
+        x_fr = x[start_idx: end_idx]
+        p_fr_t = cp.reshape(x_fr, [d, num_boxes_tot + 1])
+        cost += cp.sum(cp.norm(p_fr_t[:, 1:] - p_fr_t[:, :-1], axis=1))
 
     # constr = [x[:d * n_f] == x_init,
     #           # x[d * n_f:-d * n_f] >= l,     # safe, collision-free boxes (lower limit)
