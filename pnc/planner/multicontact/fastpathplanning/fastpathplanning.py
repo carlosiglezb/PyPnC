@@ -100,8 +100,37 @@ def get_last_defined_point(safe_points_list, frame_name):
     return 0
 
 
-def distribute_free_frames(box_seq_lst):
-    raise NotImplementedError("Fix me")
+def get_num_unassigned_boxes(box_seq_list, frame_name):
+    num_unassigned_boxes = 1
+    for bs in reversed(box_seq_list):
+        if np.isnan(bs[frame_name]):
+            num_unassigned_boxes += 1   # update location of last nan box
+        else:
+            return num_unassigned_boxes
+
+
+def distribute_free_frames(last_box_seq, box_seq_list, frame_name):
+    # find last nan entry
+    num_unassigned_boxes = get_num_unassigned_boxes(box_seq_list, frame_name)
+    num_box_last_seq = len(last_box_seq[frame_name])
+
+    # first, check if last assigned box sequence matches the first box in last box sequence
+    if num_box_last_seq != 1:
+        if box_seq_list[-num_unassigned_boxes][frame_name][0] == last_box_seq[frame_name][0]:
+            last_box_seq[frame_name].pop(0)
+
+    # re-distribute free motion between nan boxes
+    num_boxes_last_seq = len(last_box_seq[frame_name])
+
+    # Heuristic: straight-forward case w/ one box per segment
+    if num_unassigned_boxes == num_boxes_last_seq:
+        for n_box in range(1, num_unassigned_boxes):
+            box_seq_list[-n_box][frame_name] = [last_box_seq[frame_name].pop(-(n_box+1))]
+    elif num_boxes_last_seq == 1:   # if frame remains in one box
+        for n_box in range(1, num_unassigned_boxes):
+            box_seq_list[-n_box][frame_name] = [last_box_seq[frame_name][0]]
+    else:
+        raise NotImplementedError("Free frames box sequence case has not been implemented")
 
 
 def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
@@ -122,6 +151,10 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
     for f_frames in fixed_frames:
         # skip first set of fixed frames (initial stance)
         if k_transition == 0:
+            # get free frames and assign box containing initial position
+            for fr, p0 in p_init.items():
+                if fr not in motion_frames[0].keys() and fr not in fixed_frames[0]:
+                    box_seq_dict[fr] = list(safe_boxes[fr].B.contain(p0))
             k_transition += 1
             continue
 
@@ -160,10 +193,20 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
             box_seq_dict[fm] = find_shortest_box_path(safe_boxes[fm], pm_init, pm_next)
 
     # check distribution of free motion frames over all segments/intervals
-    distribute_free_frames(box_seq_lst)
+    for fname in p_init.keys():
+        if np.isnan(box_seq_lst[-1][fname][0]):
+            distribute_free_frames(box_seq_dict, box_seq_lst, fname)
+
+    # re-assign block sequence (in case last motion frame changed b_max)
+    b_max_new = np.max([len(bs) for bs in box_seq_lst[-1].values()])
+    if b_max_new != b_max:
+        distribute_box_seq(box_seq_lst[-1], b_max_new)
+    b_min_new = np.min([len(bs) for bs in box_seq_lst[-1].values()])
+    if b_max_new != b_min_new:
+        distribute_box_seq(box_seq_lst[-1], b_max_new)
 
     # fill out last safe points based on fixed frames from last sequence
-    b_max = np.max([len(bs) for bs in box_seq_lst[-1].values()])
+    b_max = np.max([len(bs) for bs in box_seq_dict.values()])
     for ff in fixed_frames[-1]:
         pf_prev = get_last_defined_point(safe_points_lst, ff)
         safe_points_lst[-1][ff] = pf_prev

@@ -285,7 +285,6 @@ class TestFrameTraversableRegion(unittest.TestCase):
         ])
         return box_llim, box_ulim
 
-
     def test_visualizing_reachable_region(self):
         frame_name = 'RF'
         test_region = FrameTraversableRegion(frame_name,
