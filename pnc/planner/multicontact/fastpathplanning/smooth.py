@@ -433,44 +433,44 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
     #     # cost_log_abs_sum = 0.
 
     # Reachability constraints
-    # fr_idx, k_fr_box = 0, 0
-    # for frame_name in frame_list:
-    #     if frame_name == 'torso':
-    #         coeffs = reach_region[frame_name]
-    #         H = coeffs['H']
-    #         d_vec = np.reshape(coeffs['d'], (len(H), 1))
-    #         d_mat = np.repeat(d_vec, n_points, axis=1)
-    #         num_boxes_current, _ = L[k_fr_box][frame_name].shape
-    #         for idx_box in range(1, num_boxes_current - 1):
-    #             # torso translation terms
-    #             z_t_prev = points[idx_box - 1][0]
-    #             z_t_post = points[idx_box][0]
-    #
-    #             # torso w.r.t. corresponding standing effector frame
-    #             z_stance_post = points[0][0]    # was points[fr_idx*n_boxes + idx_box][0]
-    #             # z_stance_post = points[n_boxes + idx_box][0]    # was points[fr_idx*n_boxes + idx_box][0]
-    #
-    #             # reachable constraint
-    #             constraints.append(H @ z_t_prev.T - 2 * H @ z_t_post.T + H @ z_stance_post.T <= -d_mat)
-    #         fr_idx += 1
-    #
-    #     else:
-    #         coeffs = reach_region[frame_name]
-    #         H = coeffs['H']
-    #         d_vec = np.reshape(coeffs['d'], (len(H), 1))
-    #         d_mat = np.repeat(d_vec, n_points, axis=1)
-    #         num_boxes_current, _ = L[k_fr_box][frame_name].shape
-    #         for idx_box in range(1, num_boxes_current - 1):
-    #             # torso translation terms
-    #             z_t_prev = points[idx_box - 1][0]
-    #             z_t_post = points[idx_box][0]
-    #
-    #             # corresponding end effector frame index
-    #             z_ee_post = points[fr_idx*num_boxes_current + idx_box][0]
-    #
-    #             # reachable constraint
-    #             constraints.append(H @ z_t_prev.T - H @ z_t_post.T + H @ z_ee_post.T <= -d_mat)
-    #         fr_idx += 1
+    fr_idx, k_fr_box = 0, 0
+    for frame_name in frame_list:
+        if frame_name == 'torso':
+            coeffs = reach_region[frame_name]
+            H = coeffs['H']
+            d_vec = np.reshape(coeffs['d'], (len(H), 1))
+            d_mat = np.repeat(d_vec, n_points, axis=1)
+            num_boxes_current, _ = L[k_fr_box][frame_name].shape
+            for idx_box in range(1, num_boxes_current - 1):
+                # torso translation terms
+                z_t_prev = points[idx_box - 1][0]
+                z_t_post = points[idx_box][0]
+
+                # torso w.r.t. corresponding standing effector frame
+                z_stance_post = points[0][0]    # was points[fr_idx*n_boxes + idx_box][0]
+                # z_stance_post = points[n_boxes + idx_box][0]    # was points[fr_idx*n_boxes + idx_box][0]
+
+                # reachable constraint
+                constraints.append(H @ z_t_prev.T - 2 * H @ z_t_post.T + H @ z_stance_post.T <= -d_mat)
+            fr_idx += 1
+
+        else:
+            coeffs = reach_region[frame_name]
+            H = coeffs['H']
+            d_vec = np.reshape(coeffs['d'], (len(H), 1))
+            d_mat = np.repeat(d_vec, n_points, axis=1)
+            num_boxes_current, _ = L[k_fr_box][frame_name].shape
+            for idx_box in range(1, num_boxes_current - 1):
+                # torso translation terms
+                z_t_prev = points[idx_box - 1][0]
+                z_t_post = points[idx_box][0]
+
+                # corresponding end effector frame index
+                z_ee_post = points[fr_idx*num_boxes_current + idx_box][0]
+
+                # reachable constraint
+                constraints.append(H @ z_t_prev.T - H @ z_t_post.T + H @ z_ee_post.T <= -d_mat)
+            fr_idx += 1
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
