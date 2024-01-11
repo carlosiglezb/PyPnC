@@ -503,7 +503,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         # frame_planner.add_reachable_frame_constraint(aux_frame, aux_frame_region)
 
     def test_use_fixed_and_motion_paths(self):
-        b_visualize = False
+        b_visualize = True
         # load robot
         rob_model, rob_collision_model, rob_visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",

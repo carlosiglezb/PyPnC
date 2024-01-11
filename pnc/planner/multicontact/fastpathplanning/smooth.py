@@ -337,7 +337,8 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                 constraints.append(points[k][0] == fixed_frame_pos_mat)
             else:   # assign for just the first time instant
                 constraints.append(points[k][0][0] == safe_points_lst[0][f_name])   # initial position
-                if fr_seg_k_box == (num_boxes_current-1):   # check if it has a final safe point assigned
+                # check if it has a final safe point assigned
+                if fr_seg_k_box == (num_boxes_current-1) and f_name in safe_points_lst[seg_idx+1].keys():
                     constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])
         elif (k + 1) % num_boxes_tot == 0:  # final position for each frame
             if f_name in fixed_frames[seg_idx]:
