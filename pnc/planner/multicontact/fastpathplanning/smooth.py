@@ -684,8 +684,8 @@ def optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, s
         L.append({})
         U.append({})
         for frame, i in bs.items():
-            L[b_i][frame] = np.array([S[frame].B.boxes[i[j]].l for j in i])
-            U[b_i][frame] = np.array([S[frame].B.boxes[i[j]].u for j in i])
+            L[b_i][frame] = np.array([S[frame].B.boxes[j].l for j in i])
+            U[b_i][frame] = np.array([S[frame].B.boxes[j].u for j in i])
         b_i += 1
 
         # Boundary conditions.
