@@ -138,9 +138,9 @@ class LocomanipulationFramePlanner:
                     convert_rgba_to_meshcat_obj(obj, color_transition)
                 else:
                     convert_rgba_to_meshcat_obj(obj, color_waypoint)
-                vis_viewer["traversable_regions"]["path"][frame][str(segment)][str(pt_number)].set_object(
+                vis_viewer["paths"][frame][str(segment)][str(pt_number)].set_object(
                     obj, g.MeshLambertMaterial(color=obj.color))
-                vis_viewer["traversable_regions"]["path"][frame][str(segment)][str(pt_number)].set_transform(tf_pos)
+                vis_viewer["paths"][frame][str(segment)][str(pt_number)].set_transform(tf_pos)
 
                 pt_number += 1
             seg_number += 1
