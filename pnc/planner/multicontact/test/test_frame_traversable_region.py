@@ -615,7 +615,6 @@ class TestFrameTraversableRegion(unittest.TestCase):
         p_end['RH'] = p_init['RH']
 
         # ---- Step 1: L hand to frame
-        # fixed_frames.append(['LF', 'RF'])   # frames that must not move
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
         motion_frames.append({'LH': p_init['LH'] + np.array([0.08, 0.07, 0.15])})
 
@@ -623,18 +622,15 @@ class TestFrameTraversableRegion(unittest.TestCase):
         fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
         motion_frames.append({'LF': p_init['LF'] + np.array([step_length, 0., 0.]),
                             'L_knee': p_init['L_knee'] + np.array([step_length, 0., 0.])})
-                            # 'torso': p_init['torso'] + np.array([step_length, 0., 0.]),    # for testing only
-                            # 'RH': p_init['RH'] + np.array([step_length, 0., 0.]) })          # for testing only
-        ##########################################################################################
         # ---- Step 3: re-position L/R hands for more stability
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
         motion_frames.append({'LH': p_init['LH'] + np.array([0.09, 0.06, 0.18]),
-                             'RH': p_init['RH'] + np.array([0.09, -0.06, 0.18]),    # frames that have a specified final position
-                              'torso': p_init['torso'] + np.array([step_length, 0., 0.])})  # for testing only
+                             'RH': p_init['RH'] + np.array([0.09, -0.06, 0.18])})
         # ---- Step 4: step through door with right foot
-        # fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
-        # motion_frames.append(['RF', 'R_knee'])        # frames that have a specified final position
-
+        fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
+        motion_frames.append({'RF': p_init['RF'] + np.array([step_length, 0., 0.]),
+                              'R_knee': p_init['R_knee'] + np.array([step_length, 0., 0.]),
+                              'torso': p_init['torso'] + np.array([step_length, 0., 0.])})
         # make multi-trajectory planner
         T = 3
         alpha = [0, 0, 1]

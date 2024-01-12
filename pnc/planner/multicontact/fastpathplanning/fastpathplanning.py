@@ -100,6 +100,15 @@ def get_last_defined_point(safe_points_list, frame_name):
     return 0
 
 
+def get_last_defined_box(box_seq_list, frame_name):
+    for bs in reversed(box_seq_list):
+        if frame_name in bs.keys() and not np.isnan(bs[frame_name]):
+            return bs[frame_name]
+
+    # if we reach this point, the corresponding frame is never assigned
+    return np.nan
+
+
 def get_num_unassigned_boxes(box_seq_list, frame_name):
     num_unassigned_boxes = 1
     for bs in reversed(box_seq_list):
@@ -109,28 +118,33 @@ def get_num_unassigned_boxes(box_seq_list, frame_name):
             return num_unassigned_boxes
 
 
+def unassigned_box_seq_interpolator(box_seq_list, last_box_seq, frame_name):
+    num_boxes_unassigned = get_num_unassigned_boxes(box_seq_list, frame_name)
+
+    last_defined_box_seq = get_last_defined_box(box_seq_list, frame_name)
+    # check last defined box sequence is consistent
+    if last_defined_box_seq[0] != last_box_seq[frame_name][0]:
+        raise AssertionError("Box sequence in free frame is inconsistent")
+
+    interval_boxes = last_box_seq[frame_name][-1] - last_box_seq[frame_name][0]
+    fract_box = interval_boxes / num_boxes_unassigned
+
+    # distribute boxes equally
+    k_box = 0
+    for bs in box_seq_list:
+        new_box_seq_val = round(last_defined_box_seq[0] + k_box * fract_box)
+        b_max = np.max([len(boxes) for boxes in bs.values()])
+        bs[frame_name] = [new_box_seq_val] * b_max
+        k_box += 1
+
+    # clear boxes from last box_seq
+    last_box_seq[frame_name] = [last_box_seq[frame_name][-1]]
+
+
 def distribute_free_frames(last_box_seq, box_seq_list, frame_name):
-    # find last nan entry
-    num_unassigned_boxes = get_num_unassigned_boxes(box_seq_list, frame_name)
-    num_box_last_seq = len(last_box_seq[frame_name])
 
-    # first, check if last assigned box sequence matches the first box in last box sequence
-    if num_box_last_seq != 1:
-        if box_seq_list[-num_unassigned_boxes][frame_name][0] == last_box_seq[frame_name][0]:
-            last_box_seq[frame_name].pop(0)
-
-    # re-distribute free motion between nan boxes
-    num_boxes_last_seq = len(last_box_seq[frame_name])
-
-    # Heuristic: straight-forward case w/ one box per segment
-    if num_unassigned_boxes == num_boxes_last_seq:
-        for n_box in range(1, num_unassigned_boxes):
-            box_seq_list[-n_box][frame_name] = [last_box_seq[frame_name].pop(-(n_box+1))]
-    elif num_boxes_last_seq == 1:   # if frame remains in one box
-        for n_box in range(1, num_unassigned_boxes):
-            box_seq_list[-n_box][frame_name] = [last_box_seq[frame_name][0]]
-    else:
-        raise NotImplementedError("Free frames box sequence case has not been implemented")
+    # distribute according to the number of segments allocated
+    unassigned_box_seq_interpolator(box_seq_list, last_box_seq, frame_name)
 
 
 def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
@@ -162,8 +176,8 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
         # first process the motion frames to determine the length of box sequences
         for fm, pm_next in motion_frames[k_transition-1].items():
             if fm in f_frames:
+                pm_init = get_last_defined_point(safe_points_lst, fm)
                 safe_points_lst[k_transition][fm] = pm_next
-                pm_init = safe_points_lst[k_transition - 1][fm]
                 box_seq_dict[fm] = find_shortest_box_path(safe_boxes[fm], pm_init, pm_next)
         # maximum number of boxes in a box sequence in the motion frames
         b_max = np.max([len(bs) for bs in box_seq_dict.values()])
@@ -175,6 +189,14 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
             safe_points_lst[k_transition][ff] = pf_prev
             box_pf_prev = next(iter((safe_boxes[ff].B.contain(pf_prev))))
             box_seq_dict[ff] = [box_pf_prev] * b_max
+
+        if k_transition > 1:
+            # if one of the old un-assigned frames got a new assignment, fill the gap
+            for fname in p_init.keys():
+                is_old_seg_unassigned = np.isnan(box_seq_lst[-1][fname][0])
+                is_current_seg_assigned = not np.isnan(box_seq_dict[fname][0])
+                if is_old_seg_unassigned and is_current_seg_assigned:
+                    distribute_free_frames(box_seq_dict, box_seq_lst, fname)
 
         box_seq_lst.append(copy.deepcopy(box_seq_dict))
         box_seq_dict.clear()
@@ -222,16 +244,11 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
     if b_max_new != b_min_new:
         distribute_box_seq(box_seq_lst[-1], b_max_new)
 
-    # fix box sequence list frames that had unassigned blocks (e.g., with nan entries)
+    # throw exception if any frames have un-assigned safe regions
     for f_list in box_seq_lst:
-        b_max = np.max([len(bs) for bs in f_list.values()])
         for fname, bs in f_list.items():
             if any(np.isnan(bs)):
-                # look for the nearest non-nan boxes and fill the nan boxes with that information
-                if f_list != box_seq_lst[-1]:
-                    f_list[fname] = [box_seq_lst[-1][fname][0]] * b_max     # TODO find next non-nan box
-                else:                   # last list corresponds to the motion frame, so we repeat the last box sequence
-                    f_list[fname] = [box_seq_lst[-2][fname][-1]] * b_max
+                raise Exception(f"{fname} frame has un-assigned safe regions")
 
     return box_seq_lst, safe_points_lst
 
