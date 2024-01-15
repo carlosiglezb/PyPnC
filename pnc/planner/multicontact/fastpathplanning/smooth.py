@@ -324,8 +324,6 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
         Lk = np.array([L[seg_idx][f_name][fr_seg_k_box]] * n_points)
         Uk = np.array([U[seg_idx][f_name][fr_seg_k_box]] * n_points)
 
-        #TODO figure out why infeasible when using LF and L_knee and k_fr_box == 1
-        # if f_name == 'LF':
         constraints.append(points[k][0] >= Lk)
         constraints.append(points[k][0] <= Uk)
 

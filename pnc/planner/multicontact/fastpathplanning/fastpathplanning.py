@@ -267,8 +267,11 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
         print('\nSmooth phase:')
 
     # Fix box sequence.
+    n_f = len(p_init)
+    n_poly_points = round(len(traj) / n_f)
     durations = []
     bs_i = 0
+    seg_idx = 0
     for bs in box_seq:
         durations.append({})
         for frame, i in bs.items():
@@ -278,20 +281,22 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
             # Initialize transition times.
             num_boxes = len(i)
             frame_idx = list(p_init.keys()).index(frame)
-            n_f = len(p_init)
             d = S[frame].B.boxes[i[0]].d
             # get indices of current frame for all curve points
             for b in range(num_boxes+1):
+                first_idx = n_poly_points * frame_idx + (b + bs_i) * d
+                last_idx = first_idx + d - 1
                 if b == 0:
-                    ee_traj_idx = np.linspace(d*frame_idx+b*d*n_f, d*frame_idx+d*(b*n_f+1)-1, d).astype(int)
+                   ee_traj_idx = np.linspace(first_idx, last_idx, d).astype(int)
                 else:
-                    ee_traj_idx = np.vstack((ee_traj_idx, (np.linspace(d*frame_idx+b*d*n_f, d*frame_idx+d*(b*n_f+1)-1, d)).astype(int)))
+                    ee_traj_idx = np.vstack((ee_traj_idx, (np.linspace(first_idx, last_idx, d)).astype(int)))
 
             ee_traj_change = traj[ee_traj_idx[1:]]-traj[ee_traj_idx[:-1]]
-            durations[bs_i][frame] = np.linalg.norm(ee_traj_change, axis=1)
+            durations[seg_idx][frame] = np.linalg.norm(ee_traj_change, axis=1)
             #TODO deal with case where any of durations[frame] == 0
-            durations[bs_i][frame] *= T / sum(durations[bs_i][frame])
-        bs_i += 1
+            durations[seg_idx][frame] *= T / sum(durations[seg_idx][frame])
+        bs_i += num_boxes
+        seg_idx += 1
 
     paths, sol_stats = optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations,
                                                              alpha, safe_pnt_lst,
