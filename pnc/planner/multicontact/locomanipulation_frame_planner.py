@@ -120,6 +120,33 @@ class LocomanipulationFramePlanner:
         return aux_frames
 
     @staticmethod
+    def visualize_simple_points(viewer, frame_name, points):
+        """ Visualizes points in Meshcat
+        Arguments
+        ---------
+        viewer: Meshcat Visualizer
+        frame_name: Name of viewer to display in Meshcat controls
+        points: ndarray
+            Points arranged in size [N, dim] where N is the number
+            of points, and dim is the dimension space, e.g., 2 for
+            2-D, 3 for 3D.
+        """
+        color_transition = [1., 1., 0., 0.6]    # yellow
+        r_bezier_pts = 0.01
+
+        # Create yellow sphere
+        obj = g.Sphere(r_bezier_pts)
+        convert_rgba_to_meshcat_obj(obj, color_transition)
+
+        pt_number = 0
+        for p in points:
+            tf_pos = tf.translation_matrix(p)
+            viewer["paths"][frame_name][str(pt_number)][str(pt_number)].set_object(
+                obj, g.MeshLambertMaterial(color=obj.color))
+            viewer["paths"][frame_name][str(pt_number)][str(pt_number)].set_transform(tf_pos)
+            pt_number += 1
+
+    @staticmethod
     def visualize_bezier_points(vis_viewer, frame, bezier_curve, segment=0):
         color_waypoint = [0., 1., 0., 0.6]      # blue
         color_transition = [1., 1., 0., 0.6]    # yellow

@@ -64,9 +64,6 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
             # process initial positions when in new frame
             if seg_idx == 0:
                 constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
-                x_init_idx += d
-                seg_idx += 1
-                continue
             else:
                 if f_name in sp_lst:
                     constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
@@ -91,10 +88,16 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
             num_boxes_current = len(next(iter(bs_lst.values())))
             boxes = [ee_box.B.boxes[i] for i in bs_lst[frame]]
 
-            for p in range(0, num_boxes_current):
-                l[x_init_idx:x_init_idx + d] = boxes[p].l
-                u[x_init_idx:x_init_idx + d] = boxes[p].u
+            for p in range(0, num_boxes_current-1):
+                llim = np.array([np.maximum(boxes[p].l, boxes[p+1].l)])
+                ulim = np.array([np.minimum(boxes[p].u, boxes[p+1].u)])
+                l[x_init_idx:x_init_idx + d] = llim
+                u[x_init_idx:x_init_idx + d] = ulim
                 x_init_idx += d
+            # for last box simply use the given bounds
+            l[x_init_idx:x_init_idx + d] = boxes[num_boxes_current-1].l
+            u[x_init_idx:x_init_idx + d] = boxes[num_boxes_current-1].u
+            x_init_idx += d
             seg_idx += 1
 
     # Construct end-effector reachability constraints (initial & final points specified)

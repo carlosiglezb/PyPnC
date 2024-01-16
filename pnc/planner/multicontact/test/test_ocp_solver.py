@@ -1,11 +1,13 @@
 import unittest
 
 import numpy as np
+import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
 
 from collections import OrderedDict
 from pnc.planner.multicontact.fastpathplanning.smooth import optimize_multiple_bezier
 from pnc.planner.multicontact.frame_traversable_region import FrameTraversableRegion
 from pnc.planner.multicontact.locomanipulation_frame_planner import LocomanipulationFramePlanner
+from pnc.planner.multicontact.fastpathplanning.polygonal import solve_min_reach_distance
 
 
 class TestOCPSolver(unittest.TestCase):
@@ -215,6 +217,48 @@ class TestOCPSolver(unittest.TestCase):
                     LocomanipulationFramePlanner.visualize_bezier_points(visualizer, 'LH', bezier_curve, seg)
             i += 1
         self.assertTrue(True, "Check solution in visualizer")
+
+    def test_solve_min_distance_safe(self):
+        points_dim = 3      # 3D points
+        reach = OrderedDict()
+        reach['LF'] = {'H': [0]}  # override
+        safe_points_lst = []
+
+        # collision-free boxes
+        box_llim, box_ulim = self.get_sample_collision_free_boxes()
+
+        # Safe points being initial and last positions
+        safe_points_lst.append({'LF': np.array([0.06, 0.14, 0.])})
+        safe_points_lst.append({'LF': np.array([0.5, 0.14, 0.])})
+
+        # Safe boxes
+        safe_boxes = OrderedDict()
+        safe_boxes['LF'] = fpp.SafeSet(box_llim['LF'], box_ulim['LF'], False)
+
+        # Box sequence
+        box_seq = [{'LF': [0, 1, 2]}]     # box sequence for LF
+
+        # Solve minimum distance problem
+        traj, length, _ = solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_lst, None)
+        n_points = int(len(traj) / points_dim)
+        traj = np.reshape(traj, [n_points, points_dim])
+
+        # visualize
+        traversable_region = OrderedDict()
+        traversable_region['LF'] = FrameTraversableRegion('LF', b_visualize_safe=True)
+        traversable_region['LF'].load_collision_free_boxes(box_llim['LF'], box_ulim['LF'])
+        visualizer = traversable_region['LF'].get_visualizer()
+        LocomanipulationFramePlanner.visualize_simple_points(visualizer, 'LF', traj)
+
+        naive_distance = 0.4 + 0.44 + 0.4   # simply moving straight up, forward, and down
+        self.assertTrue(length < naive_distance, "Trajectory is longer than expected")
+
+        shortest_distance = (np.linalg.norm([0.19, 0.4]) +      # go to [0.25, 0.14, 0.4]
+                             0.15 +                             # go to [0.4, 0.14, 0.4]
+                             np.linalg.norm([0.1, 0.4]) )       # go to [0.5, 0.14, 0.0]
+        self.assertTrue(length < shortest_distance, "Trajectory is longer than expected")
+
+
 
 if __name__ == '__main__':
     unittest.main()
