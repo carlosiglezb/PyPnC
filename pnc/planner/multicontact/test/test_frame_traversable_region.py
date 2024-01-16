@@ -254,8 +254,8 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [0.6, 0.3, 0.9]  # prevent leg-crossing
         ])
         box_ulim['LF'] = np.array([
-            [0.25, 0.35, 0.6],  # z stops at kin. limit
-            [0.6, 0.4, 0.6],  # x stops at kin. limit
+            [0.25, 0.4, 0.6],  # z stops at kin. limit
+            [0.6, 0.35, 0.6],  # x stops at kin. limit
             [0.8, 0.4, 0.6]  # x stops at kin. limit
         ])
         box_ulim['RF'] = np.array([
@@ -264,8 +264,8 @@ class TestFrameTraversableRegion(unittest.TestCase):
             [0.8, 0.0, 0.6]  # prevent leg-crossing
         ])
         box_ulim['L_knee'] = np.array([
-            [0.25, 0.35, 0.6],  # z stops at kin. limit
-            [0.6, 0.4, 0.6],  # x stops at kin. limit
+            [0.25, 0.4, 0.6],  # z stops at kin. limit
+            [0.6, 0.35, 0.6],  # x stops at kin. limit
             [0.8, 0.4, 0.6]  # x stops at kin. limit
         ])
         box_ulim['R_knee'] = np.array([
@@ -631,6 +631,10 @@ class TestFrameTraversableRegion(unittest.TestCase):
         motion_frames.append({'RF': p_init['RF'] + np.array([step_length, 0., 0.]),
                               'R_knee': p_init['R_knee'] + np.array([step_length, 0., 0.]),
                               'torso': p_init['torso'] + np.array([step_length, 0., 0.])})
+        # ---- Step 5: square up
+        fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
+        motion_frames.append({})
+
         # make multi-trajectory planner
         T = 3
         alpha = [0, 0, 1]
