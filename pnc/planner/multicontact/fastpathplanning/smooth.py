@@ -7,7 +7,7 @@ from itertools import accumulate
 from bisect import bisect
 from scipy.special import binom
 
-from pnc.planner.multicontact.cvx_mfpp_tools import create_cvx_norm_eq_relaxation, create_bezier_cvx_norm_eq_relaxation
+from pnc.planner.multicontact.cvx_mfpp_tools import create_bezier_cvx_norm_eq_relaxation
 
 
 class BezierCurve:
@@ -397,38 +397,41 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
     # Rigid links (e.g., shin link length) constraint relaxation
     soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
-    # if aux_frames is not None:
-    #     prox_fr_idx, dist_fr_idx = 0, 0
-    #     link_based_weights = 0.01 * np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
-    #     for aux_fr in aux_frames:
-    #         if aux_fr['parent_frame'] == 'l_knee_fe_ld':
-    #             L_kn_frame_idx = np.where(np.array(frame_list) == 'L_knee')[0][0]
-    #             LF_frame_idx = np.where(np.array(frame_list) == 'LF')[0][0]
-    #             prox_fr_idx = int(L_kn_frame_idx * n_boxes)
-    #             dist_fr_idx = int(LF_frame_idx * n_boxes)
-    #         elif aux_fr['parent_frame'] == 'r_knee_fe_ld':
-    #             R_kn_frame_idx = np.where(np.array(frame_list) == 'R_knee')[0][0]
-    #             RF_frame_idx = np.where(np.array(frame_list) == 'RF')[0][0]
-    #             prox_fr_idx = int(R_kn_frame_idx * n_boxes)
-    #             dist_fr_idx = int(RF_frame_idx * n_boxes)
-    #         else:
-    #             print(f'Parent frame index for bezier smoothing unknown')
-    #         link_length = aux_fr['length']
-    #
-    #         # loop through all safe boxes
-    #         for nb in range(1, n_boxes):
-    #             for pnt in range(n_points-1):
-    #                 link_proximal_point = points[prox_fr_idx+nb][0][pnt]
-    #                 link_distal_point = points[dist_fr_idx+nb][0][pnt]
-    #                 create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-    #                                          link_distal_point, soc_constraint, cost_log_abs,
-    #                                                      wi=link_based_weights)
-    #
-    #                 # knee should mostly be above the foot
-    #                 # soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
-    #
-    #     cost_log_abs_sum = -(cp.sum(cost_log_abs))
-    #     # cost_log_abs_sum = 0.
+    if aux_frames is not None:
+        prox_fr_idx, dist_fr_idx = 0, 0
+        # link_based_weights = np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
+        link_based_weights = np.diag([0.1621, 0.001, 0.2808])    # based on distance between foot-shin frames
+
+        # apply auxiliary rigid link constraint throughout all safe regions
+        for aux_fr in aux_frames:
+            if aux_fr['parent_frame'] == 'l_knee_fe_ld' and 'L_knee' in safe_points_lst[0].keys():
+                L_kn_frame_idx = np.where(np.array(frame_list) == 'L_knee')[0][0]
+                LF_frame_idx = np.where(np.array(frame_list) == 'LF')[0][0]
+                prox_fr_idx = int(L_kn_frame_idx * num_boxes_tot)
+                dist_fr_idx = int(LF_frame_idx * num_boxes_tot)
+            elif aux_fr['parent_frame'] == 'r_knee_fe_ld' and 'R_knee' in safe_points_lst[0].keys():
+                R_kn_frame_idx = np.where(np.array(frame_list) == 'R_knee')[0][0]
+                RF_frame_idx = np.where(np.array(frame_list) == 'RF')[0][0]
+                prox_fr_idx = int(R_kn_frame_idx * num_boxes_tot)
+                dist_fr_idx = int(RF_frame_idx * num_boxes_tot)
+            else:
+                print(f'Parent frame index for bezier smoothing unknown')
+            link_length = aux_fr['length']
+
+            # loop through all safe boxes
+            for nb in range(1, num_boxes_tot):
+                # for pnt in range(n_points-1):
+                for pnt in range(1):
+                    link_proximal_point = points[prox_fr_idx+nb][0][pnt]
+                    link_distal_point = points[dist_fr_idx+nb][0][pnt]
+                    create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
+                                             link_distal_point, soc_constraint, cost_log_abs,
+                                                         wi=link_based_weights)
+
+                    # knee should mostly be above the foot
+                    # soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
+
+        cost_log_abs_sum = -(cp.sum(cost_log_abs))
 
     # Reachability constraints
     fr_idx, k_fr_box = 0, 0

@@ -139,12 +139,12 @@ class TestFrameTraversableRegion(unittest.TestCase):
         ])
         box_llim['LF'] = np.array([
             [-0.2, 0.0, 0.0],  # prevent leg-crossing
-            [-0.1, 0.0, 0.4],  # prevent leg-crossing
+            [-0.2, 0.0, 0.4],  # prevent leg-crossing
             [0.4, 0.0, 0.0]  # prevent leg-crossing
         ])
         box_llim['RF'] = np.array([
             [-0.2, -0.4, 0.0],  # prevent leg-crossing
-            [-0.1, -0.35, 0.4],  # prevent leg-crossing
+            [-0.2, -0.35, 0.4],  # prevent leg-crossing
             [0.4, -0.4, 0.0]  # prevent leg-crossing
         ])
         box_llim['L_knee'] = np.array([
@@ -186,12 +186,12 @@ class TestFrameTraversableRegion(unittest.TestCase):
         ])
         box_ulim['L_knee'] = np.array([
             [0.25, 0.35, 0.6],  # z stops at kin. limit
-            [0.6, 0.4, 0.6],  # x stops at kin. limit
+            [0.8, 0.4, 0.6],  # x stops at kin. limit
             [0.8, 0.4, 0.6]  # x stops at kin. limit
         ])
         box_ulim['R_knee'] = np.array([
             [0.25, 0.0, 0.6],  # prevent leg-crossing
-            [0.6, 0.0, 0.6],  # prevent leg-crossing
+            [0.8, 0.0, 0.6],  # prevent leg-crossing
             [0.8, 0.0, 0.6]  # prevent leg-crossing
         ])
         box_ulim['LH'] = np.array([
@@ -503,7 +503,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         # frame_planner.add_reachable_frame_constraint(aux_frame, aux_frame_region)
 
     def test_use_fixed_and_motion_paths(self):
-        b_visualize = True
+        b_visualize = False
         # load robot
         rob_model, rob_collision_model, rob_visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",

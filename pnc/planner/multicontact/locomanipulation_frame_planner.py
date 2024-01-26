@@ -120,7 +120,7 @@ class LocomanipulationFramePlanner:
         return aux_frames
 
     @staticmethod
-    def visualize_simple_points(viewer, frame_name, points):
+    def visualize_simple_points(viewer, frame_name, points, color=None):
         """ Visualizes points in Meshcat
         Arguments
         ---------
@@ -131,12 +131,13 @@ class LocomanipulationFramePlanner:
             of points, and dim is the dimension space, e.g., 2 for
             2-D, 3 for 3D.
         """
-        color_transition = [1., 1., 0., 0.6]    # yellow
+        if color is None:
+            color = [1., 1., 0., 0.6]       # yellow
         r_bezier_pts = 0.01
 
         # Create yellow sphere
         obj = g.Sphere(r_bezier_pts)
-        convert_rgba_to_meshcat_obj(obj, color_transition)
+        convert_rgba_to_meshcat_obj(obj, color)
 
         pt_number = 0
         for p in points:

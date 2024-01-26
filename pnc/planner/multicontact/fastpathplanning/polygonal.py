@@ -5,7 +5,7 @@ from itertools import accumulate
 from bisect import bisect
 from scipy.special import binom
 
-from pnc.planner.multicontact.cvx_mfpp_tools import create_cvx_norm_eq_relaxation
+from pnc.planner.multicontact.cvx_mfpp_tools import create_cvx_norm_eq_relaxation, get_aux_frame_idx
 
 
 def solve_min_distance(B, box_seq, start, goal):
@@ -74,6 +74,7 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
             x_init_idx += num_boxes_current * d
             seg_idx += 1
 
+    frame_list = list(safe_points_list[0].keys())
     # organize lower and upper state limits (include initial and final state bounds)
     l = np.zeros((d * n_f * (num_boxes_tot + 1),))
     u = np.zeros((d * n_f * (num_boxes_tot + 1),))
@@ -131,6 +132,21 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
 
     # add feasibility of end curve point? Perhaps since it depends on torso
 
+    # add rigid link constraint
+    cost_log_abs = 0.
+    soc_constraint = []
+    A_soc = []      # for debug purposes
+    if aux_frames is not None:
+        for aux_fr in aux_frames:
+            # get corresponding indices of optimization variable
+            prox_idx, dist_idx, link_length = get_aux_frame_idx(
+                aux_fr, frame_list, num_boxes_tot)
+
+            if not np.isnan(prox_idx):
+                # add convex relaxation of norm constraint
+                cost_log_abs, A_soc = create_cvx_norm_eq_relaxation(
+                    prox_idx, dist_idx, link_length, d, num_boxes_tot+1, x, soc_constraint)
+
     # knee-to-foot fixed distance constraint (this should be trivially satisfied when 2 boxes)
     # for bs_lst in box_seq:
     #     num_boxes_current = len(next(iter(bs_lst.values())))
@@ -141,10 +157,8 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
     #         soc_constraint = []
     #         A_soc = []
     #         cost_log_abs = 0.
-    cost_log_abs = 0.
-    soc_constraint = []
-    A_soc = []
 
+    # minimum distance cost (add distance between points of corresponding frame)
     cost = 0
     for fr in range(n_f):
         start_idx = fr * d * (num_boxes_tot + 1)
@@ -163,19 +177,8 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
     constr.append(l <= x)   # safe, collision-free boxes (lower limit)
     constr.append(x <= u)   # safe, collision-free boxes (upper limit)
 
-    # start_idx = 0
-    # for frame in safe_boxes.keys():     # go in order
-    #     for bs_lst in box_seq:
-    #         num_boxes_current = len(next(iter(bs_lst.values())))
-    #         if num_boxes_current > 2:
-    #             constr.append([
-    #                 x[start_idx + d * n_f: -d * n_f] >= l,  # safe, collision-free boxes (lower limit)
-    #                 x[start_idx + d * n_f: -d * n_f] <= u,  # safe, collision-free boxes (upper limit)
-    #             ])
-    #         else:
-    #             start_idx += d * num_boxes_current
-    #
-    prob = cp.Problem(cp.Minimize(cost), constr + soc_constraint)
+    # solve
+    prob = cp.Problem(cp.Minimize(cost + cost_log_abs), constr + soc_constraint)
     prob.solve(solver='SCS')
 
     length = prob.value
