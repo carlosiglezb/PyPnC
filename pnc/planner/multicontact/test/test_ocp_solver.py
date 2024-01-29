@@ -365,12 +365,12 @@ class TestOCPSolver(unittest.TestCase):
         LocomanipulationFramePlanner.visualize_simple_points(visualizer, 'LK', traj[4:], color=blue)
 
         naive_distance = 2*(0.4 + 0.44 + 0.4)   # simply moving straight up, forward, and down
-        self.assertTrue(length < naive_distance, "Trajectory is longer than 90deg lines")
+        self.assertTrue(np.linalg.norm(traj) < naive_distance, "Trajectory is longer than 90deg lines")
 
-        shortest_distance = (np.linalg.norm([0.19, 0.4]) +      # go to [0.25, 0.14, 0.4]
+        shortest_distance = 2*(np.linalg.norm([0.19, 0.4]) +      # go to [0.25, 0.14, 0.4]
                              0.15 +                             # go to [0.4, 0.14, 0.4]
                              np.linalg.norm([0.1, 0.4]) )       # go to [0.5, 0.14, 0.0]
-        self.assertTrue(length < shortest_distance, "Trajectory is longer than shortest distance")
+        self.assertTrue(np.linalg.norm(traj) < shortest_distance, "Trajectory is longer than shortest distance")
 
 
 if __name__ == '__main__':
