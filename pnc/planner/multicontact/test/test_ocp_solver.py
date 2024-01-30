@@ -3,6 +3,8 @@ import unittest
 import os
 import sys
 import numpy as np
+from ruamel.yaml import YAML
+
 import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
 
 from collections import OrderedDict
@@ -371,6 +373,50 @@ class TestOCPSolver(unittest.TestCase):
                              0.15 +                             # go to [0.4, 0.14, 0.4]
                              np.linalg.norm([0.1, 0.4]) )       # go to [0.5, 0.14, 0.0]
         self.assertTrue(np.linalg.norm(traj) < shortest_distance, "Trajectory is longer than shortest distance")
+
+    def test_visualize_min_rigid_distance_safe_from_file(self):
+
+        # path to file with points to visualize
+        points_path = cwd + '/test' + '/poly_min_distance_data.yaml'
+        n_frames = 7
+        n_boxes = 10
+        x_deg = 3
+
+        # collision-free boxes
+        box_llim, box_ulim = self.get_sample_collision_free_boxes()
+
+        # Safe boxes
+        safe_boxes = OrderedDict()
+        safe_boxes['LF'] = fpp.SafeSet(box_llim['LF'], box_ulim['LF'], False)
+        safe_boxes['L_knee'] = fpp.SafeSet(box_llim['LF'], box_ulim['LF'], False)
+
+        # Solve minimum distance problem
+        traj = np.zeros((70, 3))
+        start_idx = 0
+        end_idx = x_deg
+        with open(points_path, 'r') as f:
+            yml = YAML().load(f)
+            for p in range(n_frames * n_boxes):
+                traj[p, :] = np.array(yml[start_idx:end_idx])
+                start_idx += x_deg
+                end_idx = start_idx + x_deg
+
+        # visualize safe regions
+        traversable_region = OrderedDict()
+        traversable_region['LF'] = FrameTraversableRegion('LF', b_visualize_safe=True)
+        traversable_region['LF'].load_collision_free_boxes(box_llim['LF'], box_ulim['LF'])
+        visualizer = traversable_region['LF'].get_visualizer()
+
+        # visualize points
+        LocomanipulationFramePlanner.visualize_simple_points(visualizer, 'torso', traj[0:10])
+        LocomanipulationFramePlanner.visualize_simple_points(visualizer, 'LF', traj[10:20])
+        LocomanipulationFramePlanner.visualize_simple_points(visualizer, 'RF', traj[20:30])
+        LocomanipulationFramePlanner.visualize_simple_points(visualizer, 'LK', traj[30:40], color=blue)
+        LocomanipulationFramePlanner.visualize_simple_points(visualizer, 'RK', traj[40:50], color=blue)
+        LocomanipulationFramePlanner.visualize_simple_points(visualizer, 'LH', traj[50:60])
+        LocomanipulationFramePlanner.visualize_simple_points(visualizer, 'RH', traj[60:70])
+
+        self.assertTrue(True, "Cannot visualize given points")
 
 
 if __name__ == '__main__':
