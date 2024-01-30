@@ -7,7 +7,7 @@ from itertools import accumulate
 from bisect import bisect
 from scipy.special import binom
 
-from pnc.planner.multicontact.cvx_mfpp_tools import create_bezier_cvx_norm_eq_relaxation
+from pnc.planner.multicontact.cvx_mfpp_tools import create_bezier_cvx_norm_eq_relaxation, get_aux_frame_idx
 
 
 class BezierCurve:
@@ -398,25 +398,13 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
     soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
     if aux_frames is not None:
-        prox_fr_idx, dist_fr_idx = 0, 0
-        # link_based_weights = np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
-        link_based_weights = np.diag([0.1621, 0.001, 0.2808])    # based on distance between foot-shin frames
+        frame_list = list(safe_points_lst[0].keys())
+        link_based_weights = np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
 
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
-            if aux_fr['parent_frame'] == 'l_knee_fe_ld' and 'L_knee' in safe_points_lst[0].keys():
-                L_kn_frame_idx = np.where(np.array(frame_list) == 'L_knee')[0][0]
-                LF_frame_idx = np.where(np.array(frame_list) == 'LF')[0][0]
-                prox_fr_idx = int(L_kn_frame_idx * num_boxes_tot)
-                dist_fr_idx = int(LF_frame_idx * num_boxes_tot)
-            elif aux_fr['parent_frame'] == 'r_knee_fe_ld' and 'R_knee' in safe_points_lst[0].keys():
-                R_kn_frame_idx = np.where(np.array(frame_list) == 'R_knee')[0][0]
-                RF_frame_idx = np.where(np.array(frame_list) == 'RF')[0][0]
-                prox_fr_idx = int(R_kn_frame_idx * num_boxes_tot)
-                dist_fr_idx = int(RF_frame_idx * num_boxes_tot)
-            else:
-                print(f'Parent frame index for bezier smoothing unknown')
-            link_length = aux_fr['length']
+            prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
+                aux_fr, frame_list, num_boxes_tot)
 
             # loop through all safe boxes
             for nb in range(1, num_boxes_tot):
@@ -475,7 +463,7 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-    prob.solve(solver='SCS', eps_abs=1e-3, eps_rel=1e-3)
+    prob.solve(solver='SCS')
     # prob.solve(solver='CLARABEL')
 
     # Reconstruct trajectory.
