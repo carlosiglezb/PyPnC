@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import cvxpy as cp
 from time import time
