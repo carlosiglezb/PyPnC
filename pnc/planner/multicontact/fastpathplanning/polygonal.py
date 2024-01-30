@@ -135,17 +135,28 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
     # add rigid link constraint
     cost_log_abs = 0.
     soc_constraint = []
-    A_soc = []      # for debug purposes
+    A_soc_debug, d_soc_debug, cost_log_abs_list = [], [], []      # for debug purposes
     if aux_frames is not None:
+        w_i = cp.Parameter(pos=True, value=1.)
         for aux_fr in aux_frames:
             # get corresponding indices of optimization variable
             prox_idx, dist_idx, link_length = get_aux_frame_idx(
-                aux_fr, frame_list, num_boxes_tot)
+                aux_fr, frame_list, num_boxes_tot + 1)
 
             if not np.isnan(prox_idx):
                 # add convex relaxation of norm constraint
-                cost_log_abs, A_soc = create_cvx_norm_eq_relaxation(
-                    prox_idx, dist_idx, link_length, d, num_boxes_tot+1, x, soc_constraint)
+                A_soc_aux, d_soc_aux = create_cvx_norm_eq_relaxation(
+                    prox_idx, dist_idx, link_length, d, num_boxes_tot+1, x)
+
+                # concatenate A inequality matrices for debugging
+                A_soc_debug += copy.deepcopy(A_soc_aux)
+                d_soc_debug += copy.deepcopy(d_soc_aux)
+
+        for Ai, di in zip(A_soc_debug, d_soc_debug):
+            soc_constraint.append(cp.SOC(di, Ai @ x))
+            cost_log_abs_list.append(w_i * cp.log(di.value + Ai[0] @ x))
+
+        cost_log_abs = -(cp.sum(cost_log_abs_list))
 
     # knee-to-foot fixed distance constraint (this should be trivially satisfied when 2 boxes)
     # for bs_lst in box_seq:
@@ -167,12 +178,6 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
         p_fr_t = cp.reshape(x_fr, [d, num_boxes_tot + 1])
         cost += cp.sum(cp.norm(p_fr_t[:, 1:] - p_fr_t[:, :-1], axis=1))
 
-    # constr = [x[:d * n_f] == x_init,
-    #           # x[d * n_f:-d * n_f] >= l,     # safe, collision-free boxes (lower limit)
-    #           # x[d * n_f:-d * n_f] <= u,     # safe, collision-free boxes (upper limit)
-    #           # H @ x <= -d_vec,            # non-stance frame remains reachable
-    #           x[-d * n_f:] == x_goal]
-
     # add limits if more than 2 boxes
     constr.append(l <= x)   # safe, collision-free boxes (lower limit)
     constr.append(x <= u)   # safe, collision-free boxes (upper limit)
@@ -186,7 +191,7 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
     solver_time = prob.solver_stats.solve_time
 
     # check distance of knee and foot points at each curve point
-    for Ai in A_soc:
+    for Ai in A_soc_debug:
         opt_shin_len_err = np.linalg.norm(Ai @ traj) - 0.32428632635527505
         print(f"Shin length discrepancy: {opt_shin_len_err}")
     return traj, length, solver_time
