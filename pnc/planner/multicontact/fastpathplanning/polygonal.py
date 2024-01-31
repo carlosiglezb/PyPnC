@@ -9,6 +9,16 @@ from scipy.special import binom
 
 from pnc.planner.multicontact.cvx_mfpp_tools import create_cvx_norm_eq_relaxation, get_aux_frame_idx
 
+b_debug = False
+
+if b_debug:
+    from ruamel.yaml import YAML
+    import os
+    import sys
+
+    cwd = os.getcwd()
+    sys.path.append(cwd)
+
 
 def solve_min_distance(B, box_seq, start, goal):
     x = cp.Variable((len(box_seq) + 1, B.d))
@@ -197,6 +207,16 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
     for Ai in A_soc_debug:
         opt_shin_len_err = np.linalg.norm(Ai @ traj) - 0.32428632635527505
         print(f"Shin length discrepancy: {opt_shin_len_err}")
+
+    if b_debug:
+        yaml = YAML()
+        file_loc = cwd + '/test' + '/poly_min_distance_data.yaml'
+
+        traj_reshape = np.reshape(traj, [7, 30])
+        with open(file_loc, 'w') as f:
+            for p in traj_reshape:
+                yaml.dump(p.tolist(), f)
+
     return traj, length, solver_time
 
 
