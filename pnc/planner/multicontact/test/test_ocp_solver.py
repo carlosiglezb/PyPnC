@@ -186,10 +186,10 @@ class TestOCPSolver(unittest.TestCase):
                                 'LH': np.array([0.3, 0.37, 0.89])})     # end of interval 2
 
         # Velocity / acceleration vector (in W frame) of desired end effector position
-        motion_frame_vel_lst.append({'LH': np.array([-1., 0., 0.])})
-        motion_frame_vel_lst.append({'LF': np.array([0., 0., 1.])})
-        motion_frame_acc_lst.append({'LH': np.array([1., 0., 0.])})
-        motion_frame_acc_lst.append({'LF': np.array([0., 0., -1.])})
+        motion_frame_vel_lst.append({'LH': np.array([0.01, 0., 0.])})
+        motion_frame_vel_lst.append({'LF': np.array([0., 0., -0.1])})
+        motion_frame_acc_lst.append({'LH': np.array([-0.1, 0., 0.])})
+        motion_frame_acc_lst.append({'LF': np.array([0., 0., 0.01])})
 
         # fixed frames
         fixed_frames.append({'LF'})

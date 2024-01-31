@@ -339,6 +339,12 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                 # check if it has a final safe point assigned
                 if fr_seg_k_box == (num_boxes_current-1) and f_name in safe_points_lst[seg_idx+1].keys():
                     constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])
+                    if motion_frame_vel is not None:    # TODO add check that frame provided in motion
+                        constraints.append(points[k][1][-1] == motion_frame_vel[seg_idx][f_name])  # vel
+                        # constraints.append(points[k][1][-2][0] >= 0.)  # vel
+                    if motion_frame_acc is not None:
+                        # constraints.append(points[k][2][-1] == motion_frame_acc[seg_idx][f_name])  # acc
+                        constraints.append(points[k][2][-2][0] <= 0.)  # acc
         elif (k + 1) % num_boxes_tot == 0:  # final position for each frame
             if f_name in fixed_frames[seg_idx]:
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
@@ -347,8 +353,10 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                 constraints.append(points[k][0][-1] == safe_points_lst[-1][f_name])
                 if motion_frame_vel is not None:
                     constraints.append(points[k][1][-1] == motion_frame_vel[-1][f_name])  # vel
+                    # constraints.append(points[k][1][-2][2] <= 0.)  # vel
                 if motion_frame_acc is not None:
-                    constraints.append(points[k][2][-1] == motion_frame_acc[-1][f_name])  # acc
+                    # constraints.append(points[k][2][-2] == motion_frame_acc[-1][f_name])  # acc
+                    constraints.append(points[k][2][-1][2] >= 0.)  # acc
         else:       # safe and fixed positions at other times
             if f_name in fixed_frames[seg_idx]:
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
@@ -359,10 +367,10 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                 # note: the initial point within a segment is defined by the continuity constraint below
                 if fr_seg_k_box == (num_boxes_current-1):
                     constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])  # pos
-                    if motion_frame_vel is not None:
-                        constraints.append(points[k][1][-1] == motion_frame_vel[seg_idx][f_name])  # vel
-                    if motion_frame_acc is not None:
-                        constraints.append(points[k][2][-1] == motion_frame_acc[seg_idx][f_name])  # acc
+                    # if motion_frame_vel is not None:
+                    #     constraints.append(points[k][1][-1] == motion_frame_vel[seg_idx][f_name])  # vel
+                    # if motion_frame_acc is not None:
+                    #     constraints.append(points[k][2][-1] == motion_frame_acc[seg_idx][f_name])  # acc
 
         # Bezier dynamics.
         for i in range(D):
