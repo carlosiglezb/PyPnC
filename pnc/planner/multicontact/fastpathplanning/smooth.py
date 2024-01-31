@@ -276,7 +276,7 @@ def optimize_bezier(L, U, durations, alpha, initial, final,
 
 
 def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, safe_points_lst,
-                             fixed_frames=None, motion_frames=None,
+                             fixed_frames=None, motion_frame_vel=None, motion_frame_acc=None,
                              n_points=None, **kwargs):
     stance_foot = 'LF'
 
@@ -345,6 +345,10 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                 constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
             else:
                 constraints.append(points[k][0][-1] == safe_points_lst[-1][f_name])
+                if motion_frame_vel is not None:
+                    constraints.append(points[k][1][-1] == motion_frame_vel[-1][f_name])  # vel
+                if motion_frame_acc is not None:
+                    constraints.append(points[k][2][-1] == motion_frame_acc[-1][f_name])  # acc
         else:       # safe and fixed positions at other times
             if f_name in fixed_frames[seg_idx]:
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
@@ -354,7 +358,11 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                 # Enforce (pre-computed) safe points at the end of each desired motion
                 # note: the initial point within a segment is defined by the continuity constraint below
                 if fr_seg_k_box == (num_boxes_current-1):
-                    constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])
+                    constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])  # pos
+                    if motion_frame_vel is not None:
+                        constraints.append(points[k][1][-1] == motion_frame_vel[seg_idx][f_name])  # vel
+                    if motion_frame_acc is not None:
+                        constraints.append(points[k][2][-1] == motion_frame_acc[seg_idx][f_name])  # acc
 
         # Bezier dynamics.
         for i in range(D):
