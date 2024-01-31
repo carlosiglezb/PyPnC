@@ -53,7 +53,7 @@ class TestOCPSolver(unittest.TestCase):
 
     def test_optim_bezier_lf_arch_motion(self):
 
-        reach_region = [1]  # override
+        reach_region = None  # override
         L, U, durations, safe_points_lst, fixed_frames = [], [], [], [], []
 
         # collision-free boxes
@@ -98,7 +98,7 @@ class TestOCPSolver(unittest.TestCase):
 
     def test_optim_bezier_lfk_arch_motion(self):
 
-        reach_region = [1]  # override
+        reach_region = None
         L, U, durations, safe_points_lst, fixed_frames = [], [], [], [], []
 
         # collision-free boxes
@@ -143,7 +143,7 @@ class TestOCPSolver(unittest.TestCase):
 
     def test_optim_bezier_lfh_arch_motion(self):
 
-        reach_region = [1, 1]  # override
+        reach_region = None  # override
         L, U, durations, safe_points_lst, fixed_frames = [], [], [], [], []
 
         # collision-free boxes
@@ -205,7 +205,7 @@ class TestOCPSolver(unittest.TestCase):
 
     def test_optim_bezier_lfh_arch_hands_motion(self):
 
-        reach_region = [1, 1]  # override (two frames)
+        reach_region = None  # override (two frames)
         L, U, durations, safe_points_lst, fixed_frames = [], [], [], [], []
 
         # collision-free boxes
@@ -275,8 +275,7 @@ class TestOCPSolver(unittest.TestCase):
 
     def test_solve_min_distance_safe(self):
         points_dim = 3      # 3D points
-        reach = OrderedDict()
-        reach['LF'] = {'H': [0]}  # override
+        reach = None
         safe_points_lst = []
 
         # collision-free boxes
@@ -319,9 +318,7 @@ class TestOCPSolver(unittest.TestCase):
         aux_frames = LocomanipulationFramePlanner.add_fixed_distance_between_points(aux_frames_path)
 
         points_dim = 3      # 3D points
-        reach = OrderedDict()
-        reach['LF'] = {'H': [0]}  # override
-        reach['L_knee'] = {'H': [0]}  # override
+        reach = None
 
         # collision-free boxes
         box_llim, box_ulim = self.get_sample_collision_free_boxes()

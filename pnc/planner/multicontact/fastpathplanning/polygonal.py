@@ -35,16 +35,17 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
 
     # Make copy of ee reachability region with only end effectors (e.g., excluding torso)
     ee_reach = {}
-    for frame in reach.keys():
+    for frame in safe_boxes.keys():
         if frame != 'torso':
-            ee_reach[frame] = reach[frame]
+            ee_reach[frame] = safe_boxes[frame]
 
     # parameters needed for state dimensions
     first_box = next(iter(safe_boxes.values()))
     d = first_box.B.d
-    N_planes = len(next(iter(reach.values()))['H'])
+    if reach is not None:
+        N_planes = len(next(iter(reach.values()))['H'])
     n_ee = len(ee_reach)
-    n_f = len(reach)
+    n_f = len(safe_boxes)
 
     num_boxes_tot = 0
     for bs_lst in box_seq:
