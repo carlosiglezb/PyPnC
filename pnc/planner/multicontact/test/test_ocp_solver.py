@@ -55,7 +55,7 @@ class TestOCPSolver(unittest.TestCase):
 
         reach_region = None  # override
         L, U, durations, safe_points_lst, fixed_frames = [], [], [], [], []
-        motion_frame_vel_lst, motion_frame_acc_lst = [], []
+        surface_normals_lst = []
 
         # collision-free boxes
         box_llim, box_ulim = self.get_sample_collision_free_boxes()
@@ -78,17 +78,15 @@ class TestOCPSolver(unittest.TestCase):
         safe_points_lst.append({'LF': np.array([0.5, 0.14, 0.])})
 
         # Velocity / acceleration vector (in W frame) of desired end effector position
-        motion_frame_vel_lst.append({})
-        motion_frame_vel_lst.append({'LF': np.array([0., 0., -1.])})
-        motion_frame_acc_lst.append({})
-        motion_frame_acc_lst.append({'LF': np.array([0., 0., 1.])})
+        surface_normals_lst.append({})
+        surface_normals_lst.append({'LF': np.array([0., 0., 1.])})
 
         fixed_frames.append({'LF'})
         fixed_frames.append({})
 
         path, sol_stats = optimize_multiple_bezier(reach_region, None, L, U, durations,
                                                    alpha, safe_points_lst, fixed_frames,
-                                                   motion_frame_vel_lst, motion_frame_acc_lst)
+                                                   surface_normals_lst)
         self.assertTrue(sol_stats['cost'] < 1e6, "Problem seems to be infeasible")
 
         # Visualizer
@@ -154,7 +152,7 @@ class TestOCPSolver(unittest.TestCase):
 
         reach_region = None  # override
         L, U, durations, safe_points_lst, fixed_frames = [], [], [], [], []
-        motion_frame_vel_lst, motion_frame_acc_lst = [], []
+        surface_normals_lst = []
 
         # collision-free boxes
         box_llim, box_ulim = self.get_sample_collision_free_boxes()
@@ -186,10 +184,8 @@ class TestOCPSolver(unittest.TestCase):
                                 'LH': np.array([0.3, 0.37, 0.89])})     # end of interval 2
 
         # Velocity / acceleration vector (in W frame) of desired end effector position
-        motion_frame_vel_lst.append({'LH': np.array([0.01, 0., 0.])})
-        motion_frame_vel_lst.append({'LF': np.array([0., 0., -0.1])})
-        motion_frame_acc_lst.append({'LH': np.array([-0.1, 0., 0.])})
-        motion_frame_acc_lst.append({'LF': np.array([0., 0., 0.01])})
+        surface_normals_lst.append({'LH': np.array([-1, 0., 0.])})
+        surface_normals_lst.append({'LF': np.array([0., 0., 1])})
 
         # fixed frames
         fixed_frames.append({'LF'})
@@ -197,7 +193,7 @@ class TestOCPSolver(unittest.TestCase):
 
         path, sol_stats = optimize_multiple_bezier(reach_region, None, L, U, durations,
                                                    alpha, safe_points_lst, fixed_frames,
-                                                   motion_frame_vel_lst, motion_frame_acc_lst)
+                                                   surface_normals_lst)
         self.assertTrue(sol_stats['cost'] < 1e9, "Problem seems to be infeasible")
 
         # Visualizer
