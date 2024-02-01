@@ -12,6 +12,7 @@ from pnc.planner.multicontact.fastpathplanning.smooth import optimize_multiple_b
 from pnc.planner.multicontact.frame_traversable_region import FrameTraversableRegion
 from pnc.planner.multicontact.locomanipulation_frame_planner import LocomanipulationFramePlanner
 from pnc.planner.multicontact.fastpathplanning.polygonal import solve_min_reach_distance
+from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact
 from util import util
 
 cwd = os.getcwd()
@@ -55,7 +56,6 @@ class TestOCPSolver(unittest.TestCase):
 
         reach_region = None  # override
         L, U, durations, safe_points_lst, fixed_frames = [], [], [], [], []
-        surface_normals_lst = []
 
         # collision-free boxes
         box_llim, box_ulim = self.get_sample_collision_free_boxes()
@@ -78,8 +78,8 @@ class TestOCPSolver(unittest.TestCase):
         safe_points_lst.append({'LF': np.array([0.5, 0.14, 0.])})
 
         # Velocity / acceleration vector (in W frame) of desired end effector position
-        surface_normals_lst.append({})
-        surface_normals_lst.append({'LF': np.array([0., 0., 1.])})
+        lf_contact_front = PlannerSurfaceContact('LF', np.array([0., 0., 1.]))
+        surface_normals_lst = [None, lf_contact_front]
 
         fixed_frames.append({'LF'})
         fixed_frames.append({})
@@ -152,7 +152,6 @@ class TestOCPSolver(unittest.TestCase):
 
         reach_region = None  # override
         L, U, durations, safe_points_lst, fixed_frames = [], [], [], [], []
-        surface_normals_lst = []
 
         # collision-free boxes
         box_llim, box_ulim = self.get_sample_collision_free_boxes()
@@ -184,8 +183,9 @@ class TestOCPSolver(unittest.TestCase):
                                 'LH': np.array([0.3, 0.37, 0.89])})     # end of interval 2
 
         # Velocity / acceleration vector (in W frame) of desired end effector position
-        surface_normals_lst.append({'LH': np.array([-1, 0., 0.])})
-        surface_normals_lst.append({'LF': np.array([0., 0., 1])})
+        lh_contact_front = PlannerSurfaceContact('LH', np.array([-1, 0., 0.]))
+        lf_contact_front = PlannerSurfaceContact('LF', np.array([0, 0., 1.]))
+        surface_normals_lst = [lh_contact_front, lf_contact_front]
 
         # fixed frames
         fixed_frames.append({'LF'})
@@ -260,11 +260,20 @@ class TestOCPSolver(unittest.TestCase):
         safe_points_lst.append({'LF': np.array([0.5, 0.14, 0.]),
                                 'LH': np.array([0.31, 0.36, 0.92])})
 
+        # contact surfaces used for plan
+        lh_contact_front = PlannerSurfaceContact('LH', np.array([-1, 0., 0.]))
+        lf_contact_front = PlannerSurfaceContact('LF', np.array([0., 0., 1]))
+        lh_contact_inner = PlannerSurfaceContact('LH', np.array([0, -1, 0.]))
+        lh_contact_inner.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
+        surface_normals_lst = [lh_contact_front, lf_contact_front, lh_contact_inner]
+
         fixed_frames.append({'LF'})
         fixed_frames.append({'LH'})
         fixed_frames.append({'LF'})
 
-        path, sol_stats = optimize_multiple_bezier(reach_region, None, L, U, durations, alpha, safe_points_lst, fixed_frames)
+        path, sol_stats = optimize_multiple_bezier(reach_region, None, L, U, durations,
+                                                   alpha, safe_points_lst, fixed_frames,
+                                                   surface_normals_lst)
         self.assertTrue(sol_stats['cost'] < 1e15, "Problem seems to be infeasible")
 
         # Visualizer

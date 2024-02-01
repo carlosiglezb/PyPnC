@@ -356,14 +356,14 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                 # check if it has a final safe point assigned
                 if fr_seg_k_box == (num_boxes_current-1) and f_name in safe_points_lst[seg_idx+1].keys():
                     constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])
-                    add_vel_acc_constr(f_name, seg_idx, surface_normals_lst, points[k], constraints)
+                    add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
         elif (k + 1) % num_boxes_tot == 0:  # final position for each frame
             if f_name in fixed_frames[seg_idx]:
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
                 constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
             else:
                 constraints.append(points[k][0][-1] == safe_points_lst[-1][f_name])
-                add_vel_acc_constr(f_name, -1, surface_normals_lst, points[k], constraints)
+                add_vel_acc_constr(f_name, surface_normals_lst[-1], points[k], constraints)
         else:       # safe and fixed positions at other times
             if f_name in fixed_frames[seg_idx]:
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
@@ -374,10 +374,7 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
                 # note: the initial point within a segment is defined by the continuity constraint below
                 if fr_seg_k_box == (num_boxes_current-1):
                     constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])  # pos
-                    # if motion_frame_vel is not None:
-                    #     constraints.append(points[k][1][-1] == motion_frame_vel[seg_idx][f_name])  # vel
-                    # if motion_frame_acc is not None:
-                    #     constraints.append(points[k][2][-1] == motion_frame_acc[seg_idx][f_name])  # acc
+                    add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
 
         # Bezier dynamics.
         for i in range(D):
@@ -488,7 +485,10 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
     prob.solve(solver='SCS')
-    # prob.solve(solver='CLARABEL')
+
+    if prob.status == 'infeasible':
+        print('Problem was infeasible. Retrying with relaxed tolerances.')
+        prob.solve(solver='SCS', eps_rel=1e-2, eps_abs=1e-2)
 
     # Reconstruct trajectory.
     beziers, path = [], []
@@ -554,15 +554,19 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
     return path, sol_stats
 
 
-def add_vel_acc_constr(f_name, seg_idx, surface_normals, point, constraints, b_constr_accel=True):
+def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_accel=True):
 
-    surf_normal = surface_normals[seg_idx][f_name]
-    if surface_normals is not None:
+    surf_normal = seg_surface_normal.surface_normal
+    if seg_surface_normal is not None:
         # check that a normal vector has been specified for this frame and segment
-        if f_name not in surface_normals[seg_idx].keys():
-            raise Exception('Motion frame does not contain velocity/acc component')
+        if f_name not in seg_surface_normal.contact_frame_name:
+            surf_contact_name = seg_surface_normal.contact_frame_name
+            raise Exception(f'{f_name} motion frame not found in surface contact {surf_contact_name}')
 
         # apply epsilon motion constraint along specified direction
+        if seg_surface_normal.b_initial_vel:
+            frame_vel_ini = seg_surface_normal.get_contact_breaking_velocity()
+            constraints.append(point[BezierParam.VEL.value][0] == frame_vel_ini)
         constraints.append(point[BezierParam.VEL.value][-1] == - eps_vel_constr * np.sign(surf_normal))
     if b_constr_accel:
         # apply only strictly positive and negative accelerations
@@ -570,16 +574,22 @@ def add_vel_acc_constr(f_name, seg_idx, surface_normals, point, constraints, b_c
             constraints.append(point[BezierParam.ACC.value][-1][Axis.X.value] >= 0.)  # pos acc
         elif surf_normal[Axis.X.value] < 0:
             constraints.append(point[BezierParam.ACC.value][-1][Axis.X.value] <= 0.)  # neg acc
+        else:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.X.value] == 0.)  # zero acc
 
         if surf_normal[Axis.Y.value] > 0:
             constraints.append(point[BezierParam.ACC.value][-1][Axis.Y.value] >= 0.)  # pos acc
         elif surf_normal[Axis.Y.value] < 0:
             constraints.append(point[BezierParam.ACC.value][-1][Axis.Y.value] <= 0.)  # neg acc
+        else:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.Y.value] == 0.)  # zero acc
 
         if surf_normal[Axis.Z.value] > 0:
             constraints.append(point[BezierParam.ACC.value][-1][Axis.Z.value] >= 0.)  # pos acc
         elif surf_normal[Axis.Z.value] < 0:
             constraints.append(point[BezierParam.ACC.value][-1][Axis.Z.value] <= 0.)  # neg acc
+        else:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.Z.value] == 0.)  # zero acc
 
 
 def retiming(kappa, costs, durations, retiming_weights, **kwargs):
