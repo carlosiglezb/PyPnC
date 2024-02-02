@@ -83,14 +83,14 @@ class LocomanipulationFramePlanner:
     #                         'constrained_to': associated_traversable_region}
     #     self.aux_frames.append(new_frame_constr)
 
-    def plan(self, p_init, p_term, T, alpha, der_init={}, der_term={}, verbose=True):
+    def plan(self, p_init, p_term, T, alpha, verbose=True):
         S = self.safe_boxes
         R = self.reachability_planes
         A = self.aux_frames
         fixed_frames = self.fixed_frames
         motion_frames = self.motion_frames
-        self.path, self.box_seq = fpp.plan_multiple(S, R, p_init, p_term, T, alpha, der_init,
-                                      der_term, verbose, A, fixed_frames, motion_frames)
+        self.path, self.box_seq = fpp.plan_multiple(S, R, p_init, T, alpha, verbose, A,
+                                                    fixed_frames, motion_frames)
 
     def plot(self, visualizer, static_html=False):
         i = 0

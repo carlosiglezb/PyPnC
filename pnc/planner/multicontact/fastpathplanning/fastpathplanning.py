@@ -253,7 +253,7 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
     return box_seq_lst, safe_points_lst
 
 
-def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
+def plan_multiple(S, R, p_init, T, alpha,
                   verbose=True, A=None, fixed_frames=None, motion_frames=None):
 
     if verbose:
@@ -298,9 +298,10 @@ def plan_multiple(S, R, p_init, p_term, T, alpha, der_init={}, der_term={},
         bs_i += num_boxes
         seg_idx += 1
 
+    surface_normals_lst = motion_frames.get_surface_normals()
     paths, sol_stats = optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations,
                                                              alpha, safe_pnt_lst,
-                                                             fixed_frames, motion_frames,
+                                                             fixed_frames, surface_normals_lst,
                                                              verbose=verbose)
 
     return paths, box_seq

@@ -728,7 +728,7 @@ def optimize_bezier_with_retiming(L, U, durations, alpha, initial, final,
 
 
 def optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, safe_points_lst,
-                                           fixed_frames=None, motion_frames=None,
+                                           fixed_frames=None, surface_normals_lst=None,
                                            omega=3, kappa_min=1e-2, verbose=False, **kwargs):
     L, U = [], []
     b_i = 0
@@ -747,7 +747,7 @@ def optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations, alpha, s
     # Solve initial Bezier problem.
     # path, sol_stats = optimize_bezier(L[frame], U[frame], durations[frame], alpha, initial[frame], final[frame], **kwargs)
     path, sol_stats = optimize_multiple_bezier(R, A, L, U, durations, alpha, safe_points_lst,
-                                               fixed_frames, motion_frames, **kwargs)
+                                               fixed_frames, surface_normals_lst, **kwargs)
     cost = sol_stats['cost']
     cost_breakdown = sol_stats['cost_breakdown']
     retiming_weights = sol_stats['retiming_weights']
