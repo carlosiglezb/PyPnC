@@ -298,7 +298,9 @@ def plan_multiple(S, R, p_init, T, alpha,
         bs_i += num_boxes
         seg_idx += 1
 
-    surface_normals_lst = motion_frames.get_surface_normals()
+    surface_normals_lst = []
+    for sn in motion_frames:
+        surface_normals_lst.append(sn.get_surface_normal)
     paths, sol_stats = optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations,
                                                              alpha, safe_pnt_lst,
                                                              fixed_frames, surface_normals_lst,

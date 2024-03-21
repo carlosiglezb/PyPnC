@@ -28,9 +28,14 @@ class PlannerSurfaceContact:
     def get_contact_breaking_velocity(self):
         return self.eps_vel * self.previous_normal
 
+    def get_surface_normal(self):
+        return self.surface_normal
+
 
 class ContactFrameLocation:
     def __init__(self, pos_w, surface):
         self.pos = pos_w
         self.surface = surface
-        
+
+    def get_surface_normal(self):
+        return self.surface.get_surface_normal()

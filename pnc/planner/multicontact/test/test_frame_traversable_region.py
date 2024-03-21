@@ -11,6 +11,8 @@ import numpy as np
 from pinocchio.visualize import MeshcatVisualizer
 import pinocchio as pin
 
+from pnc.planner.multicontact.planner_surface_contact import ContactFrameLocation
+
 cwd = os.getcwd()
 sys.path.append(cwd)
 
@@ -503,7 +505,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         # frame_planner.add_reachable_frame_constraint(aux_frame, aux_frame_region)
 
     def test_use_fixed_and_motion_paths(self):
-        b_visualize = False
+        b_visualize = True
         # load robot
         rob_model, rob_collision_model, rob_visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
@@ -617,6 +619,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         # ---- Step 1: L hand to frame
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
         motion_frames.append({'LH': p_init['LH'] + np.array([0.08, 0.07, 0.15])})
+        lh_motion_front = ContactFrameLocation(p_init['LH'] + np.array([0.08, 0.07, 0.15]), np.array([-1, 0, 0]))
 
         # ---- Step 2: step through door with left foot
         fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
