@@ -147,8 +147,7 @@ def distribute_free_frames(last_box_seq, box_seq_list, frame_name):
     unassigned_box_seq_interpolator(box_seq_list, last_box_seq, frame_name)
 
 
-def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
-                           p_init):
+def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames, p_init):
     box_seq_lst = []
     safe_points_lst = [p_init]
     d = safe_boxes[next(iter(safe_boxes))].B.boxes[0].d
@@ -254,12 +253,13 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames,
 
 
 def plan_multiple(S, R, p_init, T, alpha,
-                  verbose=True, A=None, fixed_frames=None, motion_frames=None):
+                  verbose=True, A=None, fixed_frames=None, motion_frames_seq=None):
 
     if verbose:
         print('Polygonal phase:')
 
-    box_seq, safe_pnt_lst = plan_mulistage_box_seq(S, fixed_frames, motion_frames, p_init)
+    motion_frames_lst = motion_frames_seq.get_motion_frames()
+    box_seq, safe_pnt_lst = plan_mulistage_box_seq(S, fixed_frames, motion_frames_lst, p_init)
     box_seq, traj, length, solver_time = iterative_planner_multiple(S, R, safe_pnt_lst,
                                                         box_seq, verbose, A)
 
@@ -298,9 +298,7 @@ def plan_multiple(S, R, p_init, T, alpha,
         bs_i += num_boxes
         seg_idx += 1
 
-    surface_normals_lst = []
-    for sn in motion_frames:
-        surface_normals_lst.append(sn.get_surface_normal)
+    surface_normals_lst = motion_frames_seq.get_contact_surfaces()
     paths, sol_stats = optimize_multiple_bezier_with_retiming(S, R, A, box_seq, durations,
                                                              alpha, safe_pnt_lst,
                                                              fixed_frames, surface_normals_lst,

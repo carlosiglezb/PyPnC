@@ -1,3 +1,6 @@
+import numpy
+
+
 class PlannerSurfaceContact:
     """
     Surface contact information of a particular plane.
@@ -32,10 +35,26 @@ class PlannerSurfaceContact:
         return self.surface_normal
 
 
-class ContactFrameLocation:
-    def __init__(self, pos_w, surface):
-        self.pos = pos_w
-        self.surface = surface
+class MotionFrameSequencer:
+    def __init__(self):
+        self.motion_frame_lst = []
+        self.contact_frame_lst = []
 
-    def get_surface_normal(self):
-        return self.surface.get_surface_normal()
+        self.b_initial_vel = False
+        self.b_initial_acc = False
+        self.b_final_vel = False
+        self.b_final_acc = False
+
+        self.eps_vel = 0.01     # default to 1 cm/s
+
+    def add_motion_frame(self, frame_goal_dict: dict[str, numpy.ndarray]):
+        self.motion_frame_lst.append(frame_goal_dict)
+
+    def add_contact_surface(self, contact_surface: PlannerSurfaceContact):
+        self.contact_frame_lst.append(contact_surface)
+
+    def get_motion_frames(self):
+        return self.motion_frame_lst
+
+    def get_contact_surfaces(self):
+        return self.contact_frame_lst
