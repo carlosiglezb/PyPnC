@@ -11,7 +11,8 @@ import numpy as np
 from pinocchio.visualize import MeshcatVisualizer
 import pinocchio as pin
 
-from pnc.planner.multicontact.planner_surface_contact import ContactFrameLocation
+from pnc.planner.multicontact.planner_surface_contact import (
+        PlannerSurfaceContact, MotionFrameSequencer)
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -566,7 +567,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         self.assertEqual(True, True)
 
         # set fixed and motion frame sets
-        fixed_frames, motion_frames = [], []
+        fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
         step_length = 0.35
         # initial and desired final positions for each frame
@@ -618,25 +619,40 @@ class TestFrameTraversableRegion(unittest.TestCase):
 
         # ---- Step 1: L hand to frame
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-        motion_frames.append({'LH': p_init['LH'] + np.array([0.08, 0.07, 0.15])})
-        lh_motion_front = ContactFrameLocation(p_init['LH'] + np.array([0.08, 0.07, 0.15]), np.array([-1, 0, 0]))
+        motion_frames_seq.add_motion_frame({'LH': p_init['LH'] + np.array([0.08, 0.07, 0.15])})
+        lh_contact_front = PlannerSurfaceContact('LH', np.array([-1, 0, 0]))
+        motion_frames_seq.add_contact_surface(lh_contact_front)
 
         # ---- Step 2: step through door with left foot
         fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
-        motion_frames.append({'LF': p_init['LF'] + np.array([step_length, 0., 0.]),
+        motion_frames_seq.add_motion_frame({
+                            'LF': p_init['LF'] + np.array([step_length, 0., 0.]),
                             'L_knee': p_init['L_knee'] + np.array([step_length, 0., 0.])})
+        lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
+        motion_frames_seq.add_contact_surface(lf_contact_over)
+
         # ---- Step 3: re-position L/R hands for more stability
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-        motion_frames.append({'LH': p_init['LH'] + np.array([0.09, 0.06, 0.18]),
-                             'RH': p_init['RH'] + np.array([0.09, -0.06, 0.18])})
+        motion_frames_seq.add_motion_frame({
+                            'LH': p_init['LH'] + np.array([0.09, 0.06, 0.18]),
+                            'RH': p_init['RH'] + np.array([0.09, -0.06, 0.18])})
+        lh_contact_inside = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
+        rh_contact_inside = PlannerSurfaceContact('RH', np.array([0, 1, 0]))
+        motion_frames_seq.add_contact_surface([lh_contact_inside, rh_contact_inside])
+
         # ---- Step 4: step through door with right foot
         fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
-        motion_frames.append({'RF': p_init['RF'] + np.array([step_length, 0., 0.]),
-                              'R_knee': p_init['R_knee'] + np.array([step_length, 0., 0.]),
-                              'torso': p_init['torso'] + np.array([step_length, 0., 0.])})
+        motion_frames_seq.add_motion_frame({
+                            'RF': p_init['RF'] + np.array([step_length, 0., 0.]),
+                            'R_knee': p_init['R_knee'] + np.array([step_length, 0., 0.]),
+                            'torso': p_init['torso'] + np.array([step_length, 0., 0.])})
+        rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
+        motion_frames_seq.add_contact_surface(rf_contact_over)
+
         # ---- Step 5: square up
         fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
-        motion_frames.append({})
+        motion_frames_seq.add_motion_frame({})
+
 
         # make multi-trajectory planner
         T = 3
@@ -653,7 +669,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
                                                      self.ee_offsets_path,
                                                      aux_frames_path=self.aux_frames_path,
                                                      fixed_frames=fixed_frames,
-                                                     motion_frames=motion_frames)
+                                                     motion_frames=motion_frames_seq)
         frame_planner.plan(p_init, p_end, T, alpha, verbose=False)
         frame_planner.plot(visualizer=visualizer, static_html=False)
         self.assertEqual(True, True)

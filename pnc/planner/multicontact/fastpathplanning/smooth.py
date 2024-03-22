@@ -556,6 +556,14 @@ def optimize_multiple_bezier(reach_region, aux_frames, L, U, durations, alpha, s
 
 def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_accel=True):
 
+    # check if we have multiple contacts occurring in the same segment
+    if type(seg_surface_normal) is list:
+        # figure out which normal we are currently using based on its frame name
+        for sn in seg_surface_normal:
+            if f_name == sn.contact_frame_name:
+                seg_surface_normal = sn
+                break
+
     surf_normal = seg_surface_normal.surface_normal
     if seg_surface_normal is not None:
         # check that a normal vector has been specified for this frame and segment

@@ -13,7 +13,7 @@ class LocomanipulationFramePlanner:
                  starting_stance_foot='LF',
                  aux_frames_path=None,
                  fixed_frames=None,
-                 motion_frames=None):
+                 motion_frames_seq=None):
 
         # fixed, motion, and free frames filled out in the creation of hyperplanes
         self.fixed_frames, self.motion_frames, self.free_frames = [], [], []
@@ -49,7 +49,7 @@ class LocomanipulationFramePlanner:
 
         # check fixed and motion frames do not conflict
         self.fixed_frames = fixed_frames
-        self.motion_frames = motion_frames
+        self.motion_frames_seq = motion_frames_seq
 
         # the torso must be reachable based on the frame in contact
         H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path,
@@ -88,9 +88,9 @@ class LocomanipulationFramePlanner:
         R = self.reachability_planes
         A = self.aux_frames
         fixed_frames = self.fixed_frames
-        motion_frames = self.motion_frames
+        motion_frames_seq = self.motion_frames
         self.path, self.box_seq = fpp.plan_multiple(S, R, p_init, T, alpha, verbose, A,
-                                                    fixed_frames, motion_frames)
+                                                    fixed_frames, motion_frames_seq)
 
     def plot(self, visualizer, static_html=False):
         i = 0
