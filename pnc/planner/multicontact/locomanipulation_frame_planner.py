@@ -16,7 +16,7 @@ class LocomanipulationFramePlanner:
                  motion_frames_seq=None):
 
         # fixed, motion, and free frames filled out in the creation of hyperplanes
-        self.fixed_frames, self.motion_frames, self.free_frames = [], [], []
+        self.fixed_frames, self.motion_frames_seq, self.free_frames = [], [], []
 
         self.safe_boxes = OrderedDict()
         self.reachability_planes = OrderedDict()
@@ -88,7 +88,7 @@ class LocomanipulationFramePlanner:
         R = self.reachability_planes
         A = self.aux_frames
         fixed_frames = self.fixed_frames
-        motion_frames_seq = self.motion_frames
+        motion_frames_seq = self.motion_frames_seq
         self.path, self.box_seq = fpp.plan_multiple(S, R, p_init, T, alpha, verbose, A,
                                                     fixed_frames, motion_frames_seq)
 

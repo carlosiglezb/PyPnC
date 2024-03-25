@@ -669,7 +669,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
                                                      self.ee_offsets_path,
                                                      aux_frames_path=self.aux_frames_path,
                                                      fixed_frames=fixed_frames,
-                                                     motion_frames=motion_frames_seq)
+                                                     motion_frames_seq=motion_frames_seq)
         frame_planner.plan(p_init, p_end, T, alpha, verbose=False)
         frame_planner.plot(visualizer=visualizer, static_html=False)
         self.assertEqual(True, True)
