@@ -3,8 +3,8 @@ import unittest
 import numpy as np
 import meshcat
 
-from iris.iris_geom_interface import *
-from iris.iris_regions_manager import IrisRegionsManager
+from vision.iris.iris_geom_interface import *
+from vision.iris.iris_regions_manager import IrisRegionsManager
 
 sphere_viz = Sphere(0.05)
 

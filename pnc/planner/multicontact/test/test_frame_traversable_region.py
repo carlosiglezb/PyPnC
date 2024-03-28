@@ -288,6 +288,85 @@ class TestFrameTraversableRegion(unittest.TestCase):
         ])
         return box_llim, box_ulim
 
+    def get_long_semi_static_collision_free_boxes(self):
+        # save safe box regions
+        box_llim, box_ulim = OrderedDict(), OrderedDict()
+
+        # lower bounds of end-effectors safe boxes
+        box_llim['torso'] = np.array([
+            [-0.2, -0.3, 0.5],  # prevent leg-crossing
+            [0.05, -0.3, 0.5],  # prevent leg-crossing
+            [0.2, -0.3, 0.5]  # prevent leg-crossing
+        ])
+        box_llim['LF'] = np.array([
+            [-0.2, 0.0, 0.0],  # prevent leg-crossing
+            [-0.1, 0.0, 0.4],  # prevent leg-crossing
+            [0.4, 0.0, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['RF'] = np.array([
+            [-0.2, -0.4, 0.0],  # prevent leg-crossing
+            [-0.1, -0.35, 0.4],  # prevent leg-crossing
+            [0.4, -0.4, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['L_knee'] = np.array([
+            [-0.2, 0.0, 0.0],  # prevent leg-crossing
+            [-0.1, 0.0, 0.4],  # prevent leg-crossing
+            [0.4, 0.0, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['R_knee'] = np.array([
+            [-0.2, -0.4, 0.0],  # prevent leg-crossing
+            [-0.1, -0.35, 0.4],  # prevent leg-crossing
+            [0.5, -0.4, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['LH'] = np.array([
+            [-0.2, 0.0, 0.7],  # prevent leg-crossing
+            [0.1, 0.0, 0.7],  # prevent leg-crossing
+            [0.5, 0.0, 0.7]  # prevent leg-crossing
+        ])
+        box_llim['RH'] = np.array([
+            [-0.2, -0.4, 0.7],  # prevent leg-crossing
+            [0.1, -0.38, 0.7],  # prevent leg-crossing
+            [0.5, -0.4, 0.7]  # prevent leg-crossing
+        ])
+
+        # upper bounds of the safe boxes
+        box_ulim['torso'] = np.array([
+            [0.25, 0.3, 0.9],  # prevent leg-crossing
+            [0.5, 0.3, 0.9],  # prevent leg-crossing
+            [0.6, 0.3, 0.9]  # prevent leg-crossing
+        ])
+        box_ulim['LF'] = np.array([
+            [0.25, 0.4, 1.0],  # z stops at kin. limit
+            [0.6, 0.35, 1.0],  # x stops at kin. limit
+            [0.8, 0.4, 1.0]  # x stops at kin. limit
+        ])
+        box_ulim['RF'] = np.array([
+            [0.25, 0.0, 1.0],  # prevent leg-crossing
+            [0.6, 0.0, 1.0],  # prevent leg-crossing
+            [0.8, 0.0, 1.0]  # prevent leg-crossing
+        ])
+        box_ulim['L_knee'] = np.array([
+            [0.25, 0.4, 1.0],  # z stops at kin. limit
+            [0.6, 0.35, 1.0],  # x stops at kin. limit
+            [0.8, 0.4, 1.0]  # x stops at kin. limit
+        ])
+        box_ulim['R_knee'] = np.array([
+            [0.25, 0.0, 1.0],  # prevent leg-crossing
+            [0.6, 0.0, 1.0],  # prevent leg-crossing
+            [0.8, 0.0, 1.0]  # prevent leg-crossing
+        ])
+        box_ulim['LH'] = np.array([
+            [0.15, 0.45, 1.3],  # prevent leg-crossing
+            [0.55, 0.38, 1.3],  # prevent leg-crossing
+            [0.8, 0.45, 1.3]  # prevent leg-crossing
+        ])
+        box_ulim['RH'] = np.array([
+            [0.15, 0.0, 1.3],  # prevent leg-crossing
+            [0.55, 0.0, 1.3],  # prevent leg-crossing
+            [0.8, 0.0, 1.3]  # prevent leg-crossing
+        ])
+        return box_llim, box_ulim
+
     def test_visualizing_reachable_region(self):
         frame_name = 'RF'
         test_region = FrameTraversableRegion(frame_name,
@@ -545,7 +624,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         standing_pos = vis_q[:3]
 
         # collision-free boxes
-        box_llim, box_ulim = self.get_semi_static_collision_free_boxes()
+        box_llim, box_ulim = self.get_long_semi_static_collision_free_boxes()
 
         # generate all frame traversable regions
         traversable_regions_dict = OrderedDict()
