@@ -26,7 +26,7 @@ class LocomanipulationFramePlanner:
         self.starting_stance_foot = starting_stance_foot
         for region in traversable_regions_list:
             self.frame_names.append(region.frame_name)
-            self.safe_boxes[region.frame_name] = region._plan_safe_box_list
+            self.safe_boxes[region.frame_name] = region._plan_safe_box_list     # TODO replace w/ _plan_iris_list
 
             # do the torso at the very end to get reachability from contact frames
             if region.frame_name != 'torso':
@@ -83,7 +83,11 @@ class LocomanipulationFramePlanner:
     #                         'constrained_to': associated_traversable_region}
     #     self.aux_frames.append(new_frame_constr)
 
-    def plan(self, p_init, p_term, T, alpha, verbose=True):
+    def plan(self, p_init: dict[str, np.array],
+             p_term: np.array,
+             T: np.float64,
+             alpha: np.float64,
+             verbose: bool=True):
         S = self.safe_boxes
         R = self.reachability_planes
         A = self.aux_frames
