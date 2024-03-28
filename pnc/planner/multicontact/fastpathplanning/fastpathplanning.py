@@ -1,10 +1,11 @@
-from collections import OrderedDict
-
 import numpy as np
 from pnc.planner.multicontact.fastpathplanning.boxes import Box, BoxCollection
 from pnc.planner.multicontact.fastpathplanning.polygonal import iterative_planner, iterative_planner_multiple
 from pnc.planner.multicontact.fastpathplanning.smooth import optimize_bezier_with_retiming, optimize_multiple_bezier_with_retiming
 import copy
+
+from vision.iris.iris_geom_interface import IrisGeomInterface
+from vision.iris.iris_regions_manager import IrisRegionsManager
 
 
 class SafeSet:
@@ -232,6 +233,123 @@ def plan_mulistage_box_seq(safe_boxes, fixed_frames, motion_frames, p_init):
         pf_prev = get_last_defined_point(safe_points_lst, ff)
         safe_points_lst[-1][ff] = pf_prev
         box_pf_prev = next(iter((safe_boxes[ff].B.contain(pf_prev))))
+        box_seq_dict[ff] = [box_pf_prev] * b_max
+    box_seq_lst.append(copy.deepcopy(box_seq_dict))
+
+    # re-assign block sequence (in case last motion frame changed b_max)
+    b_max_new = np.max([len(bs) for bs in box_seq_lst[-1].values()])
+    if b_max_new != b_max:
+        distribute_box_seq(box_seq_lst[-1], b_max_new)
+    b_min_new = np.min([len(bs) for bs in box_seq_lst[-1].values()])
+    if b_max_new != b_min_new:
+        distribute_box_seq(box_seq_lst[-1], b_max_new)
+
+    # throw exception if any frames have un-assigned safe regions
+    for f_list in box_seq_lst:
+        for fname, bs in f_list.items():
+            if any(np.isnan(bs)):
+                raise Exception(f"{fname} frame has un-assigned safe regions")
+
+    return box_seq_lst, safe_points_lst
+
+
+def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
+                             fixed_frames,
+                             motion_frames,
+                             p_init: dict[str: np.array]):
+    # safe_regions_mgr should be of type IrisSafeSet
+    safe_regions = iris_regions[next(iter(iris_regions))].getIrisRegions()
+    box_seq_lst = []
+    safe_points_lst = [p_init]
+    d = safe_regions[0].domain_mut.ambient_dimension()
+
+    # create dictionary with all frames and positions initialized to zero
+    frames_pos_dict, box_seq_dict = {}, {}
+    for fname in p_init.keys():
+        frames_pos_dict[fname] = np.zeros(d, )
+        box_seq_dict[fname] = [np.nan]
+    box_seq_nan = copy.deepcopy(box_seq_dict)
+
+    # find box sequence for frames in the fixed_frame list
+    k_transition = 0
+    for f_frames in fixed_frames:
+        # skip first set of fixed frames (initial stance)
+        if k_transition == 0:
+            # get free frames and assign box containing initial position
+            for fr, p0 in p_init.items():
+                if fr not in motion_frames[0].keys() and fr not in fixed_frames[0]:
+                    box_seq_dict[fr] = list(iris_regions[fr].regionsContainingPoint(p0))
+            k_transition += 1
+            continue
+
+        safe_points_lst.append({})
+        # first process the motion frames to determine the length of box sequences
+        for fm, pm_next in motion_frames[k_transition-1].items():
+            if fm in f_frames:
+                pm_init = get_last_defined_point(safe_points_lst, fm)
+                safe_points_lst[k_transition][fm] = pm_next
+                box_seq_dict[fm] = iris_regions[fm].findShortestPath(pm_init, pm_next)
+                # box_seq_dict[fm] = find_shortest_iris_path(safe_regions[fm], pm_init, pm_next)
+        # maximum number of boxes in a box sequence in the motion frames
+        b_max = np.max([len(bs) for bs in box_seq_dict.values()])
+
+        # then, go through the fixed frames from previous state
+        for ff in fixed_frames[k_transition-1]:
+            # for a fixed frame, the shortest path is the box that contains the point
+            pf_prev = safe_points_lst[k_transition - 1][ff]
+            safe_points_lst[k_transition][ff] = pf_prev
+            box_pf_prev = next(iter((iris_regions[ff].regionsContainingPoint(pf_prev))))
+            box_seq_dict[ff] = [box_pf_prev] * b_max
+
+        if k_transition > 1:
+            # if one of the old un-assigned frames got a new assignment, fill the gap
+            for fname in p_init.keys():
+                is_old_seg_unassigned = np.isnan(box_seq_lst[-1][fname][0])
+                is_current_seg_assigned = not np.isnan(box_seq_dict[fname][0])
+                if is_old_seg_unassigned and is_current_seg_assigned:
+                    distribute_free_frames(box_seq_dict, box_seq_lst, fname)
+
+        box_seq_lst.append(copy.deepcopy(box_seq_dict))
+        box_seq_dict.clear()
+        box_seq_dict = copy.deepcopy(box_seq_nan)
+        k_transition += 1
+
+    # append terminal motion frames
+    safe_points_lst.append({})
+    for fm, pm_next in motion_frames[k_transition-1].items():
+        pm_init = get_last_defined_point(safe_points_lst, fm)
+        safe_points_lst[k_transition][fm] = pm_next
+        # if pm_init and pm_next are on the same box, no need to find the shortest path
+        if iris_regions[fm].regionsContainingPoint(pm_next) == iris_regions[fm].regionsContainingPoint(pm_init):
+            box_seq_dict[fm] = list(iris_regions[fm].regionsContainingPoint(pm_next))
+        else:
+            box_seq_dict[fm] = iris_regions[fm].findShortestPath(pm_init, pm_next)
+            # box_seq_dict[fm] = find_shortest_iris_path(safe_regions[fm], pm_init, pm_next)
+
+    # if there were no fixed frames (only motion frames), return solution
+    # TODO: this might still fail if there were any free frames, fix later
+    if len(box_seq_lst) == 0:
+        return [box_seq_dict], safe_points_lst
+
+    # check distribution of free motion frames over all segments/intervals
+    for fname in p_init.keys():
+        if np.isnan(box_seq_lst[-1][fname][0]):
+            distribute_free_frames(box_seq_dict, box_seq_lst, fname)
+
+    # re-assign block sequence (in case last motion frame changed b_max)
+    b_max_new = np.max([len(bs) for bs in box_seq_lst[-1].values()])
+    if b_max_new != b_max:
+        distribute_box_seq(box_seq_lst[-1], b_max_new)
+    b_min_new = np.min([len(bs) for bs in box_seq_lst[-1].values()])
+    if b_max_new != b_min_new:
+        distribute_box_seq(box_seq_lst[-1], b_max_new)
+
+    # fill out last safe points based on fixed frames from last sequence
+    b_max = np.max([len(bs) for bs in box_seq_dict.values()])
+    for ff in fixed_frames[-1]:
+        pf_prev = get_last_defined_point(safe_points_lst, ff)
+        safe_points_lst[-1][ff] = pf_prev
+        box_pf_prev = next(iter((iris_regions[ff].regionsContainingPoint(pf_prev))))
         box_seq_dict[ff] = [box_pf_prev] * b_max
     box_seq_lst.append(copy.deepcopy(box_seq_dict))
 
