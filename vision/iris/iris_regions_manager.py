@@ -1,5 +1,9 @@
+from typing import List
+
 import numpy as np
-from iris_geom_interface import IrisGeomInterface
+
+from pnc.planner.multicontact.iris_seq_planner import IrisGraph
+from vision.iris.iris_geom_interface import IrisGeomInterface
 from pydrake.common import RandomGenerator
 
 
@@ -13,6 +17,7 @@ class IrisRegionsManager:
 
         self.iris_start_seed = iris_start.seed_pos
         self.iris_goal_seed = iris_goal.seed_pos
+        self.iris_graph = None      # this is computed after connecting IRIS seeds
 
     def addIris(self, iris_processor_lst):
         for ir in iris_processor_lst:
@@ -37,7 +42,7 @@ class IrisRegionsManager:
         Connect start and goal IRIS seeds.
         The current approach is based on sampling and growing from the starting IRIS region.
         An alternative approach would be to do an RRT-based expansion.
-        :return: [None] Stores the new IRIS regions in the iris_list
+        :return: [None] Stores the new IRIS regions in the iris_list and graph in iris_graph
         """
 
         # sample from within staring IRIS region, compute new IRIS region and check
@@ -70,7 +75,48 @@ class IrisRegionsManager:
                 new_iris = IrisGeomInterface(obstacles, domain, new_seed)
                 self.iris_list.append(new_iris)
                 self.iris_list[-1].computeIris()
+        self.iris_graph = IrisGraph(self.iris_list)
 
     def visualize(self, meshcat_viewer):
         for i, ir in enumerate(self.iris_list):
             ir.visualize(meshcat_viewer, i)
+
+    def findShortestPath(self, start: np.array,
+                         goal: np.array) -> List[int]:
+        planner, runtime = self.iris_graph.computeShortestPath(goal)
+
+        # find which IRIS region contains the start point
+        ir_start_idx = 0
+        for ir in self.iris_list:
+            if ir.isPointSafe(start):
+                iris_p_init = ir_start_idx
+                break
+            ir_start_idx += 1
+
+        # find which IRIS region contains the goal point
+        ir_goal_idx = 0
+        for ir in self.iris_list:
+            if ir.isPointSafe(goal):
+                iris_p_goal = ir_goal_idx
+                break
+            ir_goal_idx += 1
+
+        if iris_p_init == iris_p_goal:
+            iris_seq = list(iris_p_init)
+        else:
+            iris_seq, length, runtime = planner(start)
+        return iris_seq
+
+    def regionsContainingPoint(self, point: np.array) -> List[int]:
+        """
+        Find the IRIS region that contains the given point.
+        :param point: [np.array] 3D point
+        :return: [int] IRIS region index
+        """
+        return self.iris_graph.regionsContainingPoint(point)
+
+    def getIrisGraph(self):
+        return self.iris_graph
+
+    def getIrisRegions(self):
+        return self.iris_list
