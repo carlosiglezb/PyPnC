@@ -96,9 +96,9 @@ class IrisRegionsManager:
                 self.iris_list[-1].computeIris()
         self.iris_graph = IrisGraph(self.iris_list)
 
-    def visualize(self, meshcat_viewer):
+    def visualize(self, meshcat_viewer, frame_name):
         for i, ir in enumerate(self.iris_list):
-            ir.visualize(meshcat_viewer, i)
+            ir.visualize(meshcat_viewer, frame_name + '/' + str(i))
 
     def findShortestPath(self, start: np.array,
                          goal: np.array) -> List[int]:

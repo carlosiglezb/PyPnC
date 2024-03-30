@@ -4,7 +4,6 @@ from pnc.planner.multicontact.fastpathplanning.polygonal import iterative_planne
 from pnc.planner.multicontact.fastpathplanning.smooth import optimize_bezier_with_retiming, optimize_multiple_bezier_with_retiming
 import copy
 
-from vision.iris.iris_geom_interface import IrisGeomInterface
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
 
