@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import scipy as sp
 import meshcat
 
 # IRIS
@@ -97,6 +98,10 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(box_seq[0]['RF'][0] == 0, "First box should be the starting position")
         self.assertTrue(box_seq[0]['RF'][1] == 2, "Second box should be the goal position")
         self.assertTrue(box_seq[0]['RF'][2] == 1, "Last box should be the created IRIS region")
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[0]['RF'] - starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[1]['RF'] - ending_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[2]['RF'] - ending_pos) < 1e-3)
+
 
     def test_multistage_iris_seq_multiple_frame(self):
         # load obstacle, domain, and start / end seed for IRIS
@@ -166,9 +171,13 @@ class TestFrameTraverseIris(unittest.TestCase):
                 self.assertFalse(np.any(np.isnan(box_idx)),
                                  "Box sequence has unassigned box index in sequence")
 
+        # check box sequence and safe point list are correct
         self.assertTrue(box_seq[0][rf_name][0] == 0, "RF First Iris region should be the starting position")
         self.assertTrue(box_seq[0][rf_name][1] == 2, "RF Second Iris region should be the created one")
         self.assertTrue(box_seq[0][rf_name][2] == 1, "RFLast Iris region should be where the goal is")
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[0][rf_name] - rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[1][rf_name] - rf_ending_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[2][rf_name] - rf_ending_pos) < 1e-3)
 
         # for the RH we might have two solutions
         if len(box_seq[1]) == 2:
@@ -178,6 +187,9 @@ class TestFrameTraverseIris(unittest.TestCase):
             self.assertTrue(box_seq[1][rh_name][0] == 0, "RH First box should be the starting position")
             self.assertTrue(box_seq[1][rh_name][1] == 2, "RH Second box must be the created IRIS region")
             self.assertTrue(box_seq[1][rh_name][2] == 1, "RH Last box must be the ending position")
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[0][rh_name] - rh_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[1][rh_name] - rh_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[2][rh_name] - rh_ending_pos) < 1e-3)
 
 if __name__ == '__main__':
     unittest.main()
