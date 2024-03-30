@@ -37,6 +37,17 @@ class IrisRegionsManager:
         else:
             return False
 
+    def pointInCollision(self, point: np.array):
+        """
+        Assuming the obstacles are the same for all IRIS regions, we check that
+        the point is not contained in any of the obstacles provided in the first
+        IRIS region list.
+        """
+        for obs in self.iris_list[0].obstacles_mut:
+            if obs.PointInSet(point):
+                return True
+        return False
+
     def connectIrisSeeds(self):
         """
         Connect start and goal IRIS seeds.
@@ -55,6 +66,14 @@ class IrisRegionsManager:
         start_centroid = self.iris_list[0].iris_region.ChebyshevCenter()
         goal_centroid = self.iris_list[1].iris_region.ChebyshevCenter()
         new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.05, 0.1, 0.15])
+
+        # check that new seed is not in collision before creating new IRIS region
+        b_resample = self.pointInCollision(new_seed)
+        while b_resample:
+            new_seed = np.random.normal(loc=(start_centroid + goal_centroid) / 2, scale=[0.05, 0.1, 0.45])
+            b_resample = self.pointInCollision(new_seed)
+
+        # create IRIS region using collision-free seed
         new_iris = IrisGeomInterface(obstacles, domain, new_seed)
 
         # append new IRIS processor and compute IRIS region
