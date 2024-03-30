@@ -12,7 +12,7 @@ def pydrake_geom_to_meshcat(mut_polyhedron):
     poly_A = mut_polyhedron.A()
     poly_b = mut_polyhedron.b()
     poly_vertices = compute_polytope_vertices(poly_A, poly_b)
-    poly_chull = ConvexHull(poly_vertices)
+    poly_chull = ConvexHull(poly_vertices, qhull_options='QJ')
     return TriangularMeshGeometry(poly_chull.points, poly_chull.simplices)
 
 
@@ -40,7 +40,7 @@ class IrisGeomInterface:
         # default settings
         self.options = mut.IrisOptions()
         self.options.require_sample_point_is_contained = True
-        self.options.iteration_limit = 5
+        self.options.iteration_limit = 10
         self.options.termination_threshold = 0.05
         self.options.relative_termination_threshold = 0.01
 
