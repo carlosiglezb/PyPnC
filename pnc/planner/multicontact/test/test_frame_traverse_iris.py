@@ -44,6 +44,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.rf_starting_pos = np.array([-0.2, -0.1, 0.001])
         self.rh_starting_pos = np.array([-0.2, -0.2, 0.8])
         self.rf_final_pos = np.array([0.2, -0.1, 0.001])
+        self.rh_final_pos = np.array([0.2, -0.2, 0.8])
 
         if b_visualize:
             # visualize IRIS region
@@ -113,7 +114,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         rf_starting_pos = self.rf_starting_pos
         rh_starting_pos = self.rh_starting_pos
         rf_ending_pos = self.rf_final_pos
-        rh_ending_pos = np.array([0.2, -0.2, 0.8])
+        rh_ending_pos = self.rh_final_pos
         rf_name = 'RF'
         rh_name = 'RH'
 
@@ -163,7 +164,7 @@ class TestFrameTraverseIris(unittest.TestCase):
 
         # plan iris region sequence
         motion_frames_lst = motion_frames_seq.get_motion_frames()
-        box_seq, safe_pnt_lst = plan_multistage_iris_seq(safe_regions_mgr_dict,
+        iris_seq, safe_pnt_lst = plan_multistage_iris_seq(safe_regions_mgr_dict,
                                                          fixed_frames,
                                                          motion_frames_lst,
                                                          starting_pos_dict)
@@ -176,30 +177,32 @@ class TestFrameTraverseIris(unittest.TestCase):
                 f.write(res)
 
         # check no nan boxes
-        for bs in box_seq:
-            for box_idx in bs.values():
-                self.assertFalse(np.any(np.isnan(box_idx)),
+        for ir in iris_seq:
+            for ir_idx in ir.values():
+                self.assertFalse(np.any(np.isnan(ir_idx)),
                                  "Box sequence has unassigned box index in sequence")
 
         # check box sequence and safe point list are correct
-        self.assertTrue(box_seq[0][rf_name][0] == 0, "RF First Iris region should be the starting position")
-        self.assertTrue(box_seq[0][rf_name][1] == 2, "RF Second Iris region should be the created one")
-        self.assertTrue(box_seq[0][rf_name][2] == 1, "RFLast Iris region should be where the goal is")
+        self.assertTrue(iris_seq[0][rf_name][0] == 0, "RF First Iris region should be the starting position")
+        self.assertTrue(iris_seq[0][rf_name][1] == 2, "RF Second Iris region should be the created one")
+        self.assertTrue(iris_seq[0][rf_name][2] == 1, "RFLast Iris region should be where the goal is")
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[0][rf_name] - rf_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[1][rf_name] - rf_ending_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[2][rf_name] - rf_ending_pos) < 1e-3)
 
         # for the RH we might have two solutions
-        if len(box_seq[1]) == 2:
-            self.assertTrue(box_seq[1][rh_name][0] == 0, "RH First box should be the starting position")
-            self.assertTrue(box_seq[1][rh_name][1] == 1, "RH Second box must be the ending position")
-        elif len(box_seq[1]) == 3:
-            self.assertTrue(box_seq[1][rh_name][0] == 0, "RH First box should be the starting position")
-            self.assertTrue(box_seq[1][rh_name][1] == 2, "RH Second box must be the created IRIS region")
-            self.assertTrue(box_seq[1][rh_name][2] == 1, "RH Last box must be the ending position")
+        if len(iris_seq[1]) == 2:
+            self.assertTrue(iris_seq[1][rh_name][0] == 0, "RH First box should be the starting position")
+            self.assertTrue(iris_seq[1][rh_name][1] == 1, "RH Second box must be the ending position")
+        elif len(iris_seq[1]) == 3:
+            self.assertTrue(iris_seq[1][rh_name][0] == 0, "RH First box should be the starting position")
+            self.assertTrue(iris_seq[1][rh_name][1] == 2, "RH Second box must be the created IRIS region")
+            self.assertTrue(iris_seq[1][rh_name][2] == 1, "RH Last box must be the ending position")
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[0][rh_name] - rh_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[1][rh_name] - rh_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[2][rh_name] - rh_ending_pos) < 1e-3)
+
+        return iris_seq, safe_pnt_lst, safe_regions_mgr_dict
 
     def test_min_d_iris_seq_single_frame(self):
         iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_iris_seq_single_frame()
@@ -212,6 +215,22 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(length < 1e9, "Problem seems infeasible")
         self.assertTrue(sp.linalg.norm(traj[0] - self.rf_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(traj[-1] - self.rf_final_pos) < 1e-3)
+
+    def test_min_d_iris_seq_multiple_frame(self):
+        iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_iris_seq_multiple_frame()
+
+        # test minimum distance method
+        reach = None    # ignore reachable space in this test
+        traj, length, _ = solve_min_reach_iris_distance(reach, safe_regions_mgr_dict, iris_seq, safe_points_lst)
+
+        traj = np.reshape(traj, [2, 18])
+        traj_rf = traj[0].reshape([6, 3])
+        traj_rh = traj[1].reshape([6, 3])
+        self.assertTrue(length < 1e9, "Problem seems infeasible")
+        self.assertTrue(sp.linalg.norm(traj_rf[0] - self.rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(traj_rf[-1] - self.rf_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(traj_rh[0] - self.rh_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(traj_rh[-1] - self.rh_final_pos) < 1e-3)
 
 
 if __name__ == '__main__':

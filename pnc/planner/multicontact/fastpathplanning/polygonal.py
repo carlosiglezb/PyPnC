@@ -90,14 +90,14 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
 
     # organize lower and upper state limits (include initial and final state bounds)
     x_init_idx = d       # initial point is assumed to be feasible
-    seg_idx = 0
     for frame, ee_iris in iris_regions.items():
-        for ir_seq_idx in iris_seq[seg_idx][frame]:
-            A = ee_iris.iris_list[ir_seq_idx].iris_region.A()
-            b = ee_iris.iris_list[ir_seq_idx].iris_region.b()
-            constr.append(A @ x[x_init_idx:x_init_idx+d] <= b)
-            x_init_idx += d
-        seg_idx += 1
+        for seg_idx in range(len(iris_seq)):
+            for ir_seq_idx in iris_seq[seg_idx][frame]:
+                A = ee_iris.iris_list[ir_seq_idx].iris_region.A()
+                b = ee_iris.iris_list[ir_seq_idx].iris_region.b()
+                constr.append(A @ x[x_init_idx:x_init_idx+d] <= b)
+                x_init_idx += d
+        x_init_idx += d     # initial point is assumed to be feasible
 
     # Construct end-effector reachability constraints (initial & final points specified)
     # H = np.zeros((N_planes * (num_iris_tot - 1), d * n_f * (num_iris_tot + 1)))
@@ -176,10 +176,6 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
         x_fr = x[start_idx: end_idx]
         p_fr_t = cp.reshape(x_fr, [d, num_iris_tot + 1])
         cost += cp.sum(cp.norm(p_fr_t[:, 1:] - p_fr_t[:, :-1], axis=1))
-
-    # add limits if more than 2 boxes
-    # constr.append(l <= x)  # safe, collision-free boxes (lower limit)
-    # constr.append(x <= u)  # safe, collision-free boxes (upper limit)
 
     # solve
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs), constr + soc_constraint)
