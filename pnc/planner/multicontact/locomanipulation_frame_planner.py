@@ -1,3 +1,5 @@
+from typing import List
+
 import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
 from collections import OrderedDict
 from pnc.planner.multicontact.frame_traversable_region import convert_rgba_to_meshcat_obj
@@ -86,7 +88,7 @@ class LocomanipulationFramePlanner:
     def plan(self, p_init: dict[str, np.array],
              p_term: np.array,
              T: np.float64,
-             alpha: np.float64,
+             alpha: List[np.float64],
              verbose: bool=True):
         S = self.safe_boxes
         R = self.reachability_planes

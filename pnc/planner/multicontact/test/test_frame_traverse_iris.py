@@ -3,6 +3,7 @@ import numpy as np
 import scipy as sp
 import meshcat
 
+from pnc.planner.multicontact.fastpathplanning.polygonal import solve_min_reach_iris_distance
 # IRIS
 from vision.iris.iris_geom_interface import *
 from vision.iris.iris_regions_manager import IrisRegionsManager
@@ -11,6 +12,7 @@ from pnc.planner.multicontact.fastpathplanning.fastpathplanning import plan_mult
 from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
 
 b_visualize = False
+b_static_html = False
 
 
 class TestFrameTraverseIris(unittest.TestCase):
@@ -41,6 +43,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.domain = mut.HPolyhedron.MakeBox(dom_lb, dom_ub)
         self.rf_starting_pos = np.array([-0.2, -0.1, 0.001])
         self.rh_starting_pos = np.array([-0.2, -0.2, 0.8])
+        self.rf_final_pos = np.array([0.2, -0.1, 0.001])
 
         if b_visualize:
             # visualize IRIS region
@@ -84,24 +87,24 @@ class TestFrameTraverseIris(unittest.TestCase):
         # plan iris region sequence
         fixed_frames = [None]
         motion_frames_lst = motion_frames_seq.get_motion_frames()
-        box_seq, safe_pnt_lst = plan_multistage_iris_seq(safe_regions_mgr_dict,
+        iris_seq, safe_pnt_lst = plan_multistage_iris_seq(safe_regions_mgr_dict,
                                                          fixed_frames,
                                                          motion_frames_lst,
                                                          starting_pos_dict)
 
         # check no nan boxes
-        for bs in box_seq:
+        for bs in iris_seq:
             for box_idx in bs.values():
                 self.assertFalse(np.any(np.isnan(box_idx)),
                                  "Box sequence has unassigned box index in sequence")
 
-        self.assertTrue(box_seq[0]['RF'][0] == 0, "First box should be the starting position")
-        self.assertTrue(box_seq[0]['RF'][1] == 2, "Second box should be the goal position")
-        self.assertTrue(box_seq[0]['RF'][2] == 1, "Last box should be the created IRIS region")
+        self.assertTrue(iris_seq[0]['RF'][0] == 0, "First box should be the starting position")
+        self.assertTrue(iris_seq[0]['RF'][1] == 2, "Second box should be the goal position")
+        self.assertTrue(iris_seq[0]['RF'][2] == 1, "Last box should be the created IRIS region")
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[0]['RF'] - starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[1]['RF'] - ending_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(safe_pnt_lst[2]['RF'] - ending_pos) < 1e-3)
 
+        return iris_seq, safe_pnt_lst, safe_regions_mgr_dict
 
     def test_multistage_iris_seq_multiple_frame(self):
         # load obstacle, domain, and start / end seed for IRIS
@@ -109,7 +112,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         domain = self.domain
         rf_starting_pos = self.rf_starting_pos
         rh_starting_pos = self.rh_starting_pos
-        rf_ending_pos = np.array([0.2, -0.1, 0.001])
+        rf_ending_pos = self.rf_final_pos
         rh_ending_pos = np.array([0.2, -0.2, 0.8])
         rf_name = 'RF'
         rh_name = 'RH'
@@ -165,6 +168,13 @@ class TestFrameTraverseIris(unittest.TestCase):
                                                          motion_frames_lst,
                                                          starting_pos_dict)
 
+        if b_static_html:
+            # create and save locally in static html form
+            res = self.vis.static_html()
+            save_file = './data/multi-iris-door.html'
+            with open(save_file, "w") as f:
+                f.write(res)
+
         # check no nan boxes
         for bs in box_seq:
             for box_idx in bs.values():
@@ -190,6 +200,19 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[0][rh_name] - rh_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[1][rh_name] - rh_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[2][rh_name] - rh_ending_pos) < 1e-3)
+
+    def test_min_d_iris_seq_single_frame(self):
+        iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_iris_seq_single_frame()
+
+        # test minimum distance method
+        reach = None    # ignore reachable space in this test
+        traj, length, _ = solve_min_reach_iris_distance(reach, safe_regions_mgr_dict, iris_seq, safe_points_lst)
+
+        traj = np.reshape(traj, [4, 3])
+        self.assertTrue(length < 1e9, "Problem seems infeasible")
+        self.assertTrue(sp.linalg.norm(traj[0] - self.rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(traj[-1] - self.rf_final_pos) < 1e-3)
+
 
 if __name__ == '__main__':
     unittest.main()
