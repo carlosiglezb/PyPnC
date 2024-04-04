@@ -328,6 +328,8 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
     # if there were no fixed frames (only motion frames), return solution
     # TODO: this might still fail if there were any free frames, fix later
     if len(box_seq_lst) == 0:
+        for fname, ir in iris_regions.items():
+            ir.iris_idx_seq = [box_seq_dict[fname]]
         return [box_seq_dict], safe_points_lst
 
     # check distribution of free motion frames over all segments/intervals
@@ -365,6 +367,11 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
         for fname, bs in f_list.items():
             if any(np.isnan(bs)):
                 raise Exception(f"{fname} frame has un-assigned safe regions")
+
+    # save iris sequence to IrisRegionsManager
+    for fname, ir in iris_regions.items():
+        for seg in range(len(box_seq_lst)):
+            ir.iris_idx_seq.append(box_seq_lst[seg][fname])
 
     return box_seq_lst, safe_points_lst
 

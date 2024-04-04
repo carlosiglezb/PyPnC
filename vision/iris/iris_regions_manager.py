@@ -18,6 +18,7 @@ class IrisRegionsManager:
         self.iris_start_seed = iris_start.seed_pos
         self.iris_goal_seed = iris_goal.seed_pos
         self.iris_graph = None      # this is computed after connecting IRIS seeds
+        self.iris_idx_seq = []    # this is computed after finding the shortest path
 
     def addIris(self, iris_processor_lst):
         for ir in iris_processor_lst:
@@ -96,7 +97,7 @@ class IrisRegionsManager:
                 self.iris_list[-1].computeIris()
         self.iris_graph = IrisGraph(self.iris_list)
 
-    def visualize(self, meshcat_viewer, frame_name):
+    def visualize(self, meshcat_viewer, frame_name='frame'):
         for i, ir in enumerate(self.iris_list):
             ir.visualize(meshcat_viewer, frame_name + '/' + str(i))
 
