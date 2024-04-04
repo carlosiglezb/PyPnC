@@ -4,6 +4,8 @@ import scipy as sp
 import meshcat
 
 from pnc.planner.multicontact.fastpathplanning.polygonal import solve_min_reach_iris_distance
+from pnc.planner.multicontact.fastpathplanning.smooth import optimize_multiple_bezier_iris
+from pnc.planner.multicontact.locomanipulation_frame_planner import LocomanipulationFramePlanner
 # IRIS
 from vision.iris.iris_geom_interface import *
 from vision.iris.iris_regions_manager import IrisRegionsManager
@@ -11,7 +13,7 @@ from vision.iris.iris_regions_manager import IrisRegionsManager
 from pnc.planner.multicontact.fastpathplanning.fastpathplanning import plan_multistage_iris_seq
 from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
 
-b_visualize = False
+b_visualize = True
 b_static_html = False
 
 
@@ -74,7 +76,7 @@ class TestFrameTraverseIris(unittest.TestCase):
 
         if b_visualize:
             # Visualize IRIS regions for "start" and "end" seeds
-            safe_regions_mgr_dict['RF'].visualize(self.vis)
+            safe_regions_mgr_dict['RF'].visualize(self.vis, 'RF')
 
         # ------------------- frame planner -------------------
         starting_pos_dict = {'RF': starting_pos}
@@ -105,6 +107,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[0]['RF'] - starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[1]['RF'] - ending_pos) < 1e-3)
 
+        self.motion_frames_seq = motion_frames_seq
         return iris_seq, safe_pnt_lst, safe_regions_mgr_dict
 
     def test_multistage_iris_seq_multiple_frame(self):
@@ -202,6 +205,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[1][rh_name] - rh_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[2][rh_name] - rh_ending_pos) < 1e-3)
 
+        self.motion_frames_seq = motion_frames_seq
         return iris_seq, safe_pnt_lst, safe_regions_mgr_dict
 
     def test_min_d_iris_seq_single_frame(self):
@@ -232,6 +236,71 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(traj_rh[0] - self.rh_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(traj_rh[-1] - self.rh_final_pos) < 1e-3)
 
+    def test_optimize_bezier_single_frame(self):
+        iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_iris_seq_single_frame()
+        motion_frames_seq = self.motion_frames_seq
+
+        # test optimize multiple bezier
+        fixed_frames = [None]     # one per segment
+        reach = None    # ignore reachable space in this test
+        aux = [{}]
+        durations=[]        # should be obtained from iris_seq, hard-coded in this test
+        durations.append({'RF': np.array([0.2] * 3)})
+        alpha = {1: 1, 2: 2}
+        surface_normals_lst = motion_frames_seq.get_contact_surfaces()
+        path, sol_stats = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+                                                        durations, alpha, safe_points_lst,
+                                                        fixed_frames, surface_normals_lst)
+
+        # Visualize points from Bezier curve
+        if b_visualize:
+            for p in path:
+                for seg in range(len(p.beziers)):
+                    bezier_curve = [p.beziers[seg]]
+                    fr_name = 'RF'
+                    LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
+
+        self.assertTrue(path is not None, "Problem seems to be infeasible")
+        self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[0].beziers[2].points[-1] - self.rf_final_pos) < 1e-3)
+
+    def test_optimize_bezier_multiple_frame(self):
+        iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_iris_seq_multiple_frame()
+        motion_frames_seq = self.motion_frames_seq
+
+        # test optimize multiple bezier
+        fixed_frames = [None, None]   # one per segment
+        reach = None    # ignore reachable space in this test
+        aux = [{}]
+        durations=[]        # should be obtained from iris_seq, hard-coded in this test
+        durations.append({'RF': np.array([0.2] * 3),
+                          'RH': np.array([0.2] * 3)})
+        durations.append({'RF': np.array([0.3] * 2),
+                          'RH': np.array([0.3] * 2)})
+        alpha = {1: 1, 2: 2, 3: 3}
+        surface_normals_lst = motion_frames_seq.get_contact_surfaces()
+        path, sol_stats = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+                                                        durations, alpha, safe_points_lst,
+                                                        fixed_frames, surface_normals_lst)
+
+        # Create points from Bezier curve
+        if b_visualize:
+            i = 0
+            for p in path:
+                for seg in range(len(p.beziers)):
+                    bezier_curve = [p.beziers[seg]]
+                    if i == 0:
+                        fr_name = 'RF'
+                    elif i == 1:
+                        fr_name = 'RH'
+                    LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
+                i += 1
+
+        self.assertTrue(path is not None, "Problem seems to be infeasible")
+        self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[0].beziers[2].points[-1] - self.rf_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rh_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[2].points[-1] - self.rh_final_pos) < 1e-3)
 
 if __name__ == '__main__':
     unittest.main()
