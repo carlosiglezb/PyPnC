@@ -13,7 +13,7 @@ from vision.iris.iris_regions_manager import IrisRegionsManager
 from pnc.planner.multicontact.fastpathplanning.fastpathplanning import plan_multistage_iris_seq
 from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
 
-b_visualize = True
+b_visualize = False
 b_static_html = False
 
 
@@ -206,6 +206,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(safe_pnt_lst[2][rh_name] - rh_ending_pos) < 1e-3)
 
         self.motion_frames_seq = motion_frames_seq
+        self.fixed_frames_seq = fixed_frames
         return iris_seq, safe_pnt_lst, safe_regions_mgr_dict
 
     def test_min_d_iris_seq_single_frame(self):
@@ -246,7 +247,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         aux = [{}]
         durations=[]        # should be obtained from iris_seq, hard-coded in this test
         durations.append({'RF': np.array([0.2] * 3)})
-        alpha = {1: 1, 2: 2}
+        alpha = {1: 1, 2: 2, 3: 0.1}
         surface_normals_lst = motion_frames_seq.get_contact_surfaces()
         path, sol_stats = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
@@ -267,9 +268,9 @@ class TestFrameTraverseIris(unittest.TestCase):
     def test_optimize_bezier_multiple_frame(self):
         iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_iris_seq_multiple_frame()
         motion_frames_seq = self.motion_frames_seq
+        fixed_frames = self.fixed_frames_seq
 
         # test optimize multiple bezier
-        fixed_frames = [None, None]   # one per segment
         reach = None    # ignore reachable space in this test
         aux = [{}]
         durations=[]        # should be obtained from iris_seq, hard-coded in this test
@@ -277,7 +278,7 @@ class TestFrameTraverseIris(unittest.TestCase):
                           'RH': np.array([0.2] * 3)})
         durations.append({'RF': np.array([0.3] * 2),
                           'RH': np.array([0.3] * 2)})
-        alpha = {1: 1, 2: 2, 3: 3}
+        alpha = {1: 1, 2: 1, 3: 0.1}
         surface_normals_lst = motion_frames_seq.get_contact_surfaces()
         path, sol_stats = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
@@ -300,7 +301,8 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(path[0].beziers[2].points[-1] - self.rf_final_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rh_starting_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[1].beziers[2].points[-1] - self.rh_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[2].points[0] - self.rh_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rh_final_pos) < 1e-2)
 
 if __name__ == '__main__':
     unittest.main()

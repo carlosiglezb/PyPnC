@@ -561,7 +561,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                                   aux_frames: List[dict],
                                   iris_regions: dict[str: IrisRegionsManager],
                                   durations: List[dict[str, np.array]],
-                                  alpha: dict[int: int],
+                                  alpha: dict[int: float],
                                   safe_points_lst: List[dict[str, np.array]],
                                   fixed_frames=None,
                                   surface_normals_lst=None,
