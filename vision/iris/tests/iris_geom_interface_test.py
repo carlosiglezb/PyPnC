@@ -83,8 +83,7 @@ class IrisGeomInterfaceTest(unittest.TestCase):
         safe_regions_mgr.computeIris()
 
         # if start-to-end regions not connected, sample points in between
-        if not safe_regions_mgr.areIrisSeedsContained():
-            safe_regions_mgr.connectIrisSeeds()
+        safe_regions_mgr.connectIrisSeeds()
 
         # visualize IRIS region
         vis = meshcat.Visualizer()

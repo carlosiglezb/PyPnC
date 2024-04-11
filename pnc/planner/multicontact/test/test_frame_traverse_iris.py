@@ -133,10 +133,8 @@ class TestFrameTraverseIris(unittest.TestCase):
         safe_regions_mgr_dict[rh_name].computeIris()
 
         # if start-to-end regions not connected, sample points in between
-        if not safe_regions_mgr_dict[rf_name].areIrisSeedsContained():
-            safe_regions_mgr_dict[rf_name].connectIrisSeeds()
-        if not safe_regions_mgr_dict[rh_name].areIrisSeedsContained():
-            safe_regions_mgr_dict[rh_name].connectIrisSeeds()
+        safe_regions_mgr_dict[rf_name].connectIrisSeeds()
+        safe_regions_mgr_dict[rh_name].connectIrisSeeds()
 
         if b_visualize:
             # Visualize IRIS regions for "start" and "end" seeds
