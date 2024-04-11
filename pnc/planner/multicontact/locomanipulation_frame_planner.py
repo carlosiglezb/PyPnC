@@ -33,8 +33,8 @@ class LocomanipulationFramePlanner:
             # do the torso at the very end to get reachability from contact frames
             if region.frame_name != 'torso':
                 H, d_prime = self.extract_plane_eqn_from_coeffs(region._plane_coeffs)
-                d_prime = self.update_plane_offset_from_root(region._origin_pos,
-                                                                H, d_prime)
+                # d_prime = self.update_plane_offset_from_root(region._origin_pos,
+                #                                                 H, d_prime)
                 self.reachability_planes[region.frame_name] = {'H': H, 'd': d_prime}
 
             if region.frame_name == starting_stance_foot:
@@ -54,8 +54,8 @@ class LocomanipulationFramePlanner:
         self.motion_frames_seq = motion_frames_seq
 
         # the torso must be reachable based on the frame in contact
-        H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path,
-                                                            init_standing_pos)
+        # H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path,
+        #                                                     init_standing_pos)
         self.reachability_planes['torso'] = {'H': H, 'd': d_prime}
 
         # auxiliary frames associated to one of the above initialized reachable regions

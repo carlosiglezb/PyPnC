@@ -710,46 +710,38 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     # Reachability constraints
     if reach_region is not None:
-        fr_idx, k_fr_box = 0, 0
-        for frame_name in frame_list:
-            if frame_name == 'torso':
-                coeffs = reach_region[frame_name]
-                H = coeffs['H']
-                d_vec = np.reshape(coeffs['d'], (len(H), 1))
-                d_mat = np.repeat(d_vec, n_points, axis=1)
-                #TODO update seg_idx
-                num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
-                for idx_box in range(1, num_iris_current - 1):
-                    # torso translation terms
-                    z_t_prev = points[idx_box - 1][0]
-                    z_t_post = points[idx_box][0]
+        k_fr_iris = 0
+        for fr_idx, frame_name in enumerate(frame_list):
+            fr_iris_counter = 0
+            for seg in range(len(durations)):
 
-                    # torso w.r.t. corresponding standing effector frame
-                    z_stance_post = points[0][0]    # was points[fr_idx*n_boxes + idx_box][0]
-                    # z_stance_post = points[n_boxes + idx_box][0]    # was points[fr_idx*n_boxes + idx_box][0]
+                num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg])
+                for si in range(num_iris_current):
+                    z_t = points[0 * num_iris_tot + fr_iris_counter + si][0]
 
-                    # reachable constraint
-                    constraints.append(H @ z_t_prev.T - 2 * H @ z_t_post.T + H @ z_stance_post.T <= -d_mat)
-                fr_idx += 1
+                    if frame_name == 'torso':
+                        # get corresponding ee frame points to consider for stance reachability constraint
+                        if seg < 3:         # stance_foot = 'RF'
+                            rf_idx = 2      # RF is 3rd in the list
+                            coeffs = reach_region['RF']
+                            z_ee_seg = points[rf_idx * num_iris_tot][0]
+                        else:               # stance_foot = 'LF'
+                            lf_idx = 1      # LF is 2nd in the list
+                            coeffs = reach_region['LF']
+                            z_ee_seg = points[lf_idx * num_iris_tot][0]
 
-            else:
-                coeffs = reach_region[frame_name]
-                H = coeffs['H']
-                d_vec = np.reshape(coeffs['d'], (len(H), 1))
-                d_mat = np.repeat(d_vec, n_points, axis=1)
-                #TODO update seg_idx
-                num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
-                for idx_box in range(1, num_iris_current - 1):
-                    # torso translation terms
-                    z_t_prev = points[idx_box - 1][0]
-                    z_t_post = points[idx_box][0]
-
-                    # corresponding end effector frame index
-                    z_ee_post = points[fr_idx*num_iris_current + idx_box][0]
+                    else:
+                        coeffs = reach_region[frame_name]
+                        z_ee_seg = points[fr_idx * num_iris_tot + fr_iris_counter + si][0]
 
                     # reachable constraint
-                    constraints.append(H @ z_t_prev.T - H @ z_t_post.T + H @ z_ee_post.T <= -d_mat)
-                fr_idx += 1
+                    H = coeffs['H']
+                    d_vec = np.reshape(coeffs['d'], (len(H), 1))
+                    d_mat = np.repeat(d_vec, n_points, axis=1)
+                    constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+
+                fr_iris_counter += num_iris_current
+                k_fr_iris += num_iris_current
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
@@ -767,8 +759,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     for k in range(num_iris_tot * n_frames):
         num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
         # move on to next segment after the current number of safe boxes
-        num_seg_iris = len(iris_regions[frame_name].iris_list)
-        if (fr_seg_k_box != 0) and fr_seg_k_box % num_iris_current == 0 and seg_idx != (num_seg_iris-1):
+        if (fr_seg_k_box != 0) and fr_seg_k_box % num_iris_current == 0 and seg_idx != (num_iris_tot-1):
             seg_idx += 1
             fr_seg_k_box = 0
 
