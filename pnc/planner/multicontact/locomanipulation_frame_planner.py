@@ -23,12 +23,14 @@ class LocomanipulationFramePlanner:
         self.safe_boxes = OrderedDict()
         self.reachability_planes = OrderedDict()
         self.path = []
+        self.points = None      # control points (from Bezier trajectory solution)
         self.box_seq = []
         self.frame_names = []
         self.starting_stance_foot = starting_stance_foot
         for region in traversable_regions_list:
             self.frame_names.append(region.frame_name)
-            self.safe_boxes[region.frame_name] = region._plan_safe_box_list     # TODO replace w/ _plan_iris_list
+            # self.safe_boxes[region.frame_name] = region._plan_safe_box_list
+            self.safe_boxes[region.frame_name] = region._plan_ir_mgr
 
             # do the torso at the very end to get reachability from contact frames
             if region.frame_name != 'torso':
@@ -98,6 +100,18 @@ class LocomanipulationFramePlanner:
         self.path, self.box_seq = fpp.plan_multiple(S, R, p_init, T, alpha, verbose, A,
                                                     fixed_frames, motion_frames_seq)
 
+    def plan_iris(self, p_init: dict[str, np.array],
+             T: np.float64,
+             alpha: List[np.float64],
+             verbose: bool=False):
+        S = self.safe_boxes     # dict of IrisRegionsManager
+        R = self.reachability_planes
+        A = self.aux_frames
+        fixed_frames = self.fixed_frames
+        motion_frames_seq = self.motion_frames_seq
+        self.path, self.box_seq, self.points = fpp.plan_multiple_iris(S, R, p_init, T, alpha, verbose, A,
+                                                    fixed_frames, motion_frames_seq)
+
     def plot(self, visualizer, static_html=False):
         i = 0
         for p in self.path:
@@ -114,6 +128,17 @@ class LocomanipulationFramePlanner:
             with open(save_file, "w") as f:
                 f.write(res)
 
+        for i, p in self.points.items():
+            if i < 7:
+                self.visualize_simple_points(visualizer.viewer, f'torso/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+            elif i < 14:
+                self.visualize_simple_points(visualizer.viewer, f'LF/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+            elif i < 21:
+                self.visualize_simple_points(visualizer.viewer, f'RF/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+            elif i < 28:
+                self.visualize_simple_points(visualizer.viewer, f'LH/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+            else:
+                self.visualize_simple_points(visualizer.viewer, f'RH/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
 
     @staticmethod
     def add_fixed_distance_between_points(path):

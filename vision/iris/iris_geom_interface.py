@@ -53,6 +53,9 @@ class IrisGeomInterface:
     def isPointSafe(self, point):
         return self.iris_region.PointInSet(point)
 
+    def irisIntersects(self, other: mut.ConvexSet):
+        return self.iris_region.Intersect(other)
+
     def visualize(self, meshcat_viewer, iris_name=0):
         if self.iris_region is None:
             raise ValueError("IRIS region not computed yet")
@@ -69,4 +72,8 @@ class IrisGeomInterface:
         # Seed
         meshcat_viewer[f"seed/{iris_name}"].set_object(self.sphere_mcat, meshcat_point_obj())
         meshcat_viewer[f"seed/{iris_name}"].set_transform(tf.translation_matrix(self.seed_pos))
+
+        # default some viewer settings to False to avoid clutter
+        meshcat_viewer["obstacle"].set_property("visible", False)
+        meshcat_viewer["seed"].set_property("visible", False)
 

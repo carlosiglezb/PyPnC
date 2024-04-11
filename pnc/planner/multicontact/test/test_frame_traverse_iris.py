@@ -247,7 +247,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         durations.append({'RF': np.array([0.2] * 3)})
         alpha = {1: 1, 2: 2, 3: 0.1}
         surface_normals_lst = motion_frames_seq.get_contact_surfaces()
-        path, sol_stats = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+        path, sol_stats, _ = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
                                                         fixed_frames, surface_normals_lst)
 
@@ -278,7 +278,7 @@ class TestFrameTraverseIris(unittest.TestCase):
                           'RH': np.array([0.3] * 2)})
         alpha = {1: 1, 2: 1, 3: 0.1}
         surface_normals_lst = motion_frames_seq.get_contact_surfaces()
-        path, sol_stats = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+        path, sol_stats, _ = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
                                                         fixed_frames, surface_normals_lst)
 

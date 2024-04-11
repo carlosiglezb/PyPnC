@@ -566,7 +566,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                                   fixed_frames=None,
                                   surface_normals_lst=None,
                                   n_points=None, **kwargs):
-    stance_foot = 'LF'
+    stance_foot = 'RF'
 
     # number of frames
     n_frames = len(safe_points_lst[0].keys())
@@ -685,7 +685,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     # Rigid links (e.g., shin link length) constraint relaxation
     soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
-    if bool(aux_frames[0]):     # check if empy dictionary
+    if bool(aux_frames):     # check if empy dictionary
         link_based_weights = np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
 
         # apply auxiliary rigid link constraint throughout all safe regions
@@ -745,11 +745,12 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-    prob.solve(solver='SCS')
+    # prob.solve(solver='CLARABEL', max_iter=1000, tol_feas=1e-3, tol_gap_abs=1.0e-3, tol_gap_rel=1.0e-3, verbose=True)
+    prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
 
     if prob.status == 'infeasible':
         print('Problem was infeasible. Retrying with relaxed tolerances.')
-        prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
+        prob.solve(solver='SCS', eps_rel=1e-2, eps_abs=1e-2)
 
     # Reconstruct trajectory.
     beziers, path = [], []
@@ -812,7 +813,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     sol_stats['cost_breakdown'] = cost_breakdown
     sol_stats['retiming_weights'] = retiming_weights
 
-    return path, sol_stats
+    return path, sol_stats, points
 
 
 def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_accel=True):

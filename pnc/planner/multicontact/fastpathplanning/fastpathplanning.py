@@ -1,7 +1,9 @@
 import numpy as np
 from pnc.planner.multicontact.fastpathplanning.boxes import Box, BoxCollection
-from pnc.planner.multicontact.fastpathplanning.polygonal import iterative_planner, iterative_planner_multiple
-from pnc.planner.multicontact.fastpathplanning.smooth import optimize_bezier_with_retiming, optimize_multiple_bezier_with_retiming
+from pnc.planner.multicontact.fastpathplanning.polygonal import iterative_planner, iterative_planner_multiple, \
+    solve_min_reach_iris_distance
+from pnc.planner.multicontact.fastpathplanning.smooth import optimize_bezier_with_retiming, \
+    optimize_multiple_bezier_with_retiming, optimize_multiple_bezier_iris
 import copy
 
 from vision.iris.iris_regions_manager import IrisRegionsManager
@@ -370,6 +372,7 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
 
     # save iris sequence to IrisRegionsManager
     for fname, ir in iris_regions.items():
+        ir.iris_idx_seq.clear()
         for seg in range(len(box_seq_lst)):
             ir.iris_idx_seq.append(box_seq_lst[seg][fname])
 
@@ -429,3 +432,58 @@ def plan_multiple(S, R, p_init, T, alpha,
                                                              verbose=verbose)
 
     return paths, box_seq
+
+
+def plan_multiple_iris(S, R, p_init, T, alpha,
+                  verbose=True, A=None, fixed_frames=None,
+                  motion_frames_seq=None):
+
+    if verbose:
+        print('Polygonal phase:')
+
+    motion_frames_lst = motion_frames_seq.get_motion_frames()
+    iris_seq, safe_pnt_lst = plan_multistage_iris_seq(S, fixed_frames, motion_frames_lst, p_init)
+    traj, length, solver_time = solve_min_reach_iris_distance(R, S, iris_seq, safe_pnt_lst, A)
+
+    if verbose:
+        print('\nSmooth phase:')
+
+    # Fix box sequence.
+    first_fr_iris = next(iter(S.values()))
+    d = first_fr_iris.iris_list[0].iris_region.ambient_dimension()
+
+    n_f = len(p_init)
+    n_poly_points = round(len(traj) / n_f)
+    durations = []
+    ir_i = 0
+    seg_idx = 0
+    for ir_mgr in iris_seq:
+        durations.append({})
+        for frame, ir in ir_mgr.items():
+            # Cost coefficients.
+            alpha = {i + 1: ai for i, ai in enumerate(alpha)}
+
+            # Initialize transition times.
+            num_iris = len(ir)
+            frame_idx = list(p_init.keys()).index(frame)
+            # get indices of current frame for all curve points
+            for b in range(num_iris+1):
+                first_idx = n_poly_points * frame_idx + (b + ir_i) * d
+                last_idx = first_idx + d - 1
+                if b == 0:
+                   ee_traj_idx = np.linspace(first_idx, last_idx, d).astype(int)
+                else:
+                    ee_traj_idx = np.vstack((ee_traj_idx, (np.linspace(first_idx, last_idx, d)).astype(int)))
+
+            ee_traj_change = traj[ee_traj_idx[1:]]-traj[ee_traj_idx[:-1]]
+            durations[seg_idx][frame] = np.linalg.norm(ee_traj_change, axis=1)
+            #TODO deal with case where any of durations[frame] == 0
+            durations[seg_idx][frame] *= T / sum(durations[seg_idx][frame])
+        ir_i += num_iris
+        seg_idx += 1
+
+    surface_normals_lst = motion_frames_seq.get_contact_surfaces()
+    paths, sol_stats, points = optimize_multiple_bezier_iris(R, A, S, durations, alpha, safe_pnt_lst,
+                                                     fixed_frames, surface_normals_lst, verbose=verbose)
+
+    return paths, iris_seq, points
