@@ -143,6 +143,10 @@ class TestLocomanipulationFramePlanner(unittest.TestCase):
         obstacles = self.obstacles
         domain_ubody = self.domain_ubody
         domain_lbody = self.domain_lbody
+        # shift (feet) iris seed to get nicer IRIS region
+        iris_lf_shift = np.array([0.1, 0., 0.])
+        iris_rf_shift = np.array([0.1, 0., 0.])
+        # get end effector positions via fwd kin
         starting_torso_pos = standing_pos
         final_torso_pos = starting_torso_pos + np.array([step_length, 0., 0.])
         starting_lf_pos = draco3.get_link_iso("l_foot_contact")[:3, 3]
@@ -160,11 +164,11 @@ class TestLocomanipulationFramePlanner(unittest.TestCase):
 
         safe_torso_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_torso_pos)
         safe_torso_end_region = IrisGeomInterface(obstacles, domain_ubody, final_torso_pos)
-        safe_lf_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_lf_pos)
+        safe_lf_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_lf_pos + iris_lf_shift)
         safe_lf_end_region = IrisGeomInterface(obstacles, domain_lbody, final_lf_pos)
         safe_lh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_lh_pos)
         safe_lh_end_region = IrisGeomInterface(obstacles, domain_ubody, final_lh_pos)
-        safe_rf_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_rf_pos)
+        safe_rf_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_rf_pos + iris_rf_shift)
         safe_rf_end_region = IrisGeomInterface(obstacles, domain_lbody, final_rf_pos)
         safe_rh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_rh_pos)
         safe_rh_end_region = IrisGeomInterface(obstacles, domain_ubody, final_rh_pos)

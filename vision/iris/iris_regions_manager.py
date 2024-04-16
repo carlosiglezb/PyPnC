@@ -93,9 +93,11 @@ class IrisRegionsManager:
         domain = self.iris_list[0].domain_mut
 
         # sample random seed between start and goal IRIS regions
-        start_centroid = self.iris_list[0].iris_region.ChebyshevCenter()
-        goal_centroid = self.iris_list[1].iris_region.ChebyshevCenter()
-        new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.05, 0.1, 0.15])
+        # start_centroid = self.iris_list[0].iris_region.ChebyshevCenter()
+        # goal_centroid = self.iris_list[1].iris_region.ChebyshevCenter()
+        start_centroid = self.iris_start_seed + np.array([0., 0., 0.6])
+        goal_centroid = self.iris_goal_seed + np.array([0.1, 0., 0.6])
+        new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.001, 0.1, 0.1])
 
         # check that new seed is not in collision before creating new IRIS region
         b_resample = self.pointInCollision(new_seed)
