@@ -448,6 +448,9 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     if verbose:
         print('\nSmooth phase:')
 
+    # Cost coefficients.
+    alpha = {i + 1: ai for i, ai in enumerate(alpha)}
+
     # Fix box sequence.
     first_fr_iris = next(iter(S.values()))
     d = first_fr_iris.iris_list[0].iris_region.ambient_dimension()
@@ -460,9 +463,6 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     for ir_mgr in iris_seq:
         durations.append({})
         for frame, ir in ir_mgr.items():
-            # Cost coefficients.
-            alpha = {i + 1: ai for i, ai in enumerate(alpha)}
-
             # Initialize transition times.
             num_iris = len(ir)
             frame_idx = list(p_init.keys()).index(frame)
