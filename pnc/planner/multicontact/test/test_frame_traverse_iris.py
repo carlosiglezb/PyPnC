@@ -234,6 +234,12 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(traj_rf[-1] - self.rf_final_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(traj_rh[0] - self.rh_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(traj_rh[-1] - self.rh_final_pos) < 1e-3)
+        self.assertTrue(traj_rf[1][2] > 0.39, "RF-z should be above the knee knocker")
+        self.assertTrue(traj_rf[2][2] > 0.39, "RF-z should be above the knee knocker")
+
+        if b_visualize:
+            LocomanipulationFramePlanner.visualize_simple_points(self.vis, 'RF/points', traj_rf, [0, 0, 1, 1])
+            LocomanipulationFramePlanner.visualize_simple_points(self.vis, 'RH/points', traj_rh, [0, 0, 1, 1])
 
     def test_optimize_bezier_single_frame(self):
         iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_iris_seq_single_frame()

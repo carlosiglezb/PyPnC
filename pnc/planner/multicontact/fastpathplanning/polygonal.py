@@ -92,9 +92,19 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     x_init_idx = d       # initial point is assumed to be feasible
     for frame, ee_iris in iris_regions.items():
         for seg_idx in range(len(iris_seq)):
-            for ir_seq_idx in iris_seq[seg_idx][frame]:
-                A = ee_iris.iris_list[ir_seq_idx].iris_region.A()
-                b = ee_iris.iris_list[ir_seq_idx].iris_region.b()
+            for ir_seg_count in range(len(iris_seq[seg_idx][frame])):
+                ir_seq_idx = iris_seq[seg_idx][frame][ir_seg_count]
+                # look for intersections
+                if ir_seg_count != (len(iris_seq[seg_idx][frame]) - 1):
+                    ir_next_seq_idx = iris_seq[seg_idx][frame][ir_seg_count+1]
+                    iris_current = ee_iris.iris_list[ir_seq_idx].iris_region
+                    iris_next = ee_iris.iris_list[ir_next_seq_idx].iris_region
+                    iris_intersect = iris_current.Intersection(iris_next, check_for_redundancy=True)
+                    A = iris_intersect.A()
+                    b = iris_intersect.b()
+                else:       # last region, use as is
+                    A = ee_iris.iris_list[ir_seq_idx].iris_region.A()
+                    b = ee_iris.iris_list[ir_seq_idx].iris_region.b()
                 constr.append(A @ x[x_init_idx:x_init_idx+d] <= b)
                 x_init_idx += d
         x_init_idx += d     # initial point is assumed to be feasible
