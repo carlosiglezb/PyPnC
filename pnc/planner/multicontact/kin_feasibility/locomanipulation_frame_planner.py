@@ -2,7 +2,7 @@ from typing import List
 
 import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
 from collections import OrderedDict
-from pnc.planner.multicontact.frame_traversable_region import convert_rgba_to_meshcat_obj
+from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import convert_rgba_to_meshcat_obj
 
 import meshcat.geometry as g
 import meshcat.transformations as tf
@@ -121,6 +121,7 @@ class LocomanipulationFramePlanner:
                 self.visualize_bezier_points(visualizer.viewer, fr_name, bezier_curve, seg)
             i += 1
 
+        visualizer.viewer["traversable_regions"].set_property("visible", False)
         if static_html:
             # create and save locally in static html form
             res = visualizer.viewer.static_html()
@@ -128,17 +129,24 @@ class LocomanipulationFramePlanner:
             with open(save_file, "w") as f:
                 f.write(res)
 
-        for i, p in self.points.items():
-            if i < 7:
-                self.visualize_simple_points(visualizer.viewer, f'torso/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
-            elif i < 14:
-                self.visualize_simple_points(visualizer.viewer, f'LF/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
-            elif i < 21:
-                self.visualize_simple_points(visualizer.viewer, f'RF/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
-            elif i < 28:
-                self.visualize_simple_points(visualizer.viewer, f'LH/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
-            else:
-                self.visualize_simple_points(visualizer.viewer, f'RH/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        tot = [len(s['LF']) for s in self.box_seq]
+        num_tot_seq = sum(tot)
+        # for i, p in self.points.items():
+        #     if i < num_tot_seq:
+        #         self.visualize_simple_points(visualizer.viewer, f'torso/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        #     elif i < 2 * num_tot_seq:
+        #         self.visualize_simple_points(visualizer.viewer, f'LF/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        #     elif i < 3 * num_tot_seq:
+        #         self.visualize_simple_points(visualizer.viewer, f'RF/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        #     elif i < 4 * num_tot_seq:
+        #         self.visualize_simple_points(visualizer.viewer, f'LH/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        #     else:
+        #         self.visualize_simple_points(visualizer.viewer, f'RH/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        # visualizer.viewer["paths/torso/knots"].set_property("visible", False)
+        # visualizer.viewer["paths/LF/knots"].set_property("visible", False)
+        # visualizer.viewer["paths/RF/knots"].set_property("visible", False)
+        # visualizer.viewer["paths/LH/knots"].set_property("visible", False)
+        # visualizer.viewer["paths/RH/knots"].set_property("visible", False)
 
     @staticmethod
     def add_fixed_distance_between_points(path):

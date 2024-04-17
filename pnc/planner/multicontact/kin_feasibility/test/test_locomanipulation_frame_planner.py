@@ -3,14 +3,12 @@ import unittest
 import os
 import sys
 import numpy as np
-import scipy as sp
-import meshcat
 import pinocchio as pin
 import util.util
 from collections import OrderedDict
 from pinocchio.visualize import MeshcatVisualizer
 
-from pnc.planner.multicontact.frame_traversable_region import FrameTraversableRegion
+from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
 from pnc.planner.multicontact.locomanipulation_frame_planner import LocomanipulationFramePlanner
 from pnc.planner.multicontact.planner_surface_contact import MotionFrameSequencer, PlannerSurfaceContact
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
