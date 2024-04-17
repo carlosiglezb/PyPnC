@@ -82,7 +82,7 @@ def find_shortest_box_path(boxes, p_init, p_term):
 
 def distribute_box_seq(box_seq_all_frames, b_max):
     for frame, seq in box_seq_all_frames.items():
-        if len(seq) != b_max:
+        if not np.isnan(seq[0]) and len(seq) != b_max:
             # if all values are the same, simply copy up to b_max
             if np.mean(seq) == seq[-1]:
                 box_seq_all_frames[frame] = [seq[-1]] * b_max
@@ -293,6 +293,12 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
                 # box_seq_dict[fm] = find_shortest_iris_path(safe_regions[fm], pm_init, pm_next)
         # maximum number of boxes in a box sequence in the motion frames
         b_max = np.max([len(bs) for bs in box_seq_dict.values()])
+
+        # check that all motion frames so far have the same length
+        for fn, fs in box_seq_dict.items():
+            # ignore if entry is still nan (i.e., hasn't been assigned, yet)
+            if not np.isnan(fs[0]) and len(fs) != b_max:
+                distribute_box_seq(box_seq_dict, b_max)
 
         # then, go through the fixed frames from previous state
         for ff in fixed_frames[k_transition-1]:

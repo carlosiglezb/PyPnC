@@ -745,12 +745,11 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-    # prob.solve(solver='CLARABEL', max_iter=1000, tol_feas=1e-3, tol_gap_abs=1.0e-3, tol_gap_rel=1.0e-3, verbose=True)
-    prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
+    prob.solve(solver='CLARABEL')
 
     if prob.status == 'infeasible':
-        print('Problem was infeasible. Retrying with relaxed tolerances.')
-        prob.solve(solver='SCS', eps_rel=1e-2, eps_abs=1e-2)
+        print('Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
+        prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
 
     # Reconstruct trajectory.
     beziers, path = [], []
@@ -843,8 +842,17 @@ def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_
         # apply epsilon motion constraint along specified direction
         if seg_surface_normal.b_initial_vel:
             frame_vel_ini = seg_surface_normal.get_contact_breaking_velocity()
-            constraints.append(point[BezierParam.VEL.value][0] == frame_vel_ini)
-        constraints.append(point[BezierParam.VEL.value][-1] == - eps_vel_constr * np.sign(surf_normal))
+            constraints.append(frame_vel_ini @ point[BezierParam.VEL.value][0] >= 0)
+
+        # final velocity parallel to normal surface
+        normal_mat = np.array([[0, -surf_normal[2], surf_normal[1]],
+                               [surf_normal[2], 0, -surf_normal[0]],
+                               [-surf_normal[1], surf_normal[0], 0]])
+        constraints.append(normal_mat @ point[BezierParam.VEL.value][-1] == 0)
+        # final velocity magnitude
+        normal_tilde = (1. / eps_vel_constr) * surf_normal
+        constraints.append(-normal_tilde @ point[BezierParam.VEL.value][-2] >= 0)
+        # constraints.append(point[BezierParam.VEL.value][-1] == - eps_vel_constr * np.sign(surf_normal))
     if b_constr_accel:
         # apply only strictly positive and negative accelerations
         if surf_normal[Axis.X.value] > 0:
