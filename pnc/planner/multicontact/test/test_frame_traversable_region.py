@@ -787,8 +787,9 @@ class TestFrameTraversableRegion(unittest.TestCase):
         #
         lf_init = np.array([0.06, 0.14, 0.])  # TODO: use fwd kin
         lf_end = lf_init + np.array([0.45, 0., 0.])
-        lf_traversable_region = FrameTraversableRegion(self.lf_frame_name,
-                                                       self.lf_frame_stl_path, self.lf_poly_halfspace_path,
+        lf_traversable_region = FrameTraversableRegion(self.frame_names[1],
+                                                       self.frame_stl_paths[self.frame_names[1]],
+                                                       self.poly_halfspace_paths[self.frame_names[1]],
                                                        b_visualize_reach=b_visualize,
                                                        b_visualize_safe=b_visualize,
                                                        visualizer=visualizer)
@@ -804,8 +805,10 @@ class TestFrameTraversableRegion(unittest.TestCase):
         #
         rf_init = np.array([0.06, -0.14, 0.])  # TODO: use fwd kin
         rf_end = rf_init + np.array([0.45, 0., 0.])
-        rf_traversable_region = FrameTraversableRegion(self.rf_frame_name,
-                                                       self.rf_frame_stl_path, self.rf_poly_halfspace_path,
+        frame_name = self.frame_names[2]
+        rf_traversable_region = FrameTraversableRegion(frame_name,
+                                                       self.frame_stl_paths[frame_name],
+                                                       self.poly_halfspace_paths[frame_name],
                                                        b_visualize_reach=b_visualize,
                                                        b_visualize_safe=b_visualize,
                                                        visualizer=visualizer)
