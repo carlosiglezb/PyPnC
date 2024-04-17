@@ -62,10 +62,18 @@ class TestLocomanipulationFramePlanner(unittest.TestCase):
         knee_knocker_top = mut.HPolyhedron.MakeBox(
                                     np.array([-0.025, -0.9, 1.85]) + self.door_pos + door_width,
                                     np.array([0.025, 0.9, 2.25]) + self.door_pos + door_width)
+        knee_knocker_llip = mut.HPolyhedron.MakeBox(
+                                    np.array([-0.035, 0.9-0.518, 0.25]) + self.door_pos + door_width,
+                                    np.array([0.035, 0.9-0.518+0.15, 2.0]) + self.door_pos + door_width)
+        knee_knocker_rlip = mut.HPolyhedron.MakeBox(
+                                    np.array([-0.035, -(0.9-0.518+0.15), 0.25]) + self.door_pos + door_width,
+                                    np.array([0.035,  -(0.9-0.518), 2.0]) + self.door_pos + door_width)
         self.obstacles = [floor,
                           knee_knocker_base,
                           knee_knocker_lwall,
                           knee_knocker_rwall,
+                          knee_knocker_llip,
+                          knee_knocker_rlip,
                           knee_knocker_top]
         self.domain_ubody = mut.HPolyhedron.MakeBox(dom_ubody_lb, dom_ubody_ub)
         self.domain_lbody = mut.HPolyhedron.MakeBox(dom_lbody_lb, dom_lbody_ub)
