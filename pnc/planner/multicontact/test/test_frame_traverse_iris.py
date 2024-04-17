@@ -248,7 +248,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         # test optimize multiple bezier
         fixed_frames = [None]     # one per segment
         reach = None    # ignore reachable space in this test
-        aux = [{}]
+        aux = []
         durations=[]        # should be obtained from iris_seq, hard-coded in this test
         durations.append({'RF': np.array([0.2] * 3)})
         alpha = {1: 1, 2: 2, 3: 0.1}
@@ -276,7 +276,7 @@ class TestFrameTraverseIris(unittest.TestCase):
 
         # test optimize multiple bezier
         reach = None    # ignore reachable space in this test
-        aux = [{}]
+        aux = []
         durations=[]        # should be obtained from iris_seq, hard-coded in this test
         durations.append({'RF': np.array([0.2] * 3),
                           'RH': np.array([0.2] * 3)})
