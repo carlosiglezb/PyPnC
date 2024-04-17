@@ -191,6 +191,10 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs), constr + soc_constraint)
     prob.solve(solver='SCS')
 
+    if prob.status == 'infeasible':
+        print('Polygonal problem was infeasible. Retrying with relaxed tolerances.')
+        prob.solve(solver='SCS', eps_rel=0.1, eps_abs=0.1)
+
     length = prob.value
     traj = x.value
     solver_time = prob.solver_stats.solve_time
