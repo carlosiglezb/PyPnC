@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 import util.util
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
-from pnc.planner.multicontact.locomanipulation_frame_planner import LocomanipulationFramePlanner
+from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 
 import os
 import sys

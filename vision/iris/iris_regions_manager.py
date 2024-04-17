@@ -2,7 +2,7 @@ from typing import List
 
 import numpy as np
 
-from pnc.planner.multicontact.iris_seq_planner import IrisGraph
+from pnc.planner.multicontact.kin_feasibility.iris_seq_planner import IrisGraph
 from vision.iris.iris_geom_interface import IrisGeomInterface
 from pydrake.common import RandomGenerator
 

@@ -9,7 +9,7 @@ from collections import OrderedDict
 from pinocchio.visualize import MeshcatVisualizer
 
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
-from pnc.planner.multicontact.locomanipulation_frame_planner import LocomanipulationFramePlanner
+from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 from pnc.planner.multicontact.planner_surface_contact import MotionFrameSequencer, PlannerSurfaceContact
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 # IRIS
@@ -311,6 +311,7 @@ class TestLocomanipulationFramePlanner(unittest.TestCase):
 
     def test_use_fixed_and_motion_kn_iris_paths(self):
         self.frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
+        self.load_reachability_paths()
         # load navy door visualization
         door_model, door_collision_model, door_visual_model = pin.buildModelsFromUrdf(
             cwd + "/robot_model/ground/navy_door.urdf",

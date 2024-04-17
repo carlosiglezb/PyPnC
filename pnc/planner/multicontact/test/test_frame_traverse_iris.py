@@ -5,7 +5,7 @@ import meshcat
 
 from pnc.planner.multicontact.fastpathplanning.polygonal import solve_min_reach_iris_distance
 from pnc.planner.multicontact.fastpathplanning.smooth import optimize_multiple_bezier_iris
-from pnc.planner.multicontact.locomanipulation_frame_planner import LocomanipulationFramePlanner
+from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 # IRIS
 from vision.iris.iris_geom_interface import *
 from vision.iris.iris_regions_manager import IrisRegionsManager
