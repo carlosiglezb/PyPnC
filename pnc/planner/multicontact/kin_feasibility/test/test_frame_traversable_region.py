@@ -572,7 +572,6 @@ class TestFrameTraversableRegion(unittest.TestCase):
                                traversable_regions_dict['RH']]
 
         frame_planner = LocomanipulationFramePlanner(traversable_regions,
-                                                     self.ee_offsets_path,
                                                      aux_frames_path=self.aux_frames_path)
         frame_planner.plan(p_init, p_end, T, alpha)
         frame_planner.plot(visualizer=visualizer)
@@ -745,8 +744,6 @@ class TestFrameTraversableRegion(unittest.TestCase):
                                traversable_regions_dict['RH']]
 
         frame_planner = LocomanipulationFramePlanner(traversable_regions,
-                                                     self.ee_offsets_path,
-                                                     aux_frames_path=self.aux_frames_path,
                                                      fixed_frames=fixed_frames,
                                                      motion_frames_seq=motion_frames_seq)
         frame_planner.plan(p_init, p_end, T, alpha, verbose=False)
@@ -829,8 +826,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         self.assertEqual(True, True)
 
         traversable_regions = [torso_traversable_region, lf_traversable_region, rf_traversable_region]
-        frame_planner = LocomanipulationFramePlanner(traversable_regions,
-                                                     self.ee_offsets_path)
+        frame_planner = LocomanipulationFramePlanner(traversable_regions)
         frame_planner.debug_sample_points(visualizer, self.torso_frame_name)
         self.assertEqual(True, True)
 

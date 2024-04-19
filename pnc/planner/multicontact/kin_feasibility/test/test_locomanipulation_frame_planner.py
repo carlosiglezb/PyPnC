@@ -301,7 +301,6 @@ class TestLocomanipulationFramePlanner(unittest.TestCase):
                                traversable_regions_dict['RH']]
 
         frame_planner = LocomanipulationFramePlanner(traversable_regions,
-                                                     self.ee_offsets_path,
                                                      aux_frames_path=None,  #self.aux_frames_path
                                                      fixed_frames=fixed_frames,
                                                      motion_frames_seq=motion_frames_seq)
@@ -513,7 +512,6 @@ class TestLocomanipulationFramePlanner(unittest.TestCase):
                                traversable_regions_dict['RH']]
 
         frame_planner = LocomanipulationFramePlanner(traversable_regions,
-                                                     self.ee_offsets_path,
                                                      aux_frames_path=self.aux_frames_path,
                                                      fixed_frames=fixed_frames,
                                                      motion_frames_seq=motion_frames_seq)

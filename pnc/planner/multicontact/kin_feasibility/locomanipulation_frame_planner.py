@@ -11,7 +11,7 @@ from ruamel.yaml import YAML
 
 
 class LocomanipulationFramePlanner:
-    def __init__(self, traversable_regions_list, ee_offset_file_path,
+    def __init__(self, traversable_regions_list,
                  starting_stance_foot='LF',
                  aux_frames_path=None,
                  fixed_frames=None,
