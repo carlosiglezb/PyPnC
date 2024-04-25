@@ -165,14 +165,16 @@ class IKCFreePlanner:
         anim.default_framerate = int(1 / self.dt)
 
         # evaluate end-effector path at each time step
+        seg_memory = np.zeros(len(bez_paths), dtype=int)
         t, frame_idx = 0., int(0)
-        while t < (5.25):           # length should be: len(bez_paths)
+        while t < bez_paths[0].b:           # length should be: len(bez_paths)
             curr_ee_point = []
             # determine current ee position for all frames
-            for fr_path in bez_paths:
+            for i_f, fr_path in enumerate(bez_paths):
                 # get current segment from overall plan
-                seg = int(t // T)
-                bezier_curve = fr_path.beziers[seg]
+                if t > fr_path.beziers[seg_memory[i_f]].b:
+                    seg_memory[i_f] += 1
+                bezier_curve = fr_path.beziers[seg_memory[i_f]]
                 curr_ee_point.append(bezier_curve(t))
 
             # set desired tasks at current time
