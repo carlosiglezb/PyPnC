@@ -235,17 +235,26 @@ class IKCFreePlanner:
                 visualizer.viewer["frames/LH_d"].set_object(des_lh_frame)
                 visualizer.viewer["frames/LH_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[5]))
 
+                rh_frame = meshcat.geometry.triad(0.2)
+                des_rh_frame = meshcat.geometry.triad(0.2)
+                visualizer.viewer["frames/RH"].set_object(rh_frame)
+                visualizer.viewer["frames/RH"].set_transform(self.pink_config.get_transform_frame_to_world("r_hand_contact").homogeneous)
+                visualizer.viewer["frames/RH_d"].set_object(des_rh_frame)
+                visualizer.viewer["frames/RH_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[6]))
+
                 # record video
                 with anim.at_frame(visualizer.viewer, frame_idx) as frame:
                     display_visualizer_frames(visualizer, frame)
                     frame["frames/torso"].set_transform(self.pink_config.get_transform_frame_to_world("torso_link").homogeneous)
                     frame["frames/LH"].set_transform(self.pink_config.get_transform_frame_to_world("l_hand_contact").homogeneous)
+                    frame["frames/RH"].set_transform(self.pink_config.get_transform_frame_to_world("r_hand_contact").homogeneous)
                     frame["frames/LF"].set_transform(self.pink_config.get_transform_frame_to_world("l_foot_contact").homogeneous)
                     frame["frames/RF"].set_transform(self.pink_config.get_transform_frame_to_world("r_foot_contact").homogeneous)
                     frame["frames/LK"].set_transform(self.pink_config.get_transform_frame_to_world("l_knee_fe_ld").homogeneous)
                     frame["frames/RK"].set_transform(self.pink_config.get_transform_frame_to_world("r_knee_fe_ld").homogeneous)
                     frame["frames/torso_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[0]))
                     frame["frames/LH_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[5]))
+                    frame["frames/RH_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[6]))
                     frame["frames/LF_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[1]))
                     frame["frames/RF_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[2]))
                     frame["frames/LK_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[3]))
