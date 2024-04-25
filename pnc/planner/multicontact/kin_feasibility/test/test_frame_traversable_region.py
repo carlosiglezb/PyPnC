@@ -2,8 +2,8 @@ import unittest
 from collections import OrderedDict
 
 import util.util
-from pnc.planner.multicontact.frame_traversable_region import FrameTraversableRegion
-from pnc.planner.multicontact.locomanipulation_frame_planner import LocomanipulationFramePlanner
+from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
+from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 
 import os
 import sys
@@ -11,7 +11,8 @@ import numpy as np
 from pinocchio.visualize import MeshcatVisualizer
 import pinocchio as pin
 
-from pnc.planner.multicontact.planner_surface_contact import ContactFrameLocation
+from pnc.planner.multicontact.planner_surface_contact import (
+        PlannerSurfaceContact, MotionFrameSequencer)
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -287,6 +288,85 @@ class TestFrameTraversableRegion(unittest.TestCase):
         ])
         return box_llim, box_ulim
 
+    def get_long_semi_static_collision_free_boxes(self):
+        # save safe box regions
+        box_llim, box_ulim = OrderedDict(), OrderedDict()
+
+        # lower bounds of end-effectors safe boxes
+        box_llim['torso'] = np.array([
+            [-0.2, -0.3, 0.5],  # prevent leg-crossing
+            [0.05, -0.3, 0.5],  # prevent leg-crossing
+            [0.2, -0.3, 0.5]  # prevent leg-crossing
+        ])
+        box_llim['LF'] = np.array([
+            [-0.2, 0.0, 0.0],  # prevent leg-crossing
+            [-0.1, 0.0, 0.4],  # prevent leg-crossing
+            [0.4, 0.0, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['RF'] = np.array([
+            [-0.2, -0.4, 0.0],  # prevent leg-crossing
+            [-0.1, -0.35, 0.4],  # prevent leg-crossing
+            [0.4, -0.4, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['L_knee'] = np.array([
+            [-0.2, 0.0, 0.0],  # prevent leg-crossing
+            [-0.1, 0.0, 0.4],  # prevent leg-crossing
+            [0.4, 0.0, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['R_knee'] = np.array([
+            [-0.2, -0.4, 0.0],  # prevent leg-crossing
+            [-0.1, -0.35, 0.4],  # prevent leg-crossing
+            [0.5, -0.4, 0.0]  # prevent leg-crossing
+        ])
+        box_llim['LH'] = np.array([
+            [-0.2, 0.0, 0.7],  # prevent leg-crossing
+            [0.1, 0.0, 0.7],  # prevent leg-crossing
+            [0.5, 0.0, 0.7]  # prevent leg-crossing
+        ])
+        box_llim['RH'] = np.array([
+            [-0.2, -0.4, 0.7],  # prevent leg-crossing
+            [0.1, -0.38, 0.7],  # prevent leg-crossing
+            [0.5, -0.4, 0.7]  # prevent leg-crossing
+        ])
+
+        # upper bounds of the safe boxes
+        box_ulim['torso'] = np.array([
+            [0.25, 0.3, 0.9],  # prevent leg-crossing
+            [0.5, 0.3, 0.9],  # prevent leg-crossing
+            [0.6, 0.3, 0.9]  # prevent leg-crossing
+        ])
+        box_ulim['LF'] = np.array([
+            [0.25, 0.4, 1.0],  # z stops at kin. limit
+            [0.6, 0.35, 1.0],  # x stops at kin. limit
+            [0.8, 0.4, 1.0]  # x stops at kin. limit
+        ])
+        box_ulim['RF'] = np.array([
+            [0.25, 0.0, 1.0],  # prevent leg-crossing
+            [0.6, 0.0, 1.0],  # prevent leg-crossing
+            [0.8, 0.0, 1.0]  # prevent leg-crossing
+        ])
+        box_ulim['L_knee'] = np.array([
+            [0.25, 0.4, 1.0],  # z stops at kin. limit
+            [0.6, 0.35, 1.0],  # x stops at kin. limit
+            [0.8, 0.4, 1.0]  # x stops at kin. limit
+        ])
+        box_ulim['R_knee'] = np.array([
+            [0.25, 0.0, 1.0],  # prevent leg-crossing
+            [0.6, 0.0, 1.0],  # prevent leg-crossing
+            [0.8, 0.0, 1.0]  # prevent leg-crossing
+        ])
+        box_ulim['LH'] = np.array([
+            [0.15, 0.45, 1.3],  # prevent leg-crossing
+            [0.55, 0.38, 1.3],  # prevent leg-crossing
+            [0.8, 0.45, 1.3]  # prevent leg-crossing
+        ])
+        box_ulim['RH'] = np.array([
+            [0.15, 0.0, 1.3],  # prevent leg-crossing
+            [0.55, 0.0, 1.3],  # prevent leg-crossing
+            [0.8, 0.0, 1.3]  # prevent leg-crossing
+        ])
+        return box_llim, box_ulim
+
     def test_visualizing_reachable_region(self):
         frame_name = 'RF'
         test_region = FrameTraversableRegion(frame_name,
@@ -492,7 +572,6 @@ class TestFrameTraversableRegion(unittest.TestCase):
                                traversable_regions_dict['RH']]
 
         frame_planner = LocomanipulationFramePlanner(traversable_regions,
-                                                     self.ee_offsets_path,
                                                      aux_frames_path=self.aux_frames_path)
         frame_planner.plan(p_init, p_end, T, alpha)
         frame_planner.plot(visualizer=visualizer)
@@ -544,7 +623,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         standing_pos = vis_q[:3]
 
         # collision-free boxes
-        box_llim, box_ulim = self.get_semi_static_collision_free_boxes()
+        box_llim, box_ulim = self.get_long_semi_static_collision_free_boxes()
 
         # generate all frame traversable regions
         traversable_regions_dict = OrderedDict()
@@ -566,7 +645,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         self.assertEqual(True, True)
 
         # set fixed and motion frame sets
-        fixed_frames, motion_frames = [], []
+        fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
         step_length = 0.35
         # initial and desired final positions for each frame
@@ -618,25 +697,40 @@ class TestFrameTraversableRegion(unittest.TestCase):
 
         # ---- Step 1: L hand to frame
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-        motion_frames.append({'LH': p_init['LH'] + np.array([0.08, 0.07, 0.15])})
-        lh_motion_front = ContactFrameLocation(p_init['LH'] + np.array([0.08, 0.07, 0.15]), np.array([-1, 0, 0]))
+        motion_frames_seq.add_motion_frame({'LH': p_init['LH'] + np.array([0.08, 0.07, 0.15])})
+        lh_contact_front = PlannerSurfaceContact('LH', np.array([-1, 0, 0]))
+        motion_frames_seq.add_contact_surface(lh_contact_front)
 
         # ---- Step 2: step through door with left foot
         fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
-        motion_frames.append({'LF': p_init['LF'] + np.array([step_length, 0., 0.]),
+        motion_frames_seq.add_motion_frame({
+                            'LF': p_init['LF'] + np.array([step_length, 0., 0.]),
                             'L_knee': p_init['L_knee'] + np.array([step_length, 0., 0.])})
+        lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
+        motion_frames_seq.add_contact_surface(lf_contact_over)
+
         # ---- Step 3: re-position L/R hands for more stability
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-        motion_frames.append({'LH': p_init['LH'] + np.array([0.09, 0.06, 0.18]),
-                             'RH': p_init['RH'] + np.array([0.09, -0.06, 0.18])})
+        motion_frames_seq.add_motion_frame({
+                            'LH': p_init['LH'] + np.array([0.09, 0.06, 0.18]),
+                            'RH': p_init['RH'] + np.array([0.09, -0.06, 0.18])})
+        lh_contact_inside = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
+        rh_contact_inside = PlannerSurfaceContact('RH', np.array([0, 1, 0]))
+        motion_frames_seq.add_contact_surface([lh_contact_inside, rh_contact_inside])
+
         # ---- Step 4: step through door with right foot
         fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
-        motion_frames.append({'RF': p_init['RF'] + np.array([step_length, 0., 0.]),
-                              'R_knee': p_init['R_knee'] + np.array([step_length, 0., 0.]),
-                              'torso': p_init['torso'] + np.array([step_length, 0., 0.])})
+        motion_frames_seq.add_motion_frame({
+                            'RF': p_init['RF'] + np.array([step_length, 0., 0.]),
+                            'R_knee': p_init['R_knee'] + np.array([step_length, 0., 0.]),
+                            'torso': p_init['torso'] + np.array([step_length, 0., 0.])})
+        rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
+        motion_frames_seq.add_contact_surface(rf_contact_over)
+
         # ---- Step 5: square up
         fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
-        motion_frames.append({})
+        motion_frames_seq.add_motion_frame({})
+
 
         # make multi-trajectory planner
         T = 3
@@ -650,10 +744,8 @@ class TestFrameTraversableRegion(unittest.TestCase):
                                traversable_regions_dict['RH']]
 
         frame_planner = LocomanipulationFramePlanner(traversable_regions,
-                                                     self.ee_offsets_path,
-                                                     aux_frames_path=self.aux_frames_path,
                                                      fixed_frames=fixed_frames,
-                                                     motion_frames=motion_frames)
+                                                     motion_frames_seq=motion_frames_seq)
         frame_planner.plan(p_init, p_end, T, alpha, verbose=False)
         frame_planner.plot(visualizer=visualizer, static_html=False)
         self.assertEqual(True, True)
@@ -692,8 +784,9 @@ class TestFrameTraversableRegion(unittest.TestCase):
         #
         lf_init = np.array([0.06, 0.14, 0.])  # TODO: use fwd kin
         lf_end = lf_init + np.array([0.45, 0., 0.])
-        lf_traversable_region = FrameTraversableRegion(self.lf_frame_name,
-                                                       self.lf_frame_stl_path, self.lf_poly_halfspace_path,
+        lf_traversable_region = FrameTraversableRegion(self.frame_names[1],
+                                                       self.frame_stl_paths[self.frame_names[1]],
+                                                       self.poly_halfspace_paths[self.frame_names[1]],
                                                        b_visualize_reach=b_visualize,
                                                        b_visualize_safe=b_visualize,
                                                        visualizer=visualizer)
@@ -709,8 +802,10 @@ class TestFrameTraversableRegion(unittest.TestCase):
         #
         rf_init = np.array([0.06, -0.14, 0.])  # TODO: use fwd kin
         rf_end = rf_init + np.array([0.45, 0., 0.])
-        rf_traversable_region = FrameTraversableRegion(self.rf_frame_name,
-                                                       self.rf_frame_stl_path, self.rf_poly_halfspace_path,
+        frame_name = self.frame_names[2]
+        rf_traversable_region = FrameTraversableRegion(frame_name,
+                                                       self.frame_stl_paths[frame_name],
+                                                       self.poly_halfspace_paths[frame_name],
                                                        b_visualize_reach=b_visualize,
                                                        b_visualize_safe=b_visualize,
                                                        visualizer=visualizer)
@@ -731,8 +826,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         self.assertEqual(True, True)
 
         traversable_regions = [torso_traversable_region, lf_traversable_region, rf_traversable_region]
-        frame_planner = LocomanipulationFramePlanner(traversable_regions,
-                                                     self.ee_offsets_path)
+        frame_planner = LocomanipulationFramePlanner(traversable_regions)
         frame_planner.debug_sample_points(visualizer, self.torso_frame_name)
         self.assertEqual(True, True)
 

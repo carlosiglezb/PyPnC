@@ -12,6 +12,9 @@ import meshcat
 import meshcat.geometry as g
 import meshcat.transformations as tf
 
+# Iris Regions Manager
+from vision.iris.iris_regions_manager import IrisRegionsManager
+
 
 def convert_rgba_to_meshcat_obj(obj, color_rgb):
     obj.color = int(color_rgb[0] * 255) * 256 ** 2 + int(
@@ -62,9 +65,10 @@ class FrameTraversableRegion:
                 if visualizer is not None:
                     # see if using Pinocchio's MeshcatVisualizer
                     if hasattr(visualizer, 'model'):
-                        print("Using existing visualizer for Frame Traversable Region")
+                        print(f"Using Pinocchio Meshcat visualizer for {frame_name} Frame Traversable Region")
                         self._vis = visualizer.viewer
                     else:   # using bare Meshcat
+                        print(f"Using Meshcat visualizer for {frame_name} Frame Traversable Region")
                         self._vis = visualizer
                 else:
                     self._vis = meshcat.Visualizer()
@@ -100,6 +104,7 @@ class FrameTraversableRegion:
 
         # initialize list for collision-free safe set (boxes) for planning
         self._plan_safe_box_list = None       # safe boxes per frame
+        self._plan_ir_mgr = None       # iris regions per frame
         self._plan_T = []
         self._plan_alpha = [0, 0, 1]    # cost weights [pos, vel, acc, ...]
         self._N_boxes = 0
@@ -132,6 +137,7 @@ class FrameTraversableRegion:
         # first translate, then rotate
         tf_new = tf.concatenate_matrices(tf_trans, tf_ori)
         self._vis["traversable_regions"]["reachable"][self.frame_name].set_transform(tf_new)
+        self._vis["traversable_regions"]["reachable"].set_property("visible", False)
 
     def load_collision_free_boxes(self, box_llim, box_ulim):
         self._plan_safe_box_list = fpp.SafeSet(
@@ -150,6 +156,15 @@ class FrameTraversableRegion:
                 self._vis["traversable_regions"]["safe"][self.frame_name][str(self._N_boxes)].set_object(box, obj)
                 box_center = tf.translation_matrix((box_ul + box_ll) / 2.)
                 self._vis["traversable_regions"]["safe"][self.frame_name][str(self._N_boxes)].set_transform(box_center)
+                self._N_boxes += 1
+
+    def load_iris_regions(self, iris_region_mgr: IrisRegionsManager):
+        self._plan_ir_mgr = iris_region_mgr
+
+        # set visualization
+        if self._b_visualize_safe:
+            for ir in iris_region_mgr.iris_list:
+                ir.visualize(self._vis["traversable_regions/safe"][self.frame_name], self._N_boxes)
                 self._N_boxes += 1
 
     def get_visualizer(self):

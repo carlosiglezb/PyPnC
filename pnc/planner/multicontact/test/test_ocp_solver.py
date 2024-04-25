@@ -9,8 +9,8 @@ import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
 
 from collections import OrderedDict
 from pnc.planner.multicontact.fastpathplanning.smooth import optimize_multiple_bezier
-from pnc.planner.multicontact.frame_traversable_region import FrameTraversableRegion
-from pnc.planner.multicontact.locomanipulation_frame_planner import LocomanipulationFramePlanner
+from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
+from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 from pnc.planner.multicontact.fastpathplanning.polygonal import solve_min_reach_distance
 from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact
 from util import util

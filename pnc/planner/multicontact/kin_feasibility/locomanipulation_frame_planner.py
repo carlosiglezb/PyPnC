@@ -1,6 +1,8 @@
+from typing import List
+
 import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
 from collections import OrderedDict
-from pnc.planner.multicontact.frame_traversable_region import convert_rgba_to_meshcat_obj
+from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import convert_rgba_to_meshcat_obj
 
 import meshcat.geometry as g
 import meshcat.transformations as tf
@@ -9,30 +11,32 @@ from ruamel.yaml import YAML
 
 
 class LocomanipulationFramePlanner:
-    def __init__(self, traversable_regions_list, ee_offset_file_path,
+    def __init__(self, traversable_regions_list,
                  starting_stance_foot='LF',
                  aux_frames_path=None,
                  fixed_frames=None,
-                 motion_frames=None):
+                 motion_frames_seq=None):
 
         # fixed, motion, and free frames filled out in the creation of hyperplanes
-        self.fixed_frames, self.motion_frames, self.free_frames = [], [], []
+        self.fixed_frames, self.motion_frames_seq, self.free_frames = [], [], []
 
         self.safe_boxes = OrderedDict()
         self.reachability_planes = OrderedDict()
         self.path = []
+        self.points = None      # control points (from Bezier trajectory solution)
         self.box_seq = []
         self.frame_names = []
         self.starting_stance_foot = starting_stance_foot
         for region in traversable_regions_list:
             self.frame_names.append(region.frame_name)
-            self.safe_boxes[region.frame_name] = region._plan_safe_box_list
+            # self.safe_boxes[region.frame_name] = region._plan_safe_box_list
+            self.safe_boxes[region.frame_name] = region._plan_ir_mgr
 
             # do the torso at the very end to get reachability from contact frames
             if region.frame_name != 'torso':
                 H, d_prime = self.extract_plane_eqn_from_coeffs(region._plane_coeffs)
-                d_prime = self.update_plane_offset_from_root(region._origin_pos,
-                                                                H, d_prime)
+                # d_prime = self.update_plane_offset_from_root(region._origin_pos,
+                #                                                 H, d_prime)
                 self.reachability_planes[region.frame_name] = {'H': H, 'd': d_prime}
 
             if region.frame_name == starting_stance_foot:
@@ -49,11 +53,11 @@ class LocomanipulationFramePlanner:
 
         # check fixed and motion frames do not conflict
         self.fixed_frames = fixed_frames
-        self.motion_frames = motion_frames
+        self.motion_frames_seq = motion_frames_seq
 
         # the torso must be reachable based on the frame in contact
-        H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path,
-                                                            init_standing_pos)
+        # H, d_prime = self.add_offset_to_plane_eqn_from_file(starting_stance_foot, ee_offset_file_path,
+        #                                                     init_standing_pos)
         self.reachability_planes['torso'] = {'H': H, 'd': d_prime}
 
         # auxiliary frames associated to one of the above initialized reachable regions
@@ -83,14 +87,30 @@ class LocomanipulationFramePlanner:
     #                         'constrained_to': associated_traversable_region}
     #     self.aux_frames.append(new_frame_constr)
 
-    def plan(self, p_init, p_term, T, alpha, verbose=True):
+    def plan(self, p_init: dict[str, np.array],
+             p_term: np.array,
+             T: np.float64,
+             alpha: List[np.float64],
+             verbose: bool=True):
         S = self.safe_boxes
         R = self.reachability_planes
         A = self.aux_frames
         fixed_frames = self.fixed_frames
-        motion_frames = self.motion_frames
+        motion_frames_seq = self.motion_frames_seq
         self.path, self.box_seq = fpp.plan_multiple(S, R, p_init, T, alpha, verbose, A,
-                                                    fixed_frames, motion_frames)
+                                                    fixed_frames, motion_frames_seq)
+
+    def plan_iris(self, p_init: dict[str, np.array],
+             T: np.float64,
+             alpha: List[np.float64],
+             verbose: bool=False):
+        S = self.safe_boxes     # dict of IrisRegionsManager
+        R = self.reachability_planes
+        A = self.aux_frames
+        fixed_frames = self.fixed_frames
+        motion_frames_seq = self.motion_frames_seq
+        self.path, self.box_seq, self.points = fpp.plan_multiple_iris(S, R, p_init, T, alpha, verbose, A,
+                                                    fixed_frames, motion_frames_seq)
 
     def plot(self, visualizer, static_html=False):
         i = 0
@@ -101,6 +121,7 @@ class LocomanipulationFramePlanner:
                 self.visualize_bezier_points(visualizer.viewer, fr_name, bezier_curve, seg)
             i += 1
 
+        visualizer.viewer["traversable_regions"].set_property("visible", False)
         if static_html:
             # create and save locally in static html form
             res = visualizer.viewer.static_html()
@@ -108,6 +129,24 @@ class LocomanipulationFramePlanner:
             with open(save_file, "w") as f:
                 f.write(res)
 
+        tot = [len(s['LF']) for s in self.box_seq]
+        num_tot_seq = sum(tot)
+        # for i, p in self.points.items():
+        #     if i < num_tot_seq:
+        #         self.visualize_simple_points(visualizer.viewer, f'torso/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        #     elif i < 2 * num_tot_seq:
+        #         self.visualize_simple_points(visualizer.viewer, f'LF/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        #     elif i < 3 * num_tot_seq:
+        #         self.visualize_simple_points(visualizer.viewer, f'RF/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        #     elif i < 4 * num_tot_seq:
+        #         self.visualize_simple_points(visualizer.viewer, f'LH/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        #     else:
+        #         self.visualize_simple_points(visualizer.viewer, f'RH/knots/{str(i)}', p[0].value, color=[0., 0., 0., 1.0])
+        # visualizer.viewer["paths/torso/knots"].set_property("visible", False)
+        # visualizer.viewer["paths/LF/knots"].set_property("visible", False)
+        # visualizer.viewer["paths/RF/knots"].set_property("visible", False)
+        # visualizer.viewer["paths/LH/knots"].set_property("visible", False)
+        # visualizer.viewer["paths/RH/knots"].set_property("visible", False)
 
     @staticmethod
     def add_fixed_distance_between_points(path):
