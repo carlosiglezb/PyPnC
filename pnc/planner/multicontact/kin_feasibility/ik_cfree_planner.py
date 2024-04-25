@@ -72,7 +72,7 @@ class IKCFreePlanner:
     def _initialize_tasks(self) -> List[pink.Task]:
         torso_task = FrameTask(
             "torso_link",
-            position_cost=0.5,
+            position_cost=0.001,
             orientation_cost=0.01,
         )
         left_foot_task = FrameTask(

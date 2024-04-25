@@ -24,8 +24,8 @@ sys.path.append(cwd)
 
 b_visualize = True
 
-def get_draco3_default_initial_pose():
-    q0 = np.zeros(35, )
+def get_draco3_shaft_wrist_default_initial_pose():
+    q0 = np.zeros(27, )
     hip_yaw_angle = 5
     q0[0] = 0.  # l_hip_ie
     q0[1] = np.radians(hip_yaw_angle)  # l_hip_aa
@@ -40,32 +40,23 @@ def get_draco3_default_initial_pose():
     q0[10] = -np.pi / 2  # l_elbow_fe
     q0[11] = -np.pi/3.  # l_wrist_ps
     q0[12] = 0.  # l_wrist_pitch
-    q0[13] = 0.  # left_ezgripper_knuckle_palm_L1_1
-    q0[14] = 0.  # left_ezgripper_knuckle_L1_L2_1
-    q0[15] = 0.  # left_ezgripper_knuckle_palm_L1_2
-    q0[16] = 0.  # left_ezgripper_knuckle_L1_L2_2
-    q0[17] = 0.  # neck pitch
-    q0[18] = 0.  # r_hip_ie
-    q0[19] = np.radians(-hip_yaw_angle)  # r_hip_aa
-    q0[20] = -np.pi / 4  # r_hip_fe
-    q0[21] = np.pi / 4  # r_knee_fe_jp
-    q0[22] = np.pi / 4  # r_knee_fe_jd
-    q0[23] = -np.pi / 4  # r_ankle_fe
-    q0[24] = np.radians(hip_yaw_angle)  # r_ankle_ie
-    q0[25] = 0.  # r_shoulder_fe
-    q0[26] = -np.pi / 6  # r_shoulder_aa
-    q0[27] = 0.  # r_shoulder_ie
-    q0[28] = -np.pi / 2  # r_elbow_fe
-    q0[29] = np.pi/3.   # r_wrist_ps
-    q0[30] = 0.  # r_wrist_pitch
-    q0[31] = 0.  # right_ezgripper_knuckle_palm_L1_1
-    q0[32] = 0.  # right_ezgripper_knuckle_L1_L2_1
-    q0[33] = 0.  # right_ezgripper_knuckle_palm_L1_2
-    q0[34] = 0.  # right_ezgripper_knuckle_L1_L2_2
+    q0[13] = 0.  # neck pitch
+    q0[14] = 0.  # r_hip_ie
+    q0[15] = np.radians(-hip_yaw_angle)  # r_hip_aa
+    q0[16] = -np.pi / 4  # r_hip_fe
+    q0[17] = np.pi / 4  # r_knee_fe_jp
+    q0[18] = np.pi / 4  # r_knee_fe_jd
+    q0[19] = -np.pi / 4  # r_ankle_fe
+    q0[20] = np.radians(hip_yaw_angle)  # r_ankle_ie
+    q0[21] = 0.  # r_shoulder_fe
+    q0[22] = -np.pi / 6  # r_shoulder_aa
+    q0[23] = 0.  # r_shoulder_ie
+    q0[24] = -np.pi / 2  # r_elbow_fe
+    q0[25] = np.pi/3.   # r_wrist_ps
+    q0[26] = 0.  # r_wrist_pitch
 
     floating_base = np.array([0., 0., 0.741, 0., 0., 0., 1.])
     return np.concatenate((floating_base, q0))
-
 
 class TestIKCFreePlanner(unittest.TestCase):
 
@@ -112,16 +103,16 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         # load robot
         self.robot = pin.RobotWrapper.BuildFromURDF(
-            cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
+            cwd + "/robot_model/draco3/draco3_ft_wrist_mesh_updated.urdf",
             cwd + '/robot_model/draco3',
             root_joint=pin.JointModelFreeFlyer())
 
         # load default standing pos configuration
-        self.q0 = get_draco3_default_initial_pose()
+        self.q0 = get_draco3_shaft_wrist_default_initial_pose()
 
         # set-up easy access to fwd kinematics for IRIS seeds
         self.draco3_fwdk = PinocchioRobotSystem(
-            cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf",
+            cwd + "/robot_model/draco3/draco3_ft_wrist_mesh_updated.urdf",
             cwd + "/robot_model/draco3", False, False)
         cmd = self.draco3_fwdk.create_cmd_ordered_dict(self.q0[7:], np.zeros(len(self.q0[7:])), np.zeros(len(self.q0[7:])))
         self.draco3_fwdk.update_system(None, None, None, None,
