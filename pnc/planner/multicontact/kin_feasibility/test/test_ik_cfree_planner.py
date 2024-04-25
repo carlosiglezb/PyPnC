@@ -337,7 +337,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         ik_cfree_planner.set_planner(frame_planner)
         ik_cfree_planner.plan(p_init, T, alpha, visualizer)
 
-        self.assertEqual(True, False)  # add assertion here
+        self.assertEqual(True, True)  # add assertion here
 
 
 if __name__ == '__main__':

@@ -43,7 +43,7 @@ class IKCFreePlanner:
     def __init__(self, pin_robot: pin.RobotWrapper,
                  plan_frames_to_model_map: dict[str: str],
                  q0: np.array = None,
-                 dt: float = 0.005):
+                 dt: float = 0.02):
         self.pin_robot = pin_robot
         self.dt = dt
         self.task_dict = {}             # filled out in PInk tasks (setup_tasks)
@@ -72,8 +72,8 @@ class IKCFreePlanner:
     def _initialize_tasks(self) -> List[pink.Task]:
         torso_task = FrameTask(
             "torso_link",
-            position_cost=0.01,
-            orientation_cost=0.02,
+            position_cost=0.5,
+            orientation_cost=0.01,
         )
         left_foot_task = FrameTask(
             "l_foot_contact",
@@ -87,24 +87,24 @@ class IKCFreePlanner:
         )
         left_knee_task = FrameTask(
             "l_knee_fe_ld",
-            position_cost=2.0,
-            orientation_cost=0.01,
+            position_cost=0.5,
+            orientation_cost=0.001,
         )
         right_knee_task = FrameTask(
             "r_knee_fe_ld",
-            position_cost=2.0,
-            orientation_cost=0.01,
+            position_cost=0.5,
+            orientation_cost=0.001,
         )
         left_hand_task = FrameTask(
             "l_hand_contact",
-            position_cost=5.0,
-            orientation_cost=0.1,
+            position_cost=3.0,
+            orientation_cost=0.001,
             gain=0.1,
         )
         right_hand_task = FrameTask(
             "r_hand_contact",
-            position_cost=5.0,
-            orientation_cost=0.1,
+            position_cost=1.0,
+            orientation_cost=0.001,
             gain=0.1,
         )
         posture_task = PostureTask(
@@ -193,9 +193,63 @@ class IKCFreePlanner:
             if visualizer is not None:
                 visualizer.display(self.pink_config.q)
 
+                torso_frame = meshcat.geometry.triad(0.2)
+                des_torso_frame = meshcat.geometry.triad(0.2)
+                visualizer.viewer["frames/torso"].set_object(torso_frame)
+                visualizer.viewer["frames/torso"].set_transform(self.pink_config.get_transform_frame_to_world("torso_link").homogeneous)
+                visualizer.viewer["frames/torso_d"].set_object(des_torso_frame)
+                visualizer.viewer["frames/torso_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[0]))
+
+                lf_frame = meshcat.geometry.triad(0.2)
+                des_lf_frame = meshcat.geometry.triad(0.2)
+                visualizer.viewer["frames/LF"].set_object(lf_frame)
+                visualizer.viewer["frames/LF"].set_transform(self.pink_config.get_transform_frame_to_world("l_foot_contact").homogeneous)
+                visualizer.viewer["frames/LF_d"].set_object(des_lf_frame)
+                visualizer.viewer["frames/LF_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[1]))
+
+                rf_frame = meshcat.geometry.triad(0.2)
+                des_rf_frame = meshcat.geometry.triad(0.2)
+                visualizer.viewer["frames/RF"].set_object(rf_frame)
+                visualizer.viewer["frames/RF"].set_transform(self.pink_config.get_transform_frame_to_world("r_foot_contact").homogeneous)
+                visualizer.viewer["frames/RF_d"].set_object(des_rf_frame)
+                visualizer.viewer["frames/RF_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[2]))
+
+                lk_frame = meshcat.geometry.triad(0.2)
+                des_lk_frame = meshcat.geometry.triad(0.2)
+                visualizer.viewer["frames/LK"].set_object(lk_frame)
+                visualizer.viewer["frames/LK"].set_transform(self.pink_config.get_transform_frame_to_world("l_knee_fe_ld").homogeneous)
+                visualizer.viewer["frames/LK_d"].set_object(des_lk_frame)
+                visualizer.viewer["frames/LK_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[3]))
+
+                rk_frame = meshcat.geometry.triad(0.2)
+                des_rk_frame = meshcat.geometry.triad(0.2)
+                visualizer.viewer["frames/RK"].set_object(rk_frame)
+                visualizer.viewer["frames/RK"].set_transform(self.pink_config.get_transform_frame_to_world("r_knee_fe_ld").homogeneous)
+                visualizer.viewer["frames/RK_d"].set_object(des_rk_frame)
+                visualizer.viewer["frames/RK_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[4]))
+
+                lh_frame = meshcat.geometry.triad(0.2)
+                des_lh_frame = meshcat.geometry.triad(0.2)
+                visualizer.viewer["frames/LH"].set_object(lh_frame)
+                visualizer.viewer["frames/LH"].set_transform(self.pink_config.get_transform_frame_to_world("l_hand_contact").homogeneous)
+                visualizer.viewer["frames/LH_d"].set_object(des_lh_frame)
+                visualizer.viewer["frames/LH_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[5]))
+
                 # record video
                 with anim.at_frame(visualizer.viewer, frame_idx) as frame:
                     display_visualizer_frames(visualizer, frame)
+                    frame["frames/torso"].set_transform(self.pink_config.get_transform_frame_to_world("torso_link").homogeneous)
+                    frame["frames/LH"].set_transform(self.pink_config.get_transform_frame_to_world("l_hand_contact").homogeneous)
+                    frame["frames/LF"].set_transform(self.pink_config.get_transform_frame_to_world("l_foot_contact").homogeneous)
+                    frame["frames/RF"].set_transform(self.pink_config.get_transform_frame_to_world("r_foot_contact").homogeneous)
+                    frame["frames/LK"].set_transform(self.pink_config.get_transform_frame_to_world("l_knee_fe_ld").homogeneous)
+                    frame["frames/RK"].set_transform(self.pink_config.get_transform_frame_to_world("r_knee_fe_ld").homogeneous)
+                    frame["frames/torso_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[0]))
+                    frame["frames/LH_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[5]))
+                    frame["frames/LF_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[1]))
+                    frame["frames/RF_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[2]))
+                    frame["frames/LK_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[3]))
+                    frame["frames/RK_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[4]))
                 frame_idx += 1
 
             t += self.dt
