@@ -72,39 +72,39 @@ class IKCFreePlanner:
     def _initialize_tasks(self) -> List[pink.Task]:
         torso_task = FrameTask(
             "torso_link",
-            position_cost=0.001,
-            orientation_cost=0.01,
+            position_cost=0.0001,
+            orientation_cost=0.005,
         )
         left_foot_task = FrameTask(
             "l_foot_contact",
-            position_cost=5.0,
-            orientation_cost=0.5,
+            position_cost=0.1,
+            orientation_cost=0.05,
         )
         right_foot_task = FrameTask(
             "r_foot_contact",
             position_cost=5.0,
-            orientation_cost=0.5,
+            orientation_cost=0.05,
         )
         left_knee_task = FrameTask(
             "l_knee_fe_ld",
-            position_cost=0.5,
+            position_cost=0.2,
             orientation_cost=0.001,
         )
         right_knee_task = FrameTask(
             "r_knee_fe_ld",
-            position_cost=0.5,
+            position_cost=0.2,
             orientation_cost=0.001,
         )
         left_hand_task = FrameTask(
             "l_hand_contact",
-            position_cost=3.0,
+            position_cost=5.0,
             orientation_cost=0.001,
             gain=0.1,
         )
         right_hand_task = FrameTask(
             "r_hand_contact",
-            position_cost=1.0,
-            orientation_cost=0.001,
+            position_cost=0.01,
+            orientation_cost=0.0001,
             gain=0.1,
         )
         posture_task = PostureTask(
@@ -233,14 +233,18 @@ class IKCFreePlanner:
                 visualizer.viewer["frames/LH"].set_object(lh_frame)
                 visualizer.viewer["frames/LH"].set_transform(self.pink_config.get_transform_frame_to_world("l_hand_contact").homogeneous)
                 visualizer.viewer["frames/LH_d"].set_object(des_lh_frame)
-                visualizer.viewer["frames/LH_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[5]))
+                T_lh = meshcat.transformations.translation_matrix(curr_ee_point[5])
+                T_lh[:3, :3] = util.quat_to_rot(self.frames_quat['LH'])
+                visualizer.viewer["frames/LH_d"].set_transform(T_lh)
 
                 rh_frame = meshcat.geometry.triad(0.2)
                 des_rh_frame = meshcat.geometry.triad(0.2)
                 visualizer.viewer["frames/RH"].set_object(rh_frame)
                 visualizer.viewer["frames/RH"].set_transform(self.pink_config.get_transform_frame_to_world("r_hand_contact").homogeneous)
                 visualizer.viewer["frames/RH_d"].set_object(des_rh_frame)
-                visualizer.viewer["frames/RH_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[6]))
+                T_rh = meshcat.transformations.translation_matrix(curr_ee_point[6])
+                T_rh[:3, :3] = util.quat_to_rot(self.frames_quat['RH'])
+                visualizer.viewer["frames/RH_d"].set_transform(T_rh)
 
                 # record video
                 with anim.at_frame(visualizer.viewer, frame_idx) as frame:
