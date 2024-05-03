@@ -62,7 +62,7 @@ def main(args):
             plane_dict['a'] = float(scaled_pydrake_geom[fr].A()[i][0])
             plane_dict['b'] = float(scaled_pydrake_geom[fr].A()[i][1])
             plane_dict['c'] = float(scaled_pydrake_geom[fr].A()[i][2])
-            plane_dict['d'] = float(scaled_pydrake_geom[fr].b()[i])
+            plane_dict['d'] = -float(scaled_pydrake_geom[fr].b()[i])
             plane_coeffs_list.append(deepcopy(plane_dict))
         with open(save_loc + filename + '.yaml', 'w') as f:
             yaml.dump(plane_coeffs_list, f)
@@ -71,7 +71,7 @@ def main(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scale", type=float, default=1.0,
+    parser.add_argument("--scale", type=float, default=0.75,
                         help="Scale factor for the polytopes")
     args = parser.parse_args()
     main(args)
