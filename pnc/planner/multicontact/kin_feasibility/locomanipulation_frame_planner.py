@@ -3,6 +3,7 @@ from typing import List
 import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
 from collections import OrderedDict
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import convert_rgba_to_meshcat_obj
+from util.polytope_math import extract_plane_eqn_from_coeffs
 
 import meshcat.geometry as g
 import meshcat.transformations as tf
@@ -34,7 +35,7 @@ class LocomanipulationFramePlanner:
 
             # do the torso at the very end to get reachability from contact frames
             if region.frame_name != 'torso':
-                H, d_prime = self.extract_plane_eqn_from_coeffs(region._plane_coeffs)
+                H, d_prime = extract_plane_eqn_from_coeffs(region._plane_coeffs)
                 # d_prime = self.update_plane_offset_from_root(region._origin_pos,
                 #                                                 H, d_prime)
                 self.reachability_planes[region.frame_name] = {'H': H, 'd': d_prime}
@@ -211,17 +212,6 @@ class LocomanipulationFramePlanner:
 
                 pt_number += 1
             seg_number += 1
-
-    @staticmethod
-    def extract_plane_eqn_from_coeffs(coeffs):
-        H = np.zeros((len(coeffs), 3))
-        d_vec = np.zeros((len(coeffs),))
-        i = 0
-        for h in coeffs:
-            H[i] = np.array([h['a'], h['b'], h['c']])
-            d_vec[i] = h['d']
-            i += 1
-        return H, d_vec
 
     @staticmethod
     def update_plane_offset_from_root(_origin_pos, H, d):
