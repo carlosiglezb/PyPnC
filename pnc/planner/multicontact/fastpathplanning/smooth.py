@@ -636,7 +636,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
                 constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
             # Check if safe_point is available for the current frame
-            elif f_name in safe_points_lst[seg_idx].keys():
+            elif f_name in safe_points_lst[seg_idx+1].keys():
                 # Enforce (pre-computed) safe points at the end of each desired motion
                 # note: the initial point within a segment is defined by the continuity constraint below
                 if fr_seg_k_box == (num_iris_current-1):

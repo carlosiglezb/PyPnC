@@ -104,7 +104,7 @@ def get_last_defined_point(safe_points_list, frame_name):
 
 def get_last_defined_box(box_seq_list, frame_name):
     for bs in reversed(box_seq_list):
-        if frame_name in bs.keys() and not np.isnan(bs[frame_name]):
+        if frame_name in bs.keys() and not any(np.isnan(bs[frame_name])):
             return bs[frame_name]
 
     # if we reach this point, the corresponding frame is never assigned
@@ -114,7 +114,7 @@ def get_last_defined_box(box_seq_list, frame_name):
 def get_num_unassigned_boxes(box_seq_list, frame_name):
     num_unassigned_boxes = 1
     for bs in reversed(box_seq_list):
-        if np.isnan(bs[frame_name]):
+        if any(np.isnan(bs[frame_name])):
             num_unassigned_boxes += 1   # update location of last nan box
         else:
             return num_unassigned_boxes
