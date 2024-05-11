@@ -147,7 +147,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         starting_rf_pos = self.draco3_fwdk.get_link_iso("r_foot_contact")[:3, 3]
         final_rf_pos = starting_rf_pos + np.array([goal_step_length, 0., 0.])
         starting_rh_pos = self.draco3_fwdk.get_link_iso("r_hand_contact")[:3, 3] - np.array([0.01, 0., 0.])
-        final_rh_pos = starting_rh_pos + np.array([goal_step_length, 0., 0.])
+        final_rh_pos = starting_rh_pos + np.array([goal_step_length + 0.15, 0., 0.])
         starting_lkn_pos = self.draco3_fwdk.get_link_iso("l_knee_fe_ld")[:3, 3]
         final_lkn_pos = starting_lkn_pos + np.array([goal_step_length, 0., 0.])
         starting_rkn_pos = self.draco3_fwdk.get_link_iso("r_knee_fe_ld")[:3, 3]
@@ -265,7 +265,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
         # ---- Step 1: L hand to frame
-        fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+        fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'RH'])   # frames that must not move
         motion_frames_seq.add_motion_frame({'LH': starting_lh_pos + np.array([0.08, 0.07, 0.15])})
         lh_contact_front = PlannerSurfaceContact('LH', np.array([-1, 0, 0]))
         lh_contact_front.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
@@ -282,7 +282,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         # ---- Step 3: re-position L/R hands for more stability
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
         motion_frames_seq.add_motion_frame({
-                            'LH': starting_lh_pos + np.array([0.4, 0.0, 0.0])})
+                            'LH': starting_lh_pos + np.array([0.3, 0.0, 0.0])})
                             # 'RH': starting_rh_pos + np.array([0.08, -0.07, 0.15])})
         lh_contact_inside = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
         lh_contact_inside.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
@@ -290,12 +290,13 @@ class TestIKCFreePlanner(unittest.TestCase):
         motion_frames_seq.add_contact_surface([lh_contact_inside])
 
         # ---- Step 4: step through door with right foot
-        fixed_frames.append(['LF', 'L_knee', 'LH'])   # frames that must not move
+        fixed_frames.append(['LF', 'L_knee'])   # frames that must not move
         motion_frames_seq.add_motion_frame({
                             'RF': final_rf_pos,
                             'torso': final_torso_pos,
                             'R_knee': final_rkn_pos,
-                            'RH': final_rh_pos})
+                            'RH': final_rh_pos,
+                            'LH': starting_lh_pos + np.array([0.55, 0.0, 0.0])})
         rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
         motion_frames_seq.add_contact_surface(rf_contact_over)
 
@@ -316,7 +317,7 @@ class TestIKCFreePlanner(unittest.TestCase):
             'LH': 'l_hand_contact',
             'RH': 'r_hand_contact'
         }
-        ik_cfree_planner = IKCFreePlanner(self.robot, plan_to_model_frames, self.q0)
+        ik_cfree_planner = IKCFreePlanner(self.robot.model, self.robot.data, plan_to_model_frames, self.q0)
         ee_halfspace_params, frame_stl_paths = OrderedDict(), OrderedDict()
         for fr in frame_names:
             ee_halfspace_params[fr] = cwd + '/pnc/reachability_map/output/draco3_' + fr + '.yaml'
@@ -416,7 +417,7 @@ class TestIKCFreePlanner(unittest.TestCase):
             'LH': 'l_hand_contact',
             'RH': 'r_hand_contact'
         }
-        ik_cfree_planner = IKCFreePlanner(self.robot, plan_to_model_frames, self.q0)
+        ik_cfree_planner = IKCFreePlanner(self.robot.model, self.robot.data, plan_to_model_frames, self.q0)
         ee_halfspace_params, frame_stl_paths = OrderedDict(), OrderedDict()
         for fr in frame_names:
             ee_halfspace_params[fr] = cwd + '/pnc/reachability_map/output/draco3_' + fr + '.yaml'
