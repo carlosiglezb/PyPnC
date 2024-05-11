@@ -71,7 +71,7 @@ def main(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scale", type=float, default=0.75,
+    parser.add_argument("--scale", type=float, default=0.85,
                         help="Scale factor for the polytopes")
     args = parser.parse_args()
     main(args)
