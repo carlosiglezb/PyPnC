@@ -156,7 +156,8 @@ class IKCFreePlanner:
 
         # compute plan
         self.planner.plan_iris(p_init, T, alpha)
-        self.planner.plot(visualizer)
+        if visualizer is not None:
+            self.planner.plot(visualizer)
 
         # get some information from planner
         frame_names = self.planner.frame_names      # in the order matching path solution

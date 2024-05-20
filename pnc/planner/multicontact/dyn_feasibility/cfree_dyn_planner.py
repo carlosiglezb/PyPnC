@@ -566,39 +566,44 @@ def main(args):
         x0 = fddp[i].xs[-1]
 
     # Creating display
-    save_freq = 1
-    display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
-                      rob_data, vis_data, ctrl_freq=1/DT, save_freq=save_freq)
-    # display.add_robot("door", door_model, door_col_model, door_vis_model, door_ini_pos, door_ini_quat)
-    display.display_targets("lfoot_target", lf_targets, [1, 0, 0])
-    # display.display_targets("rfoot_target", rf_targets, [0, 0, 1])
-    display.display_targets("lhand_target", lh_targets, [0.5, 0, 0])
-    # display.display_targets("lhand_inner_targets", lh_inner_targets, [0.5, 0, 0])
-    # display.display_targets("lhand_ready_targets", lh_ready_targets, [0.5, 0, 0])
-    # display.display_targets("rhand_target", rh_targets, [0, 0, 0.5])
-    # display.display_targets("rhand_ready_targets", rh_ready_targets, [0, 0, 0.5])
-    display.display_targets("base_pass_target", base_into_targets, [0, 1, 0])
-    # display.display_targets("base_ffoot_targets", base_ffoot_targets, [0, 1, 0])
-    # display.display_targets("base_square_target", base_outof_targets, [0, 1, 0])
-    display.add_arrow("forces/l_ankle_ie", color=[1, 0, 0])
-    display.add_arrow("forces/r_ankle_ie", color=[0, 0, 1])
-    display.add_arrow("forces/l_wrist_pitch", color=[0, 1, 0])
-    display.add_arrow("forces/r_wrist_pitch", color=[0, 1, 0])
-    # display.displayForcesFromCrocoddylSolver(fddp)
-    display.displayFromCrocoddylSolver(fddp)
-    viz_to_hide = list(("lfoot_target", "rfoot_target", "lhand_target", "lhand_inner_targets",
-                   "rhand_target", "base_pass_target", "base_ffoot_targets", "base_square_target"))
-    display.hide_visuals(viz_to_hide)
+    if B_VISUALIZE:
+        save_freq = 1
+        display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
+                          rob_data, vis_data, ctrl_freq=1/DT, save_freq=save_freq)
+        # display.add_robot("door", door_model, door_col_model, door_vis_model, door_ini_pos, door_ini_quat)
+        display.display_targets("lfoot_target", lf_targets, [1, 0, 0])
+        # display.display_targets("rfoot_target", rf_targets, [0, 0, 1])
+        display.display_targets("lhand_target", lh_targets, [0.5, 0, 0])
+        # display.display_targets("lhand_inner_targets", lh_inner_targets, [0.5, 0, 0])
+        # display.display_targets("lhand_ready_targets", lh_ready_targets, [0.5, 0, 0])
+        # display.display_targets("rhand_target", rh_targets, [0, 0, 0.5])
+        # display.display_targets("rhand_ready_targets", rh_ready_targets, [0, 0, 0.5])
+        display.display_targets("base_pass_target", base_into_targets, [0, 1, 0])
+        # display.display_targets("base_ffoot_targets", base_ffoot_targets, [0, 1, 0])
+        # display.display_targets("base_square_target", base_outof_targets, [0, 1, 0])
+        display.add_arrow("forces/l_ankle_ie", color=[1, 0, 0])
+        display.add_arrow("forces/r_ankle_ie", color=[0, 0, 1])
+        display.add_arrow("forces/l_wrist_pitch", color=[0, 1, 0])
+        display.add_arrow("forces/r_wrist_pitch", color=[0, 1, 0])
+        # display.displayForcesFromCrocoddylSolver(fddp)
+        display.displayFromCrocoddylSolver(fddp)
+        viz_to_hide = list(("lfoot_target", "rfoot_target", "lhand_target", "lhand_inner_targets",
+                       "rhand_target", "base_pass_target", "base_ffoot_targets", "base_square_target"))
+        display.hide_visuals(viz_to_hide)
 
     fig_idx = 1
     if B_SHOW_JOINT_PLOTS:
         for it in fddp:
             log = it.getCallbacks()[0]
-            crocoddyl.plotOCSolution(log.xs, log.us, figIndex=fig_idx, show=False)
+            xs_reduced = np.array(log.xs)[:, [l_constr_ids[0], l_constr_ids[1],
+                                              r_constr_ids[0], r_constr_ids[1]]]
+            us_reduced = np.array(log.us)[:, [l_constr_ids_u[0], l_constr_ids_u[1],
+                                              r_constr_ids_u[0], r_constr_ids_u[1]]]
+            crocoddyl.plotOCSolution(xs_reduced, us_reduced, figIndex=fig_idx, show=False)
             fig_idx += 1
-            crocoddyl.plotConvergence(log.costs, log.u_regs, log.x_regs, log.grads,
-                                      log.stops, log.steps, figIndex=fig_idx, show=False)
-            fig_idx +=1
+            # crocoddyl.plotConvergence(log.costs, log.u_regs, log.x_regs, log.grads,
+            #                           log.stops, log.steps, figIndex=fig_idx, show=False)
+            # fig_idx +=1
 
     if B_SHOW_GRF_PLOTS:
         # Note: contact_links are l_ankle_ie, r_ankle_ie, l_wrist_pitch, r_wrist_pitch
