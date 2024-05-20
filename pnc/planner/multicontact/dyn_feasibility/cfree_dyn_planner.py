@@ -2,8 +2,12 @@ import os
 import sys
 from collections import OrderedDict
 
+import crocoddyl
+from pnc.planner.multicontact.crocoddyl.ConstraintModelRCJ import ConstraintModelRCJ
 # Collision free description
 from pydrake.geometry.optimization import HPolyhedron
+
+from pnc.planner.multicontact.crocoddyl.ResidualModelStateError import ResidualModelStateError
 # Kinematic feasibility
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
 from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
@@ -20,9 +24,10 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 cwd = os.getcwd()
 sys.path.append(cwd)
 
-B_SHOW_JOINT_PLOTS = False
+B_SHOW_JOINT_PLOTS = True
 B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = True
+
 
 def get_draco3_shaft_wrist_default_initial_pose():
     q0 = np.zeros(27, )
@@ -383,8 +388,33 @@ def main(args):
     #
     # Start Dynamic Feasibility Check
     #
+    n_q = len(q0)
+    l_constr_ids, r_constr_ids = [9 + n_q, 10 + n_q], [23 + n_q, 24 + n_q]    # qdot
+    l_constr_ids_u, r_constr_ids_u = [3, 4], [17, 18]       # u
     state = crocoddyl.StateMultibody(rob_model)
     actuation = crocoddyl.ActuationModelFloatingBase(state)
+
+    constr_mgr = crocoddyl.ConstraintModelManager(state, actuation.nu)
+    # -------- Existent constraint --------
+    # res_model = crocoddyl.ResidualModelState(state, x0, actuation.nu)
+    # constr_model_res = crocoddyl.ConstraintModelResidual(state, res_model)
+    # constr_mgr.addConstraint("residual_model", constr_model_res)
+    # -------- New constraint --------
+    l_res_model = ResidualModelStateError(state, 1, nu=actuation.nu, q_dependent=False)
+    l_res_model.constr_ids = l_constr_ids
+    # l_res_model.constr_ids_u = l_constr_ids_u
+    l_rcj_constr = ConstraintModelRCJ(state, residual=l_res_model, ng=0, nh=1)
+    constr_mgr.addConstraint("l_rcj_constr", l_rcj_constr)
+    r_res_model = ResidualModelStateError(state, 1, nu=actuation.nu, q_dependent=False)
+    r_res_model.constr_ids = r_constr_ids
+    # r_res_model.constr_ids_u = r_constr_ids_u
+    r_rcj_constr = ConstraintModelRCJ(state, residual=r_res_model, ng=0, nh=1)
+    constr_mgr.addConstraint("r_rcj_constr", r_rcj_constr)
+
+    # ---------- testing ----------
+    # shared_data = crocoddyl.DataCollectorMultibody(rob_data)
+    # data = constr_mgr.createData(shared_data)
+    # constr_mgr.calc(data, x0, np.zeros(actuation.nu))
 
     #
     # Dynamic solve
@@ -402,7 +432,7 @@ def main(args):
     #     model_seqs += createSequence([dmodel], DT, N)
 
     # Defining the problem and the solver
-    fddp = [None] * NUM_OF_CONTACT_CONFIGURATIONS
+    fddp = [crocoddyl.SolverFDDP] * NUM_OF_CONTACT_CONFIGURATIONS
     for i in range(NUM_OF_CONTACT_CONFIGURATIONS):
         model_seqs = []
         if i == 0:
@@ -419,31 +449,44 @@ def main(args):
                                                         rf_id,
                                                         lh_id,
                                                         rh_id,
+                                                        constr_mgr,
                                                         lh_target=lhand_t)
                 lh_targets.append(lhand_t)
                 model_seqs += createSequence([dmodel], DT, 1)
 
         elif i == 1:
+            plan_to_model_ids.pop('L_knee')
+            plan_to_model_ids.pop('R_knee')
             # DT = 0.015
             # Using left-hand support, pass left-leg through door
+            ee_rpy = {'LH': [0., -np.pi/2, 0.]}
             N_base_through_door = 60  # knots per waypoint to pass through door
             # for base_t, lfoot_t in zip(base_into_targets, lf_targets):
             for t in np.linspace(i*T, (i+1)*T, N_base_through_door):
                 lfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LF'), t)
+                # lknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('L_knee'), t)
+                rfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('RF'), t)
+                # rknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('R_knee'), t)
+                lhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LH'), t)
+                rhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('RH'), t)
                 base_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('torso'), t)
-                dmodel = createSingleSupportHandActionModel(state,
-                                                            actuation,
-                                                            x0,
-                                                            lf_id,
-                                                            rf_id,
-                                                            lh_id,
-                                                            rh_id,
-                                                            base_id,
-                                                            base_t,
-                                                            lfoot_target=lfoot_t,
-                                                            lhand_target=lhand_t,
-                                                            lh_contact=True,
-                                                            lh_rpy=[0., -np.pi/2, 0.])
+                frame_targets_dict = {
+                    'torso': base_t,
+                    'LF': lfoot_t,
+                    'RF': rfoot_t,
+                    # 'L_knee': lknee_t,
+                    # 'R_knee': rknee_t,
+                    'LH': lhand_t,
+                    'RH': rhand_t
+                }
+                dmodel = createMultiFrameActionModel(state,
+                                                     actuation,
+                                                     x0,
+                                                     plan_to_model_ids,
+                                                     ['LH', 'RF'],
+                                                     ee_rpy,
+                                                     frame_targets_dict,
+                                                     constr_mgr)
                 base_into_targets.append(base_t)
                 lf_targets.append(lfoot_t)
                 model_seqs += createSequence([dmodel], DT, 1)
@@ -542,7 +585,6 @@ def main(args):
         #                                                 base_outof_targets[-1],
         #                                                 ang_weights=0.8)
         #     model_seqs += createSequence([dmodel], DT, N_straighten_torso)
-
 
         problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
         fddp[i] = crocoddyl.SolverFDDP(problem)
