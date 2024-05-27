@@ -7,6 +7,7 @@ RED = 0xff0000
 GREEN = 0x00ff00
 BLUE = 0x0000ff
 GREY = 0x888888
+WHITE = 0xffffff
 BLACK = 0x000000
 CYAN = 0x00ffff
 
@@ -23,6 +24,10 @@ def meshcat_obstacle_obj():
 
 def meshcat_iris_obj():
     return MeshLambertMaterial(color=RED, opacity=0.3)
+
+
+def meshcat_reach_obj():
+    return MeshLambertMaterial(color=WHITE, opacity=0.2)
 
 
 def meshcat_point_obj():
