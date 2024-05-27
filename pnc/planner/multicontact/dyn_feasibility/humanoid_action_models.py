@@ -24,7 +24,7 @@ def createDoubleSupportActionModel(state: crocoddyl.StateMultibody,
         pin.SE3.Identity(),
         pin.LOCAL_WORLD_ALIGNED,
         actuation.nu,
-        np.array([0, 0]),
+        np.array([0., 0.4]),
     )
     rf_contact = crocoddyl.ContactModel6D(
         state,
@@ -32,7 +32,7 @@ def createDoubleSupportActionModel(state: crocoddyl.StateMultibody,
         pin.SE3.Identity(),
         pin.LOCAL_WORLD_ALIGNED,
         actuation.nu,
-        np.array([0, 0]),
+        np.array([0., 0.4]),
     )
     contacts.addContact("lf_contact", lf_contact)
     contacts.addContact("rf_contact", rf_contact)
@@ -74,7 +74,7 @@ def createDoubleSupportActionModel(state: crocoddyl.StateMultibody,
         state, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
     costs.addCost("xReg", x_reg_cost, 1e-3)
-    costs.addCost("uReg", u_reg_cost, 1e-4)
+    costs.addCost("uReg", u_reg_cost, 1e-6)
 
     # Adding the state limits penalization
     x_lb = np.concatenate([state.lb[1 : state.nv + 1], state.lb[-state.nv :]])
@@ -373,19 +373,16 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     # Define the cost sum (cost manager)
     costs = crocoddyl.CostModelSum(state, actuation.nu)
 
-    # Define contacts (e.g., feet /hand supports)
+    # Define contacts (e.g., feet / hand supports)
     contacts = crocoddyl.ContactModelMultiple(state, actuation.nu)
 
     # create contact models for each frame in contact
-    for fr_name, fr_id in plan_to_model_ids.items():
-
-        # skip if frame is not in contact
-        if fr_name not in frames_in_contact:
-            continue
+    for fr_name in frames_in_contact:
+        fr_id = plan_to_model_ids[fr_name]
 
         # for hand contact frames, set the corresponding rotation
         SE3_ee = pin.SE3.Identity()
-        if fr_name == 'LH':
+        if fr_name in ee_rpy.keys():
             SE3_ee.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
 
         fr_contact = crocoddyl.ContactModel6D(
@@ -394,7 +391,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             SE3_ee,
             pin.LOCAL_WORLD_ALIGNED,
             actuation.nu,
-            np.array([0, 0]),
+            np.array([0, 0.1]),
         )
         contacts.addContact(fr_name, fr_contact)
 
@@ -403,7 +400,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(ee_rpy[fr_name]), mu, 4, True)
         else:
             floor_rotation = np.eye(3)
-            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, False)
+            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
@@ -417,26 +414,38 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         costs.addCost(fr_name + "_friction", fr_friction, 1e1)
 
     # Add the base-placement cost
-    w_base = np.array([0.01] * 3 + [ang_weights] * 3)        # (lin, ang)
-    base_Mref = pin.SE3(np.eye(3), frame_targets_dict['torso'])
-    activation_base = crocoddyl.ActivationModelWeightedQuad(w_base**2)
-    base_cost = crocoddyl.CostModelResidual(
-        state,
-        activation_base,
-        crocoddyl.ResidualModelFramePlacement(state, plan_to_model_ids['torso'], base_Mref, actuation.nu),
-    )
-    costs.addCost("base_goal", base_cost, 1e1)
+    # w_base = np.array([0.01] * 3 + [ang_weights] * 3)        # (lin, ang)
+    # base_Mref = pin.SE3(np.eye(3), frame_targets_dict['torso'])
+    # activation_base = crocoddyl.ActivationModelWeightedQuad(w_base**2)
+    # base_cost = crocoddyl.CostModelResidual(
+    #     state,
+    #     activation_base,
+    #     crocoddyl.ResidualModelFramePlacement(state, plan_to_model_ids['torso'], base_Mref, actuation.nu),
+    # )
+    # costs.addCost("base_goal", base_cost, 1e1)
 
     # Add frame-placement cost
     for fr_name, fr_id in plan_to_model_ids.items():
         # set higher tracking cost on feet
         if 'F' in fr_name:
-            w_fr = np.array([5.] * 3 + [1.] * 3)        # (lin, ang)
+            w_fr = np.array([1.] * 3 + [1.] * 3)        # (lin, ang)
         elif 'H' in fr_name:
             w_fr = np.array([2.] * 3 + [0.00001] * 3)
+        elif 'knee' in fr_name:
+            w_fr = np.array([2.] * 3 + [0.00001] * 3)
+        elif 'torso' in fr_name:
+            w_fr = np.array([0.1] * 3 + [0.1] * 3)
+        else:
+            raise ValueError(f"Weights to track frame {fr_name} were not set")
+
+        # set the desired frame pose
+        fr_Mref = pin.SE3.Identity()
+        if fr_name in ee_rpy.keys():
+            fr_Mref.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
+        fr_Mref.translation = frame_targets_dict[fr_name]
 
         # add as cost
-        fr_Mref = pin.SE3(np.eye(3), frame_targets_dict[fr_name])
+        # fr_Mref = pin.SE3(np.eye(3), frame_targets_dict[fr_name])
         activation_fr = crocoddyl.ActivationModelWeightedQuad(w_fr ** 2)
         fr_cost = crocoddyl.CostModelResidual(
             state,
@@ -458,6 +467,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     costs.addCost("uReg", u_reg_cost, 1e-8)
 
     if rcj_constraints is not None:
+        raise ValueError("Should not be entering here!")
         # Add the rolling contact joint constraint as cost
         w_rcj = np.array([0.01])        # (lin, ang)
         l_activation_rcj = crocoddyl.ActivationModelWeightedQuad(w_rcj**2)

@@ -217,7 +217,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     # door_l_outer_location = np.array([0.45, 0.35, 1.2])
     # door_r_outer_location = np.array([0.45, -0.35, 1.2])
     door_l_inner_location = np.array([0.28, 0.35, 0.9])
-    # door_r_inner_location = np.array([0.52, -0.3, 1.2])
+    door_r_inner_location = np.array([0.34, -0.32, 0.9])
 
     starting_lh_pos = safe_regions_mgr_dict['LH'].iris_list[0].seed_pos
     starting_rh_pos = safe_regions_mgr_dict['RH'].iris_list[0].seed_pos
@@ -232,7 +232,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
     # ---- Step 1: L hand to frame
-    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee', 'torso'])   # frames that must not move
+    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
     motion_frames_seq.add_motion_frame({'LH': door_l_inner_location})
     lh_contact_front = PlannerSurfaceContact('LH', np.array([-1, 0, 0]))
     lh_contact_front.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
@@ -242,22 +242,22 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                         'LF': final_lf_pos,
-                        'L_knee': final_lkn_pos + np.array([-0.05, 0., 0.07]),
-                        'torso': final_torso_pos,     # testing
-                        'RH': starting_rh_pos + np.array([0.2, 0.0, 0.0])})     # testing
+                        'L_knee': final_lkn_pos + np.array([-0.05, 0., 0.07]) })#,
+                        # 'RH': starting_rh_pos + np.array([0.2, 0.0, 0.0])})     # testing
     lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surface(lf_contact_over)
 
     # ---- Step 3: re-position L/R hands for more stability
-    # fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-    # motion_frames_seq.add_motion_frame({
-    #                     'LH': starting_lh_pos + np.array([0.3, 0.0, 0.0])})
-    #                     # 'RH': starting_rh_pos + np.array([0.08, -0.07, 0.15])})
+    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    motion_frames_seq.add_motion_frame({
+                        'LH': starting_lh_pos + np.array([0.3, 0.0, 0.0]),
+                        'torso': final_torso_pos + np.array([-0.1, 0., 0.]),                               # testing
+                        'RH': door_r_inner_location})
     # lh_contact_inside = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
     # lh_contact_inside.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
-    # # rh_contact_inside = PlannerSurfaceContact('RH', np.array([0, 1, 0]))
-    # motion_frames_seq.add_contact_surface([lh_contact_inside])
-    #
+    rh_contact_inside = PlannerSurfaceContact('RH', np.array([1, 0, 0]))
+    motion_frames_seq.add_contact_surface(rh_contact_inside)
+
     # # ---- Step 4: step through door with right foot
     # fixed_frames.append(['LF', 'L_knee'])   # frames that must not move
     # motion_frames_seq.add_motion_frame({
@@ -323,7 +323,7 @@ def main(args):
         plan_to_model_frames['LH'] = 'l_hand_contact'
         plan_to_model_frames['RH'] = 'r_hand_contact'
     elif robot_name == 'g1':
-        plan_to_model_frames['torso'] = 'pelvis'
+        plan_to_model_frames['torso'] = 'torso_link'
         plan_to_model_frames['LF'] = 'left_ankle_roll_link'
         plan_to_model_frames['RF'] = 'right_ankle_roll_link'
         plan_to_model_frames['L_knee'] = 'left_knee_link'
@@ -439,13 +439,15 @@ def main(args):
     #
     # Start Dynamic Feasibility Check
     #
-    n_q = len(q0)
-    l_constr_ids, r_constr_ids = [9 + n_q, 10 + n_q], [23 + n_q, 24 + n_q]    # qdot
-    l_constr_ids_u, r_constr_ids_u = [3, 4], [17, 18]       # u
     state = crocoddyl.StateMultibody(rob_model)
     actuation = crocoddyl.ActuationModelFloatingBase(state)
 
+    ee_rpy = {'LH': [0., 0., 0.], 'RH': [0., 0., 0.]}
     if robot_name == 'draco3':
+        n_q = len(q0)
+        l_constr_ids, r_constr_ids = [9 + n_q, 10 + n_q], [23 + n_q, 24 + n_q]  # qdot
+        l_constr_ids_u, r_constr_ids_u = [3, 4], [17, 18]  # u
+
         constr_mgr = crocoddyl.ConstraintModelManager(state, actuation.nu)
         # -------- Existent constraint --------
         # res_model = crocoddyl.ResidualModelState(state, x0, actuation.nu)
@@ -462,26 +464,20 @@ def main(args):
         # r_res_model.constr_ids_u = r_constr_ids_u
         r_rcj_constr = ConstraintModelRCJ(state, residual=r_res_model, ng=0, nh=1)
         constr_mgr.addConstraint("r_rcj_constr", r_rcj_constr)
-
-    # ---------- testing ----------
-    # shared_data = crocoddyl.DataCollectorMultibody(rob_data)
-    # data = constr_mgr.createData(shared_data)
-    # constr_mgr.calc(data, x0, np.zeros(actuation.nu))
+        ee_rpy = {'LH': [0., -np.pi/2, 0.], 'RH': [0., -np.pi/2, 0.]}
 
     #
     # Dynamic solve
     #
-    DT = 2e-2
+    # DT = 2e-2
 
     # Connecting the sequences of models
     # NUM_OF_CONTACT_CONFIGURATIONS = len(motion_frames_seq.motion_frame_lst)
-    NUM_OF_CONTACT_CONFIGURATIONS = 2
+    NUM_OF_CONTACT_CONFIGURATIONS = 3
     T_total = T * NUM_OF_CONTACT_CONFIGURATIONS
 
     lh_targets, base_into_targets, lf_targets, lkn_targets = [], [], [], []
-    # for left_t, right_t in zip(lh_targets, rh_targets):
-    #     dmodel = createDoubleSupportActionModel(left_t, right_t)
-    #     model_seqs += createSequence([dmodel], DT, N)
+    base_before_lf_step, base_after_lf_step, base_during_rf_step = [], [], []
 
     # Defining the problem and the solver
     fddp = [crocoddyl.SolverFDDP] * NUM_OF_CONTACT_CONFIGURATIONS
@@ -489,26 +485,53 @@ def main(args):
         model_seqs = []
         if i == 0:
             # Reach door with left hand
+            ee_rpy = {'LH': [0., 0., 0.],
+                      'RH': [0., 0., 0.]}
             N_lhand_to_door = 20  # knots for left hand reaching
             # for lhand_t in lh_targets:
             for t in np.linspace(i*T, (i+1)*T, N_lhand_to_door):
+                lfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LF'), t)
+                lknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('L_knee'), t)
+                rfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('RF'), t)
+                rknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('R_knee'), t)
                 lhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LH'), t)
-                dmodel = createDoubleSupportActionModel(state,
-                                                        actuation,
-                                                        x0,
-                                                        lf_id,
-                                                        rf_id,
-                                                        lh_id,
-                                                        rh_id,
-                                                        None,
-                                                        lh_target=lhand_t)
+                rhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('RH'), t)
+                base_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('torso'), t)
+                frame_targets_dict = {
+                    'torso': base_t,
+                    'LF': lfoot_t,
+                    'RF': rfoot_t,
+                    'L_knee': lknee_t,
+                    'R_knee': rknee_t,
+                    'LH': lhand_t,
+                    'RH': rhand_t
+                }
+                dmodel = createMultiFrameActionModel(state,
+                                                     actuation,
+                                                     x0,
+                                                     plan_to_model_ids,
+                                                     ['LF', 'RF'],
+                                                     ee_rpy,
+                                                     frame_targets_dict,
+                                                     None)
+                # dmodel = createDoubleSupportActionModel(state,
+                #                                         actuation,
+                #                                         x0,
+                #                                         lf_id,
+                #                                         rf_id,
+                #                                         lh_id,
+                #                                         rh_id,
+                #                                         None,
+                #                                         lh_target=lhand_t)
                 lh_targets.append(lhand_t)
-                model_seqs += createSequence([dmodel], DT, 1)
+                base_before_lf_step.append(base_t)
+                model_seqs += createSequence([dmodel], T/(N_lhand_to_door-1), 1)
 
         elif i == 1:
             # Using left-hand support, pass left-leg through door
-            ee_rpy = {'LH': [0., -np.pi/2, 0.]}
-            N_base_through_door = 80  # knots per waypoint to pass through door
+            ee_rpy = {'LH': [0., 0., 0.],
+                      'RH': [0., 0., 0.]}
+            N_base_through_door = 60  # knots per waypoint to pass through door
             # for base_t, lfoot_t in zip(base_into_targets, lf_targets):
             for t in np.linspace(i*T, (i+1)*T, N_base_through_door):
                 lfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LF'), t)
@@ -538,25 +561,52 @@ def main(args):
                 base_into_targets.append(base_t)
                 lf_targets.append(lfoot_t)
                 lkn_targets.append(lknee_t)
-                model_seqs += createSequence([dmodel], DT, 1)
+                model_seqs += createSequence([dmodel], T/(N_base_through_door-1), 1)
 
-        # elif i == 2:
-        #     DT = 0.02
-        #     # Reach door with left and right hand from inside
-        #     N_rhand_to_door = 20  # knots for left hand reaching
-        #     for lhand_t, rhand_t in zip(lh_inner_targets, rh_targets):
-        #         dmodel = createDoubleSupportActionModel(state,
-        #                                                 actuation,
-        #                                                 rob_data,
-        #                                                 x0,
-        #                                                 lf_id,
-        #                                                 rf_id,
-        #                                                 lh_id,
-        #                                                 rh_id,
-        #                                                 lh_target=lhand_t,
-        #                                                 rh_target=rhand_t)
-        #         model_seqs += createSequence([dmodel], DT, N_rhand_to_door)
-        #
+        elif i == 2:
+            # DT = 0.02
+            # Reach door with left and right hand from inside
+            N_rhand_to_door = 40  # knots for left hand reaching
+            # for lhand_t, rhand_t in zip(lh_inner_targets, rh_targets):
+            for t in np.linspace(i*T, (i+1)*T, N_rhand_to_door):
+                lfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LF'), t)
+                lknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('L_knee'), t)
+                rfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('RF'), t)
+                rknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('R_knee'), t)
+                lhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LH'), t)
+                rhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('RH'), t)
+                base_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('torso'), t)
+                frame_targets_dict = {
+                    'torso': base_t,
+                    'LF': lfoot_t,
+                    'RF': rfoot_t,
+                    'L_knee': lknee_t,
+                    'R_knee': rknee_t,
+                    'LH': lhand_t,
+                    'RH': rhand_t
+                }
+                dmodel = createMultiFrameActionModel(state,
+                                                     actuation,
+                                                     x0,
+                                                     plan_to_model_ids,
+                                                     ['LF', 'RF'],
+                                                     ee_rpy,
+                                                     frame_targets_dict,
+                                                     None)
+                # dmodel = createDoubleSupportActionModel(state,
+                #                                         actuation,
+                #                                         x0,
+                #                                         lf_id,
+                #                                         rf_id,
+                #                                         lh_id,
+                #                                         rh_id,
+                #                                         None,
+                #                                         lh_target=lhand_t,
+                #                                         rh_target=rhand_t)
+                model_seqs += createSequence([dmodel], T/(N_rhand_to_door-1), 1)
+                base_after_lf_step.append(base_t)
+
+
         # elif i == 3:
         #     DT = 0.03
         #     # Start transferring weight to front foot
@@ -660,7 +710,7 @@ def main(args):
     if B_VISUALIZE:
         save_freq = 1
         display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
-                          rob_data, vis_data, ctrl_freq=1/DT, save_freq=save_freq)
+                          rob_data, vis_data, ctrl_freq=(N_rhand_to_door-1)/T, save_freq=save_freq)
         display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
         display.display_targets("lfoot_target", lf_targets, [1, 0, 0])
         display.display_targets("lknee_target", lkn_targets, [1, 0, 0])
@@ -670,7 +720,9 @@ def main(args):
         # display.display_targets("lhand_ready_targets", lh_ready_targets, [0.5, 0, 0])
         # display.display_targets("rhand_target", rh_targets, [0, 0, 0.5])
         # display.display_targets("rhand_ready_targets", rh_ready_targets, [0, 0, 0.5])
-        display.display_targets("base_pass_target", base_into_targets, [0, 1, 0])
+        display.display_targets("base_before_lf_step", base_before_lf_step, [0, 1, 0])
+        display.display_targets("base_into_target", base_into_targets, [0, 1, 0])
+        display.display_targets("base_after_lf_step", base_after_lf_step, [0, 1, 0])
         # display.display_targets("base_ffoot_targets", base_ffoot_targets, [0, 1, 0])
         # display.display_targets("base_square_target", base_outof_targets, [0, 1, 0])
         # display.add_arrow("forces/l_ankle_ie", color=[1, 0, 0])
@@ -679,8 +731,8 @@ def main(args):
         # display.add_arrow("forces/r_wrist_pitch", color=[0, 1, 0])
         # display.displayForcesFromCrocoddylSolver(fddp)
         display.displayFromCrocoddylSolver(fddp)
-        viz_to_hide = list(("rfoot_target", "lhand_target", "lhand_inner_targets",
-                       "rhand_target", "base_pass_target", "base_ffoot_targets", "base_square_target"))
+        viz_to_hide = list(("rfoot_target", "lhand_inner_targets",
+                       "rhand_target", "base_ffoot_targets", "base_square_target"))
         display.hide_visuals(viz_to_hide)
 
     fig_idx = 1
