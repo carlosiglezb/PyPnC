@@ -157,7 +157,7 @@ class IrisRegionsManager:
             ir_goal_idx += 1
 
         if iris_p_init == iris_p_goal:
-            iris_seq = list(iris_p_init)
+            iris_seq = [iris_p_init]
         else:
             iris_seq, length, runtime = planner(start)
         return iris_seq

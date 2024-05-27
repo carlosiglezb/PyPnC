@@ -374,7 +374,7 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
     for f_list in box_seq_lst:
         for fname, bs in f_list.items():
             if any(np.isnan(bs)):
-                raise Exception(f"{fname} frame has un-assigned safe regions")
+                raise Exception(f"{fname} frame has un-assigned safe regions or goal")
 
     # save iris sequence to IrisRegionsManager
     for fname, ir in iris_regions.items():
