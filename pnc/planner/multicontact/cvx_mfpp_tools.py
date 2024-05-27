@@ -35,12 +35,12 @@ def create_bezier_cvx_norm_eq_relaxation(link_length, x_var_first_point, x_var_s
 
 def get_aux_frame_idx(aux_fr, frame_list, num_points):
     prox_fr_idx, dist_fr_idx = np.nan, np.nan
-    if aux_fr['parent_frame'] == 'l_knee_fe_ld' and 'L_knee' in frame_list:
+    if aux_fr['parent_frame'][0] == 'l' and 'L_knee' in frame_list:
         L_kn_frame_idx = np.where(np.array(frame_list) == 'L_knee')[0][0]
         LF_frame_idx = np.where(np.array(frame_list) == 'LF')[0][0]
         prox_fr_idx = int(L_kn_frame_idx * num_points)
         dist_fr_idx = int(LF_frame_idx * num_points)
-    elif aux_fr['parent_frame'] == 'r_knee_fe_ld' and 'R_knee' in frame_list:
+    elif aux_fr['parent_frame'][0] == 'r' and 'R_knee' in frame_list:
         R_kn_frame_idx = np.where(np.array(frame_list) == 'R_knee')[0][0]
         RF_frame_idx = np.where(np.array(frame_list) == 'RF')[0][0]
         prox_fr_idx = int(R_kn_frame_idx * num_points)
