@@ -367,7 +367,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 ee_rpy: dict[str, list[float]],
                                 frame_targets_dict: dict[str, np.array],
                                 rcj_constraints: crocoddyl.ConstraintModelManager,
-                                ang_weights=0.00001):
+                                ang_weights=5.0):
     mu = 0.7
 
     # Define the cost sum (cost manager)
@@ -431,9 +431,9 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     for fr_name, fr_id in plan_to_model_ids.items():
         # set higher tracking cost on feet
         if 'F' in fr_name:
-            w_fr = np.array([3.] * 3 + [1.] * 3)        # (lin, ang)
+            w_fr = np.array([5.] * 3 + [1.] * 3)        # (lin, ang)
         elif 'H' in fr_name:
-            w_fr = np.array([1.] * 3 + [0.00001] * 3)
+            w_fr = np.array([2.] * 3 + [0.00001] * 3)
 
         # add as cost
         fr_Mref = pin.SE3(np.eye(3), frame_targets_dict[fr_name])

@@ -232,7 +232,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
     # ---- Step 1: L hand to frame
-    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee', 'torso'])   # frames that must not move
     motion_frames_seq.add_motion_frame({'LH': door_l_inner_location})
     lh_contact_front = PlannerSurfaceContact('LH', np.array([-1, 0, 0]))
     lh_contact_front.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
@@ -242,8 +242,8 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                         'LF': final_lf_pos,
-                        'L_knee': final_lkn_pos,
-                        'torso': final_torso_pos,                               # testing
+                        'L_knee': final_lkn_pos + np.array([-0.05, 0., 0.07]),
+                        'torso': final_torso_pos,     # testing
                         'RH': starting_rh_pos + np.array([0.2, 0.0, 0.0])})     # testing
     lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surface(lf_contact_over)
@@ -506,7 +506,6 @@ def main(args):
                 model_seqs += createSequence([dmodel], DT, 1)
 
         elif i == 1:
-            # DT = 0.015
             # Using left-hand support, pass left-leg through door
             ee_rpy = {'LH': [0., -np.pi/2, 0.]}
             N_base_through_door = 80  # knots per waypoint to pass through door
@@ -680,7 +679,7 @@ def main(args):
         # display.add_arrow("forces/r_wrist_pitch", color=[0, 1, 0])
         # display.displayForcesFromCrocoddylSolver(fddp)
         display.displayFromCrocoddylSolver(fddp)
-        viz_to_hide = list(("lfoot_target", "rfoot_target", "lhand_target", "lhand_inner_targets",
+        viz_to_hide = list(("rfoot_target", "lhand_target", "lhand_inner_targets",
                        "rhand_target", "base_pass_target", "base_ffoot_targets", "base_square_target"))
         display.hide_visuals(viz_to_hide)
 
