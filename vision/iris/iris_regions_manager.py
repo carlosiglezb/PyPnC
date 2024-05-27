@@ -96,7 +96,7 @@ class IrisRegionsManager:
         # start_centroid = self.iris_list[0].iris_region.ChebyshevCenter()
         # goal_centroid = self.iris_list[1].iris_region.ChebyshevCenter()
         start_centroid = self.iris_start_seed + np.array([0., 0., 0.6])
-        goal_centroid = self.iris_goal_seed + np.array([0.1, 0., 0.6])
+        goal_centroid = self.iris_goal_seed + np.array([-0.15, 0., 0.6])
         new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.001, 0.1, 0.1])
 
         # check that new seed is not in collision before creating new IRIS region

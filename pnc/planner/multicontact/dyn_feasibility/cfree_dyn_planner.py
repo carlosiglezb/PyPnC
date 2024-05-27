@@ -24,7 +24,7 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 cwd = os.getcwd()
 sys.path.append(cwd)
 
-B_SHOW_JOINT_PLOTS = True
+B_SHOW_JOINT_PLOTS = False
 B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = True
 
@@ -64,9 +64,27 @@ def get_draco3_shaft_wrist_default_initial_pose():
     return np.concatenate((floating_base, q0))
 
 
-def load_navy_env():
+def get_g1_default_initial_pose(n_joints):
+    q0 = np.zeros(n_joints, )
+    q0[0] = -np.pi / 6  # left_hip_pitch_joint
+    # q0[1] = np.radians(hip_yaw_angle)  # left_hip_roll_joint
+    # q0[2] = np.radians(hip_yaw_angle)  # left_hip_yaw_joint
+    q0[3] = np.pi / 3  # left_knee_joint
+    q0[4] = -np.pi / 6  # left_ankle_pitch_joint
+    # q0[5] = np.radians(-hip_yaw_angle)  # left_ankle_roll_joint
+    q0[6] = -np.pi / 6  # right_hip_pitch_joint
+    # q0[7] = np.pi / 6  # right_hip_roll_joint
+    # q0[8] = 0.  # right_hip_yaw_joint
+    q0[9] = np.pi / 3  # right_knee_joint
+    q0[10] = -np.pi / 6  # right_ankle_pitch_joint
+    # q0[11] = 0.  # right_ankle_roll_joint
+
+    floating_base = np.array([0., 0., 0.62, 0., 0., 0., 1.])
+    return np.concatenate((floating_base, q0))
+
+
+def load_navy_env(door_pos):
     # create navy door environment
-    door_pos = np.array([0.32, 0., 0.])
     door_quat = np.array([0., 0., 0.7071068, 0.7071068])
     door_width = np.array([0.025, 0., 0.])
     dom_ubody_lb = np.array([-1.6, -0.8, 0.5])
@@ -108,10 +126,16 @@ def load_navy_env():
     return door_pose, obstacles, domain_ubody, domain_lbody
 
 
-def load_robot_model():
-    draco_urdf_file = cwd + "/robot_model/draco3/draco3_ft_wrist_mesh_updated.urdf"
-    package_dir = cwd + "/robot_model/draco3"
-    rob_model, col_model, vis_model = pin.buildModelsFromUrdf(draco_urdf_file,
+def load_robot_model(robot_name):
+    if robot_name == 'draco3':
+        package_dir = cwd + "/robot_model/draco3"
+        robot_urdf_file = package_dir + "/draco3_ft_wrist_mesh_updated.urdf"
+    elif robot_name == 'g1':
+        package_dir = cwd + "/robot_model/g1_description"
+        robot_urdf_file = package_dir + "/g1.urdf"
+    else:
+        raise NotImplementedError('Robot model URDF path not specified')
+    rob_model, col_model, vis_model = pin.buildModelsFromUrdf(robot_urdf_file,
                                                               package_dir,
                                                               pin.JointModelFreeFlyer())
     rob_data, col_data, vis_data = pin.createDatas(rob_model, col_model, vis_model)
@@ -127,22 +151,23 @@ def compute_iris_regions_mgr(obstacles,
                              standing_pos,
                              goal_step_length):
     # shift (feet) iris seed to get nicer IRIS region
-    iris_lf_shift = np.array([0.1, 0., 0.])
-    iris_rf_shift = np.array([0.1, 0., 0.])
-    iris_kn_shift = np.array([-0.08, 0., 0.04])
+    iris_lf_shift = np.array([0.0, 0., 0.])
+    iris_rf_shift = np.array([0.0, 0., 0.])
+    iris_kn_shift = np.array([0.0, 0., 0.])
 
     # get end effector positions via fwd kin
     starting_torso_pos = standing_pos
     final_torso_pos = starting_torso_pos + np.array([goal_step_length, 0., 0.])
     starting_lf_pos = robot_data.oMf[plan_to_model_ids['LF']].translation
     final_lf_pos = starting_lf_pos + np.array([goal_step_length, 0., 0.])
-    starting_lh_pos = robot_data.oMf[plan_to_model_ids['LH']].translation - np.array([0.01, 0., 0.])
+    # starting_lh_pos = robot_data.oMf[plan_to_model_ids['LH']].translation - np.array([0.01, 0., 0.])
+    starting_lh_pos = robot_data.oMf[plan_to_model_ids['LH']].translation + np.array([0.1, 0., 0.])
     final_lh_pos = starting_lh_pos + np.array([goal_step_length, 0., 0.])
     starting_rf_pos = robot_data.oMf[plan_to_model_ids['RF']].translation
     final_rf_pos = starting_rf_pos + np.array([goal_step_length, 0., 0.])
-    starting_rh_pos = robot_data.oMf[plan_to_model_ids['RH']].translation - np.array([0.01, 0., 0.])
+    starting_rh_pos = robot_data.oMf[plan_to_model_ids['RH']].translation + np.array([0.1, 0., 0.])
     final_rh_pos = starting_rh_pos + np.array([goal_step_length + 0.15, 0., 0.])
-    starting_lkn_pos = robot_data.oMf[plan_to_model_ids['L_knee']].translation
+    starting_lkn_pos = robot_data.oMf[plan_to_model_ids['L_knee']].translation + np.array([0.02, 0., -0.05])
     final_lkn_pos = starting_lkn_pos + np.array([goal_step_length, 0., 0.])
     starting_rkn_pos = robot_data.oMf[plan_to_model_ids['R_knee']].translation
     final_rkn_pos = starting_rkn_pos + np.array([goal_step_length, 0., 0.])
@@ -191,7 +216,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     ###### Previously used key locations
     # door_l_outer_location = np.array([0.45, 0.35, 1.2])
     # door_r_outer_location = np.array([0.45, -0.35, 1.2])
-    # door_l_inner_location = np.array([0.52, 0.3, 1.2])
+    door_l_inner_location = np.array([0.28, 0.35, 0.9])
     # door_r_inner_location = np.array([0.52, -0.3, 1.2])
 
     starting_lh_pos = safe_regions_mgr_dict['LH'].iris_list[0].seed_pos
@@ -207,8 +232,8 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
     # ---- Step 1: L hand to frame
-    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'RH'])   # frames that must not move
-    motion_frames_seq.add_motion_frame({'LH': starting_lh_pos + np.array([0.08, 0.07, 0.15])})
+    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    motion_frames_seq.add_motion_frame({'LH': door_l_inner_location})
     lh_contact_front = PlannerSurfaceContact('LH', np.array([-1, 0, 0]))
     lh_contact_front.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
     motion_frames_seq.add_contact_surface(lh_contact_front)
@@ -217,30 +242,32 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                         'LF': final_lf_pos,
-                        'L_knee': final_lkn_pos})
+                        'L_knee': final_lkn_pos,
+                        'torso': final_torso_pos,                               # testing
+                        'RH': starting_rh_pos + np.array([0.2, 0.0, 0.0])})     # testing
     lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surface(lf_contact_over)
 
     # ---- Step 3: re-position L/R hands for more stability
-    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-    motion_frames_seq.add_motion_frame({
-                        'LH': starting_lh_pos + np.array([0.3, 0.0, 0.0])})
-                        # 'RH': starting_rh_pos + np.array([0.08, -0.07, 0.15])})
-    lh_contact_inside = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
-    lh_contact_inside.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
-    # rh_contact_inside = PlannerSurfaceContact('RH', np.array([0, 1, 0]))
-    motion_frames_seq.add_contact_surface([lh_contact_inside])
-
-    # ---- Step 4: step through door with right foot
-    fixed_frames.append(['LF', 'L_knee'])   # frames that must not move
-    motion_frames_seq.add_motion_frame({
-                        'RF': final_rf_pos,
-                        'torso': final_torso_pos,
-                        'R_knee': final_rkn_pos,
-                        'RH': final_rh_pos,
-                        'LH': starting_lh_pos + np.array([0.55, 0.0, 0.0])})
-    rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(rf_contact_over)
+    # fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    # motion_frames_seq.add_motion_frame({
+    #                     'LH': starting_lh_pos + np.array([0.3, 0.0, 0.0])})
+    #                     # 'RH': starting_rh_pos + np.array([0.08, -0.07, 0.15])})
+    # lh_contact_inside = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
+    # lh_contact_inside.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
+    # # rh_contact_inside = PlannerSurfaceContact('RH', np.array([0, 1, 0]))
+    # motion_frames_seq.add_contact_surface([lh_contact_inside])
+    #
+    # # ---- Step 4: step through door with right foot
+    # fixed_frames.append(['LF', 'L_knee'])   # frames that must not move
+    # motion_frames_seq.add_motion_frame({
+    #                     'RF': final_rf_pos,
+    #                     'torso': final_torso_pos,
+    #                     'R_knee': final_rkn_pos,
+    #                     'RH': final_rh_pos,
+    #                     'LH': starting_lh_pos + np.array([0.55, 0.0, 0.0])})
+    # rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
+    # motion_frames_seq.add_contact_surface(rf_contact_over)
 
     # ---- Step 5: square up
     fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
@@ -262,7 +289,7 @@ def visualize_env(rob_model, rob_collision_model, rob_visual_model, q0, door_pos
         )
         print(err)
         sys.exit(0)
-    visualizer.loadViewerModel(rootNodeName="draco3")
+    visualizer.loadViewerModel(rootNodeName=rob_model.name)
     visualizer.display(q0)
 
     # load (real) door to visualizer
@@ -276,35 +303,61 @@ def visualize_env(rob_model, rob_collision_model, rob_visual_model, q0, door_pos
     door_vis_q = door_pose
     door_vis.display(door_vis_q)
 
-    return visualizer
+    return visualizer, door_model, door_collision_model, door_visual_model
 
 
 def main(args):
     contact_seq = args.sequence
+    robot_name = args.robot_name
 
     #
     # Initialize frames to consider for contact planning
     #
     plan_to_model_frames = OrderedDict()
-    plan_to_model_frames['torso'] = 'torso_link'
-    plan_to_model_frames['LF'] = 'l_foot_contact'
-    plan_to_model_frames['RF'] = 'r_foot_contact'
-    plan_to_model_frames['L_knee'] = 'l_knee_fe_ld'
-    plan_to_model_frames['R_knee'] = 'r_knee_fe_ld'
-    plan_to_model_frames['LH'] = 'l_hand_contact'
-    plan_to_model_frames['RH'] = 'r_hand_contact'
+    if robot_name == 'draco3':
+        plan_to_model_frames['torso'] = 'torso_link'
+        plan_to_model_frames['LF'] = 'l_foot_contact'
+        plan_to_model_frames['RF'] = 'r_foot_contact'
+        plan_to_model_frames['L_knee'] = 'l_knee_fe_ld'
+        plan_to_model_frames['R_knee'] = 'r_knee_fe_ld'
+        plan_to_model_frames['LH'] = 'l_hand_contact'
+        plan_to_model_frames['RH'] = 'r_hand_contact'
+    elif robot_name == 'g1':
+        plan_to_model_frames['torso'] = 'pelvis'
+        plan_to_model_frames['LF'] = 'left_ankle_roll_link'
+        plan_to_model_frames['RF'] = 'right_ankle_roll_link'
+        plan_to_model_frames['L_knee'] = 'left_knee_link'
+        plan_to_model_frames['R_knee'] = 'right_knee_link'
+        plan_to_model_frames['LH'] = 'left_palm_link'
+        plan_to_model_frames['RH'] = 'right_palm_link'
+    else:
+        raise NotImplementedError('Mapping between planner and robot frames not defined')
 
     #
     # Load robot model, reachable regions, and environment
     #
-    aux_frames_path = cwd + '/pnc/reachability_map/output/draco3_aux_frames.yaml'
+    aux_frames_path = (cwd + '/pnc/reachability_map/output/' + robot_name + '/' +
+                       robot_name + '_aux_frames.yaml')
     ee_halfspace_params = OrderedDict()
+    reach_path = cwd + '/pnc/reachability_map/output/' + robot_name + '/' + robot_name
     for fr in plan_to_model_frames.keys():
-        ee_halfspace_params[fr] = cwd + '/pnc/reachability_map/output/draco3_' + fr + '.yaml'
+        ee_halfspace_params[fr] = reach_path + '_' + fr + '.yaml'
 
-    door_pose, obstacles, domain_ubody, domain_lbody = load_navy_env()
-    rob_model, col_model, vis_model, rob_data, col_data, vis_data = load_robot_model()
-    q0 = get_draco3_shaft_wrist_default_initial_pose()
+    # load robot model and corresponding robot data
+    rob_model, col_model, vis_model, rob_data, col_data, vis_data = load_robot_model(robot_name)
+
+    # load navy environment (with respective door offset) and initial robot pose
+    door_pos = np.array([0.32, 0., 0.])
+    step_length = 0.35
+    if robot_name == 'draco3':
+        q0 = get_draco3_shaft_wrist_default_initial_pose()
+    elif robot_name == 'g1':
+        q0 = get_g1_default_initial_pose(rob_model.nq - 7)
+        door_pos = np.array([0.28, 0., 0.])
+        step_length = 0.4
+    else:
+        raise NotImplementedError('Robot default configuration not specified')
+    door_pose, obstacles, domain_ubody, domain_lbody = load_navy_env(door_pos)
     v0 = np.zeros(rob_model.nv)
     x0 = np.concatenate([q0, v0])
 
@@ -329,13 +382,13 @@ def main(args):
 
     # Generate IRIS regions
     standing_pos = q0[:3]
-    step_length = 0.35
     safe_regions_mgr_dict, p_init = compute_iris_regions_mgr(obstacles, domain_ubody, domain_lbody,
                                                      rob_data, plan_to_model_ids,
                                                      standing_pos, step_length)
 
     if B_VISUALIZE:
-        visualizer = visualize_env(rob_model, col_model, vis_model, q0, door_pose)
+        visualizer, door_model, door_collision_model, door_visual_model \
+            = visualize_env(rob_model, col_model, vis_model, q0, door_pose)
     else:
         visualizer = None
 
@@ -392,22 +445,23 @@ def main(args):
     state = crocoddyl.StateMultibody(rob_model)
     actuation = crocoddyl.ActuationModelFloatingBase(state)
 
-    constr_mgr = crocoddyl.ConstraintModelManager(state, actuation.nu)
-    # -------- Existent constraint --------
-    # res_model = crocoddyl.ResidualModelState(state, x0, actuation.nu)
-    # constr_model_res = crocoddyl.ConstraintModelResidual(state, res_model)
-    # constr_mgr.addConstraint("residual_model", constr_model_res)
-    # -------- New constraint --------
-    l_res_model = ResidualModelStateError(state, 1, nu=actuation.nu, q_dependent=False)
-    l_res_model.constr_ids = l_constr_ids
-    # l_res_model.constr_ids_u = l_constr_ids_u
-    l_rcj_constr = ConstraintModelRCJ(state, residual=l_res_model, ng=0, nh=1)
-    constr_mgr.addConstraint("l_rcj_constr", l_rcj_constr)
-    r_res_model = ResidualModelStateError(state, 1, nu=actuation.nu, q_dependent=False)
-    r_res_model.constr_ids = r_constr_ids
-    # r_res_model.constr_ids_u = r_constr_ids_u
-    r_rcj_constr = ConstraintModelRCJ(state, residual=r_res_model, ng=0, nh=1)
-    constr_mgr.addConstraint("r_rcj_constr", r_rcj_constr)
+    if robot_name == 'draco3':
+        constr_mgr = crocoddyl.ConstraintModelManager(state, actuation.nu)
+        # -------- Existent constraint --------
+        # res_model = crocoddyl.ResidualModelState(state, x0, actuation.nu)
+        # constr_model_res = crocoddyl.ConstraintModelResidual(state, res_model)
+        # constr_mgr.addConstraint("residual_model", constr_model_res)
+        # -------- New constraint --------
+        l_res_model = ResidualModelStateError(state, 1, nu=actuation.nu, q_dependent=False)
+        l_res_model.constr_ids = l_constr_ids
+        # l_res_model.constr_ids_u = l_constr_ids_u
+        l_rcj_constr = ConstraintModelRCJ(state, residual=l_res_model, ng=0, nh=1)
+        constr_mgr.addConstraint("l_rcj_constr", l_rcj_constr)
+        r_res_model = ResidualModelStateError(state, 1, nu=actuation.nu, q_dependent=False)
+        r_res_model.constr_ids = r_constr_ids
+        # r_res_model.constr_ids_u = r_constr_ids_u
+        r_rcj_constr = ConstraintModelRCJ(state, residual=r_res_model, ng=0, nh=1)
+        constr_mgr.addConstraint("r_rcj_constr", r_rcj_constr)
 
     # ---------- testing ----------
     # shared_data = crocoddyl.DataCollectorMultibody(rob_data)
@@ -424,7 +478,7 @@ def main(args):
     NUM_OF_CONTACT_CONFIGURATIONS = 2
     T_total = T * NUM_OF_CONTACT_CONFIGURATIONS
 
-    lh_targets, base_into_targets, lf_targets = [], [], []
+    lh_targets, base_into_targets, lf_targets, lkn_targets = [], [], [], []
     # for left_t, right_t in zip(lh_targets, rh_targets):
     #     dmodel = createDoubleSupportActionModel(left_t, right_t)
     #     model_seqs += createSequence([dmodel], DT, N)
@@ -441,30 +495,27 @@ def main(args):
                 lhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LH'), t)
                 dmodel = createDoubleSupportActionModel(state,
                                                         actuation,
-                                                        rob_data,
                                                         x0,
                                                         lf_id,
                                                         rf_id,
                                                         lh_id,
                                                         rh_id,
-                                                        constr_mgr,
+                                                        None,
                                                         lh_target=lhand_t)
                 lh_targets.append(lhand_t)
                 model_seqs += createSequence([dmodel], DT, 1)
 
         elif i == 1:
-            plan_to_model_ids.pop('L_knee')
-            plan_to_model_ids.pop('R_knee')
             # DT = 0.015
             # Using left-hand support, pass left-leg through door
             ee_rpy = {'LH': [0., -np.pi/2, 0.]}
-            N_base_through_door = 60  # knots per waypoint to pass through door
+            N_base_through_door = 80  # knots per waypoint to pass through door
             # for base_t, lfoot_t in zip(base_into_targets, lf_targets):
             for t in np.linspace(i*T, (i+1)*T, N_base_through_door):
                 lfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LF'), t)
-                # lknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('L_knee'), t)
+                lknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('L_knee'), t)
                 rfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('RF'), t)
-                # rknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('R_knee'), t)
+                rknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('R_knee'), t)
                 lhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LH'), t)
                 rhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('RH'), t)
                 base_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('torso'), t)
@@ -472,8 +523,8 @@ def main(args):
                     'torso': base_t,
                     'LF': lfoot_t,
                     'RF': rfoot_t,
-                    # 'L_knee': lknee_t,
-                    # 'R_knee': rknee_t,
+                    'L_knee': lknee_t,
+                    'R_knee': rknee_t,
                     'LH': lhand_t,
                     'RH': rhand_t
                 }
@@ -484,9 +535,10 @@ def main(args):
                                                      ['LH', 'RF'],
                                                      ee_rpy,
                                                      frame_targets_dict,
-                                                     constr_mgr)
+                                                     None)
                 base_into_targets.append(base_t)
                 lf_targets.append(lfoot_t)
+                lkn_targets.append(lknee_t)
                 model_seqs += createSequence([dmodel], DT, 1)
 
         # elif i == 2:
@@ -610,8 +662,9 @@ def main(args):
         save_freq = 1
         display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
                           rob_data, vis_data, ctrl_freq=1/DT, save_freq=save_freq)
-        # display.add_robot("door", door_model, door_col_model, door_vis_model, door_ini_pos, door_ini_quat)
+        display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
         display.display_targets("lfoot_target", lf_targets, [1, 0, 0])
+        display.display_targets("lknee_target", lkn_targets, [1, 0, 0])
         # display.display_targets("rfoot_target", rf_targets, [0, 0, 1])
         display.display_targets("lhand_target", lh_targets, [0.5, 0, 0])
         # display.display_targets("lhand_inner_targets", lh_inner_targets, [0.5, 0, 0])
@@ -621,10 +674,10 @@ def main(args):
         display.display_targets("base_pass_target", base_into_targets, [0, 1, 0])
         # display.display_targets("base_ffoot_targets", base_ffoot_targets, [0, 1, 0])
         # display.display_targets("base_square_target", base_outof_targets, [0, 1, 0])
-        display.add_arrow("forces/l_ankle_ie", color=[1, 0, 0])
-        display.add_arrow("forces/r_ankle_ie", color=[0, 0, 1])
-        display.add_arrow("forces/l_wrist_pitch", color=[0, 1, 0])
-        display.add_arrow("forces/r_wrist_pitch", color=[0, 1, 0])
+        # display.add_arrow("forces/l_ankle_ie", color=[1, 0, 0])
+        # display.add_arrow("forces/r_ankle_ie", color=[0, 0, 1])
+        # display.add_arrow("forces/l_wrist_pitch", color=[0, 1, 0])
+        # display.add_arrow("forces/r_wrist_pitch", color=[0, 1, 0])
         # display.displayForcesFromCrocoddylSolver(fddp)
         display.displayFromCrocoddylSolver(fddp)
         viz_to_hide = list(("lfoot_target", "rfoot_target", "lhand_target", "lhand_inner_targets",
@@ -685,5 +738,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--sequence", type=int, default=0,
                         help="Contact sequence to solve for")
+    parser.add_argument("--robot_name", type=str, default='g1',
+                        help="Robot name to use for planning")
     args = parser.parse_args()
     main(args)
