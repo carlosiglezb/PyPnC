@@ -318,10 +318,9 @@ class TestIKCFreePlanner(unittest.TestCase):
             'RH': 'r_hand_contact'
         }
         ik_cfree_planner = IKCFreePlanner(self.robot.model, self.robot.data, plan_to_model_frames, self.q0)
-        ee_halfspace_params, frame_stl_paths = OrderedDict(), OrderedDict()
+        ee_halfspace_params = OrderedDict()
         for fr in frame_names:
             ee_halfspace_params[fr] = cwd + '/pnc/reachability_map/output/draco3_' + fr + '.yaml'
-            frame_stl_paths[fr] = (cwd + '/pnc/reachability_map/output/draco3_' + fr + '.stl')
 
         # process vision and create IRIS regions
         standing_pos = self.q0[:3]
@@ -367,7 +366,6 @@ class TestIKCFreePlanner(unittest.TestCase):
                                                                       visualizer=visualizer)
             else:
                 traversable_regions_dict[fr] = FrameTraversableRegion(fr,
-                                                                      frame_stl_paths[fr],
                                                                       ee_halfspace_params[fr],
                                                                       b_visualize_reach=b_visualize,
                                                                       b_visualize_safe=b_visualize,
@@ -418,10 +416,9 @@ class TestIKCFreePlanner(unittest.TestCase):
             'RH': 'r_hand_contact'
         }
         ik_cfree_planner = IKCFreePlanner(self.robot.model, self.robot.data, plan_to_model_frames, self.q0)
-        ee_halfspace_params, frame_stl_paths = OrderedDict(), OrderedDict()
+        ee_halfspace_params = OrderedDict()
         for fr in frame_names:
             ee_halfspace_params[fr] = cwd + '/pnc/reachability_map/output/draco3_' + fr + '.yaml'
-            frame_stl_paths[fr] = (cwd + '/pnc/reachability_map/output/draco3_' + fr + '.stl')
 
         # process vision and create IRIS regions
         standing_pos = self.q0[:3]
@@ -467,7 +464,6 @@ class TestIKCFreePlanner(unittest.TestCase):
                                                                       visualizer=visualizer)
             else:
                 traversable_regions_dict[fr] = FrameTraversableRegion(fr,
-                                                                      frame_stl_paths[fr],
                                                                       ee_halfspace_params[fr],
                                                                       b_visualize_reach=b_visualize,
                                                                       b_visualize_safe=b_visualize,

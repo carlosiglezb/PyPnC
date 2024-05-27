@@ -298,10 +298,9 @@ def main(args):
     # Load robot model, reachable regions, and environment
     #
     aux_frames_path = cwd + '/pnc/reachability_map/output/draco3_aux_frames.yaml'
-    ee_halfspace_params, frame_stl_paths = OrderedDict(), OrderedDict()
+    ee_halfspace_params = OrderedDict()
     for fr in plan_to_model_frames.keys():
         ee_halfspace_params[fr] = cwd + '/pnc/reachability_map/output/draco3_' + fr + '.yaml'
-        frame_stl_paths[fr] = (cwd + '/pnc/reachability_map/output/draco3_' + fr + '.stl')
 
     door_pose, obstacles, domain_ubody, domain_lbody = load_navy_env()
     rob_model, col_model, vis_model, rob_data, col_data, vis_data = load_robot_model()
@@ -355,7 +354,6 @@ def main(args):
                                                                   visualizer=visualizer)
         else:
             traversable_regions_dict[fr] = FrameTraversableRegion(fr,
-                                                                  frame_stl_paths[fr],
                                                                   ee_halfspace_params[fr],
                                                                   b_visualize_reach=B_VISUALIZE,
                                                                   b_visualize_safe=B_VISUALIZE,

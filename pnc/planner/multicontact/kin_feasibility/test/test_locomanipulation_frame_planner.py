@@ -67,10 +67,8 @@ class TestLocomanipulationFramePlanner(unittest.TestCase):
         self.domain_lbody = mut.HPolyhedron.MakeBox(dom_lbody_lb, dom_lbody_ub)
 
     def load_reachability_paths(self):
-        self.frame_stl_paths, self.poly_halfspace_paths = OrderedDict(), OrderedDict()
+        self.poly_halfspace_paths = OrderedDict()
         for fr in self.frame_names:
-            self.frame_stl_paths[fr] = (cwd +
-                                        '/pnc/reachability_map/output/draco3_' + fr + '.stl')
             self.poly_halfspace_paths[fr] = (cwd +
                                          '/pnc/reachability_map/output/draco3_' + fr + '.yaml')
 
@@ -228,7 +226,6 @@ class TestLocomanipulationFramePlanner(unittest.TestCase):
                                                                       visualizer=visualizer)
             else:
                 traversable_regions_dict[fr] = FrameTraversableRegion(fr,
-                                                                      self.frame_stl_paths[fr],
                                                                       self.poly_halfspace_paths[fr],
                                                                       b_visualize_reach=b_visualize,
                                                                       b_visualize_safe=b_visualize,
@@ -426,7 +423,6 @@ class TestLocomanipulationFramePlanner(unittest.TestCase):
                                                                       visualizer=visualizer)
             else:
                 traversable_regions_dict[fr] = FrameTraversableRegion(fr,
-                                                                      self.frame_stl_paths[fr],
                                                                       self.poly_halfspace_paths[fr],
                                                                       b_visualize_reach=b_visualize,
                                                                       b_visualize_safe=b_visualize,

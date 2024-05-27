@@ -11,7 +11,9 @@ import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
 import meshcat
 import meshcat.geometry as g
 import meshcat.transformations as tf
-
+from util.pydrake_meshcat_interface import *
+from util.polytope_math import extract_plane_eqn_from_coeffs
+from visualizer.meshcat_tools.meshcat_palette import meshcat_reach_obj
 # Iris Regions Manager
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
@@ -24,7 +26,7 @@ def convert_rgba_to_meshcat_obj(obj, color_rgb):
 
 
 class FrameTraversableRegion:
-    def __init__(self, frame_name, reachable_stl_path=None,
+    def __init__(self, frame_name,
                  convex_hull_halfspace_path=None,
                  visualizer=None,
                  b_visualize_reach=False,
@@ -37,14 +39,11 @@ class FrameTraversableRegion:
         ---------
         frame_name : String
             Name of the frame for which TraversableRegion is made for.
-        reachable_stl_path : String
-            Path to the stl (convex polygon) describing the reachable space of the frame
         convex_hull_halfspace_path : String
             Path to hyperplane parameters, e.g., of (a, b, c, d) in
                 .. math::
                     ax + by + cz + d = 0
-            of STL in reachable_stl_path. Parameters are
-            specified w.r.t. root (e.g., torso frame)
+            Parameters are specified w.r.t. root (e.g., torso frame)
         visualizer : Meshcat.Visualizer
             Viewer window for displaying reachable and safe regions
         b_visualize_reach : Bool
@@ -56,8 +55,17 @@ class FrameTraversableRegion:
             b_visualize_reach = True
 
         self.frame_name = frame_name
-        self._reachable_stl_path = reachable_stl_path
         self._b_visualize_reach = b_visualize_reach
+
+        # Retrieve halfspace coefficients defining the convex hull
+        self._plane_coeffs = []
+        if convex_hull_halfspace_path is not None:
+            with open(convex_hull_halfspace_path, 'r') as f:
+                yml = YAML().load(f)
+                for i_plane in range(len(yml)):
+                    self._plane_coeffs.append(yml[i_plane])
+        else:
+            print(f"Convex hull not specified for {frame_name}")
 
         # Visualize convex hull (reachable region)
         if b_visualize_reach or b_visualize_safe:
@@ -75,10 +83,12 @@ class FrameTraversableRegion:
                     self._vis.open()
                     self._vis.wait()
 
-                if reachable_stl_path is not None:
-                    obj = g.Mesh(g.StlMeshGeometry.from_file(reachable_stl_path))
-                    convert_rgba_to_meshcat_obj(obj.material, [0.9, 0.9, 0.9, 0.2])
-                    self._vis["traversable_regions"]["reachable"][frame_name].set_object(obj)
+                if convex_hull_halfspace_path is not None:
+                    # load the convex hull
+                    A, b = extract_plane_eqn_from_coeffs(self._plane_coeffs)
+                    polyhedron = HPolyhedron(A, -b)
+                    obj = pydrake_geom_to_meshcat(polyhedron)
+                    self._vis["traversable_regions"]["reachable"][frame_name].set_object(obj, meshcat_reach_obj())
 
             except ImportError as err:
                 print(
@@ -86,16 +96,6 @@ class FrameTraversableRegion:
                 )
                 print(err)
                 sys.exit(0)
-
-        # Retrieve halfspace coefficients defining the convex hull
-        if convex_hull_halfspace_path is not None:
-            with open(convex_hull_halfspace_path, 'r') as f:
-                yml = YAML().load(f)
-                self._plane_coeffs = []
-                for i_plane in range(len(yml)):
-                    self._plane_coeffs.append(yml[i_plane])
-        else:
-            print(f"Convex hull not specified for {frame_name}")
 
         # set the origin of the reachable space (i.e., origin of torso w.r.t. world)
         self._origin_pos = np.zeros((3,))               # [x,y,z] of torso w.r.t. world
@@ -116,7 +116,7 @@ class FrameTraversableRegion:
         if origin_ori_direction is None:
             origin_ori_direction = np.array([0., 0., 1.])
 
-        if self._b_visualize_reach and self._reachable_stl_path is not None:
+        if self._b_visualize_reach and len(self._plane_coeffs) != 0:
             # Note: this does NOT update the actual plane equations, it simply
             # shifts the origin of the STL part to origin_pos. The equations
             # update is currently being done in the LocomanipulationFramePlanner
