@@ -173,6 +173,12 @@ class IrisRegionsManager:
             # point must be contained in either the start/goal IRIS region
             if self.iris_list[self.iris_idx_seq[0]].isPointSafe(point):
                 return [self.iris_idx_seq[0]]
+            elif len(self.global_iris) > 1:
+                # as fallback, loop through IRIS regions in the global IRIS list
+                for gi in self.global_iris:
+                    if gi[0] != self.iris_idx_seq[0]:
+                        print(f"[IRIS fallback] Using IRIS region {gi[0]} for point {point}.")
+                        return [gi[0]]
             else:
                 raise ValueError(f"Ideal IRIS Region does NOT contain point {point}.")
         return self.iris_graph.regionsContainingPoint(point)
