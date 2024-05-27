@@ -17,14 +17,16 @@ import pydrake.geometry.optimization as mut
 
 def main(args):
     scale = args.scale
+    robot_name = args.robot_name
     print(f"Scaling the polytopes by {scale}")
 
-    save_loc = cwd + '/pnc/reachability_map/output/'
+    save_loc = cwd + '/pnc/reachability_map/output/' + robot_name
 
-    frame_names = ['LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
+    # frame_names = ['LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
+    frame_names = ['L_knee', 'R_knee']
     convex_hull_halfspace_path = {}
     for fr in frame_names:
-        convex_hull_halfspace_path[fr] = cwd + '/pnc/reachability_map/output/draco3_' + fr + '.yaml'
+        convex_hull_halfspace_path[fr] = save_loc + '/' + robot_name + '_' + fr + '.yaml'
 
     # Scale
     original_pydrake_geom = {}
@@ -56,7 +58,7 @@ def main(args):
     yaml = YAML()
     plane_dict = {'a': 0., 'b': 0., 'c': 0., 'd': 0.}
     for fr in frame_names:
-        filename = 'draco3_' + fr + '_scaled'
+        filename = robot_name + '_' + fr + '_scaled'
         plane_coeffs_list = []
         for i in range(scaled_pydrake_geom[fr].A().shape[0]):
             plane_dict['a'] = float(scaled_pydrake_geom[fr].A()[i][0])
@@ -64,15 +66,17 @@ def main(args):
             plane_dict['c'] = float(scaled_pydrake_geom[fr].A()[i][2])
             plane_dict['d'] = -float(scaled_pydrake_geom[fr].b()[i])
             plane_coeffs_list.append(deepcopy(plane_dict))
-        with open(save_loc + filename + '.yaml', 'w') as f:
+        with open(save_loc + '/' + filename + '.yaml', 'w') as f:
             yaml.dump(plane_coeffs_list, f)
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scale", type=float, default=0.85,
+    parser.add_argument("--scale", type=float, default=1.25,
                         help="Scale factor for the polytopes")
+    parser.add_argument("--robot_name", type=str, default='g1',
+                        help="Name of robot model to use for scaling polytopes")
     args = parser.parse_args()
     main(args)
 
