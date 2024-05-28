@@ -368,7 +368,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 frame_targets_dict: dict[str, np.array],
                                 rcj_constraints: crocoddyl.ConstraintModelManager,
                                 ang_weights=5.0):
-    mu = 0.7
+    mu = 0.9
 
     # Define the cost sum (cost manager)
     costs = crocoddyl.CostModelSum(state, actuation.nu)
@@ -391,13 +391,18 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             SE3_ee,
             pin.LOCAL_WORLD_ALIGNED,
             actuation.nu,
-            np.array([0, 0.1]),
+            np.array([0, 0]),
         )
         contacts.addContact(fr_name, fr_contact)
 
         # Add friction cone penalization according to foot or hand contact
-        if 'H' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(ee_rpy[fr_name]), mu, 4, True)
+        if 'RH' in fr_name:
+            # surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(ee_rpy[fr_name]), mu, 4, True)
+            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., -np.pi/2])), mu, 4, True)
+            # surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., 0.])), mu, 4, True)
+        elif 'LH' in fr_name:
+            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., np.pi/2])), mu, 4, True)
+            # surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., 0.])), mu, 4, True)
         else:
             floor_rotation = np.eye(3)
             surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
@@ -428,13 +433,13 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     for fr_name, fr_id in plan_to_model_ids.items():
         # set higher tracking cost on feet
         if 'F' in fr_name:
-            w_fr = np.array([1.] * 3 + [1.] * 3)        # (lin, ang)
+            w_fr = np.array([10.] * 3 + [0.001] * 3)        # (lin, ang)
         elif 'H' in fr_name:
             w_fr = np.array([2.] * 3 + [0.00001] * 3)
         elif 'knee' in fr_name:
             w_fr = np.array([2.] * 3 + [0.00001] * 3)
         elif 'torso' in fr_name:
-            w_fr = np.array([0.1] * 3 + [0.1] * 3)
+            w_fr = np.array([0.5] * 3 + [0.1] * 3)
         else:
             raise ValueError(f"Weights to track frame {fr_name} were not set")
 
@@ -445,7 +450,6 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         fr_Mref.translation = frame_targets_dict[fr_name]
 
         # add as cost
-        # fr_Mref = pin.SE3(np.eye(3), frame_targets_dict[fr_name])
         activation_fr = crocoddyl.ActivationModelWeightedQuad(w_fr ** 2)
         fr_cost = crocoddyl.CostModelResidual(
             state,
@@ -455,7 +459,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         costs.addCost(fr_name + "_goal", fr_cost, 1e2)
 
     # Adding state and control regularization terms
-    w_x = np.array([0] * 3 + [10.0] * 3 + [0.01] * (state.nv - 6) + [10] * state.nv)
+    w_x = np.array([0.1] * 3 + [10.0] * 3 + [2.] * (state.nv - 6) + [2.] * state.nv)
     activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x**2)
     x_reg_cost = crocoddyl.CostModelResidual(
         state, activation_xreg, crocoddyl.ResidualModelState(state, x0, actuation.nu)
@@ -463,7 +467,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     u_reg_cost = crocoddyl.CostModelResidual(
         state, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
-    costs.addCost("xReg", x_reg_cost, 1e-3)
+    costs.addCost("xReg", x_reg_cost, 5e-3)
     costs.addCost("uReg", u_reg_cost, 1e-8)
 
     if rcj_constraints is not None:
@@ -502,7 +506,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         activation_xbounds,
         crocoddyl.ResidualModelState(state, 0 * x0, actuation.nu),
     )
-    costs.addCost("xBounds", x_bounds, 1.0)
+    costs.addCost("xBounds", x_bounds, 100.0)
 
     # Creating the action model
     dmodel = crocoddyl.DifferentialActionModelContactFwdDynamics(
