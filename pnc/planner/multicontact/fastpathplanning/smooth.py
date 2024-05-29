@@ -709,39 +709,39 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
         cost_log_abs_sum = -(cp.sum(cost_log_abs))
 
     # Reachability constraints
-    if reach_region is not None:
-        k_fr_iris = 0
-        for fr_idx, frame_name in enumerate(frame_list):
-            fr_iris_counter = 0
-            for seg in range(len(durations)):
-
-                num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg])
-                for si in range(num_iris_current):
-                    z_t = points[0 * num_iris_tot + fr_iris_counter + si][0]
-
-                    if frame_name == 'torso':
-                        # get corresponding ee frame points to consider for stance reachability constraint
-                        if seg < 3:         # stance_foot = 'RF'
-                            rf_idx = 2      # RF is 3rd in the list
-                            coeffs = reach_region['RF']
-                            z_ee_seg = points[rf_idx * num_iris_tot][0]
-                        else:               # stance_foot = 'LF'
-                            lf_idx = 1      # LF is 2nd in the list
-                            coeffs = reach_region['LF']
-                            z_ee_seg = points[lf_idx * num_iris_tot][0]
-
-                    else:
-                        coeffs = reach_region[frame_name]
-                        z_ee_seg = points[fr_idx * num_iris_tot + fr_iris_counter + si][0]
-
-                    # reachable constraint
-                    H = coeffs['H']
-                    d_vec = np.reshape(coeffs['d'], (len(H), 1))
-                    d_mat = np.repeat(d_vec, n_points, axis=1)
-                    constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
-
-                fr_iris_counter += num_iris_current
-                k_fr_iris += num_iris_current
+    # if reach_region is not None:
+    #     k_fr_iris = 0
+    #     for fr_idx, frame_name in enumerate(frame_list):
+    #         fr_iris_counter = 0
+    #         for seg in range(len(durations)):
+    #
+    #             num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg])
+    #             for si in range(num_iris_current):
+    #                 z_t = points[0 * num_iris_tot + fr_iris_counter + si][0]
+    #
+    #                 if frame_name == 'torso':
+    #                     # get corresponding ee frame points to consider for stance reachability constraint
+    #                     if seg < 3:         # stance_foot = 'RF'
+    #                         rf_idx = 2      # RF is 3rd in the list
+    #                         coeffs = reach_region['RF']
+    #                         z_ee_seg = points[rf_idx * num_iris_tot][0]
+    #                     else:               # stance_foot = 'LF'
+    #                         lf_idx = 1      # LF is 2nd in the list
+    #                         coeffs = reach_region['LF']
+    #                         z_ee_seg = points[lf_idx * num_iris_tot][0]
+    #
+    #                 else:
+    #                     coeffs = reach_region[frame_name]
+    #                     z_ee_seg = points[fr_idx * num_iris_tot + fr_iris_counter + si][0]
+    #
+    #                 # reachable constraint
+    #                 H = coeffs['H']
+    #                 d_vec = np.reshape(coeffs['d'], (len(H), 1))
+    #                 d_mat = np.repeat(d_vec, n_points, axis=1)
+    #                 constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+    #
+    #             fr_iris_counter += num_iris_current
+    #             k_fr_iris += num_iris_current
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
@@ -749,7 +749,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     if prob.status == 'infeasible':
         print('Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
-        prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
+        prob.solve(solver='SCS', eps_rel=1e-1, eps_abs=1e-1)
 
     # Reconstruct trajectory.
     beziers, path = [], []

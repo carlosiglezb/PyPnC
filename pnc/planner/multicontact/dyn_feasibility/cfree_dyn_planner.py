@@ -2,12 +2,16 @@ import os
 import sys
 from collections import OrderedDict
 
+cwd = os.getcwd()
+sys.path.append(cwd)
+
 import crocoddyl
+import numpy as np
+
 from pnc.planner.multicontact.crocoddyl.ConstraintModelRCJ import ConstraintModelRCJ
 # Collision free description
 from pydrake.geometry.optimization import HPolyhedron
 
-from pnc.planner.multicontact.crocoddyl.ResidualModelStateError import ResidualModelStateError
 # Kinematic feasibility
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
 from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
@@ -21,8 +25,6 @@ from plot.helper import plot_vector_traj, Fxyz_labels
 import plot.meshcat_utils as vis_tools
 from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterface
 
-cwd = os.getcwd()
-sys.path.append(cwd)
 
 B_SHOW_JOINT_PLOTS = False
 B_SHOW_GRF_PLOTS = False
@@ -90,7 +92,7 @@ def load_navy_env(door_pos):
     dom_ubody_lb = np.array([-1.6, -0.8, 0.5])
     dom_ubody_ub = np.array([1.6, 0.8, 2.1])
     dom_lbody_lb = np.array([-1.6, -0.8, -0.])
-    dom_lbody_ub = np.array([1.6, 0.8, 1.1])
+    dom_lbody_ub = np.array([1.6, 0.8, 1.2])
     floor = HPolyhedron.MakeBox(
         np.array([-2, -0.9, -0.05]) + door_pos + door_width,
         np.array([2, 0.9, -0.001]) + door_pos + door_width)
@@ -216,8 +218,8 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     ###### Previously used key locations
     # door_l_outer_location = np.array([0.45, 0.35, 1.2])
     # door_r_outer_location = np.array([0.45, -0.35, 1.2])
-    door_l_inner_location = np.array([0.28, 0.35, 0.9])
-    door_r_inner_location = np.array([0.34, -0.35, 1.0])
+    door_l_inner_location = np.array([0.3, 0.35, 0.9])
+    door_r_inner_location = np.array([0.34, -0.35, 0.9])
 
     starting_lh_pos = safe_regions_mgr_dict['LH'].iris_list[0].seed_pos
     starting_rh_pos = safe_regions_mgr_dict['RH'].iris_list[0].seed_pos
@@ -227,13 +229,16 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     final_torso_pos = safe_regions_mgr_dict['torso'].iris_list[1].seed_pos
     final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
     final_rh_pos = safe_regions_mgr_dict['RH'].iris_list[1].seed_pos
+    final_lh_pos = safe_regions_mgr_dict['LH'].iris_list[1].seed_pos
 
     # initialize fixed and motion frame sets
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
     # ---- Step 1: L hand to frame
-    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-    motion_frames_seq.add_motion_frame({'LH': door_l_inner_location})
+    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    motion_frames_seq.add_motion_frame({
+                                        'LH': door_l_inner_location,
+                                        })
     lh_contact_front = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
     lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
     motion_frames_seq.add_contact_surface(lh_contact_front)
@@ -249,8 +254,8 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     # ---- Step 3: re-position L/R hands for more stability
     fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
-                        'LH': starting_lh_pos + np.array([0.3, 0., 0.0]),
-                        'torso': final_torso_pos + np.array([-0.15, 0., 0.]),     # testing
+                        # 'LH': starting_lh_pos + np.array([0.35, 0.1, 0.0]),
+                        'torso': final_torso_pos + np.array([-0.10, 0., 0.05]),     # good testing
                         'RH': door_r_inner_location})
     # lh_contact_inside = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
     # lh_contact_inside.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
@@ -258,19 +263,23 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     motion_frames_seq.add_contact_surface(rh_contact_inside)
 
     # ---- Step 4: step through door with right foot
-    fixed_frames.append(['LF', 'L_knee', 'RH', 'LH'])   # frames that must not move
+    fixed_frames.append(['LF', 'L_knee', 'RH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                         'RF': final_rf_pos,
-                        'torso': final_torso_pos,
+                        'torso': final_torso_pos + np.array([0.02, 0., 0.0]),     # good testing
                         'R_knee': final_rkn_pos,
-                        # 'LH': starting_lh_pos + np.array([0.4, 0.0, 0.0])
+                        'LH': starting_lh_pos + np.array([0.35, 0.0, 0.0])
     })
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surface(rf_contact_over)
 
-    # ---- Step 5: square up
-    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
-    motion_frames_seq.add_motion_frame({})
+    # ---- Step 5: balance / square up
+    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee'])
+    motion_frames_seq.add_motion_frame({
+        'torso': final_torso_pos,
+        'RH': final_rh_pos + np.array([-0.20, 0., 0.]),
+        'LH': final_lh_pos
+    })
 
     return fixed_frames, motion_frames_seq
 
@@ -373,11 +382,6 @@ def main(args):
     plan_to_model_ids['LH'] = rob_model.getFrameId(plan_to_model_frames['LH'])
     plan_to_model_ids['RH'] = rob_model.getFrameId(plan_to_model_frames['RH'])
     plan_to_model_ids['torso'] = rob_model.getFrameId(plan_to_model_frames['torso'])
-    rf_id = rob_model.getFrameId(plan_to_model_frames['RF'])
-    lf_id = rob_model.getFrameId(plan_to_model_frames['LF'])
-    lh_id = rob_model.getFrameId(plan_to_model_frames['LH'])
-    rh_id = rob_model.getFrameId(plan_to_model_frames['RH'])
-    base_id = rob_model.getFrameId(plan_to_model_frames['torso'])
 
     # Generate IRIS regions
     standing_pos = q0[:3]
@@ -468,12 +472,9 @@ def main(args):
     #
     # Dynamic solve
     #
-    # DT = 2e-2
 
     # Connecting the sequences of models
-    # NUM_OF_CONTACT_CONFIGURATIONS = len(motion_frames_seq.motion_frame_lst)
-    NUM_OF_CONTACT_CONFIGURATIONS = 4
-    T_total = T * NUM_OF_CONTACT_CONFIGURATIONS
+    NUM_OF_CONTACT_CONFIGURATIONS = len(motion_frames_seq.motion_frame_lst)
 
     lh_targets, base_into_targets, lf_targets, lkn_targets = [], [], [], []
     base_before_lf_step, base_after_lf_step, base_during_rf_step = [], [], []
@@ -520,7 +521,7 @@ def main(args):
 
         elif i == 2:
             # Reach door with left and right hand from inside
-            N_rhand_to_door = 60  # knots for left hand reaching
+            N_rhand_to_door = 80  # knots for left hand reaching
             for t in np.linspace(i*T, (i+1)*T, N_rhand_to_door):
                 frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                 dmodel = createMultiFrameActionModel(state,
@@ -534,26 +535,6 @@ def main(args):
                 model_seqs += createSequence([dmodel], T/(N_rhand_to_door-1), 1)
                 base_after_lf_step.append(frame_targets_dict['torso'])
 
-        # elif i == 3:
-        #     DT = 0.03
-        #     # Start transferring weight to front foot
-        #     N_base_to_ffoot = 15  # knots for left hand reaching
-        #     for base_t in base_ffoot_targets:
-        #         dmodel = createSingleSupportHandActionModel(state,
-        #                                                     actuation,
-        #                                                     x0,
-        #                                                     lf_id,
-        #                                                     rf_id,
-        #                                                     lh_id,
-        #                                                     rh_id,
-        #                                                     base_id,
-        #                                                     base_t,
-        #                                                     lhand_target=door_l_inner_location,
-        #                                                     lh_contact=False,
-        #                                                     rhand_target=door_r_inner_location,
-        #                                                     rh_contact=False)
-        #         model_seqs += createSequence([dmodel], DT, N_base_to_ffoot)
-        #
         elif i == 3:
             # Using left-hand and right-foot supports, pass right-leg through door
             N_base_square_up = 150  # knots per waypoint to pass through door
@@ -572,41 +553,21 @@ def main(args):
                 rf_targets.append(frame_targets_dict['RF'])
                 rkn_targets.append(frame_targets_dict['R_knee'])
 
-        # elif i == 5:
-        #     DT = 0.02
-        #     # Push forward while straightening up torso
-        #     N_straighten_torso = 20  # knots per waypoint to pass through door
-        #     dmodel = createSingleSupportHandActionModel(state,
-        #                                                 actuation,
-        #                                                 x0,
-        #                                                 lf_id,
-        #                                                 rf_id,
-        #                                                 lh_id,
-        #                                                 rh_id,
-        #                                                 base_id,
-        #                                                 base_outof_targets[-1],
-        #                                                 lhand_target=lhand_inner_contact_pos,
-        #                                                 lh_contact=True,
-        #                                                 rhand_target=rhand_inner_contact_pos,
-        #                                                 rh_contact=True,
-        #                                                 ang_weights=0.1)
-        #     model_seqs += createSequence([dmodel], DT, N_straighten_torso)
-        #
-        # elif i == 6:
-        #     DT = 0.02
-        #     # Finish straightening torso
-        #     N_straighten_torso = 30  # knots per waypoint to pass through door
-        #     dmodel = createSingleSupportHandActionModel(state,
-        #                                                 actuation,
-        #                                                 x0,
-        #                                                 lf_id,
-        #                                                 rf_id,
-        #                                                 lh_id,
-        #                                                 rh_id,
-        #                                                 base_id,
-        #                                                 base_outof_targets[-1],
-        #                                                 ang_weights=0.8)
-        #     model_seqs += createSequence([dmodel], DT, N_straighten_torso)
+        elif i == 4:
+            # Reach door with left and right hand from inside
+            N_square_up = 160  # knots for squaring up
+            for t in np.linspace(i*T, (i+1)*T, N_square_up):
+                frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
+                dmodel = createMultiFrameActionModel(state,
+                                                     actuation,
+                                                     x0,
+                                                     plan_to_model_ids,
+                                                     ['LF', 'RF'],
+                                                     ee_rpy,
+                                                     frame_targets_dict,
+                                                     None,
+                                                     zero_config=q0)
+                model_seqs += createSequence([dmodel], T/(N_square_up-1), 1)
 
         problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
         fddp[i] = crocoddyl.SolverFDDP(problem)
