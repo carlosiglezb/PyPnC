@@ -333,6 +333,13 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
             box_seq_dict[fm] = iris_regions[fm].findShortestPath(pm_init, pm_next)
             # box_seq_dict[fm] = find_shortest_iris_path(safe_regions[fm], pm_init, pm_next)
 
+    # check motion frames for consistency
+    for mf_idx, mf in enumerate(motion_frames):
+        for mframe, mpos in mf.items():
+            # add it to the safe points list if it's not already there
+            if mframe not in safe_points_lst[mf_idx+1].keys():
+                safe_points_lst[mf_idx+1][mframe] = mpos
+
     # if there were no fixed frames (only motion frames), return solution
     # TODO: this might still fail if there were any free frames, fix later
     if len(box_seq_lst) == 0:
