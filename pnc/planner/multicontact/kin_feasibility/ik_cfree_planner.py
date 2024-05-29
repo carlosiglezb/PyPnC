@@ -293,5 +293,8 @@ class IKCFreePlanner:
     def get_ee_des_pos(self, frame_name_idx: int, t: float):
         frame_bez_path = self.planner.path[frame_name_idx]
         seg = self._get_bez_segment(frame_bez_path, t)
+        if seg >= len(frame_bez_path.beziers):
+            print(f'Segment {seg} was out of bounds for frame {frame_name_idx} at time {t}.')
+            seg = len(frame_bez_path.beziers) - 1
         bezier_curve = frame_bez_path.beziers[seg]
         return bezier_curve(t)
