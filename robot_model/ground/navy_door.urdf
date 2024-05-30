@@ -6,7 +6,7 @@
   </contact>
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0"/>
-       <mass value="500."/>
+       <mass value="5000."/>
        <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
     </inertial>
     <visual>
@@ -18,10 +18,25 @@
         <color rgba="0.6 0.6 0.6 1"/>
       </material>
     </visual>
+    <!-- base of knee-knocker -->
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.2"/>
+      <origin rpy="0 0 0" xyz="0 -0.025 0.2"/>
       <geometry>
-         <box size="1.4 0.1 0.4"/>
+         <box size="1.4 0.05 0.4"/>
+      </geometry>
+    </collision>
+    <!-- left column of knee-knocker -->
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.641 -0.025 1.1"/>
+      <geometry>
+         <box size="0.518 0.05 2.2"/>
+      </geometry>
+    </collision>
+    <!-- right column of knee-knocker -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0.641 -0.025 1.1"/>
+      <geometry>
+         <box size="0.518 0.05 2.2"/>
       </geometry>
     </collision>
   </link>
