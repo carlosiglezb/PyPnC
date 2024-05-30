@@ -1,0 +1,6 @@
+- parent_frame: left_knee_link
+  child_frame: left_ankle_roll_link
+  length: 0.31744073475038936
+- parent_frame: right_knee_link
+  child_frame: right_ankle_roll_link
+  length: 0.31744073475038936
