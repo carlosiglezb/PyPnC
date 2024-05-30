@@ -24,11 +24,13 @@ import matplotlib.pyplot as plt
 from plot.helper import plot_vector_traj, Fxyz_labels
 import plot.meshcat_utils as vis_tools
 from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterface
-
+# Save data
+from plot.data_saver import *
 
 B_SHOW_JOINT_PLOTS = False
 B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = True
+B_SAVE_DATA = True
 
 
 def get_draco3_shaft_wrist_default_initial_pose():
@@ -318,6 +320,10 @@ def main(args):
     contact_seq = args.sequence
     robot_name = args.robot_name
 
+    if B_SAVE_DATA:
+        # Saving data tools
+        data_saver = DataSaver('g1_knee_knocker.pkl')
+
     #
     # Initialize frames to consider for contact planning
     #
@@ -573,7 +579,7 @@ def main(args):
         fddp[i] = crocoddyl.SolverFDDP(problem)
 
         # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
-        fddp[i].setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
+        fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
 
         # Solver settings
         max_iter = 200
@@ -586,6 +592,17 @@ def main(args):
         print("Number of iterations:", fddp[i].iter)
         print("Total cost:", fddp[i].cost)
         print("Gradient norm:", fddp[i].stoppingCriteria())
+
+        # save data
+        if B_SAVE_DATA:
+            for ti in range(len(fddp[i].us)):
+                data_saver.add('time', float(i*T + ti*T/(len(fddp[i].xs)-1)))
+                data_saver.add('q_base', list(fddp[i].xs[ti][:7]))
+                data_saver.add('q_joints', list(fddp[i].xs[ti][7:state.nq]))
+                data_saver.add('qd_base', list(fddp[i].xs[ti][state.nq:state.nq+6]))
+                data_saver.add('qd_joints', list(fddp[i].xs[ti][state.nq+6:]))
+                data_saver.add('tau_joints', list(fddp[i].us[ti]))
+                data_saver.advance()
 
         # Set final state as initial state of next phase
         x0 = fddp[i].xs[-1]
