@@ -5,8 +5,8 @@ from collections import OrderedDict
 import pybullet as p
 import numpy as np
 from tqdm import tqdm
-import cv2
-import imageio
+# import cv2
+# import imageio
 
 from util import util
 from util import liegroup
@@ -332,6 +332,14 @@ def get_sensor_data(robot, joint_id, link_id, pos_basejoint_to_basecom,
         sensor_data['joint_vel'][k] = js[1]
 
     return sensor_data
+
+
+def get_gains_dicts(joint_id, kp_vals, kd_vals):
+    kp_dict, kd_dict = OrderedDict(), OrderedDict()
+    for i, k in enumerate(joint_id.keys()):
+        kp_dict[k] = kp_vals[i]
+        kd_dict[k] = kd_vals[i]
+    return kp_dict, kd_dict
 
 
 def get_camera_image_from_link(robot, link, pic_width, pic_height, fov,
