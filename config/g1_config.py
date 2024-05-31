@@ -14,7 +14,7 @@ class SimConfig(object):
     NAVY_DOOR_POSITION = [0.28, 0, 0]
     NAVY_DOOR_QUAT = [0., 0., 0.7071068, 0.7071068]
 
-    PRINT_ROBOT_INFO = True
+    PRINT_ROBOT_INFO = False
     VIDEO_RECORD = False
     RECORD_FREQ = 5
 

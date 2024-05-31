@@ -65,7 +65,7 @@ def createDoubleSupportActionModel(state: crocoddyl.StateMultibody,
         costs.addCost("rh_goal", rh_cost, 1e2)
 
     # Adding state and control regularization terms
-    w_x = np.array([0] * 3 + [10.0] * 3 + [0.01] * (state.nv - 6) + [10] * state.nv)
+    w_x = np.array([0] * 3 + [1.0] * 3 + [2.] * (state.nv - 6) + [10] * state.nv)
     activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x**2)
     x_reg_cost = crocoddyl.CostModelResidual(
         state, activation_xreg, crocoddyl.ResidualModelState(state, x0, actuation.nu)

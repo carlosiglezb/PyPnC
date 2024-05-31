@@ -8,11 +8,15 @@ from collections import OrderedDict
 import copy
 import signal
 import pickle
-
 # import cv2
 import pybullet as p
 import numpy as np
-
+# planner tools
+import crocoddyl
+import pinocchio as pin
+from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (createMultiFrameActionModel,
+                                                                             createSequence,
+                                                                             createDoubleSupportActionModel)
 np.set_printoptions(precision=2)
 
 from config.g1_config import SimConfig, LowLevelConfig
@@ -46,6 +50,34 @@ def signal_handler(signal, frame):
     sys.exit(0)
 
 
+def get_plan_to_model_frames():
+    plan_to_model_frames = OrderedDict()
+    plan_to_model_frames['torso'] = 'torso_link'
+    plan_to_model_frames['LF'] = 'left_ankle_roll_link'
+    plan_to_model_frames['RF'] = 'right_ankle_roll_link'
+    plan_to_model_frames['L_knee'] = 'left_knee_link'
+    plan_to_model_frames['R_knee'] = 'right_knee_link'
+    plan_to_model_frames['LH'] = 'left_palm_link'
+    plan_to_model_frames['RH'] = 'right_palm_link'
+    return plan_to_model_frames
+
+
+def get_plan_to_model_ids(rob_model):
+    plan_to_model_frames = get_plan_to_model_frames()
+
+    # Getting the frame ids
+    plan_to_model_ids = {}
+    plan_to_model_ids['RF'] = rob_model.getFrameId(plan_to_model_frames['RF'])
+    plan_to_model_ids['LF'] = rob_model.getFrameId(plan_to_model_frames['LF'])
+    plan_to_model_ids['R_knee'] = rob_model.getFrameId(plan_to_model_frames['R_knee'])
+    plan_to_model_ids['L_knee'] = rob_model.getFrameId(plan_to_model_frames['L_knee'])
+    plan_to_model_ids['LH'] = rob_model.getFrameId(plan_to_model_frames['LH'])
+    plan_to_model_ids['RH'] = rob_model.getFrameId(plan_to_model_frames['RH'])
+    plan_to_model_ids['torso'] = rob_model.getFrameId(plan_to_model_frames['torso'])
+
+    return plan_to_model_ids
+
+
 signal.signal(signal.SIGINT, signal_handler)
 
 if __name__ == "__main__":
@@ -63,8 +95,10 @@ if __name__ == "__main__":
     # if SimConfig.VIDEO_RECORD: TODO implement with Meshcat?
 
     # Create Robot, Ground
+    package_dir = cwd + "/robot_model/g1_description"
+    robot_urdf_file = package_dir + "/g1.urdf"
     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
-    robot = p.loadURDF(cwd + "/robot_model/g1_description/g1.urdf",
+    robot = p.loadURDF(robot_urdf_file,
                        SimConfig.INITIAL_POS_WORLD_TO_BASEJOINT,
                        SimConfig.INITIAL_QUAT_WORLD_TO_BASEJOINT)
 
@@ -103,6 +137,12 @@ if __name__ == "__main__":
             except EOFError:
                 break
 
+    # Build pinocchio robot model
+    rob_model, col_model, vis_model = pin.buildModelsFromUrdf(robot_urdf_file,
+                                                              package_dir,
+                                                              pin.JointModelFreeFlyer())
+    rob_data, _, __ = pin.createDatas(rob_model, col_model, vis_model)
+
     # Run Sim
     t = 0
     dt = SimConfig.CONTROLLER_DT
@@ -121,6 +161,22 @@ if __name__ == "__main__":
         gripper_command[gripper_joint] = nominal_sensor_data['joint_pos'][
             gripper_joint]
 
+    # update pinocchio model
+    q0_joints = np.array(list(nominal_sensor_data['joint_pos'].values()))
+    q0_base = np.concatenate([SimConfig.INITIAL_POS_WORLD_TO_BASEJOINT,
+                             SimConfig.INITIAL_QUAT_WORLD_TO_BASEJOINT])
+    q0 = np.concatenate([q0_base, q0_joints])
+    pin.forwardKinematics(rob_model, rob_data, q0)
+    pin.updateFramePlacements(rob_model, rob_data)
+    # Initialize Planner
+    plan_to_model_ids = get_plan_to_model_ids(rob_model)
+    state = crocoddyl.StateMultibody(rob_model)
+    actuation = crocoddyl.ActuationModelFloatingBase(state)
+    ee_rpy = {'LH': [0., 0., 0.], 'RH': [0., 0., 0.]}
+    # Solver settings
+    T, N_horizon = 0.5, 50
+    max_iter = 100
+
     initial_jpos_dict = copy.deepcopy(nominal_sensor_data['joint_pos'])
     b_start_plan = False
     command = {}
@@ -137,6 +193,16 @@ if __name__ == "__main__":
         sensor_data['b_rf_contact'] = True if rf_height <= 0.03 else False
         sensor_data['b_lf_contact'] = True if lf_height <= 0.03 else False
 
+        # update current state
+        x_current = np.concatenate((
+                                    sensor_data['base_joint_pos'],
+                                    sensor_data['base_joint_quat'],
+                                    np.array(list(sensor_data['joint_pos'].values())),
+                                    sensor_data['base_joint_lin_vel'],
+                                    sensor_data['base_joint_ang_vel'],
+                                    np.array(list(sensor_data['joint_vel'].values())),
+        ))
+
         # Get Keyboard Event
         keys = p.getKeyboardEvents()
         if pybullet_util.is_key_triggered(keys, 'c'):
@@ -147,12 +213,15 @@ if __name__ == "__main__":
                 gripper_command[k] -= 1.94 / 3.
         elif pybullet_util.is_key_triggered(keys, 'p'):
             b_start_plan = True
+            ref_start_time = t
 
         # choose command from either planner or MPC balance controller
         if b_start_plan:
-            # Get next reference trajectories
+            # Get next reference trajectories (ideally, we'd get these from the
+            # Bezier curve functions. For now, we just get them from the pkl file)
 
-            # Interpolate references
+
+            # Interpolate references to deal with different time steps
 
 
             # Perform MPC
@@ -166,9 +235,37 @@ if __name__ == "__main__":
 
             # if last step, reset flags and balance
 
-        else:
-            # balance
-            pybullet_util.set_motor_pos(robot, joint_id, initial_jpos_dict)
+        else:               # balance with MPC
+            if t < 1:       # balance with fixed position control for the first second or so
+                pybullet_util.set_motor_pos(robot, joint_id, initial_jpos_dict)
+            else:           # balance with torque control
+                # Set commands to current
+                dmodel = createDoubleSupportActionModel(state,
+                                                        actuation,
+                                                        x_current,
+                                                        plan_to_model_ids['LF'],
+                                                        plan_to_model_ids['RF'],
+                                                        None,
+                                                        None,
+                                                        None)
+                model_seqs = createSequence([dmodel], T / N_horizon, N_horizon-1)
+                problem = crocoddyl.ShootingProblem(x_current, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
+                fddp = crocoddyl.SolverFDDP(problem)
+                fddp.setCallbacks([crocoddyl.CallbackLogger()])
+                fddp.th_stop = 1e-3
+
+                # Set initial guess and solve
+                xs = [x_current] * (fddp.problem.T + 1)
+                us = fddp.problem.quasiStatic([x_current] * fddp.problem.T)
+                if not fddp.solve(xs, us, max_iter):
+                    print("Failed to solve")
+
+                # balance with torque control
+                tau_des = list(fddp.us[0])
+                p.setJointMotorControlArray(robot,
+                                            list(joint_id.values()),
+                                            controlMode=p.TORQUE_CONTROL,
+                                            forces=tau_des)
 
         # # Save Image
         # if (SimConfig.VIDEO_RECORD) and (count % SimConfig.RECORD_FREQ == 0):
@@ -184,3 +281,4 @@ if __name__ == "__main__":
         time.sleep(dt)
         t += dt
         count += 1
+        print(f't: {t}')
