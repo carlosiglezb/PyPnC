@@ -2,6 +2,8 @@ from collections import OrderedDict
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 import numpy as np
+import math
+from copy import copy
 import json
 import multiprocessing as mp
 from tqdm import tqdm
@@ -269,3 +271,44 @@ class GridLocation(object):
         else:
             bds = self.get_boundaries(idx)
             return np.array([(bds[0] + bds[1]) / 2., (bds[2] + bds[3]) / 2.])
+
+
+def trajectory_scaler(prev_trajectory, N_scaled_horizon, time_indices, current_time, control_dt):
+
+    # model parameters
+    nx = len(prev_trajectory[0])
+
+    # initialize by assuming the first values for all N_scaled_horizon values
+    scaled_trajectory = np.repeat(np.reshape(prev_trajectory[0], (1, nx)),
+                                  N_scaled_horizon, axis=0)
+
+    # find t' & index i'
+    ti_idx = 1
+    for idx in range(1, N_scaled_horizon):
+        curr_traj_time = current_time + idx * control_dt
+        if curr_traj_time > time_indices[ti_idx]:
+            ti_idx += 1
+        time_since_prev_ti = curr_traj_time - time_indices[ti_idx-1]
+
+        # Note: if the trajectories can be matched one-to-one by skipping certain nodes, e.g.,
+        # idx_prev_traj == integer, this can be simplified, e.g.:
+        # idx_prev_traj = int(idx_prev_traj)
+        # scaled_trajectory[nx * idx:nx * (idx + 1)] \
+        #     = prev_trajectory[nx * idx_prev_traj:nx * (idx_prev_traj + 1)]
+
+        # assuming idx_prev_traj ~= integer:
+        x_l = prev_trajectory[ti_idx-1]
+        x_u = prev_trajectory[ti_idx]
+
+        # corrected values
+        dx = x_u - x_l
+
+        # linear interpolation
+        mpc_dt = time_indices[ti_idx] - time_indices[ti_idx-1]
+        decimal = np.around(time_since_prev_ti / mpc_dt, decimals=5)
+        x_interpol = x_l + decimal*dx
+
+        # fill up the initial guess
+        scaled_trajectory[idx] = x_interpol
+
+    return scaled_trajectory

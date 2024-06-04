@@ -30,6 +30,18 @@ def smooth_changing_acc(ini, end, dur, curr_time):
     return ret
 
 
+def interpolate_linearly(x_ini, x_end, t_init, t_end, curr_time):
+    dur = t_end - t_init
+    seg_time = curr_time - t_init
+    x_ini = np.array(x_ini)
+    x_end = np.array(x_end)
+    ret = x_ini + (x_end - x_ini) * seg_time / dur
+    if seg_time > dur:
+        ret = x_end
+
+    return ret
+
+
 def iso_interpolate(T1, T2, alpha):
     p1 = T1[0:3, 3]
     R1 = T1[0:3, 0:3]

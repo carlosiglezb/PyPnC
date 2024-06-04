@@ -1,6 +1,9 @@
 import os
 import sys
 
+from util.interpolation import interpolate_linearly
+from util.util import trajectory_scaler
+
 cwd = os.getcwd()
 sys.path.append(cwd)
 import time, math
@@ -83,12 +86,12 @@ signal.signal(signal.SIGINT, signal_handler)
 if __name__ == "__main__":
 
     # Environment Setup
-    p.connect(p.GUI)
+    p.connect(p.DIRECT)     #p.DIRECT
     p.resetDebugVisualizerCamera(
         cameraDistance=1.6,
         cameraYaw=180,
         cameraPitch=-6,
-        cameraTargetPosition=[0, 0.5, 1.0])
+        cameraTargetPosition=[0, 0.5, 1.2])
     p.setGravity(0, 0, -9.8)
     p.setPhysicsEngineParameter(
         fixedTimeStep=SimConfig.CONTROLLER_DT, numSubSteps=SimConfig.N_SUBSTEP)
@@ -175,10 +178,10 @@ if __name__ == "__main__":
     ee_rpy = {'LH': [0., 0., 0.], 'RH': [0., 0., 0.]}
     # Solver settings
     T, N_horizon = 0.5, 50
-    max_iter = 100
+    max_iter = 50
 
     initial_jpos_dict = copy.deepcopy(nominal_sensor_data['joint_pos'])
-    b_start_plan = False
+    b_replay_plan = False
     command = {}
     while True:
         # Get SensorData
@@ -204,37 +207,124 @@ if __name__ == "__main__":
         ))
 
         # Get Keyboard Event
-        keys = p.getKeyboardEvents()
-        if pybullet_util.is_key_triggered(keys, 'c'):
-            for k, v in gripper_command.items():
-                gripper_command[k] += 1.94 / 3.
-        elif pybullet_util.is_key_triggered(keys, 'o'):
-            for k, v in gripper_command.items():
-                gripper_command[k] -= 1.94 / 3.
-        elif pybullet_util.is_key_triggered(keys, 'p'):
-            b_start_plan = True
+        # keys = p.getKeyboardEvents()
+        # if pybullet_util.is_key_triggered(keys, 'c'):
+        #     for k, v in gripper_command.items():
+        #         gripper_command[k] += 1.94 / 3.
+        # elif pybullet_util.is_key_triggered(keys, 'o'):
+        #     for k, v in gripper_command.items():
+        #         gripper_command[k] -= 1.94 / 3.
+        # elif pybullet_util.is_key_triggered(keys, 'p'):
+        if t > 0.5:
+            b_replay_plan = True
             ref_start_time = t
+            replan_call_idx = 0
+            to_ref_idx = 0          # index of TO trajectory reference
 
         # choose command from either planner or MPC balance controller
-        if b_start_plan:
+        if b_replay_plan:
             # Get next reference trajectories (ideally, we'd get these from the
-            # Bezier curve functions. For now, we just get them from the pkl file)
+            # Bezier curve functions. For now, we just get them from the pkl file).
+            # Get all the data we have up to the next horizon point
+            # TODO can be made smaller than dim N_horizon
+            qb_r, qj_r = np.zeros((10, 7)), np.zeros((10, nq-7))
+            qdb_r, qdj_r = np.zeros((10, 6)), np.zeros((10, nv-6))
+            tau_r = np.zeros((10, na))
 
+            # check if we can move on to next index in TO trajectories
+            if (ref_start_time + replan_call_idx * dt) > (ref_start_time + ref_time[to_ref_idx + 1]):
+                to_ref_idx += 1
+
+            # grab the reference points covering the next horizon
+            t_ref_0, t_ref = ref_time[to_ref_idx], ref_time[replan_call_idx]
+            r_idx = 0
+            while t_ref < (t_ref_0 + T):
+                qb_r[r_idx, :] = ref_q_base[r_idx]
+                qj_r[r_idx, :] = ref_q_joints[r_idx]
+                qdb_r[r_idx, :] = ref_qd_base[r_idx]
+                qdj_r[r_idx, :] = ref_qd_joints[r_idx]
+                tau_r[r_idx, :] = ref_tau_joints[r_idx]
+                t_ref = ref_time[r_idx+1]
+                r_idx += 1
+            # check we get the last point covering the horizon up to T
+            qb_r[r_idx, :] = interpolate_linearly(ref_q_base[r_idx-1], ref_q_base[r_idx],
+                                                  ref_time[r_idx-1], ref_time[r_idx], t_ref_0 + T)
+            qj_r[r_idx, :] = interpolate_linearly(ref_q_joints[r_idx-1], ref_q_joints[r_idx],
+                                                  ref_time[r_idx-1], ref_time[r_idx], t_ref_0 + T)
+            qdb_r[r_idx, :] = interpolate_linearly(ref_qd_base[r_idx-1], ref_qd_base[r_idx],
+                                                   ref_time[r_idx-1], ref_time[r_idx], t_ref_0 + T)
+            qdj_r[r_idx, :] = interpolate_linearly(ref_qd_joints[r_idx-1], ref_qd_joints[r_idx],
+                                                   ref_time[r_idx-1], ref_time[r_idx], t_ref_0 + T)
+            tau_r[r_idx, :] = interpolate_linearly(ref_tau_joints[r_idx-1], ref_tau_joints[r_idx],
+                                                   ref_time[r_idx-1], ref_time[r_idx], t_ref_0 + T)
 
             # Interpolate references to deal with different time steps
+            mpc_ref_time = np.concatenate((ref_time[:r_idx], [t_ref_0 + T]))
+            qb_r_scaled = trajectory_scaler(qb_r, N_horizon, mpc_ref_time, t_ref_0, dt)
+            qj_r_scaled = trajectory_scaler(qj_r, N_horizon, mpc_ref_time, t_ref_0, dt)
+            qdb_r_scaled = trajectory_scaler(qdb_r, N_horizon, mpc_ref_time, t_ref_0, dt)
+            qdj_r_scaled = trajectory_scaler(qdj_r, N_horizon, mpc_ref_time, t_ref_0, dt)
+            tau_r_scaled = trajectory_scaler(tau_r, N_horizon, mpc_ref_time, t_ref_0, dt)
 
+            # Set corresponding EE references (forgot to save them)
+            all_frame_targets_dict = [None] * N_horizon
+            model_seqs = []
+            for r_idx in range(N_horizon):
+                frame_targets_dict = {}
+                q0 = np.concatenate([qb_r_scaled[r_idx], qj_r_scaled[r_idx]])
+                v0 = np.concatenate([qdb_r_scaled[r_idx], qdj_r_scaled[r_idx]])
+                x0 = np.concatenate((q0, v0))
+                pin.forwardKinematics(rob_model, rob_data, q0)
+                pin.updateFramePlacements(rob_model, rob_data)
+                frame_targets_dict['torso'] = rob_data.oMf[plan_to_model_ids['torso']].translation
+                frame_targets_dict['LF'] = rob_data.oMf[plan_to_model_ids['LF']].translation
+                frame_targets_dict['RF'] = rob_data.oMf[plan_to_model_ids['RF']].translation
+                frame_targets_dict['L_knee'] = rob_data.oMf[plan_to_model_ids['L_knee']].translation
+                frame_targets_dict['R_knee'] = rob_data.oMf[plan_to_model_ids['R_knee']].translation
+                frame_targets_dict['LH'] = rob_data.oMf[plan_to_model_ids['LH']].translation
+                frame_targets_dict['RH'] = rob_data.oMf[plan_to_model_ids['RH']].translation
+                all_frame_targets_dict[r_idx] = frame_targets_dict
 
-            # Perform MPC
+                # Set commands to current
+                dmodel = createMultiFrameActionModel(state,
+                                                     actuation,
+                                                     x_current,
+                                                     plan_to_model_ids,
+                                                     ['LF', 'RF'],
+                                                     ee_rpy,
+                                                     all_frame_targets_dict[r_idx],
+                                                     None,
+                                                     zero_config=x0)
+                model_seqs += createSequence([dmodel], T / N_horizon, 0)
+            problem = crocoddyl.ShootingProblem(x_current, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
+            fddp = crocoddyl.SolverFDDP(problem)
+            fddp.setCallbacks([crocoddyl.CallbackLogger()])
+            fddp.th_stop = 1e-3
 
+            # Set initial guess and solve
+            xs = [x_current] * (fddp.problem.T + 1)
+            us = fddp.problem.quasiStatic([x_current] * fddp.problem.T)
+            # us = tau_r_scaled[:-1]
+            if not fddp.solve(xs, us, max_iter):
+                print(f"Failed to solve MPC problem in {fddp.iter} iterations.")
 
-            # Set commands
-            command['joint_pos'] = [0.0] * len(joint_id)
-            command['joint_vel'] = [0.0] * len(joint_id)
-            command['joint_trq'] = [0.0] * len(joint_id)
-            pybullet_util.set_motor_impedance(robot, joint_id, command, kp, kd)
+            # balance with torque control
+            pos_des = list(fddp.xs[0][7:nq])
+            vel_des = list(fddp.xs[0][-(nv-6):])
+            trq_des = list(fddp.us[0])
+            trq_applied = (trq_des +
+                           np.array(list(kp.values())) * (pos_des - x_current[7:nq]) +
+                           np.array(list(kd.values())) * (vel_des - x_current[-(nv-6):]))
+            p.setJointMotorControlArray(robot,
+                                        joint_id.values(),
+                                        controlMode=p.TORQUE_CONTROL,
+                                        forces=list(trq_applied))
+            # pybullet_util.set_motor_impedance(robot, joint_id, command, kp, kd)
+            replan_call_idx += 1
 
             # if last step, reset flags and balance
-
+            if t_ref >= (20 - 2*T):
+                b_replay_plan = False
         else:               # balance with MPC
             if t < 1:       # balance with fixed position control for the first second or so
                 pybullet_util.set_motor_pos(robot, joint_id, initial_jpos_dict)

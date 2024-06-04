@@ -451,8 +451,10 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
 
     # Adding state and control regularization terms
     if zero_config is not None:
-        x0[3:state.nq] = zero_config[3:]
-        x0[-state.nv:] = np.zeros(state.nv)
+        x0 = zero_config
+        # section below was used for TO, fix later
+        # x0[3:state.nq] = zero_config[3:]
+        # x0[-state.nv:] = np.zeros(state.nv)
     w_x = np.array([0.1] * 3 + [10.0] * 3 + [2.] * (state.nv - 6) + [4.] * state.nv)
     activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x**2)
     x_reg_cost = crocoddyl.CostModelResidual(
