@@ -1,0 +1,6 @@
+- parent_frame: leftKneePitchLink
+  child_frame: leftFoot
+  length: 0.40639898079548625
+- parent_frame: rightKneePitchLink
+  child_frame: rightFoot
+  length: 0.40639898079548625
