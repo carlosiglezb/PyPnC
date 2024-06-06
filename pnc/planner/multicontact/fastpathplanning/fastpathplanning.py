@@ -108,6 +108,7 @@ def get_last_defined_box(box_seq_list, frame_name):
             return bs[frame_name]
 
     # if we reach this point, the corresponding frame is never assigned
+    print(f'Frame {frame_name} is never assigned in the box sequence list')
     return np.nan
 
 
@@ -124,6 +125,15 @@ def unassigned_box_seq_interpolator(box_seq_list, last_box_seq, frame_name):
     num_boxes_unassigned = get_num_unassigned_boxes(box_seq_list, frame_name)
 
     last_defined_box_seq = get_last_defined_box(box_seq_list, frame_name)
+
+    # if there are no unassigned boxes, and the box seq list contains nan, over-write it
+    if num_boxes_unassigned is None:
+        if np.isnan(last_defined_box_seq):
+            if last_box_seq[frame_name][0] is not None:
+                last_defined_box_seq = [last_box_seq[frame_name][0]]
+                num_boxes_unassigned = 1
+                print('[warning] Double-check the box sequence list')
+
     # check last defined box sequence is consistent
     if last_defined_box_seq[0] != last_box_seq[frame_name][0]:
         raise AssertionError("Box sequence in free frame is inconsistent")
