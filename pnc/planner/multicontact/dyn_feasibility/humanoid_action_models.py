@@ -368,7 +368,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 frame_targets_dict: dict[str, np.array],
                                 rcj_constraints: crocoddyl.ConstraintModelManager,
                                 zero_config: np.array = None,
-                                ang_weights=5.0):
+                                v_ref: np.array = None):
     mu = 0.9
 
     # Define the cost sum (cost manager)
@@ -403,7 +403,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., np.pi/2])), mu, 4, True)
         else:
             floor_rotation = np.eye(3)
-            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, False)     # better if False?
+            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
@@ -451,10 +451,11 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
 
     # Adding state and control regularization terms
     if zero_config is not None:
-        x0 = zero_config
-        # section below was used for TO, fix later
-        # x0[3:state.nq] = zero_config[3:]
-        # x0[-state.nv:] = np.zeros(state.nv)
+        x0[3:state.nq] = zero_config[3:]
+    if v_ref is not None:
+        x0[-state.nv:] = v_ref
+    else:
+        x0[-state.nv:] = np.zeros(state.nv)
     w_x = np.array([0.1] * 3 + [10.0] * 3 + [2.] * (state.nv - 6) + [4.] * state.nv)
     activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x**2)
     x_reg_cost = crocoddyl.CostModelResidual(
@@ -514,6 +515,6 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
 def createSequence(dmodels, DT, N):
     return [
         [crocoddyl.IntegratedActionModelEuler(m, DT)] * N
-        + [crocoddyl.IntegratedActionModelEuler(m, 0.0)]
+        # + [crocoddyl.IntegratedActionModelEuler(m, 0.0)]
         for m in dmodels
     ]
