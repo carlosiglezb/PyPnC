@@ -207,7 +207,7 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         return safe_regions_mgr_dict
 
-    def get_five_stage_contact_sequence(self, safe_regions_mgr_dict):
+    def get_two_stage_contact_sequence(self, safe_regions_mgr_dict):
         starting_lh_pos = safe_regions_mgr_dict['LH'].iris_list[0].seed_pos
         starting_rh_pos = safe_regions_mgr_dict['RH'].iris_list[0].seed_pos
         final_lf_pos = safe_regions_mgr_dict['LF'].iris_list[1].seed_pos
@@ -426,7 +426,7 @@ class TestIKCFreePlanner(unittest.TestCase):
             p_init[fr] = safe_regions_mgr_dict[fr].iris_list[0].seed_pos  # starting_pos
 
         # hand-chosen five-stage sequence of contacts
-        fixed_frames_seq, motion_frames_seq = self.get_five_stage_contact_sequence(safe_regions_mgr_dict)
+        fixed_frames_seq, motion_frames_seq = self.get_two_stage_contact_sequence(safe_regions_mgr_dict)
 
         # planner parameters
         T = 3
@@ -457,6 +457,14 @@ class TestIKCFreePlanner(unittest.TestCase):
         # set planner
         ik_cfree_planner.set_planner(frame_planner)
         ik_cfree_planner.plan(p_init, T, alpha, visualizer)
+
+        # visualize terminal reachable regions
+        torso_pos_T = ik_cfree_planner.get_ee_des_pos(0, T * len(fixed_frames_seq))
+        print(f'Final position: {torso_pos_T}')
+        for fr_idx, fr in enumerate(frame_names):
+            if fr == 'torso':
+                continue
+            traversable_regions_dict[fr].visualize_reachable_region_from_pos(torso_pos_T)
 
         self.assertEqual(True, True)  # add assertion here
 

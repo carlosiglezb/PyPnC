@@ -170,4 +170,25 @@ class FrameTraversableRegion:
     def get_visualizer(self):
         return self._vis
 
+    def visualize_reachable_region_from_pos(self, torso_pos):
+        torso_init = np.array([0., 0., 1.01])
+        if len(self._plane_coeffs) == 0:
+            raise ValueError(f"Convex hull path not specified for {self.frame_name}")
+        else:
+            # load the convex hull
+            H, d = extract_plane_eqn_from_coeffs(self._plane_coeffs)
+
+        # create random points
+        p_tmp = np.random.uniform(-1.5, 2.5, (10000, 3))
+
+        # remove points that are outside the reachable constraint
+        for idx, p in enumerate(p_tmp):
+            if (H @ (p - torso_pos + torso_init).T <= -d).all():
+                continue
+            else:
+                p_tmp[idx] = np.zeros((3, ))
+
+        # visualize the points
+        obj = g.Points(g.PointsGeometry(p_tmp.T), g.PointsMaterial(size=0.01))
+        self._vis["traversable_regions"]["reachable"][self.frame_name][str(1)].set_object(obj)
 
