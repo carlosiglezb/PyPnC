@@ -403,7 +403,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., np.pi/2])), mu, 4, True)
         else:
             floor_rotation = np.eye(3)
-            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, False)     # better if False?
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
