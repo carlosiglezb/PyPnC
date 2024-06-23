@@ -201,7 +201,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
 
     # check distance of knee and foot points at each curve point
     for Ai in A_soc_debug:
-        opt_shin_len_err = np.linalg.norm(Ai @ traj) - 0.32428632635527505
+        opt_shin_len_err = np.linalg.norm(Ai @ traj) - link_length
         print(f"Shin length discrepancy: {opt_shin_len_err}")
 
     if b_debug:

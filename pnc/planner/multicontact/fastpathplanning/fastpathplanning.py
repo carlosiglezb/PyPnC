@@ -136,7 +136,8 @@ def unassigned_box_seq_interpolator(box_seq_list, last_box_seq, frame_name):
 
     # check last defined box sequence is consistent
     if last_defined_box_seq[0] != last_box_seq[frame_name][0]:
-        raise AssertionError("Box sequence in free frame is inconsistent")
+        print(f"[warning] Box sequence in {frame_name} free frame is inconsistent. "
+              f"Check that seeds for {frame_name} frame are contained in both IRIS regions")
 
     interval_boxes = last_box_seq[frame_name][-1] - last_box_seq[frame_name][0]
     fract_box = interval_boxes / num_boxes_unassigned

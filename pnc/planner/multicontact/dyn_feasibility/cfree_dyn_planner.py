@@ -121,6 +121,70 @@ def get_val_default_initial_pose(n_joints):
     return np.concatenate((floating_base, q0))
 
 
+def get_ergoCub_default_initial_pose(n_joints):
+    q0 = np.zeros(n_joints, )
+    hip_pitch_angle = 35.
+    hip_roll_angle = 10.
+    q0[0] = np.radians(hip_pitch_angle)     # "l_hip_pitch"
+    q0[1] = np.radians(hip_roll_angle)     # "l_hip_roll"
+    # q0[2] = -np.radians(hip_pitch_angle)    # "l_hip_yaw"
+    q0[3] = -2*np.radians(hip_pitch_angle)   # "l_knee"
+    q0[4] = -np.radians(hip_pitch_angle)    # "l_ankle_pitch"
+    q0[5] = -np.radians(hip_roll_angle)    # "l_ankle_roll"
+    q0[6] = np.radians(hip_pitch_angle)    # "r_hip_pitch"
+    q0[7] = np.radians(hip_roll_angle)      # "r_hip_roll"
+    # q0[8] = -np.radians(hip_pitch_angle)  # "r_hip_yaw"
+    q0[9] = -2*np.radians(hip_pitch_angle)   # "r_knee"
+    q0[10] = -np.radians(hip_pitch_angle)   # "r_ankle_pitch"
+    q0[11] = -np.radians(hip_roll_angle)    # "r_ankle_roll"
+    # q0[12] = 0.                           # "torso_roll"
+    # q0[13] = 0.                           # "torso_pitch"
+    # q0[14] = np.radians(-hip_yaw_angle)   # "torso_yaw"
+    # q0[15] = -np.pi / 2                     # "l_shoulder_pitch"
+    # q0[16] = -np.pi / 2                     # "l_shoulder_roll"
+    # q0[17] = np.pi / 4                    # "l_shoulder_yaw"
+    q0[18] = np.pi / 2                     # "l_elbow"
+    # q0[19] = np.radians(hip_yaw_angle)    # "l_wrist_yaw"
+    # q0[20] = 0.                           # "l_wrist_roll"
+    # q0[21] = -np.pi / 6                   # "l_wrist_pitch"
+    # q0[22] = 0.                           # "l_index_add"
+    # q0[23] = np.pi / 2                      # "l_index_prox"
+    # q0[24] = np.pi/3.                     # "l_index_dist"
+    # q0[25] = 0.                           # "l_middle_prox",
+    # q0[26] = 0.                           # "l_middle_dist",
+    # q0[27] = 0.                           # "l_pinkie_prox",
+    # q0[28] = 0.                           # "l_pinkie_dist",
+    # q0[29] = 0.                           # "l_ring_prox",
+    # q0[30] = 0.                           # "l_ring_dist",
+    # q0[31] = 0.                           # "l_thumb_add",
+    # q0[32] = 0.                           # "l_thumb_prox",
+    # q0[33] = 0.                           # "l_thumb_dist",
+    # q0[34] = 0.                           # "neck_pitch",
+    # q0[35] = 0.                           # "neck_roll",
+    # q0[36] = 0.                           # "neck_yaw",
+    # q0[37] = 0.                           # "camera_tilt",
+    # q0[38] = -np.pi / 2                           # "r_shoulder_pitch",
+    # q0[39] = 0.                           # "r_shoulder_roll",
+    # q0[40] = 0.                           # "r_shoulder_yaw",
+    q0[41] = np.pi / 2                           # "r_elbow",
+    # q0[32] = 0.                           # "r_wrist_yaw",
+    # q0[32] = 0.                           # "r_wrist_roll",
+    # q0[32] = 0.                           # "r_wrist_pitch",
+    # q0[32] = 0.                           # "r_index_add",
+    # q0[32] = 0.                           # "r_index_prox",
+    # q0[32] = 0.                           # "r_index_dist",
+    # q0[32] = 0.                           # "r_middle_prox",
+    # q0[32] = 0.                           # "r_middle_dist",
+    # q0[32] = 0.                           # "r_pinkie_prox",
+    # q0[32] = 0.                           # "r_pinkie_dist",
+    # q0[32] = 0.                           # "r_thumb_add",
+    # q0[32] = 0.                           # "r_thumb_prox",
+    # q0[32] = 0.                           # "r_thumb_dist"
+
+    floating_base = np.array([0., 0., 0.65, 0., 0., 0., 1.])
+    return np.concatenate((floating_base, q0))
+
+
 def load_navy_env(door_pos):
     # create navy door environment
     door_quat = np.array([0., 0., 0.7071068, 0.7071068])
@@ -174,6 +238,9 @@ def load_robot_model(robot_name):
     elif robot_name == 'valkyrie':
         package_dir = cwd + "/robot_model/" + robot_name
         robot_urdf_file = package_dir + "/valkyrie_hands.urdf"
+    elif robot_name == 'ergoCub':
+        package_dir = cwd + "/robot_model/" + robot_name
+        robot_urdf_file = package_dir + "/ergoCub.urdf"
     else:
         raise NotImplementedError('Robot model URDF path not specified')
     rob_model, col_model, vis_model = pin.buildModelsFromUrdf(robot_urdf_file,
@@ -456,6 +523,14 @@ def main(args):
         plan_to_model_frames['R_knee'] = 'rightKneePitchLink'
         plan_to_model_frames['LH'] = 'leftWristLink'
         plan_to_model_frames['RH'] = 'rightWristLink'
+    elif robot_name == 'ergoCub':
+        plan_to_model_frames['torso'] =  'root_link'
+        plan_to_model_frames['LF'] =  'l_ankle_2'
+        plan_to_model_frames['RF'] =  'r_ankle_2'
+        plan_to_model_frames['L_knee'] =  'l_lower_leg'
+        plan_to_model_frames['R_knee'] =  'r_lower_leg'
+        plan_to_model_frames['LH'] =  'l_hand_palm'
+        plan_to_model_frames['RH'] =  'r_hand_palm'
     else:
         raise NotImplementedError('Mapping between planner and robot frames not defined')
 
@@ -485,6 +560,10 @@ def main(args):
         q0 = get_val_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.34, 0., 0.])
         step_length = 0.55
+    elif robot_name == 'ergoCub':
+        q0 = get_ergoCub_default_initial_pose(rob_model.nq - 7)
+        door_pos = np.array([0.30, 0., 0.])
+        step_length = 0.40
     else:
         raise NotImplementedError('Robot default configuration not specified')
     door_pose, obstacles, domain_ubody, domain_lbody = load_navy_env(door_pos)
