@@ -625,7 +625,7 @@ def main(args):
         fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict)
 
     # planner parameters
-    T = 4
+    T = 3
     alpha = [0, 0, 1]
     traversable_regions = [traversable_regions_dict['torso'],
                            traversable_regions_dict['LF'],
@@ -691,10 +691,13 @@ def main(args):
         model_seqs = []
         if robot_name == 'valkyrie':
             N_horizon_lst = [150, 150, 100, 150]
+            b_terminal_step = False
             if i == 0:
                 # Cross door with left foot
                 N_rf_support = N_horizon_lst[i]
                 for t in np.linspace(i * T, (i + 1) * T, N_rf_support):
+                    if t == (i+1)*T:
+                        b_terminal_step = True
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -703,7 +706,8 @@ def main(args):
                                                          ['RF'],
                                                          ee_rpy,
                                                          frame_targets_dict,
-                                                         None)
+                                                         None,
+                                                         terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     base_before_lf_step.append(frame_targets_dict['torso'])
                     model_seqs += createSequence([dmodel], T / (N_rf_support - 1), 1)
@@ -712,6 +716,8 @@ def main(args):
                 # Cross door with right foot
                 N_lf_support = N_horizon_lst[i]  # knots for left hand reaching
                 for t in np.linspace(i * T, (i + 1) * T, N_lf_support):
+                    if t == (i+1)*T:
+                        b_terminal_step = True
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -720,7 +726,8 @@ def main(args):
                                                          ['LF'],
                                                          ee_rpy,
                                                          frame_targets_dict,
-                                                         None)
+                                                         None,
+                                                         terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     base_before_lf_step.append(frame_targets_dict['torso'])
                     model_seqs += createSequence([dmodel], T / (N_lf_support - 1), 1)
@@ -729,6 +736,8 @@ def main(args):
                 # Reach door with left and right hand from inside
                 N_square_up = N_horizon_lst[i]  # knots for squaring up
                 for t in np.linspace(i*T, (i+1)*T, N_square_up):
+                    if t == (i+1)*T:
+                        b_terminal_step = True
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -738,14 +747,17 @@ def main(args):
                                                          ee_rpy,
                                                          frame_targets_dict,
                                                          None,
-                                                         zero_config=q0)
+                                                         terminal_step=b_terminal_step)
                     model_seqs += createSequence([dmodel], T/(N_square_up-1), 1)
         else:
             N_horizon_lst = [80, 100, 80, 150, 160]
+            b_terminal_step = False
             if i == 0:
                 # Reach door with left hand
                 N_lhand_to_door = N_horizon_lst[i]  # knots for left hand reaching
                 for t in np.linspace(i*T, (i+1)*T, N_lhand_to_door):
+                    if t == (i+1)*T:
+                        b_terminal_step = True
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -754,7 +766,8 @@ def main(args):
                                                          ['LF', 'RF'],
                                                          ee_rpy,
                                                          frame_targets_dict,
-                                                         None)
+                                                         None,
+                                                         terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     base_before_lf_step.append(frame_targets_dict['torso'])
                     model_seqs += createSequence([dmodel], T/(N_lhand_to_door-1), 1)
@@ -763,6 +776,8 @@ def main(args):
                 # Using left-hand support, pass left-leg through door
                 N_base_through_door = N_horizon_lst[i]  # knots per waypoint to pass through door
                 for t in np.linspace(i*T, (i+1)*T, N_base_through_door):
+                    if t == (i+1)*T:
+                        b_terminal_step = True
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -771,7 +786,8 @@ def main(args):
                                                          ['LH', 'RF'],
                                                          ee_rpy,
                                                          frame_targets_dict,
-                                                         None)
+                                                         None,
+                                                         terminal_step=b_terminal_step)
                     base_into_targets.append(frame_targets_dict['torso'])
                     lf_targets.append(frame_targets_dict['LF'])
                     lkn_targets.append(frame_targets_dict['L_knee'])
@@ -781,40 +797,8 @@ def main(args):
                 # Reach door with left and right hand from inside
                 N_rhand_to_door = N_horizon_lst[i]  # knots for left hand reaching
                 for t in np.linspace(i*T, (i+1)*T, N_rhand_to_door):
-                    frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
-                    dmodel = createMultiFrameActionModel(state,
-                                                         actuation,
-                                                         x0,
-                                                         plan_to_model_ids,
-                                                         ['LF', 'RF'],
-                                                         ee_rpy,
-                                                         frame_targets_dict,
-                                                         None)
-                    model_seqs += createSequence([dmodel], T/(N_rhand_to_door-1), 1)
-                    base_after_lf_step.append(frame_targets_dict['torso'])
-
-            elif i == 3:
-                # Using left-hand and right-foot supports, pass right-leg through door
-                N_base_square_up = N_horizon_lst[i]  # knots per waypoint to pass through door
-                for t in np.linspace(i*T, (i+1)*T, N_base_square_up):
-                    frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
-                    dmodel = createMultiFrameActionModel(state,
-                                                         actuation,
-                                                         x0,
-                                                         plan_to_model_ids,
-                                                         ['RH', 'LF'],
-                                                         ee_rpy,
-                                                         frame_targets_dict,
-                                                         None)
-                    model_seqs += createSequence([dmodel], T/(N_base_square_up-1), 1)
-                    base_during_rf_step.append(frame_targets_dict['torso'])
-                    rf_targets.append(frame_targets_dict['RF'])
-                    rkn_targets.append(frame_targets_dict['R_knee'])
-
-            elif i == 4:
-                # Reach door with left and right hand from inside
-                N_square_up = N_horizon_lst[i]  # knots for squaring up
-                for t in np.linspace(i*T, (i+1)*T, N_square_up):
+                    if t == (i+1)*T:
+                        b_terminal_step = True
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -824,7 +808,47 @@ def main(args):
                                                          ee_rpy,
                                                          frame_targets_dict,
                                                          None,
-                                                         zero_config=q0)
+                                                         terminal_step=b_terminal_step)
+                    model_seqs += createSequence([dmodel], T/(N_rhand_to_door-1), 1)
+                    base_after_lf_step.append(frame_targets_dict['torso'])
+
+            elif i == 3:
+                # Using left-hand and right-foot supports, pass right-leg through door
+                N_base_square_up = N_horizon_lst[i]  # knots per waypoint to pass through door
+                for t in np.linspace(i*T, (i+1)*T, N_base_square_up):
+                    if t == (i+1)*T:
+                        b_terminal_step = True
+                    frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
+                    dmodel = createMultiFrameActionModel(state,
+                                                         actuation,
+                                                         x0,
+                                                         plan_to_model_ids,
+                                                         ['RH', 'LF'],
+                                                         ee_rpy,
+                                                         frame_targets_dict,
+                                                         None,
+                                                         terminal_step=b_terminal_step)
+                    model_seqs += createSequence([dmodel], T/(N_base_square_up-1), 1)
+                    base_during_rf_step.append(frame_targets_dict['torso'])
+                    rf_targets.append(frame_targets_dict['RF'])
+                    rkn_targets.append(frame_targets_dict['R_knee'])
+
+            elif i == 4:
+                # Reach door with left and right hand from inside
+                N_square_up = N_horizon_lst[i]  # knots for squaring up
+                for t in np.linspace(i*T, (i+1)*T, N_square_up):
+                    if t == (i+1)*T:
+                        b_terminal_step = True
+                    frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
+                    dmodel = createMultiFrameActionModel(state,
+                                                         actuation,
+                                                         x0,
+                                                         plan_to_model_ids,
+                                                         ['LF', 'RF'],
+                                                         ee_rpy,
+                                                         frame_targets_dict,
+                                                         None,
+                                                         terminal_step=b_terminal_step)
                     model_seqs += createSequence([dmodel], T/(N_square_up-1), 1)
 
         problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
