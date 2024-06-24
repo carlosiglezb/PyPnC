@@ -1,3 +1,4 @@
+import time
 from typing import List, OrderedDict
 
 import meshcat
@@ -151,12 +152,15 @@ class IKCFreePlanner:
     def plan(self, p_init: np.array,
              T: float,
              alpha: np.array,
-             visualizer: MeshcatVisualizer = None):
+             visualizer: MeshcatVisualizer = None,
+             verbose: bool = False):
         if self.planner is None:
             raise ValueError("Planner not set")
 
         # compute plan
-        self.planner.plan_iris(p_init, T, alpha)
+        ik_all_start_time = time.time()
+        self.planner.plan_iris(p_init, T, alpha, verbose)
+        print("Total IK solve time: ", time.time() - ik_all_start_time)
         if visualizer is not None:
             self.planner.plot(visualizer)
 

@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from collections import OrderedDict
 
 cwd = os.getcwd()
@@ -31,6 +32,7 @@ B_SHOW_JOINT_PLOTS = False
 B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = True
 B_SAVE_DATA = False
+B_VERBOSE = True
 
 
 def get_draco3_shaft_wrist_default_initial_pose():
@@ -303,9 +305,11 @@ def compute_iris_regions_mgr(obstacles,
                              'RH': IrisRegionsManager(safe_rh_start_region, safe_rh_end_region)}
 
     # compute and connect IRIS from start to goal
+    start_iris_compute_time = time.time()
     for _, irm in safe_regions_mgr_dict.items():
         irm.computeIris()
         irm.connectIrisSeeds()
+    print("IRIS computation time: ", time.time() - start_iris_compute_time)
 
     # save initial/final EE positions
     p_init = {}
@@ -641,7 +645,7 @@ def main(args):
 
     # compute paths and create targets
     ik_cfree_planner.set_planner(frame_planner)
-    ik_cfree_planner.plan(p_init, T, alpha, visualizer)
+    ik_cfree_planner.plan(p_init, T, alpha, visualizer, B_VERBOSE)
 
     #
     # Start Dynamic Feasibility Check
@@ -864,10 +868,12 @@ def main(args):
         # Set initial guess
         xs = [x0] * (fddp[i].problem.T + 1)
         us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
+        start_ddp_solve_time = time.time()
         print("Problem solved:", fddp[i].solve(xs, us, max_iter))
         print("Number of iterations:", fddp[i].iter)
         print("Total cost:", fddp[i].cost)
         print("Gradient norm:", fddp[i].stoppingCriteria())
+        print("Time to solve:", time.time() - start_ddp_solve_time)
 
         # save data
         if B_SAVE_DATA:

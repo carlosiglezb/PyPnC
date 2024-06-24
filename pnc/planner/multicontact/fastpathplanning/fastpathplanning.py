@@ -461,16 +461,13 @@ def plan_multiple(S, R, p_init, T, alpha,
 def plan_multiple_iris(S, R, p_init, T, alpha,
                   verbose=True, A=None, fixed_frames=None,
                   motion_frames_seq=None):
-
-    if verbose:
-        print('Polygonal phase:')
-
+    # Find IRIS sequence and minimize length between safe points
     motion_frames_lst = motion_frames_seq.get_motion_frames()
     iris_seq, safe_pnt_lst = plan_multistage_iris_seq(S, fixed_frames, motion_frames_lst, p_init)
     traj, length, solver_time = solve_min_reach_iris_distance(R, S, iris_seq, safe_pnt_lst, A)
 
     if verbose:
-        print('\nSmooth phase:')
+        print(f"Min. distance solve time: {solver_time}")
 
     # Cost coefficients.
     alpha = {i + 1: ai for i, ai in enumerate(alpha)}
@@ -509,5 +506,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     surface_normals_lst = motion_frames_seq.get_contact_surfaces()
     paths, sol_stats, points = optimize_multiple_bezier_iris(R, A, S, durations, alpha, safe_pnt_lst,
                                                      fixed_frames, surface_normals_lst, verbose=verbose)
+    if verbose:
+        print(f"Bezier solve time: {sol_stats['runtime']}")
 
     return paths, iris_seq, points
