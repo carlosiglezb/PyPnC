@@ -103,8 +103,11 @@ class IrisRegionsManager:
         # goal_centroid = self.iris_goal_seed + np.array([0.0, 0., 0.5])      # <-- ideal for G1
         # goal_centroid = self.iris_goal_seed + np.array([0.15, 0., 0.5])     # <-- ideal for Val
         # ----------- settings for ergoCub
-        start_centroid = self.iris_start_seed + np.array([0., 0., 0.35])
-        goal_centroid = self.iris_goal_seed + np.array([0.0, 0., 0.35])
+        # start_centroid = self.iris_start_seed + np.array([0., 0., 0.35])
+        # goal_centroid = self.iris_goal_seed + np.array([0.0, 0., 0.35])
+        # ----------- settings for all
+        start_centroid = np.array([0.3, 0, 0.8])
+        goal_centroid = np.array([0.3, 0, 0.8])
         new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.001, 0.1, 0.1])
 
         # check that new seed is not in collision before creating new IRIS region

@@ -27,7 +27,7 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 # Save data
 from plot.data_saver import *
 
-B_SHOW_JOINT_PLOTS = True
+B_SHOW_JOINT_PLOTS = False
 B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = True
 B_SAVE_DATA = False
@@ -259,9 +259,9 @@ def compute_iris_regions_mgr(obstacles,
                              standing_pos,
                              goal_step_length):
     # shift (feet) iris seed to get nicer IRIS region
-    iris_lf_shift = np.array([0.0, 0., 0.])
-    iris_rf_shift = np.array([0.0, 0., 0.])
-    iris_kn_shift = np.array([0.0, 0., 0.])
+    iris_lf_shift = np.array([0.1, 0., 0.])
+    iris_rf_shift = np.array([0.1, 0., 0.])
+    iris_kn_shift = np.array([0.02, 0., -0.05])
 
     # get end effector positions via fwd kin
     starting_torso_pos = standing_pos
@@ -274,8 +274,8 @@ def compute_iris_regions_mgr(obstacles,
     starting_rf_pos = robot_data.oMf[plan_to_model_ids['RF']].translation
     final_rf_pos = starting_rf_pos + np.array([goal_step_length, 0., 0.])
     starting_rh_pos = robot_data.oMf[plan_to_model_ids['RH']].translation + np.array([0.1, 0., 0.])
-    final_rh_pos = starting_rh_pos + np.array([goal_step_length + 0.15, 0., 0.])
-    starting_lkn_pos = robot_data.oMf[plan_to_model_ids['L_knee']].translation + np.array([0.02, 0., -0.05])
+    final_rh_pos = starting_rh_pos + np.array([goal_step_length, 0., 0.])
+    starting_lkn_pos = robot_data.oMf[plan_to_model_ids['L_knee']].translation #+ np.array([0.02, 0., -0.05])
     final_lkn_pos = starting_lkn_pos + np.array([goal_step_length, 0., 0.])
     starting_rkn_pos = robot_data.oMf[plan_to_model_ids['R_knee']].translation
     final_rkn_pos = starting_rkn_pos + np.array([goal_step_length, 0., 0.])
@@ -284,14 +284,14 @@ def compute_iris_regions_mgr(obstacles,
     safe_torso_end_region = IrisGeomInterface(obstacles, domain_ubody, final_torso_pos)
     safe_lf_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_lf_pos + iris_lf_shift)
     safe_lf_end_region = IrisGeomInterface(obstacles, domain_lbody, final_lf_pos)
-    safe_lk_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_lkn_pos)
-    safe_lk_end_region = IrisGeomInterface(obstacles, domain_lbody, final_lkn_pos + iris_kn_shift)
+    safe_lk_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_lkn_pos + iris_kn_shift)
+    safe_lk_end_region = IrisGeomInterface(obstacles, domain_lbody, final_lkn_pos)
     safe_lh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_lh_pos)
     safe_lh_end_region = IrisGeomInterface(obstacles, domain_ubody, final_lh_pos)
     safe_rf_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_rf_pos + iris_rf_shift)
     safe_rf_end_region = IrisGeomInterface(obstacles, domain_lbody, final_rf_pos)
     safe_rk_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_rkn_pos)
-    safe_rk_end_region = IrisGeomInterface(obstacles, domain_lbody, final_rkn_pos + iris_kn_shift)
+    safe_rk_end_region = IrisGeomInterface(obstacles, domain_lbody, final_rkn_pos)
     safe_rh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_rh_pos)
     safe_rh_end_region = IrisGeomInterface(obstacles, domain_ubody, final_rh_pos)
     safe_regions_mgr_dict = {'torso': IrisRegionsManager(safe_torso_start_region, safe_torso_end_region),
@@ -405,7 +405,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
     # ---- Step 1: L hand to frame
-    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'RH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                                         'LH': door_l_inner_location,
                                         })
@@ -439,8 +439,8 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     motion_frames_seq.add_motion_frame({
                         'RF': final_rf_pos,
                         'torso': final_torso_pos + np.array([0.02, 0., 0.0]),     # good testing
-                        'R_knee': final_rkn_pos,
-                        'LH': starting_lh_pos + np.array([0.35, 0.0, 0.0])
+                        'R_knee': final_rkn_pos + np.array([-0.05, 0., 0.07]),
+                        # 'LH': starting_lh_pos + np.array([0.35, 0.0, 0.0])
     })
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surface(rf_contact_over)
@@ -450,7 +450,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee'])
     motion_frames_seq.add_motion_frame({
         # 'torso': final_torso_pos,
-        'RH': final_rh_pos + np.array([-0.20, 0., 0.]),
+        'RH': final_rh_pos, # + np.array([-0.20, 0., 0.]),
         'LH': final_lh_pos
     })
 
@@ -524,13 +524,13 @@ def main(args):
         plan_to_model_frames['LH'] = 'leftWristLink'
         plan_to_model_frames['RH'] = 'rightWristLink'
     elif robot_name == 'ergoCub':
-        plan_to_model_frames['torso'] =  'root_link'
-        plan_to_model_frames['LF'] =  'l_ankle_2'
-        plan_to_model_frames['RF'] =  'r_ankle_2'
-        plan_to_model_frames['L_knee'] =  'l_lower_leg'
-        plan_to_model_frames['R_knee'] =  'r_lower_leg'
-        plan_to_model_frames['LH'] =  'l_hand_palm'
-        plan_to_model_frames['RH'] =  'r_hand_palm'
+        plan_to_model_frames['torso'] = 'root_link'
+        plan_to_model_frames['LF'] = 'l_ankle_2'
+        plan_to_model_frames['RF'] = 'r_ankle_2'
+        plan_to_model_frames['L_knee'] = 'l_lower_leg'
+        plan_to_model_frames['R_knee'] = 'r_lower_leg'
+        plan_to_model_frames['LH'] = 'l_hand_palm'
+        plan_to_model_frames['RH'] = 'r_hand_palm'
     else:
         raise NotImplementedError('Mapping between planner and robot frames not defined')
 
@@ -895,17 +895,20 @@ def main(args):
         for it in fddp:
             log = it.getCallbacks()[0]
             # Reduced to check Draco3's RCJ constraint
-            # xs_reduced = np.array(log.xs)[:, [l_constr_ids[0], l_constr_ids[1],
-            #                                   r_constr_ids[0], r_constr_ids[1]]]
-            # us_reduced = np.array(log.us)[:, [l_constr_ids_u[0], l_constr_ids_u[1],
-            #                                   r_constr_ids_u[0], r_constr_ids_u[1]]]
-            # crocoddyl.plotOCSolution(xs_reduced, us_reduced, figIndex=fig_idx, show=False)
-            # fig_idx += 1
-            idx_lhip_r = list(rob_model.names).index('left_hip_roll_joint') - 2 + 7
-            idx_lhip_p = list(rob_model.names).index('left_hip_pitch_joint') - 2 + 7
-            idx_lhip_y = list(rob_model.names).index('left_hip_yaw_joint') - 2 + 7
-            xs_reduced = np.array(log.xs)[:, [idx_lhip_r, idx_lhip_p, idx_lhip_y]]
-            us_reduced = np.array(log.us)[:, [idx_lhip_r, idx_lhip_p, idx_lhip_y]]
+            if robot_name == 'draco3':
+                xs_reduced = np.array(log.xs)[:, [l_constr_ids[0], l_constr_ids[1],
+                                                  r_constr_ids[0], r_constr_ids[1]]]
+                us_reduced = np.array(log.us)[:, [l_constr_ids_u[0], l_constr_ids_u[1],
+                                                  r_constr_ids_u[0], r_constr_ids_u[1]]]
+            elif robot_name == 'g1':
+                idx_lhip_r = list(rob_model.names).index('left_hip_roll_joint') - 2 + 7
+                idx_lhip_p = list(rob_model.names).index('left_hip_pitch_joint') - 2 + 7
+                idx_lhip_y = list(rob_model.names).index('left_hip_yaw_joint') - 2 + 7
+                xs_reduced = np.array(log.xs)[:, [idx_lhip_r, idx_lhip_p, idx_lhip_y]]
+                us_reduced = np.array(log.us)[:, [idx_lhip_r, idx_lhip_p, idx_lhip_y]]
+            else:
+                xs_reduced = np.array(log.xs)
+                us_reduced = np.array(log.us)
             crocoddyl.plotOCSolution(xs_reduced, us_reduced, figIndex=fig_idx, show=False)
             fig_idx += 1
             # crocoddyl.plotConvergence(log.costs, log.u_regs, log.x_regs, log.grads,
