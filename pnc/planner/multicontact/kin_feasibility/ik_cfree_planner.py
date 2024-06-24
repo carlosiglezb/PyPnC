@@ -50,6 +50,7 @@ class IKCFreePlanner:
         self.dt = dt
         self.task_dict = {}             # filled out in PInk tasks (setup_tasks)
         self.planner = None
+        self._b_record_anim = False
 
         if q0 is None:
             q0 = np.zeros(pin_robot_model.nq)
@@ -74,37 +75,37 @@ class IKCFreePlanner:
     def _initialize_tasks(self) -> List[pink.Task]:
         torso_task = FrameTask(
             "torso_link",
-            position_cost=0.0001,
+            position_cost=0.001,
             orientation_cost=0.005,
         )
         left_foot_task = FrameTask(
-            "l_foot_contact",
+            "left_ankle_roll_link",     #"l_foot_contact",
             position_cost=1.0,
             orientation_cost=0.05,
         )
         right_foot_task = FrameTask(
-            "r_foot_contact",
+            "right_ankle_roll_link",     #"r_foot_contact",
             position_cost=5.0,
             orientation_cost=0.05,
         )
         left_knee_task = FrameTask(
-            "l_knee_fe_ld",
+            "left_knee_link",     #"l_knee_fe_ld
             position_cost=0.05,
             orientation_cost=0.001,
         )
         right_knee_task = FrameTask(
-            "r_knee_fe_ld",
+            "right_knee_link",          #r_knee_fe_ld",
             position_cost=0.2,
             orientation_cost=0.001,
         )
         left_hand_task = FrameTask(
-            "l_hand_contact",
+            "left_palm_link",       #"l_hand_contact",
             position_cost=5.0,
             orientation_cost=0.001,
             gain=0.1,
         )
         right_hand_task = FrameTask(
-            "r_hand_contact",
+            "right_palm_link",       #"r_hand_contact",
             position_cost=0.01,
             orientation_cost=0.0001,
             gain=0.1,
@@ -113,36 +114,36 @@ class IKCFreePlanner:
             cost=1e-3,  # [cost] / [rad]
         )
         # ----- Joint coupling task
-        r_knee_holonomic_task = JointCouplingTask(
-            ["r_knee_fe_jp", "r_knee_fe_jd"],
-            [1.0, -1.0],
-            100.0,
-            self.pink_config,
-            lm_damping=5e-7,
-        )
-        r_knee_holonomic_task.gain = 0.05
-        l_knee_holonomic_task = JointCouplingTask(
-            ["l_knee_fe_jp", "l_knee_fe_jd"],
-            [1.0, -1.0],
-            100.0,
-            self.pink_config,
-            lm_damping=5e-7,
-        )
-        l_knee_holonomic_task.gain = 0.05
+        # r_knee_holonomic_task = JointCouplingTask(
+        #     ["r_knee_fe_jp", "r_knee_fe_jd"],
+        #     [1.0, -1.0],
+        #     10.0,
+        #     self.pink_config,
+        #     lm_damping=5e-7,
+        # )
+        # r_knee_holonomic_task.gain = 0.05
+        # l_knee_holonomic_task = JointCouplingTask(
+        #     ["l_knee_fe_jp", "l_knee_fe_jd"],
+        #     [1.0, -1.0],
+        #     10.0,
+        #     self.pink_config,
+        #     lm_damping=5e-7,
+        # )
+        # l_knee_holonomic_task.gain = 0.05
         self.task_dict = {'torso_task': torso_task,
                           'lfoot_task': left_foot_task,
                           'rfoot_task': right_foot_task,
                           'lknee_task': left_knee_task,
                           'rknee_task': right_knee_task,
                           'lhand_task': left_hand_task,
-                          'rhand_task': right_hand_task,
+                          'rhand_task': right_hand_task,}
                           # 'posture_task': posture_task,
-                          'lknee_constr_task': l_knee_holonomic_task,
-                          'rknee_constr_task': r_knee_holonomic_task}
+                          # 'lknee_constr_task': l_knee_holonomic_task,
+                          # 'rknee_constr_task': r_knee_holonomic_task}
 
         return [torso_task, left_foot_task, right_foot_task, left_knee_task, right_knee_task,
-                left_hand_task, right_hand_task, #posture_task,
-                l_knee_holonomic_task, r_knee_holonomic_task]
+                left_hand_task, right_hand_task] #, posture_task,
+                # l_knee_holonomic_task, r_knee_holonomic_task]
 
     def set_planner(self, planner: LocomanipulationFramePlanner):
         self.planner = planner
@@ -164,8 +165,9 @@ class IKCFreePlanner:
         bez_paths = self.planner.path
 
         # record video
-        anim = meshcat.animation.Animation()
-        anim.default_framerate = int(1 / self.dt)
+        if self._b_record_anim:
+            anim = meshcat.animation.Animation()
+            anim.default_framerate = int(1 / self.dt)
 
         # evaluate end-effector path at each time step
         # seg_memory = np.zeros(len(bez_paths), dtype=int)
@@ -199,42 +201,42 @@ class IKCFreePlanner:
         #         torso_frame = meshcat.geometry.triad(0.2)
         #         des_torso_frame = meshcat.geometry.triad(0.2)
         #         visualizer.viewer["frames/torso"].set_object(torso_frame)
-        #         visualizer.viewer["frames/torso"].set_transform(self.pink_config.get_transform_frame_to_world("torso_link").homogeneous)
+        #         visualizer.viewer["frames/torso"].set_transform(self.pink_config.get_transform_frame_to_world("torso_link").homogeneous)    #torso_link
         #         visualizer.viewer["frames/torso_d"].set_object(des_torso_frame)
         #         visualizer.viewer["frames/torso_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[0]))
         #
         #         lf_frame = meshcat.geometry.triad(0.2)
         #         des_lf_frame = meshcat.geometry.triad(0.2)
         #         visualizer.viewer["frames/LF"].set_object(lf_frame)
-        #         visualizer.viewer["frames/LF"].set_transform(self.pink_config.get_transform_frame_to_world("l_foot_contact").homogeneous)
+        #         visualizer.viewer["frames/LF"].set_transform(self.pink_config.get_transform_frame_to_world("left_ankle_roll_link").homogeneous) #l_foot_contact
         #         visualizer.viewer["frames/LF_d"].set_object(des_lf_frame)
         #         visualizer.viewer["frames/LF_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[1]))
         #
         #         rf_frame = meshcat.geometry.triad(0.2)
         #         des_rf_frame = meshcat.geometry.triad(0.2)
         #         visualizer.viewer["frames/RF"].set_object(rf_frame)
-        #         visualizer.viewer["frames/RF"].set_transform(self.pink_config.get_transform_frame_to_world("r_foot_contact").homogeneous)
+        #         visualizer.viewer["frames/RF"].set_transform(self.pink_config.get_transform_frame_to_world("right_ankle_roll_link").homogeneous)    #r_foot_contact
         #         visualizer.viewer["frames/RF_d"].set_object(des_rf_frame)
         #         visualizer.viewer["frames/RF_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[2]))
         #
         #         lk_frame = meshcat.geometry.triad(0.2)
         #         des_lk_frame = meshcat.geometry.triad(0.2)
         #         visualizer.viewer["frames/LK"].set_object(lk_frame)
-        #         visualizer.viewer["frames/LK"].set_transform(self.pink_config.get_transform_frame_to_world("l_knee_fe_ld").homogeneous)
+        #         visualizer.viewer["frames/LK"].set_transform(self.pink_config.get_transform_frame_to_world("left_knee_link").homogeneous)
         #         visualizer.viewer["frames/LK_d"].set_object(des_lk_frame)
         #         visualizer.viewer["frames/LK_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[3]))
         #
         #         rk_frame = meshcat.geometry.triad(0.2)
         #         des_rk_frame = meshcat.geometry.triad(0.2)
         #         visualizer.viewer["frames/RK"].set_object(rk_frame)
-        #         visualizer.viewer["frames/RK"].set_transform(self.pink_config.get_transform_frame_to_world("r_knee_fe_ld").homogeneous)
+        #         visualizer.viewer["frames/RK"].set_transform(self.pink_config.get_transform_frame_to_world("right_knee_link").homogeneous)
         #         visualizer.viewer["frames/RK_d"].set_object(des_rk_frame)
         #         visualizer.viewer["frames/RK_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[4]))
         #
         #         lh_frame = meshcat.geometry.triad(0.2)
         #         des_lh_frame = meshcat.geometry.triad(0.2)
         #         visualizer.viewer["frames/LH"].set_object(lh_frame)
-        #         visualizer.viewer["frames/LH"].set_transform(self.pink_config.get_transform_frame_to_world("l_hand_contact").homogeneous)
+        #         visualizer.viewer["frames/LH"].set_transform(self.pink_config.get_transform_frame_to_world("left_palm_link").homogeneous)
         #         visualizer.viewer["frames/LH_d"].set_object(des_lh_frame)
         #         T_lh = meshcat.transformations.translation_matrix(curr_ee_point[5])
         #         T_lh[:3, :3] = util.quat_to_rot(self.frames_quat['LH'])
@@ -243,7 +245,7 @@ class IKCFreePlanner:
         #         rh_frame = meshcat.geometry.triad(0.2)
         #         des_rh_frame = meshcat.geometry.triad(0.2)
         #         visualizer.viewer["frames/RH"].set_object(rh_frame)
-        #         visualizer.viewer["frames/RH"].set_transform(self.pink_config.get_transform_frame_to_world("r_hand_contact").homogeneous)
+        #         visualizer.viewer["frames/RH"].set_transform(self.pink_config.get_transform_frame_to_world("right_palm_link").homogeneous)
         #         visualizer.viewer["frames/RH_d"].set_object(des_rh_frame)
         #         T_rh = meshcat.transformations.translation_matrix(curr_ee_point[6])
         #         T_rh[:3, :3] = util.quat_to_rot(self.frames_quat['RH'])
@@ -253,12 +255,12 @@ class IKCFreePlanner:
         #         with anim.at_frame(visualizer.viewer, frame_idx) as frame:
         #             display_visualizer_frames(visualizer, frame)
         #             frame["frames/torso"].set_transform(self.pink_config.get_transform_frame_to_world("torso_link").homogeneous)
-        #             frame["frames/LH"].set_transform(self.pink_config.get_transform_frame_to_world("l_hand_contact").homogeneous)
-        #             frame["frames/RH"].set_transform(self.pink_config.get_transform_frame_to_world("r_hand_contact").homogeneous)
-        #             frame["frames/LF"].set_transform(self.pink_config.get_transform_frame_to_world("l_foot_contact").homogeneous)
-        #             frame["frames/RF"].set_transform(self.pink_config.get_transform_frame_to_world("r_foot_contact").homogeneous)
-        #             frame["frames/LK"].set_transform(self.pink_config.get_transform_frame_to_world("l_knee_fe_ld").homogeneous)
-        #             frame["frames/RK"].set_transform(self.pink_config.get_transform_frame_to_world("r_knee_fe_ld").homogeneous)
+        #             frame["frames/LH"].set_transform(self.pink_config.get_transform_frame_to_world("left_palm_link").homogeneous)
+        #             frame["frames/RH"].set_transform(self.pink_config.get_transform_frame_to_world("right_palm_link").homogeneous)
+        #             frame["frames/LF"].set_transform(self.pink_config.get_transform_frame_to_world("left_ankle_roll_link").homogeneous)
+        #             frame["frames/RF"].set_transform(self.pink_config.get_transform_frame_to_world("right_ankle_roll_link").homogeneous)
+        #             frame["frames/LK"].set_transform(self.pink_config.get_transform_frame_to_world("left_knee_link").homogeneous)
+        #             frame["frames/RK"].set_transform(self.pink_config.get_transform_frame_to_world("right_knee_link").homogeneous)
         #             frame["frames/torso_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[0]))
         #             frame["frames/LH_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[5]))
         #             frame["frames/RH_d"].set_transform(meshcat.transformations.translation_matrix(curr_ee_point[6]))
@@ -271,8 +273,8 @@ class IKCFreePlanner:
         #     t += self.dt
 
         # save video
-        # if visualizer is not None:
-        #     visualizer.viewer.set_animation(anim, play=False)
+        if self._b_record_anim:
+            visualizer.viewer.set_animation(anim, play=False)
 
     def solve_ik(self):
         # Compute velocity and integrate it into next configuration
