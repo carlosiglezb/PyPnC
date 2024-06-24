@@ -1,0 +1,33 @@
+name: pypnc-cig
+channels:
+  - anaconda
+  - conda-forge
+dependencies:
+  - crocoddyl
+  # - example-robot-data
+  # - libcblas
+  # - liblapack
+  - pinocchio
+  - python=3.9
+  - pip
+  - pip:
+      - casadi==3.5.5
+      # - conda-env-export
+      # - flatbuffers
+      # - ipdb
+      - matplotlib
+      - meshcat
+      - opencv-python
+      - pybullet
+      - qpsolvers
+      - ruamel.yaml
+      - tensorflow==2.3.0
+      # - tqdm
+      # - yapf
+      - open3d
+      - imageio
+      - scipy
+      - networkx
+      - cvxpy
+      - clarabel
+# prefix: /home/carlos-pc/anaconda3/envs/pypnc-cig
