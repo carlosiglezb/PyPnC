@@ -160,7 +160,7 @@ class IKCFreePlanner:
         # compute plan
         ik_all_start_time = time.time()
         self.planner.plan_iris(p_init, T, alpha, verbose)
-        print("Total IK solve time: ", time.time() - ik_all_start_time)
+        print("[Compute Time] Total IK solve time: ", time.time() - ik_all_start_time)
         if visualizer is not None:
             self.planner.plot(visualizer)
 

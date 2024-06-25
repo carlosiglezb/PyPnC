@@ -680,10 +680,10 @@ def main(args):
     #
     # Dynamic solve
     #
+    dyn_solve_time = 0
 
     # Connecting the sequences of models
     NUM_OF_CONTACT_CONFIGURATIONS = len(motion_frames_seq.motion_frame_lst)
-    # NUM_OF_CONTACT_CONFIGURATIONS = 1
 
     lh_targets, base_into_targets, lf_targets, lkn_targets = [], [], [], []
     base_before_lf_step, base_after_lf_step, base_during_rf_step = [], [], []
@@ -694,7 +694,7 @@ def main(args):
     for i in range(NUM_OF_CONTACT_CONFIGURATIONS):
         model_seqs = []
         if robot_name == 'valkyrie':
-            N_horizon_lst = [150, 150, 100, 150]
+            N_horizon_lst = [150, 150, 150]
             b_terminal_step = False
             if i == 0:
                 # Cross door with left foot
@@ -870,10 +870,12 @@ def main(args):
         us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
         start_ddp_solve_time = time.time()
         print("Problem solved:", fddp[i].solve(xs, us, max_iter))
+        dyn_seg_solve_time = time.time() - start_ddp_solve_time
         print("Number of iterations:", fddp[i].iter)
         print("Total cost:", fddp[i].cost)
         print("Gradient norm:", fddp[i].stoppingCriteria())
-        print("Time to solve:", time.time() - start_ddp_solve_time)
+        print("Time to solve:", dyn_seg_solve_time)
+        dyn_solve_time += dyn_seg_solve_time
 
         # save data
         if B_SAVE_DATA:
@@ -889,6 +891,7 @@ def main(args):
         # Set final state as initial state of next phase
         x0 = fddp[i].xs[-1]
 
+    print("[Compute Time] Dynamic feasibility check: ", dyn_solve_time)
     # Creating display
     if B_VISUALIZE:
         save_freq = 1
@@ -916,8 +919,10 @@ def main(args):
         # display.add_arrow("forces/r_wrist_pitch", color=[0, 1, 0])
         # display.displayForcesFromCrocoddylSolver(fddp)
         display.displayFromCrocoddylSolver(fddp)
-        viz_to_hide = list(("lhand_inner_targets",
-                       "rhand_target", "base_ffoot_targets", "base_square_target"))
+        viz_to_hide = list(("lhand_inner_targets", "lhand_target",
+                            "rhand_target", "base_ffoot_targets", "base_square_target",
+                            "base_before_lf_step","base_into_target", "base_after_lf_step",
+                            "base_during_rf_step"))
         display.hide_visuals(viz_to_hide)
 
     fig_idx = 1

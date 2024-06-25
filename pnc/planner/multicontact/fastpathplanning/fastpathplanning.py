@@ -467,7 +467,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     traj, length, solver_time = solve_min_reach_iris_distance(R, S, iris_seq, safe_pnt_lst, A)
 
     if verbose:
-        print(f"Min. distance solve time: {solver_time}")
+        print(f"[Compute Time] Min. distance solve time: {solver_time}")
 
     # Cost coefficients.
     alpha = {i + 1: ai for i, ai in enumerate(alpha)}
@@ -507,6 +507,6 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     paths, sol_stats, points = optimize_multiple_bezier_iris(R, A, S, durations, alpha, safe_pnt_lst,
                                                      fixed_frames, surface_normals_lst, verbose=verbose)
     if verbose:
-        print(f"Bezier solve time: {sol_stats['runtime']}")
+        print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
 
     return paths, iris_seq, points

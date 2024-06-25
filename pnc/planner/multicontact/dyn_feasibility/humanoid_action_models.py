@@ -434,7 +434,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         elif 'torso' in fr_name:
             w_fr = np.array([0.5] * 3 + [0.1] * 3)
             if zero_config is not None:
-                w_fr = np.array([1] * 3 + [1.] * 3)
+                w_fr = np.array([0.1] * 3 + [0.01] * 3)
         else:
             raise ValueError(f"Weights to track frame {fr_name} were not set")
 
@@ -454,7 +454,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         costs.addCost(fr_name + "_goal", fr_cost, 1e2)
 
     # Adding state and control regularization terms
-    if zero_config is not None:
+    if zero_config is not None and terminal_step:
         x0[3:state.nq] = zero_config[3:]
     if v_ref is not None:
         x0[-state.nv:] = v_ref
@@ -469,7 +469,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         state, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
     costs.addCost("xReg", x_reg_cost, 5e-3)
-    costs.addCost("uReg", u_reg_cost, 1e-6)
+    costs.addCost("uReg", u_reg_cost, 1e-4)
 
     if rcj_constraints is not None:
         raise ValueError("Should not be entering here!")
