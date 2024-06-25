@@ -190,7 +190,7 @@ def get_ergoCub_default_initial_pose(n_joints):
 def load_navy_env(door_pos):
     # create navy door environment
     door_quat = np.array([0., 0., 0.7071068, 0.7071068])
-    door_width = np.array([0.025, 0., 0.])
+    door_width = np.array([0.03, 0., 0.])
     dom_ubody_lb = np.array([-1.6, -0.8, 0.5])
     dom_ubody_ub = np.array([1.6, 0.8, 2.1])
     dom_lbody_lb = np.array([-1.6, -0.8, -0.])
@@ -199,8 +199,8 @@ def load_navy_env(door_pos):
         np.array([-2, -0.9, -0.05]) + door_pos + door_width,
         np.array([2, 0.9, -0.001]) + door_pos + door_width)
     knee_knocker_base = HPolyhedron.MakeBox(
-        np.array([-0.025, -0.9, 0.0]) + door_pos + door_width,
-        np.array([0.025, 0.9, 0.4]) + door_pos + door_width)
+        np.array([-0.045, -0.9, 0.0]) + door_pos + door_width,
+        np.array([0.03, 0.9, 0.4]) + door_pos + door_width)
     knee_knocker_lwall = HPolyhedron.MakeBox(
         np.array([-0.025, 0.9 - 0.518, 0.0]) + door_pos + door_width,
         np.array([0.025, 0.9, 2.2]) + door_pos + door_width)
@@ -210,18 +210,18 @@ def load_navy_env(door_pos):
     knee_knocker_top = HPolyhedron.MakeBox(
         np.array([-0.025, -0.9, 1.85]) + door_pos + door_width,
         np.array([0.025, 0.9, 2.25]) + door_pos + door_width)
-    knee_knocker_llip = HPolyhedron.MakeBox(
-        np.array([-0.035, 0.9 - 0.518, 0.25]) + door_pos + door_width,
-        np.array([0.035, 0.9 - 0.518 + 0.15, 2.0]) + door_pos + door_width)
-    knee_knocker_rlip = HPolyhedron.MakeBox(
-        np.array([-0.035, -(0.9 - 0.518 + 0.15), 0.25]) + door_pos + door_width,
-        np.array([0.035, -(0.9 - 0.518), 2.0]) + door_pos + door_width)
+    # knee_knocker_llip = HPolyhedron.MakeBox(
+    #     np.array([-0.035, 0.9 - 0.518, 0.25]) + door_pos + door_width,
+    #     np.array([0.035, 0.9 - 0.518 + 0.15, 2.0]) + door_pos + door_width)
+    # knee_knocker_rlip = HPolyhedron.MakeBox(
+    #     np.array([-0.035, -(0.9 - 0.518 + 0.15), 0.25]) + door_pos + door_width,
+    #     np.array([0.035, -(0.9 - 0.518), 2.0]) + door_pos + door_width)
     obstacles = [floor,
                       knee_knocker_base,
                       knee_knocker_lwall,
                       knee_knocker_rwall,
-                      knee_knocker_llip,
-                      knee_knocker_rlip,
+                      # knee_knocker_llip,
+                      # knee_knocker_rlip,
                       knee_knocker_top]
     domain_ubody = HPolyhedron.MakeBox(dom_ubody_lb, dom_ubody_ub)
     domain_lbody = HPolyhedron.MakeBox(dom_lbody_lb, dom_lbody_ub)
@@ -263,7 +263,7 @@ def compute_iris_regions_mgr(obstacles,
     # shift (feet) iris seed to get nicer IRIS region
     iris_lf_shift = np.array([0.1, 0., 0.])
     iris_rf_shift = np.array([0.1, 0., 0.])
-    iris_kn_shift = np.array([0.02, 0., -0.05])
+    iris_kn_shift = np.array([0.01, 0., -0.05])
 
     # get end effector positions via fwd kin
     starting_torso_pos = standing_pos
@@ -921,8 +921,9 @@ def main(args):
         display.displayFromCrocoddylSolver(fddp)
         viz_to_hide = list(("lhand_inner_targets", "lhand_target",
                             "rhand_target", "base_ffoot_targets", "base_square_target",
-                            "base_before_lf_step","base_into_target", "base_after_lf_step",
-                            "base_during_rf_step"))
+                            "base_before_lf_step", "base_into_target", "base_after_lf_step",
+                            "base_during_rf_step", "lfoot_target", "lknee_target",
+                            "rfoot_target", "rknee_target"))
         display.hide_visuals(viz_to_hide)
 
     fig_idx = 1
