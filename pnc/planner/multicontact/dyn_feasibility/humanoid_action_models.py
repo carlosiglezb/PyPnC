@@ -3,7 +3,7 @@ import crocoddyl
 import pinocchio as pin
 import util.util
 from pnc.planner.multicontact.crocoddyl.ResidualModelStateError import ResidualModelStateError
-
+from crocoddyl.utils.biped import SimpleBipedGaitProblem
 
 def createDoubleSupportActionModel(state: crocoddyl.StateMultibody,
                                    actuation: crocoddyl.ActuationModelFloatingBase,
@@ -422,17 +422,17 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         # set higher tracking cost on feet
         if 'F' in fr_name:
             if terminal_step:
-                w_fr = np.array([10.] * 3 + [5] * 3)  # (lin, ang)
+                w_fr = np.array([10.] * 3 + [1] * 3)  # (lin, ang)
             else:
-                w_fr = np.array([10.] * 3 + [0.001] * 3)        # (lin, ang)
+                w_fr = np.array([2.] * 3 + [0.00001] * 3)        # (lin, ang)
         elif 'H' in fr_name:
             w_fr = np.array([2.] * 3 + [0.00001] * 3)
         elif 'R_knee' in fr_name:
-            w_fr = np.array([0.5] * 3 + [0.00001] * 3)
+            w_fr = np.array([1.0] * 3 + [0.00001] * 3)
         elif 'L_knee' in fr_name:
-            w_fr = np.array([2.] * 3 + [0.00001] * 3)
+            w_fr = np.array([1.] * 3 + [0.00001] * 3)
         elif 'torso' in fr_name:
-            w_fr = np.array([0.5] * 3 + [0.1] * 3)
+            w_fr = np.array([5.0] * 3 + [0.1] * 3)
             if zero_config is not None:
                 w_fr = np.array([0.1] * 3 + [0.01] * 3)
         else:
@@ -469,7 +469,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         state, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
     costs.addCost("xReg", x_reg_cost, 5e-3)
-    costs.addCost("uReg", u_reg_cost, 1e-4)
+    costs.addCost("uReg", u_reg_cost, 1e-6)
 
     if rcj_constraints is not None:
         raise ValueError("Should not be entering here!")

@@ -397,6 +397,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
 
     starting_lh_pos = safe_regions_mgr_dict['LH'].iris_list[0].seed_pos
     starting_rh_pos = safe_regions_mgr_dict['RH'].iris_list[0].seed_pos
+    starting_torso_pos = safe_regions_mgr_dict['torso'].iris_list[0].seed_pos
     final_lf_pos = safe_regions_mgr_dict['LF'].iris_list[1].seed_pos
     final_lkn_pos = safe_regions_mgr_dict['L_knee'].iris_list[1].seed_pos
     final_rf_pos = safe_regions_mgr_dict['RF'].iris_list[1].seed_pos
@@ -409,9 +410,10 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
     # ---- Step 1: L hand to frame
-    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'RH'])   # frames that must not move
+    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee', 'RH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                                         'LH': door_l_inner_location,
+                                        'torso': starting_torso_pos + np.array([0.05, -0.07, 0])
                                         })
     lh_contact_front = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
     lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
@@ -442,7 +444,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames.append(['LF', 'L_knee', 'RH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                         'RF': final_rf_pos,
-                        'torso': final_torso_pos + np.array([0.02, 0., 0.0]),     # good testing
+                        'torso': final_torso_pos + np.array([0.0, 0., 0.04]),     # good testing
                         'R_knee': final_rkn_pos + np.array([-0.05, 0., 0.07]),
                         # 'LH': starting_lh_pos + np.array([0.35, 0.0, 0.0])
     })
