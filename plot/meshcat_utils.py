@@ -288,7 +288,8 @@ class MeshcatPinocchioAnimation:
         for viz in viz_list:
             self.viz.viewer[viz].set_property("visible", False)
 
-    def save_html(self, filename):
+    def save_html(self, path, filename):
         viewer_html = self.viz.viewer.static_html()
-        with open(filename, "w") as f:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path + filename, "w") as f:
             f.write(viewer_html)

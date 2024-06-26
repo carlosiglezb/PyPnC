@@ -929,7 +929,7 @@ def main(args):
                             "rfoot_target", "rknee_target"))
         display.hide_visuals(viz_to_hide)
         if B_SAVE_HTML:
-            display.save_html(cwd + "/data/" + robot_name + "_door_crossing.html")
+            display.save_html(cwd + "/data/", robot_name + "_door_crossing.html")
 
     fig_idx = 1
     if B_SHOW_JOINT_PLOTS:
