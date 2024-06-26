@@ -33,6 +33,7 @@ B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = True
 B_SAVE_DATA = False
 B_VERBOSE = True
+B_SAVE_HTML = True
 
 
 def get_draco3_shaft_wrist_default_initial_pose():
@@ -200,7 +201,7 @@ def load_navy_env(door_pos):
         np.array([2, 0.9, -0.001]) + door_pos + door_width)
     knee_knocker_base = HPolyhedron.MakeBox(
         np.array([-0.045, -0.9, 0.0]) + door_pos + door_width,
-        np.array([0.03, 0.9, 0.4]) + door_pos + door_width)
+        np.array([0.035, 0.9, 0.4]) + door_pos + door_width)
     knee_knocker_lwall = HPolyhedron.MakeBox(
         np.array([-0.025, 0.9 - 0.518, 0.0]) + door_pos + door_width,
         np.array([0.025, 0.9, 2.2]) + door_pos + door_width)
@@ -410,7 +411,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
     # ---- Step 1: L hand to frame
-    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee', 'RH'])   # frames that must not move
+    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                                         'LH': door_l_inner_location,
                                         'torso': starting_torso_pos + np.array([0.05, -0.07, 0])
@@ -561,7 +562,7 @@ def main(args):
     elif robot_name == 'g1':
         q0 = get_g1_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.28, 0., 0.])
-        step_length = 0.4
+        step_length = 0.42
     elif robot_name == 'valkyrie':
         q0 = get_val_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.34, 0., 0.])
@@ -927,6 +928,8 @@ def main(args):
                             "base_during_rf_step", "lfoot_target", "lknee_target",
                             "rfoot_target", "rknee_target"))
         display.hide_visuals(viz_to_hide)
+        if B_SAVE_HTML:
+            display.save_html(cwd + "/data/" + robot_name + "_door_crossing.html")
 
     fig_idx = 1
     if B_SHOW_JOINT_PLOTS:

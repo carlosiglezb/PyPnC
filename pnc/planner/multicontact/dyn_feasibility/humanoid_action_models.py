@@ -424,7 +424,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             if terminal_step:
                 w_fr = np.array([10.] * 3 + [1] * 3)  # (lin, ang)
             else:
-                w_fr = np.array([2.] * 3 + [0.00001] * 3)        # (lin, ang)
+                w_fr = np.array([4.] * 3 + [0.00001] * 3)        # (lin, ang)
         elif 'H' in fr_name:
             w_fr = np.array([2.] * 3 + [0.00001] * 3)
         elif 'R_knee' in fr_name:
@@ -507,7 +507,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         activation_xbounds,
         crocoddyl.ResidualModelState(state, 0 * x0, actuation.nu),
     )
-    costs.addCost("xBounds", x_bounds, 1500.0)
+    costs.addCost("xBounds", x_bounds, 500.0)
 
     # Creating the action model
     dmodel = crocoddyl.DifferentialActionModelContactFwdDynamics(
