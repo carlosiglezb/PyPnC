@@ -146,7 +146,8 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     soc_constraint = []
     A_soc_debug, d_soc_debug, cost_log_abs_list = [], [], []  # for debug purposes
     if aux_frames is not None:
-        w_i = cp.Parameter(pos=True, value=1.)
+        # w_i = cp.Parameter(pos=True, value=1.)
+        w_i = np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
         for aux_fr in aux_frames:
             # get corresponding indices of optimization variable
             prox_idx, dist_idx, link_length = get_aux_frame_idx(
@@ -163,7 +164,9 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
 
         for Ai, di in zip(A_soc_debug, d_soc_debug):
             soc_constraint.append(cp.SOC(di, Ai @ x))
-            cost_log_abs_list.append(w_i * cp.log(di.value + Ai[0] @ x))
+            cost_log_abs_list.append(w_i[0] * cp.log(Ai[0] @ x))
+            # cost_log_abs_list.append(w_i[1] * cp.log(Ai[1] @ x))
+            # cost_log_abs_list.append(w_i[2] * cp.log(Ai[2] @ x))
 
         cost_log_abs = -(cp.sum(cost_log_abs_list))
 

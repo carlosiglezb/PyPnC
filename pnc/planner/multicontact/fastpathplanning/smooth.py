@@ -687,6 +687,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     cost_log_abs_sum = 0.
     if bool(aux_frames):     # check if empy dictionary
         link_based_weights = np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
+        wi = np.array([1000., 0.5, 500.])
 
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
@@ -694,14 +695,14 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 aux_fr, frame_list, num_iris_tot)
 
             # loop through all safe boxes
-            for nb in range(1, num_iris_tot):
+            for nb in range(1, num_iris_tot-1):
                 # for pnt in range(n_points-1):
                 for pnt in range(1):
                     link_proximal_point = points[prox_fr_idx+nb][0][pnt]
                     link_distal_point = points[dist_fr_idx+nb][0][pnt]
                     create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
                                              link_distal_point, soc_constraint, cost_log_abs,
-                                                         wi=link_based_weights)
+                                                         wi=wi)
 
                     # knee should mostly be above the foot
                     # soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
@@ -745,7 +746,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-    prob.solve(solver='CLARABEL')
+    prob.solve(solver='SCS')
 
     if prob.status == 'infeasible':
         print('Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
