@@ -195,12 +195,12 @@ def load_navy_env(door_pos):
     dom_ubody_lb = np.array([-1.6, -0.8, 0.5])
     dom_ubody_ub = np.array([1.6, 0.8, 2.1])
     dom_lbody_lb = np.array([-1.6, -0.8, -0.])
-    dom_lbody_ub = np.array([1.6, 0.8, 1.2])
+    dom_lbody_ub = np.array([1.6, 0.8, 0.9])
     floor = HPolyhedron.MakeBox(
         np.array([-2, -0.9, -0.05]) + door_pos + door_width,
         np.array([2, 0.9, -0.001]) + door_pos + door_width)
     knee_knocker_base = HPolyhedron.MakeBox(
-        np.array([-0.045, -0.9, 0.0]) + door_pos + door_width,
+        np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
         np.array([0.035, 0.9, 0.4]) + door_pos + door_width)
     knee_knocker_lwall = HPolyhedron.MakeBox(
         np.array([-0.025, 0.9 - 0.518, 0.0]) + door_pos + door_width,
@@ -354,8 +354,8 @@ def get_two_stage_contact_sequence(safe_regions_mgr_dict):
         'LF': final_lf_pos,
         'L_knee': final_lkn_pos,
         # 'torso': final_torso_pos + np.array([0.2, 0., 0.]),  # testing
-        'LH': starting_lh_pos + np.array([0.4, 0., 0.]),  # testing
-        'RH': starting_rh_pos + np.array([0.4, 0., 0.])})  # testing
+        'LH': starting_lh_pos + np.array([0.2, -0.1, 0.2]),  # testing
+        'RH': starting_rh_pos + np.array([0.2, 0.1, 0.2])})  # testing
     lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surface(lf_contact_over)
 
@@ -370,11 +370,14 @@ def get_two_stage_contact_sequence(safe_regions_mgr_dict):
     # motion_frames_seq.add_contact_surface([lh_contact_inside, rh_contact_inside])
 
     # ---- Step 4: step through door with right foot
-    fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
+    fixed_frames.append(['LF', 'L_knee'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                         'RF': final_rf_pos,
                         'torso': final_torso_pos,
-                        'R_knee': final_rkn_pos})
+                        'R_knee': final_rkn_pos,
+                        'LH': starting_lh_pos + np.array([0.4, 0., 0.]),
+                        'RH': starting_rh_pos + np.array([0.4, 0., 0.])
+    })
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surface(rf_contact_over)
 
@@ -717,11 +720,13 @@ def main(args):
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     base_before_lf_step.append(frame_targets_dict['torso'])
+                    lf_targets.append(frame_targets_dict['LF'])
+                    lkn_targets.append(frame_targets_dict['L_knee'])
                     model_seqs += createSequence([dmodel], T / (N_rf_support - 1), 1)
 
             elif i == 1:
-                # Cross door with right foot
-                N_lf_support = N_horizon_lst[i]  # knots for left hand reaching
+                # Cross door with left foot
+                N_lf_support = N_horizon_lst[i]  # knots for left foot crossing
                 for t in np.linspace(i * T, (i + 1) * T, N_lf_support):
                     if t == (i+1)*T:
                         b_terminal_step = True
@@ -737,11 +742,13 @@ def main(args):
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     base_before_lf_step.append(frame_targets_dict['torso'])
+                    rf_targets.append(frame_targets_dict['RF'])
+                    rkn_targets.append(frame_targets_dict['R_knee'])
                     model_seqs += createSequence([dmodel], T / (N_lf_support - 1), 1)
 
             elif i == 2:
-                # Reach door with left and right hand from inside
-                N_square_up = N_horizon_lst[i]  # knots for squaring up
+                # Croos door with right feet
+                N_square_up = N_horizon_lst[i]  # knots for right foot crossing
                 for t in np.linspace(i*T, (i+1)*T, N_square_up):
                     if t == (i+1)*T:
                         b_terminal_step = True
@@ -901,8 +908,8 @@ def main(args):
         display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
                           rob_data, vis_data, ctrl_freq=(N_horizon_lst[0]-1)/T, save_freq=save_freq)
         display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
-        display.display_targets("lfoot_target", lf_targets, [1, 0, 0])
-        display.display_targets("lknee_target", lkn_targets, [1, 0, 0])
+        display.display_targets("lfoot_target", lf_targets, [1, 1, 0])
+        display.display_targets("lknee_target", lkn_targets, [0, 0, 1])
         display.display_targets("rfoot_target", rf_targets, [0, 0, 1])
         display.display_targets("rknee_target", rkn_targets, [0, 0, 1])
         display.display_targets("lhand_target", lh_targets, [0.5, 0, 0])
@@ -955,6 +962,7 @@ def main(args):
             # crocoddyl.plotConvergence(log.costs, log.u_regs, log.x_regs, log.grads,
             #                           log.stops, log.steps, figIndex=fig_idx, show=False)
             # fig_idx +=1
+            plt.show()
 
     if B_SHOW_GRF_PLOTS:
         # Note: contact_links are l_ankle_ie, r_ankle_ie, l_wrist_pitch, r_wrist_pitch

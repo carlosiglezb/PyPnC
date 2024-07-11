@@ -106,14 +106,14 @@ class IrisRegionsManager:
         # start_centroid = self.iris_start_seed + np.array([0., 0., 0.35])
         # goal_centroid = self.iris_goal_seed + np.array([0.0, 0., 0.35])
         # ----------- settings for all
-        start_centroid = np.array([0.3, 0, 0.8])
-        goal_centroid = np.array([0.3, 0, 0.8])
+        start_centroid = np.array([0.3, 0, 0.6])
+        goal_centroid = np.array([0.3, 0, 0.6])
         new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.001, 0.1, 0.1])
 
         # check that new seed is not in collision before creating new IRIS region
         b_resample = self.pointInCollision(new_seed)
         while b_resample:
-            new_seed = np.random.normal(loc=(start_centroid + goal_centroid) / 2, scale=[0.05, 0.05, 0.25])
+            new_seed = np.random.normal(loc=(start_centroid + goal_centroid) / 2, scale=[0.05, 0.05, 0.15])
             b_resample = self.pointInCollision(new_seed)
 
         # create IRIS region using collision-free seed
