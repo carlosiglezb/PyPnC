@@ -343,8 +343,9 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
 
         for Ai, di in zip(A_soc_debug, d_soc_debug):
             soc_constraint.append(cp.SOC(di, Ai @ x))
-            cost_log_abs_list.append(w_i * cp.log(di.value + Ai[0] @ x))
-
+            cost_log_abs_list.append(w_i * cp.log(Ai[0] @ x))
+            cost_log_abs_list.append(0.*w_i * cp.log(Ai[1] @ x))
+            cost_log_abs_list.append(w_i * cp.log(Ai[2] @ x))
         cost_log_abs = -(cp.sum(cost_log_abs_list))
 
     # knee-to-foot fixed distance constraint (this should be trivially satisfied when 2 boxes)
@@ -373,15 +374,15 @@ def solve_min_reach_distance(reach, safe_boxes, box_seq, safe_points_list, aux_f
 
     # solve
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs), constr + soc_constraint)
-    prob.solve(solver='SCS')
+    prob.solve(solver='CLARABEL')
 
     length = prob.value
     traj = x.value
     solver_time = prob.solver_stats.solve_time
 
     # check distance of knee and foot points at each curve point
-    for Ai in A_soc_debug:
-        opt_shin_len_err = np.linalg.norm(Ai @ traj) - 0.32428632635527505
+    for Ai, di in zip(A_soc_debug, d_soc_debug):
+        opt_shin_len_err = np.linalg.norm(Ai @ traj) - di.value
         print(f"Shin length discrepancy: {opt_shin_len_err}")
 
     if b_debug:

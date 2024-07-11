@@ -83,7 +83,7 @@ def populate_rigid_link_constraint(rigid_pnt_1_idx, rigid_pnt_2_idx, link_length
     d_j.value = link_length
 
     # create constraint for all interior curve points (don't include neither first nor last points)
-    for p in range(1, num_points):
+    for p in range(1, num_points-1):
         A_j = np.zeros((3, x_dim))  # (x,y,z) of current curve point
         start_idx_1 = rigid_pnt_1_idx * x_deg + x_deg * p
         start_idx_2 = rigid_pnt_2_idx * x_deg + x_deg * p
