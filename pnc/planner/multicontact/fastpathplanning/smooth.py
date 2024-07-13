@@ -687,7 +687,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     cost_log_abs_sum = 0.
     if bool(aux_frames):     # check if empy dictionary
         link_based_weights = np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
-        wi = np.array([800., 0.5, 10.])
+        wi = np.array([1500., 0.5, 10.])
 
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
@@ -739,7 +739,8 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                     H = coeffs['H']
                     d_vec = np.reshape(coeffs['d'], (len(H), 1))
                     d_mat = np.repeat(d_vec, n_points, axis=1)
-                    constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+                    if frame_name != 'torso':
+                        constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
 
                 fr_iris_counter += num_iris_current
                 k_fr_iris += num_iris_current
