@@ -3,7 +3,7 @@ channels:
   - anaconda
   - conda-forge
 dependencies:
-  - crocoddyl
+  - crocoddyl=2.0.2
   - pinocchio
   - python=3.10
   - pip
