@@ -4,7 +4,7 @@ channels:
   - conda-forge
 dependencies:
   - crocoddyl=2.0.2
-  - pinocchio
+  - pinocchio=2.7.0
   - python=3.10
   - pip
   - pip:
