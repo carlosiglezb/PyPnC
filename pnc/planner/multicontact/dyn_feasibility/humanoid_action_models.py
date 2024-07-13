@@ -424,13 +424,13 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             if terminal_step:
                 w_fr = np.array([10.] * 3 + [1] * 3)  # (lin, ang)
             else:
-                w_fr = np.array([4.] * 3 + [0.00001] * 3)        # (lin, ang)
+                w_fr = np.array([8.] * 3 + [0.00001] * 3)        # (lin, ang)
         elif 'H' in fr_name:
             w_fr = np.array([2.] * 3 + [0.00001] * 3)
         elif 'R_knee' in fr_name:
-            w_fr = np.array([1.0] * 3 + [0.00001] * 3)
+            w_fr = np.array([1.5] * 3 + [0.00001] * 3)
         elif 'L_knee' in fr_name:
-            w_fr = np.array([1.] * 3 + [0.00001] * 3)
+            w_fr = np.array([4.] * 3 + [0.00001] * 3)
         elif 'torso' in fr_name:
             w_fr = np.array([2.0] * 3 + [0.5] * 3)
             if zero_config is not None:

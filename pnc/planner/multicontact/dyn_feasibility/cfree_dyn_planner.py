@@ -33,7 +33,7 @@ B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = True
 B_SAVE_DATA = False
 B_VERBOSE = True
-B_SAVE_HTML = True
+B_SAVE_HTML = False
 
 
 def get_draco3_shaft_wrist_default_initial_pose():
@@ -195,13 +195,13 @@ def load_navy_env(door_pos):
     dom_ubody_lb = np.array([-1.6, -0.8, 0.5])
     dom_ubody_ub = np.array([1.6, 0.8, 2.1])
     dom_lbody_lb = np.array([-1.6, -0.8, -0.])
-    dom_lbody_ub = np.array([1.6, 0.8, 0.9])
+    dom_lbody_ub = np.array([1.6, 0.8, 1.2])
     floor = HPolyhedron.MakeBox(
         np.array([-2, -0.9, -0.05]) + door_pos + door_width,
         np.array([2, 0.9, -0.001]) + door_pos + door_width)
     knee_knocker_base = HPolyhedron.MakeBox(
         np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
-        np.array([0.035, 0.9, 0.4]) + door_pos + door_width)
+        np.array([0.05, 0.9, 0.4]) + door_pos + door_width)
     knee_knocker_lwall = HPolyhedron.MakeBox(
         np.array([-0.025, 0.9 - 0.518, 0.0]) + door_pos + door_width,
         np.array([0.025, 0.9, 2.2]) + door_pos + door_width)
@@ -272,11 +272,11 @@ def compute_iris_regions_mgr(obstacles,
     starting_lf_pos = robot_data.oMf[plan_to_model_ids['LF']].translation
     final_lf_pos = starting_lf_pos + np.array([goal_step_length, 0., 0.])
     # starting_lh_pos = robot_data.oMf[plan_to_model_ids['LH']].translation - np.array([0.01, 0., 0.])
-    starting_lh_pos = robot_data.oMf[plan_to_model_ids['LH']].translation + np.array([0.1, 0., 0.])
+    starting_lh_pos = robot_data.oMf[plan_to_model_ids['LH']].translation
     final_lh_pos = starting_lh_pos + np.array([goal_step_length, 0., 0.])
     starting_rf_pos = robot_data.oMf[plan_to_model_ids['RF']].translation
     final_rf_pos = starting_rf_pos + np.array([goal_step_length, 0., 0.])
-    starting_rh_pos = robot_data.oMf[plan_to_model_ids['RH']].translation + np.array([0.1, 0., 0.])
+    starting_rh_pos = robot_data.oMf[plan_to_model_ids['RH']].translation
     final_rh_pos = starting_rh_pos + np.array([goal_step_length, 0., 0.])
     starting_lkn_pos = robot_data.oMf[plan_to_model_ids['L_knee']].translation #+ np.array([0.02, 0., -0.05])
     final_lkn_pos = starting_lkn_pos + np.array([goal_step_length, 0., 0.])
@@ -289,13 +289,13 @@ def compute_iris_regions_mgr(obstacles,
     safe_lf_end_region = IrisGeomInterface(obstacles, domain_lbody, final_lf_pos)
     safe_lk_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_lkn_pos + iris_kn_shift)
     safe_lk_end_region = IrisGeomInterface(obstacles, domain_lbody, final_lkn_pos)
-    safe_lh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_lh_pos)
+    safe_lh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_lh_pos + np.array([0.1, 0., 0.]))
     safe_lh_end_region = IrisGeomInterface(obstacles, domain_ubody, final_lh_pos)
     safe_rf_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_rf_pos + iris_rf_shift)
     safe_rf_end_region = IrisGeomInterface(obstacles, domain_lbody, final_rf_pos)
     safe_rk_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_rkn_pos)
     safe_rk_end_region = IrisGeomInterface(obstacles, domain_lbody, final_rkn_pos)
-    safe_rh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_rh_pos)
+    safe_rh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_rh_pos + np.array([0.1, 0., 0.]))
     safe_rh_end_region = IrisGeomInterface(obstacles, domain_ubody, final_rh_pos)
     safe_regions_mgr_dict = {'torso': IrisRegionsManager(safe_torso_start_region, safe_torso_end_region),
                              'LF': IrisRegionsManager(safe_lf_start_region, safe_lf_end_region),
