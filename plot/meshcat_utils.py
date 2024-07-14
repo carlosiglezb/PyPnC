@@ -234,7 +234,7 @@ class MeshcatPinocchioAnimation:
 
                 with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
                     self.display_visualizer_frames(frame, q)
-                    self.displayForcesFromCrocoddylSolver(fs_ti, frame)
+                #     self.displayForcesFromCrocoddylSolver(fs_ti, frame)
 
                 self.frame_idx += 1     # increase frame index counter
 

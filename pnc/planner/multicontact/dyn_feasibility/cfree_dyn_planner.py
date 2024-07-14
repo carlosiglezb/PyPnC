@@ -691,9 +691,8 @@ def main(args):
     # Connecting the sequences of models
     NUM_OF_CONTACT_CONFIGURATIONS = len(motion_frames_seq.motion_frame_lst)
 
-    lh_targets, base_into_targets, lf_targets, lkn_targets = [], [], [], []
-    base_before_lf_step, base_after_lf_step, base_during_rf_step = [], [], []
-    rf_targets, rkn_targets = [], []
+    lh_targets, rh_targets, lf_targets, rf_targets, lkn_targets, rkn_targets = [], [], [], [], [], []
+    base_targets = []
 
     # Defining the problem and the solver
     fddp = [crocoddyl.SolverFDDP] * NUM_OF_CONTACT_CONFIGURATIONS
@@ -719,7 +718,8 @@ def main(args):
                                                          None,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
-                    base_before_lf_step.append(frame_targets_dict['torso'])
+                    rh_targets.append(frame_targets_dict['RH'])
+                    base_targets.append(frame_targets_dict['torso'])
                     lf_targets.append(frame_targets_dict['LF'])
                     lkn_targets.append(frame_targets_dict['L_knee'])
                     model_seqs += createSequence([dmodel], T / (N_rf_support - 1), 1)
@@ -741,7 +741,8 @@ def main(args):
                                                          None,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
-                    base_before_lf_step.append(frame_targets_dict['torso'])
+                    rh_targets.append(frame_targets_dict['RH'])
+                    base_targets.append(frame_targets_dict['torso'])
                     rf_targets.append(frame_targets_dict['RF'])
                     rkn_targets.append(frame_targets_dict['R_knee'])
                     model_seqs += createSequence([dmodel], T / (N_lf_support - 1), 1)
@@ -762,6 +763,9 @@ def main(args):
                                                          frame_targets_dict,
                                                          None,
                                                          terminal_step=b_terminal_step)
+                    lh_targets.append(frame_targets_dict['LH'])
+                    rh_targets.append(frame_targets_dict['RH'])
+                    base_targets.append(frame_targets_dict['torso'])
                     model_seqs += createSequence([dmodel], T/(N_square_up-1), 1)
         else:
             N_horizon_lst = [80, 100, 80, 150, 160]
@@ -783,7 +787,8 @@ def main(args):
                                                          None,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
-                    base_before_lf_step.append(frame_targets_dict['torso'])
+                    rh_targets.append(frame_targets_dict['RH'])
+                    base_targets.append(frame_targets_dict['torso'])
                     model_seqs += createSequence([dmodel], T/(N_lhand_to_door-1), 1)
 
             elif i == 1:
@@ -802,7 +807,9 @@ def main(args):
                                                          frame_targets_dict,
                                                          None,
                                                          terminal_step=b_terminal_step)
-                    base_into_targets.append(frame_targets_dict['torso'])
+                    lh_targets.append(frame_targets_dict['LH'])
+                    rh_targets.append(frame_targets_dict['RH'])
+                    base_targets.append(frame_targets_dict['torso'])
                     lf_targets.append(frame_targets_dict['LF'])
                     lkn_targets.append(frame_targets_dict['L_knee'])
                     model_seqs += createSequence([dmodel], T/(N_base_through_door-1), 1)
@@ -823,8 +830,10 @@ def main(args):
                                                          frame_targets_dict,
                                                          None,
                                                          terminal_step=b_terminal_step)
+                    lh_targets.append(frame_targets_dict['LH'])
+                    rh_targets.append(frame_targets_dict['RH'])
+                    base_targets.append(frame_targets_dict['torso'])
                     model_seqs += createSequence([dmodel], T/(N_rhand_to_door-1), 1)
-                    base_after_lf_step.append(frame_targets_dict['torso'])
 
             elif i == 3:
                 # Using left-hand and right-foot supports, pass right-leg through door
@@ -842,10 +851,12 @@ def main(args):
                                                          frame_targets_dict,
                                                          None,
                                                          terminal_step=b_terminal_step)
-                    model_seqs += createSequence([dmodel], T/(N_base_square_up-1), 1)
-                    base_during_rf_step.append(frame_targets_dict['torso'])
+                    lh_targets.append(frame_targets_dict['LH'])
+                    rh_targets.append(frame_targets_dict['RH'])
+                    base_targets.append(frame_targets_dict['torso'])
                     rf_targets.append(frame_targets_dict['RF'])
                     rkn_targets.append(frame_targets_dict['R_knee'])
+                    model_seqs += createSequence([dmodel], T/(N_base_square_up-1), 1)
 
             elif i == 4:
                 # Reach door with left and right hand from inside
@@ -863,6 +874,9 @@ def main(args):
                                                          frame_targets_dict,
                                                          None,
                                                          terminal_step=b_terminal_step)
+                    lh_targets.append(frame_targets_dict['LH'])
+                    rh_targets.append(frame_targets_dict['RH'])
+                    base_targets.append(frame_targets_dict['torso'])
                     model_seqs += createSequence([dmodel], T/(N_square_up-1), 1)
 
         problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
@@ -910,29 +924,15 @@ def main(args):
         display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
         display.display_targets("lfoot_target", lf_targets, [1, 1, 0])
         display.display_targets("lknee_target", lkn_targets, [0, 0, 1])
-        display.display_targets("rfoot_target", rf_targets, [0, 0, 1])
+        display.display_targets("rfoot_target", rf_targets, [1, 1, 0])
         display.display_targets("rknee_target", rkn_targets, [0, 0, 1])
         display.display_targets("lhand_target", lh_targets, [0.5, 0, 0])
-        # display.display_targets("lhand_inner_targets", lh_inner_targets, [0.5, 0, 0])
-        # display.display_targets("lhand_ready_targets", lh_ready_targets, [0.5, 0, 0])
-        # display.display_targets("rhand_target", rh_targets, [0, 0, 0.5])
-        # display.display_targets("rhand_ready_targets", rh_ready_targets, [0, 0, 0.5])
-        display.display_targets("base_before_lf_step", base_before_lf_step, [0, 1, 0])
-        display.display_targets("base_into_target", base_into_targets, [0, 1, 0])
-        display.display_targets("base_after_lf_step", base_after_lf_step, [0, 1, 0])
-        display.display_targets("base_during_rf_step", base_during_rf_step, [0, 1, 0])
-        # display.display_targets("base_ffoot_targets", base_ffoot_targets, [0, 1, 0])
-        # display.display_targets("base_square_target", base_outof_targets, [0, 1, 0])
-        # display.add_arrow("forces/l_ankle_ie", color=[1, 0, 0])
-        # display.add_arrow("forces/r_ankle_ie", color=[0, 0, 1])
-        # display.add_arrow("forces/l_wrist_pitch", color=[0, 1, 0])
-        # display.add_arrow("forces/r_wrist_pitch", color=[0, 1, 0])
+        display.display_targets("rhand_target", rh_targets, [0.5, 0, 0])
+        display.display_targets("base_target", base_targets, [0, 0.5, 0])
         # display.displayForcesFromCrocoddylSolver(fddp)
         display.displayFromCrocoddylSolver(fddp)
-        viz_to_hide = list(("lhand_inner_targets", "lhand_target",
-                            "rhand_target", "base_ffoot_targets", "base_square_target",
-                            "base_before_lf_step", "base_into_target", "base_after_lf_step",
-                            "base_during_rf_step", "lfoot_target", "lknee_target",
+        viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
+                            "lfoot_target", "lknee_target",
                             "rfoot_target", "rknee_target"))
         display.hide_visuals(viz_to_hide)
         if B_SAVE_HTML:
@@ -996,7 +996,7 @@ def main(args):
         plot_vector_traj(sim_time, rf_rfoot.T, 'RF RFoot (Local)', Fxyz_labels)
         plot_vector_traj(sim_time, rf_lwrist.T, 'RF LWrist (Local)', Fxyz_labels)
         plot_vector_traj(sim_time, rf_rwrist.T, 'RF RWrist (Local)', Fxyz_labels)
-    plt.show()
+        plt.show()
 
 
 def pack_current_targets(ik_cfree_planner, plan_to_model_frames, t):
