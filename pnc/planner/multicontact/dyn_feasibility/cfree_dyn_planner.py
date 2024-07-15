@@ -201,7 +201,7 @@ def load_navy_env(door_pos):
         np.array([2, 0.9, -0.001]) + door_pos + door_width)
     knee_knocker_base = HPolyhedron.MakeBox(
         np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
-        np.array([0.05, 0.9, 0.4]) + door_pos + door_width)
+        np.array([0.06, 0.9, 0.4]) + door_pos + door_width)
     knee_knocker_lwall = HPolyhedron.MakeBox(
         np.array([-0.025, 0.9 - 0.518, 0.0]) + door_pos + door_width,
         np.array([0.025, 0.9, 2.2]) + door_pos + door_width)
@@ -417,7 +417,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                                         'LH': door_l_inner_location,
-                                        'torso': starting_torso_pos + np.array([0.05, -0.07, 0])
+                                        'torso': starting_torso_pos + np.array([0.07, -0.07, 0])
                                         })
     lh_contact_front = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
     lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
@@ -436,7 +436,7 @@ def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
     motion_frames_seq.add_motion_frame({
                         # 'LH': starting_lh_pos + np.array([0.3, 0., 0.0]),   # <-- G1
                         # 'LH': starting_lh_pos + np.array([0.35, 0.1, 0.0]),   # <-- other
-                        'torso': final_torso_pos + np.array([-0.10, 0., 0.05]),     # good testing
+                        'torso': final_torso_pos + np.array([-0.15, 0.05, -0.05]),     # good testing
                         'RH': door_r_inner_location})
     rh_contact_inside = PlannerSurfaceContact('RH', np.array([1, 0, 0]))
     motion_frames_seq.add_contact_surface(rh_contact_inside)
@@ -768,7 +768,7 @@ def main(args):
                     base_targets.append(frame_targets_dict['torso'])
                     model_seqs += createSequence([dmodel], T/(N_square_up-1), 1)
         else:
-            N_horizon_lst = [80, 100, 80, 150, 160]
+            N_horizon_lst = [80, 150, 100, 150, 100]
             b_terminal_step = False
             if i == 0:
                 # Reach door with left hand
