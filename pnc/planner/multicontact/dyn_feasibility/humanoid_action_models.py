@@ -424,15 +424,15 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             if terminal_step:
                 w_fr = np.array([10.] * 3 + [1.5] * 3)  # (lin, ang)
             else:
-                w_fr = np.array([8.] * 3 + [0.00001] * 3)        # (lin, ang)
+                w_fr = np.array([6.] * 3 + [0.00001] * 3)        # (lin, ang)
         elif 'H' in fr_name:
             w_fr = np.array([2.] * 3 + [0.00001] * 3)
         elif 'R_knee' in fr_name:
-            w_fr = np.array([3.] * 3 + [0.00001] * 3)
+            w_fr = np.array([2.] * 3 + [0.00001] * 3)
         elif 'L_knee' in fr_name:
-            w_fr = np.array([3.] * 3 + [0.00001] * 3)
+            w_fr = np.array([2.] * 3 + [0.00001] * 3)
         elif 'torso' in fr_name:
-            w_fr = np.array([1.0] * 3 + [0.5] * 3)
+            w_fr = np.array([3.0] * 3 + [0.5, 0.5, 0.01])
             if zero_config is not None:
                 w_fr = np.array([0.1] * 3 + [0.01] * 3)
         else:
@@ -468,8 +468,8 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     u_reg_cost = crocoddyl.CostModelResidual(
         state, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
-    costs.addCost("xReg", x_reg_cost, 5e-3)
-    costs.addCost("uReg", u_reg_cost, 1e-6)
+    costs.addCost("xReg", x_reg_cost, 5e-2)
+    costs.addCost("uReg", u_reg_cost, 1e-4)
 
     if rcj_constraints is not None:
         raise ValueError("Should not be entering here!")

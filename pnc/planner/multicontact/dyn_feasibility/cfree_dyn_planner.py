@@ -188,7 +188,7 @@ def get_ergoCub_default_initial_pose(n_joints):
     return np.concatenate((floating_base, q0))
 
 
-def load_navy_env(door_pos):
+def load_orig_navy_env(door_pos):
     # create navy door environment
     door_quat = np.array([0., 0., 0.7071068, 0.7071068])
     door_width = np.array([0.03, 0., 0.])
@@ -231,6 +231,52 @@ def load_navy_env(door_pos):
     return door_pose, obstacles, domain_ubody, domain_lbody
 
 
+def load_navy_env(door_pos):
+    # create navy door environment
+    door_quat = np.array([0., 0., 0.7071068, 0.7071068])
+    door_width = np.array([0.03, 0., 0.])
+    dom_ubody_lb = np.array([-1.6, -0.8, 0.5])
+    dom_ubody_ub = np.array([1.6, 0.8, 2.1])
+    dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
+    dom_lbody_ub_l = np.array([1.6, 0.8, 1.2])
+    dom_lbody_lb_r = np.array([-1.6, -0.8, -0.])
+    dom_lbody_ub_r = np.array([1.6, 0.05, 1.2])
+    floor = HPolyhedron.MakeBox(
+        np.array([-2, -0.9, -0.05]) + door_pos + door_width,
+        np.array([2, 0.9, -0.001]) + door_pos + door_width)
+    knee_knocker_base = HPolyhedron.MakeBox(
+        np.array([-0.06, -0.9, 0.0]) + door_pos + door_width,
+        np.array([0.12, 0.9, 0.45]) + door_pos + door_width)
+    knee_knocker_lwall = HPolyhedron.MakeBox(
+        np.array([-0.025, 0.9 - 0.518, 0.0]) + door_pos + door_width,
+        np.array([0.025, 0.9, 2.2]) + door_pos + door_width)
+    knee_knocker_rwall = HPolyhedron.MakeBox(
+        np.array([-0.025, -0.9, 0.0]) + door_pos + door_width,
+        np.array([0.025, -(0.9 - 0.518), 2.2]) + door_pos + door_width)
+    knee_knocker_top = HPolyhedron.MakeBox(
+        np.array([-0.025, -0.9, 1.85]) + door_pos + door_width,
+        np.array([0.025, 0.9, 2.25]) + door_pos + door_width)
+    # knee_knocker_llip = HPolyhedron.MakeBox(
+    #     np.array([-0.035, 0.9 - 0.518, 0.25]) + door_pos + door_width,
+    #     np.array([0.035, 0.9 - 0.518 + 0.15, 2.0]) + door_pos + door_width)
+    # knee_knocker_rlip = HPolyhedron.MakeBox(
+    #     np.array([-0.035, -(0.9 - 0.518 + 0.15), 0.25]) + door_pos + door_width,
+    #     np.array([0.035, -(0.9 - 0.518), 2.0]) + door_pos + door_width)
+    obstacles = [floor,
+                      knee_knocker_base,
+                      knee_knocker_lwall,
+                      knee_knocker_rwall,
+                      # knee_knocker_llip,
+                      # knee_knocker_rlip,
+                      knee_knocker_top]
+    domain_ubody = HPolyhedron.MakeBox(dom_ubody_lb, dom_ubody_ub)
+    domain_lbody_l = HPolyhedron.MakeBox(dom_lbody_lb_l, dom_lbody_ub_l)
+    domain_lbody_r = HPolyhedron.MakeBox(dom_lbody_lb_r, dom_lbody_ub_r)
+
+    door_pose = np.concatenate((door_pos, door_quat))
+    return door_pose, obstacles, domain_ubody, domain_lbody_l, domain_lbody_r
+
+
 def load_robot_model(robot_name):
     if robot_name == 'draco3':
         package_dir = cwd + "/robot_model/draco3"
@@ -256,7 +302,8 @@ def load_robot_model(robot_name):
 
 def compute_iris_regions_mgr(obstacles,
                              domain_ubody,
-                             domain_lbody,
+                             domain_lbody_l,
+                             domain_lbody_r,
                              robot_data,
                              plan_to_model_ids,
                              standing_pos,
@@ -285,16 +332,16 @@ def compute_iris_regions_mgr(obstacles,
 
     safe_torso_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_torso_pos)
     safe_torso_end_region = IrisGeomInterface(obstacles, domain_ubody, final_torso_pos)
-    safe_lf_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_lf_pos + iris_lf_shift)
-    safe_lf_end_region = IrisGeomInterface(obstacles, domain_lbody, final_lf_pos)
-    safe_lk_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_lkn_pos + iris_kn_shift)
-    safe_lk_end_region = IrisGeomInterface(obstacles, domain_lbody, final_lkn_pos)
+    safe_lf_start_region = IrisGeomInterface(obstacles, domain_lbody_l, starting_lf_pos + iris_lf_shift)
+    safe_lf_end_region = IrisGeomInterface(obstacles, domain_lbody_l, final_lf_pos)
+    safe_lk_start_region = IrisGeomInterface(obstacles, domain_lbody_l, starting_lkn_pos + iris_kn_shift)
+    safe_lk_end_region = IrisGeomInterface(obstacles, domain_lbody_l, final_lkn_pos)
     safe_lh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_lh_pos + np.array([0.1, 0., 0.]))
     safe_lh_end_region = IrisGeomInterface(obstacles, domain_ubody, final_lh_pos)
-    safe_rf_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_rf_pos + iris_rf_shift)
-    safe_rf_end_region = IrisGeomInterface(obstacles, domain_lbody, final_rf_pos)
-    safe_rk_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_rkn_pos)
-    safe_rk_end_region = IrisGeomInterface(obstacles, domain_lbody, final_rkn_pos)
+    safe_rf_start_region = IrisGeomInterface(obstacles, domain_lbody_r, starting_rf_pos + iris_rf_shift)
+    safe_rf_end_region = IrisGeomInterface(obstacles, domain_lbody_r, final_rf_pos)
+    safe_rk_start_region = IrisGeomInterface(obstacles, domain_lbody_r, starting_rkn_pos)
+    safe_rk_end_region = IrisGeomInterface(obstacles, domain_lbody_r, final_rkn_pos)
     safe_rh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_rh_pos + np.array([0.1, 0., 0.]))
     safe_rh_end_region = IrisGeomInterface(obstacles, domain_ubody, final_rh_pos)
     safe_regions_mgr_dict = {'torso': IrisRegionsManager(safe_torso_start_region, safe_torso_end_region),
@@ -576,7 +623,7 @@ def main(args):
         step_length = 0.40
     else:
         raise NotImplementedError('Robot default configuration not specified')
-    door_pose, obstacles, domain_ubody, domain_lbody = load_navy_env(door_pos)
+    door_pose, obstacles, domain_ubody, domain_lbody_l, domain_lbody_r = load_navy_env(door_pos)
     v0 = np.zeros(rob_model.nv)
     x0 = np.concatenate([q0, v0])
 
@@ -596,9 +643,10 @@ def main(args):
 
     # Generate IRIS regions
     standing_pos = q0[:3]
-    safe_regions_mgr_dict, p_init = compute_iris_regions_mgr(obstacles, domain_ubody, domain_lbody,
-                                                     rob_data, plan_to_model_ids,
-                                                     standing_pos, step_length)
+    safe_regions_mgr_dict, p_init = compute_iris_regions_mgr(obstacles, domain_ubody,
+                                                             domain_lbody_l, domain_lbody_r,
+                                                             rob_data, plan_to_model_ids,
+                                                             standing_pos, step_length)
 
     if B_VISUALIZE:
         visualizer, door_model, door_collision_model, door_visual_model \
@@ -699,7 +747,7 @@ def main(args):
     for i in range(NUM_OF_CONTACT_CONFIGURATIONS):
         model_seqs = []
         if robot_name == 'valkyrie':
-            N_horizon_lst = [150, 150, 150]
+            N_horizon_lst = [150, 150, 100]
             b_terminal_step = False
             if i == 0:
                 # Cross door with left foot

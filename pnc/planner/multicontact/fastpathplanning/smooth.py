@@ -687,7 +687,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     cost_log_abs_sum = 0.
     if bool(aux_frames):     # check if empy dictionary
         link_based_weights = np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
-        wi = np.array([3500., 0.5, 10.])
+        wi = np.array([500., 0.5, 50.])
 
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
@@ -747,7 +747,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-    prob.solve(solver='SCS')
+    prob.solve(solver='CLARABEL')
 
     if prob.status == 'infeasible':
         print('Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')

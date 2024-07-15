@@ -30,7 +30,7 @@ def create_bezier_cvx_norm_eq_relaxation(link_length, x_var_first_point, x_var_s
     # cost_log_abs_list.append(cp.log_det(cp.diag(wi @ (x_var_first_point - x_var_second_point))))
     cost_log_abs_list.append(wi[0] * cp.log(x_var_first_point[0] - x_var_second_point[0]))
     # cost_log_abs_list.append(wi[1] * cp.log(x_var_first_point[1] - x_var_second_point[1]))
-    # cost_log_abs_list.append(wi[2] * cp.log(x_var_first_point[2] - x_var_second_point[2]))
+    cost_log_abs_list.append(wi[2] * cp.log(x_var_first_point[2] - x_var_second_point[2]))
 
     return
 
