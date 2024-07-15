@@ -789,7 +789,7 @@ def main(args):
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
                     base_targets.append(frame_targets_dict['torso'])
-                    model_seqs += createSequence([dmodel], T/(N_lhand_to_door-1), 1)
+                    model_seqs += createSequence([dmodel], T/(N_lhand_to_door), 1)
 
             elif i == 1:
                 # Using left-hand support, pass left-leg through door
@@ -812,7 +812,7 @@ def main(args):
                     base_targets.append(frame_targets_dict['torso'])
                     lf_targets.append(frame_targets_dict['LF'])
                     lkn_targets.append(frame_targets_dict['L_knee'])
-                    model_seqs += createSequence([dmodel], T/(N_base_through_door-1), 1)
+                    model_seqs += createSequence([dmodel], T/(N_base_through_door), 1)
 
             elif i == 2:
                 # Reach door with left and right hand from inside
@@ -833,7 +833,7 @@ def main(args):
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
                     base_targets.append(frame_targets_dict['torso'])
-                    model_seqs += createSequence([dmodel], T/(N_rhand_to_door-1), 1)
+                    model_seqs += createSequence([dmodel], T/(N_rhand_to_door), 1)
 
             elif i == 3:
                 # Using left-hand and right-foot supports, pass right-leg through door
@@ -856,7 +856,7 @@ def main(args):
                     base_targets.append(frame_targets_dict['torso'])
                     rf_targets.append(frame_targets_dict['RF'])
                     rkn_targets.append(frame_targets_dict['R_knee'])
-                    model_seqs += createSequence([dmodel], T/(N_base_square_up-1), 1)
+                    model_seqs += createSequence([dmodel], T/(N_base_square_up), 1)
 
             elif i == 4:
                 # Reach door with left and right hand from inside
@@ -877,7 +877,7 @@ def main(args):
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
                     base_targets.append(frame_targets_dict['torso'])
-                    model_seqs += createSequence([dmodel], T/(N_square_up-1), 1)
+                    model_seqs += createSequence([dmodel], T/(N_square_up), 1)
 
         problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
         fddp[i] = crocoddyl.SolverFDDP(problem)
@@ -920,7 +920,7 @@ def main(args):
     if B_VISUALIZE:
         save_freq = 1
         display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
-                          rob_data, vis_data, ctrl_freq=(N_horizon_lst[0]-1)/T, save_freq=save_freq)
+                          rob_data, vis_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
         display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
         display.display_targets("lfoot_target", lf_targets, [1, 1, 0])
         display.display_targets("lknee_target", lkn_targets, [0, 0, 1])
