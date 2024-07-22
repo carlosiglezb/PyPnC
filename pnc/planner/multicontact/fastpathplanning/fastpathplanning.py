@@ -460,11 +460,11 @@ def plan_multiple(S, R, p_init, T, alpha,
 
 def plan_multiple_iris(S, R, p_init, T, alpha,
                   verbose=True, A=None, fixed_frames=None,
-                  motion_frames_seq=None, w_rigid=None):
+                  motion_frames_seq=None, w_rigid=None, w_rigid_poly=None):
     # Find IRIS sequence and minimize length between safe points
     motion_frames_lst = motion_frames_seq.get_motion_frames()
     iris_seq, safe_pnt_lst = plan_multistage_iris_seq(S, fixed_frames, motion_frames_lst, p_init)
-    traj, length, solver_time = solve_min_reach_iris_distance(R, S, iris_seq, safe_pnt_lst, A)
+    traj, length, solver_time = solve_min_reach_iris_distance(R, S, iris_seq, safe_pnt_lst, A, w_rigid_poly)
 
     if verbose:
         print(f"[Compute Time] Min. distance solve time: {solver_time}")

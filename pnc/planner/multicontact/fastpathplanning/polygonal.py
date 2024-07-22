@@ -42,8 +42,12 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
                                   iris_regions: dict[str: IrisRegionsManager],
                                   iris_seq: List[dict[str: int]],
                                   safe_points_list: List[dict[str: np.array]],
-                                  aux_frames=None) -> [np.array, np.float64, np.float64]:
+                                  aux_frames=None,
+                                  weights_rigid: np.array = None) -> [np.array, np.float64, np.float64]:
     stance_foot = 'LF'
+
+    if weights_rigid is None:
+        weights_rigid = np.array([0.1621, 0., 0.0808])
 
     # Make copy of ee reachability region with only end effectors (e.g., excluding torso)
     ee_reach = {}
@@ -147,7 +151,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     A_soc_debug, d_soc_debug, cost_log_abs_list = [], [], []  # for debug purposes
     if aux_frames is not None:
         # w_i = cp.Parameter(pos=True, value=1.)
-        w_i = np.array([0.1621, 0.006, 0.0808])    # based on desired distance between foot-shin frames
+        # w_i = np.array([0.1621, 0.006, 0.0808])    # based on desired distance between foot-shin frames
         for aux_fr in aux_frames:
             # get corresponding indices of optimization variable
             prox_idx, dist_idx, link_length = get_aux_frame_idx(
@@ -164,9 +168,9 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
 
         for Ai, di in zip(A_soc_debug, d_soc_debug):
             soc_constraint.append(cp.SOC(di, Ai @ x))
-            cost_log_abs_list.append(w_i[0] * cp.log(Ai[0] @ x))
-            # cost_log_abs_list.append(w_i[1] * cp.log(Ai[1] @ x))
-            cost_log_abs_list.append(w_i[2] * cp.log(Ai[2] @ x))
+            for i in range(3):
+                if weights_rigid[i] != 0.:
+                    cost_log_abs_list.append(weights_rigid[i] * cp.log(Ai[i] @ x))
 
         cost_log_abs = -(cp.sum(cost_log_abs_list))
 

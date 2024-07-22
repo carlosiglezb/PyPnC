@@ -367,6 +367,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 ee_rpy: dict[str, list[float]],
                                 frame_targets_dict: dict[str, np.array],
                                 rcj_constraints: crocoddyl.ConstraintModelManager,
+                                gains: dict[str, np.array] = None,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
                                 terminal_step: bool = False):
@@ -421,18 +422,15 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     for fr_name, fr_id in plan_to_model_ids.items():
         # set higher tracking cost on feet
         if 'F' in fr_name:
-            if terminal_step:
-                w_fr = np.array([10.] * 3 + [1.5] * 3)  # (lin, ang)
-            else:
-                w_fr = np.array([6.] * 3 + [0.00001] * 3)        # (lin, ang)
+            w_fr = gains['feet']
         elif 'H' in fr_name:
-            w_fr = np.array([2.] * 3 + [0.00001] * 3)
+            w_fr = gains['hands']
         elif 'R_knee' in fr_name:
-            w_fr = np.array([2.] * 3 + [0.00001] * 3)
+            w_fr = gains['R_knee']
         elif 'L_knee' in fr_name:
-            w_fr = np.array([2.] * 3 + [0.00001] * 3)
+            w_fr = gains['L_knee']
         elif 'torso' in fr_name:
-            w_fr = np.array([3.0] * 3 + [0.5, 0.5, 0.01])
+            w_fr = gains['torso']
             if zero_config is not None:
                 w_fr = np.array([0.1] * 3 + [0.01] * 3)
         else:

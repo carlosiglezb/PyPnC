@@ -249,7 +249,7 @@ def load_navy_env(robot_name, door_pos):
         dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
         dom_lbody_ub_r = np.array([1.6, 0.05, 1.2])
         knee_knocker_base = HPolyhedron.MakeBox(
-            np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
+            np.array([-0.06, -0.9, 0.0]) + door_pos + door_width,
             np.array([0.12, 0.9, 0.45]) + door_pos + door_width)
     else:   # default
         dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
@@ -675,7 +675,11 @@ def main(args):
     #
     # Initialize IK Frame Planner
     #
-    ik_cfree_planner = IKCFreePlanner(rob_model, rob_data, plan_to_model_frames, q0)
+    if robot_name == 'valkyrie':
+        w_rigid_poly = np.array([0.1621, 0.0, 0.])
+    else:
+        w_rigid_poly = None
+    ik_cfree_planner = IKCFreePlanner(rob_model, rob_data, plan_to_model_frames, q0, w_rigid_poly=w_rigid_poly)
 
     # generate all frame traversable regions
     traversable_regions_dict = OrderedDict()
@@ -767,12 +771,20 @@ def main(args):
         if robot_name == 'valkyrie':
             N_horizon_lst = [150, 150, 100]
             b_terminal_step = False
+            gains = {
+                'torso': np.array([3.0] * 3 + [0.5, 0.5, 0.01]),    # (lin, ang)
+                'feet': np.array([6.] * 3 + [0.00001] * 3),         # (lin, ang)
+                'L_knee': np.array([2.] * 3 + [0.00001] * 3),
+                'R_knee': np.array([2.] * 3 + [0.00001] * 3),
+                'hands': np.array([2.] * 3 + [0.00001] * 3)
+            }
             if i == 0:
                 # Cross door with left foot
                 N_rf_support = N_horizon_lst[i]
                 for t in np.linspace(i * T, (i + 1) * T, N_rf_support):
                     if t == (i+1)*T:
                         b_terminal_step = True
+                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -782,6 +794,7 @@ def main(args):
                                                          ee_rpy,
                                                          frame_targets_dict,
                                                          None,
+                                                         gains=gains,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
@@ -796,6 +809,7 @@ def main(args):
                 for t in np.linspace(i * T, (i + 1) * T, N_lf_support):
                     if t == (i+1)*T:
                         b_terminal_step = True
+                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -805,6 +819,7 @@ def main(args):
                                                          ee_rpy,
                                                          frame_targets_dict,
                                                          None,
+                                                         gains=gains,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
@@ -819,6 +834,7 @@ def main(args):
                 for t in np.linspace(i*T, (i+1)*T, N_square_up):
                     if t == (i+1)*T:
                         b_terminal_step = True
+                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -828,6 +844,7 @@ def main(args):
                                                          ee_rpy,
                                                          frame_targets_dict,
                                                          None,
+                                                         gains=gains,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
@@ -836,12 +853,20 @@ def main(args):
         else:
             N_horizon_lst = [80, 150, 100, 150, 100]
             b_terminal_step = False
+            gains = {
+                'torso': np.array([1.0] * 3 + [0.5, 0.5, 0.5]),    # (lin, ang)
+                'feet': np.array([8.] * 3 + [0.00001] * 3),         # (lin, ang)
+                'L_knee': np.array([3.] * 3 + [0.00001] * 3),
+                'R_knee': np.array([3.] * 3 + [0.00001] * 3),
+                'hands': np.array([2.] * 3 + [0.00001] * 3)
+            }
             if i == 0:
                 # Reach door with left hand
                 N_lhand_to_door = N_horizon_lst[i]  # knots for left hand reaching
                 for t in np.linspace(i*T, (i+1)*T, N_lhand_to_door):
                     if t == (i+1)*T:
                         b_terminal_step = True
+                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -851,6 +876,7 @@ def main(args):
                                                          ee_rpy,
                                                          frame_targets_dict,
                                                          None,
+                                                         gains=gains,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
@@ -863,6 +889,7 @@ def main(args):
                 for t in np.linspace(i*T, (i+1)*T, N_base_through_door):
                     if t == (i+1)*T:
                         b_terminal_step = True
+                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -872,6 +899,7 @@ def main(args):
                                                          ee_rpy,
                                                          frame_targets_dict,
                                                          None,
+                                                         gains=gains,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
@@ -886,6 +914,7 @@ def main(args):
                 for t in np.linspace(i*T, (i+1)*T, N_rhand_to_door):
                     if t == (i+1)*T:
                         b_terminal_step = True
+                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -895,6 +924,7 @@ def main(args):
                                                          ee_rpy,
                                                          frame_targets_dict,
                                                          None,
+                                                         gains=gains,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
@@ -907,6 +937,7 @@ def main(args):
                 for t in np.linspace(i*T, (i+1)*T, N_base_square_up):
                     if t == (i+1)*T:
                         b_terminal_step = True
+                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -916,6 +947,7 @@ def main(args):
                                                          ee_rpy,
                                                          frame_targets_dict,
                                                          None,
+                                                         gains=gains,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
@@ -930,6 +962,7 @@ def main(args):
                 for t in np.linspace(i*T, (i+1)*T, N_square_up):
                     if t == (i+1)*T:
                         b_terminal_step = True
+                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -939,6 +972,7 @@ def main(args):
                                                          ee_rpy,
                                                          frame_targets_dict,
                                                          None,
+                                                         gains=gains,
                                                          terminal_step=b_terminal_step)
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])

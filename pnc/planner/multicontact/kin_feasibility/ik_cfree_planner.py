@@ -47,11 +47,13 @@ class IKCFreePlanner:
                  pin_robot_data: pin.Data,
                  plan_frames_to_model_map: dict[str: str],
                  q0: np.array = None,
-                 dt: float = 0.02):
+                 dt: float = 0.02,
+                 w_rigid_poly=None):
         self.dt = dt
         self.task_dict = {}             # filled out in PInk tasks (setup_tasks)
         self.planner = None
         self._b_record_anim = False
+        self.w_rigid_poly = w_rigid_poly
 
         if q0 is None:
             q0 = np.zeros(pin_robot_model.nq)
@@ -160,7 +162,7 @@ class IKCFreePlanner:
 
         # compute plan
         ik_all_start_time = time.time()
-        self.planner.plan_iris(p_init, T, alpha, w_rigid, verbose)
+        self.planner.plan_iris(p_init, T, alpha, w_rigid, self.w_rigid_poly, verbose)
         print("[Compute Time] Total IK solve time: ", time.time() - ik_all_start_time)
         if visualizer is not None:
             self.planner.plot(visualizer)
