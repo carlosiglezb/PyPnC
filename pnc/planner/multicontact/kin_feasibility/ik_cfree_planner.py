@@ -152,6 +152,7 @@ class IKCFreePlanner:
     def plan(self, p_init: np.array,
              T: float,
              alpha: np.array,
+             w_rigid: np.array,
              visualizer: MeshcatVisualizer = None,
              verbose: bool = False):
         if self.planner is None:
@@ -159,7 +160,7 @@ class IKCFreePlanner:
 
         # compute plan
         ik_all_start_time = time.time()
-        self.planner.plan_iris(p_init, T, alpha, verbose)
+        self.planner.plan_iris(p_init, T, alpha, w_rigid, verbose)
         print("[Compute Time] Total IK solve time: ", time.time() - ik_all_start_time)
         if visualizer is not None:
             self.planner.plot(visualizer)

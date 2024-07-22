@@ -231,22 +231,37 @@ def load_orig_navy_env(door_pos):
     return door_pose, obstacles, domain_ubody, domain_lbody
 
 
-def load_navy_env(door_pos):
+def load_navy_env(robot_name, door_pos):
     # create navy door environment
     door_quat = np.array([0., 0., 0.7071068, 0.7071068])
     door_width = np.array([0.03, 0., 0.])
     dom_ubody_lb = np.array([-1.6, -0.8, 0.5])
     dom_ubody_ub = np.array([1.6, 0.8, 2.1])
-    dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
+
+    # account for different robot feet dimensions and restrict inwards motion
+    if robot_name == 'g1':
+        dom_lbody_lb_l = np.array([-1.6, -0.8, -0.])
+        dom_lbody_ub_r = np.array([1.6, 0.8, 1.2])
+        knee_knocker_base = HPolyhedron.MakeBox(
+            np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
+            np.array([0.06, 0.9, 0.4]) + door_pos + door_width)
+    elif robot_name == 'valkyrie':
+        dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
+        dom_lbody_ub_r = np.array([1.6, 0.05, 1.2])
+        knee_knocker_base = HPolyhedron.MakeBox(
+            np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
+            np.array([0.12, 0.9, 0.45]) + door_pos + door_width)
+    else:   # default
+        dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
+        dom_lbody_ub_r = np.array([1.6, 0.8, 1.2])
+        knee_knocker_base = HPolyhedron.MakeBox(
+            np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
+            np.array([0.12, 0.9, 0.45]) + door_pos + door_width)
     dom_lbody_ub_l = np.array([1.6, 0.8, 1.2])
     dom_lbody_lb_r = np.array([-1.6, -0.8, -0.])
-    dom_lbody_ub_r = np.array([1.6, 0.05, 1.2])
     floor = HPolyhedron.MakeBox(
         np.array([-2, -0.9, -0.05]) + door_pos + door_width,
         np.array([2, 0.9, -0.001]) + door_pos + door_width)
-    knee_knocker_base = HPolyhedron.MakeBox(
-        np.array([-0.06, -0.9, 0.0]) + door_pos + door_width,
-        np.array([0.12, 0.9, 0.45]) + door_pos + door_width)
     knee_knocker_lwall = HPolyhedron.MakeBox(
         np.array([-0.025, 0.9 - 0.518, 0.0]) + door_pos + door_width,
         np.array([0.025, 0.9, 2.2]) + door_pos + door_width)
@@ -613,17 +628,20 @@ def main(args):
         q0 = get_g1_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.28, 0., 0.])
         step_length = 0.42
+        weights_rigid_link = np.array([3500., 0., 0.])
     elif robot_name == 'valkyrie':
         q0 = get_val_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.34, 0., 0.])
         step_length = 0.55
+        weights_rigid_link = np.array([500., 0., 50.])
     elif robot_name == 'ergoCub':
         q0 = get_ergoCub_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.30, 0., 0.])
         step_length = 0.40
+        weights_rigid_link = np.array([3500., 0.5, 10.])
     else:
         raise NotImplementedError('Robot default configuration not specified')
-    door_pose, obstacles, domain_ubody, domain_lbody_l, domain_lbody_r = load_navy_env(door_pos)
+    door_pose, obstacles, domain_ubody, domain_lbody_l, domain_lbody_r = load_navy_env(robot_name, door_pos)
     v0 = np.zeros(rob_model.nv)
     x0 = np.concatenate([q0, v0])
 
@@ -699,7 +717,7 @@ def main(args):
 
     # compute paths and create targets
     ik_cfree_planner.set_planner(frame_planner)
-    ik_cfree_planner.plan(p_init, T, alpha, visualizer, B_VERBOSE)
+    ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer, B_VERBOSE)
 
     #
     # Start Dynamic Feasibility Check

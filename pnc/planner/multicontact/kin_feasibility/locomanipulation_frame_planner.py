@@ -104,6 +104,7 @@ class LocomanipulationFramePlanner:
     def plan_iris(self, p_init: dict[str, np.array],
              T: np.float64,
              alpha: List[np.float64],
+             w_rigid: np.array,
              verbose: bool=False):
         S = self.safe_boxes     # dict of IrisRegionsManager
         R = self.reachability_planes
@@ -111,7 +112,7 @@ class LocomanipulationFramePlanner:
         fixed_frames = self.fixed_frames
         motion_frames_seq = self.motion_frames_seq
         self.path, self.box_seq, self.points = fpp.plan_multiple_iris(S, R, p_init, T, alpha, verbose, A,
-                                                    fixed_frames, motion_frames_seq)
+                                                    fixed_frames, motion_frames_seq, w_rigid)
 
     def plot(self, visualizer, static_html=False):
         i = 0

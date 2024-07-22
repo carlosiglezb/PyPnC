@@ -565,8 +565,12 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                                   safe_points_lst: List[dict[str, np.array]],
                                   fixed_frames=None,
                                   surface_normals_lst=None,
+                                  weights_rigid_link=None,
                                   n_points=None, **kwargs):
     stance_foot = 'RF'
+
+    if weights_rigid_link is None:
+        weights_rigid_link = np.array([3500., 0.5, 10.])     # default for g1
 
     # number of frames
     n_frames = len(safe_points_lst[0].keys())
@@ -686,9 +690,6 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
     if bool(aux_frames):     # check if empy dictionary
-        link_based_weights = np.array([0.1621, 0.006, 0.2808])    # based on distance between foot-shin frames
-        wi = np.array([500., 0.5, 50.])
-
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
             prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
@@ -702,7 +703,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                     link_distal_point = points[dist_fr_idx+nb][0][pnt]
                     create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
                                              link_distal_point, soc_constraint, cost_log_abs,
-                                                         wi=wi)
+                                                         wi=weights_rigid_link)
 
                     # knee should mostly be above the foot
                     # soc_constraint.append(link_proximal_point[2] - link_distal_point[2] <= 0.02)
