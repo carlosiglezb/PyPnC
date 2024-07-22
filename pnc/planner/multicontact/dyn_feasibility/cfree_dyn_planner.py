@@ -251,6 +251,12 @@ def load_navy_env(robot_name, door_pos):
         knee_knocker_base = HPolyhedron.MakeBox(
             np.array([-0.06, -0.9, 0.0]) + door_pos + door_width,
             np.array([0.12, 0.9, 0.45]) + door_pos + door_width)
+    elif robot_name == 'ergoCub':
+        dom_lbody_lb_l = np.array([-1.6, -0.8, -0.])
+        dom_lbody_ub_r = np.array([1.6, 0.8, 1.0])
+        knee_knocker_base = HPolyhedron.MakeBox(
+            np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
+            np.array([0.085, 0.9, 0.52]) + door_pos + door_width)
     else:   # default
         dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
         dom_lbody_ub_r = np.array([1.6, 0.8, 1.2])
@@ -450,16 +456,18 @@ def get_two_stage_contact_sequence(safe_regions_mgr_dict):
     return fixed_frames, motion_frames_seq
 
 
-def get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict):
+def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     ###### Previously used key locations
     # door_l_outer_location = np.array([0.45, 0.35, 1.2])
     # door_r_outer_location = np.array([0.45, -0.35, 1.2])
-    # G1 settings
-    door_l_inner_location = np.array([0.3, 0.35, 0.9])
-    door_r_inner_location = np.array([0.34, -0.35, 0.9])
-    # other settings
-    # door_l_inner_location = np.array([0.3, 0.35, 0.9])
-    # door_r_inner_location = np.array([0.34, -0.35, 0.9])
+    if robot_name == 'g1':
+        # G1 settings
+        door_l_inner_location = np.array([0.3, 0.35, 0.9])
+        door_r_inner_location = np.array([0.34, -0.35, 0.9])
+    else:
+        # ergoCub settings
+        door_l_inner_location = np.array([0.3, 0.35, 1.0])
+        door_r_inner_location = np.array([0.34, -0.35, 1.0])
 
     starting_lh_pos = safe_regions_mgr_dict['LH'].iris_list[0].seed_pos
     starting_rh_pos = safe_regions_mgr_dict['RH'].iris_list[0].seed_pos
@@ -637,8 +645,8 @@ def main(args):
     elif robot_name == 'ergoCub':
         q0 = get_ergoCub_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.30, 0., 0.])
-        step_length = 0.40
-        weights_rigid_link = np.array([3500., 0.5, 10.])
+        step_length = 0.47
+        weights_rigid_link = np.array([6500., 0., 1500.])
     else:
         raise NotImplementedError('Robot default configuration not specified')
     door_pose, obstacles, domain_ubody, domain_lbody_l, domain_lbody_r = load_navy_env(robot_name, door_pos)
@@ -702,7 +710,7 @@ def main(args):
     if robot_name == 'valkyrie':
         fixed_frames_seq, motion_frames_seq = get_two_stage_contact_sequence(safe_regions_mgr_dict)
     else:
-        fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict)
+        fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict)
 
     # planner parameters
     T = 3
@@ -851,22 +859,37 @@ def main(args):
                     base_targets.append(frame_targets_dict['torso'])
                     model_seqs += createSequence([dmodel], T/(N_square_up-1), 1)
         else:
-            N_horizon_lst = [80, 150, 100, 150, 100]
+            if robot_name == 'g1':
+                N_horizon_lst = [80, 150, 100, 150, 100]
+                gains = {
+                    'torso': np.array([1.0] * 3 + [0.5] * 3),  # (lin, ang)
+                    'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
+                    'L_knee': np.array([3.] * 3 + [0.00001] * 3),
+                    'R_knee': np.array([3.] * 3 + [0.00001] * 3),
+                    'hands': np.array([2.] * 3 + [0.00001] * 3)
+                }
+            elif robot_name == 'ergoCub':
+                N_horizon_lst = [80, 220, 100, 180, 80]
+                gains = {
+                    'torso': np.array([1.0, 5., 0.5] + [0.8] * 3),  # (lin, ang)
+                    'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
+                    'L_knee': np.array([4.] * 3 + [0.00001] * 3),
+                    'R_knee': np.array([4.] * 3 + [0.00001] * 3),
+                    'hands': np.array([2.] * 3 + [0.00001] * 3)
+                }
+            else:
+                raise NotImplementedError('Horizon list and gains not defined for robot')
             b_terminal_step = False
-            gains = {
-                'torso': np.array([1.0] * 3 + [0.5, 0.5, 0.5]),    # (lin, ang)
-                'feet': np.array([8.] * 3 + [0.00001] * 3),         # (lin, ang)
-                'L_knee': np.array([3.] * 3 + [0.00001] * 3),
-                'R_knee': np.array([3.] * 3 + [0.00001] * 3),
-                'hands': np.array([2.] * 3 + [0.00001] * 3)
-            }
             if i == 0:
                 # Reach door with left hand
                 N_lhand_to_door = N_horizon_lst[i]  # knots for left hand reaching
                 for t in np.linspace(i*T, (i+1)*T, N_lhand_to_door):
                     if t == (i+1)*T:
                         b_terminal_step = True
-                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                        if robot_name == 'g1':
+                            gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                        elif robot_name == 'ergoCub':
+                            gains['feet'] = np.array([10.] * 3 + [1.0] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -889,7 +912,10 @@ def main(args):
                 for t in np.linspace(i*T, (i+1)*T, N_base_through_door):
                     if t == (i+1)*T:
                         b_terminal_step = True
-                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                        if robot_name == 'g1':
+                            gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                        elif robot_name == 'ergoCub':
+                            gains['feet'] = np.array([10.] * 3 + [1.0] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -914,7 +940,10 @@ def main(args):
                 for t in np.linspace(i*T, (i+1)*T, N_rhand_to_door):
                     if t == (i+1)*T:
                         b_terminal_step = True
-                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                        if robot_name == 'g1':
+                            gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                        elif robot_name == 'ergoCub':
+                            gains['feet'] = np.array([10.] * 3 + [1.0] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -937,7 +966,10 @@ def main(args):
                 for t in np.linspace(i*T, (i+1)*T, N_base_square_up):
                     if t == (i+1)*T:
                         b_terminal_step = True
-                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                        if robot_name == 'g1':
+                            gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                        elif robot_name == 'ergoCub':
+                            gains['feet'] = np.array([10.] * 3 + [1.0] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
@@ -962,7 +994,10 @@ def main(args):
                 for t in np.linspace(i*T, (i+1)*T, N_square_up):
                     if t == (i+1)*T:
                         b_terminal_step = True
-                        gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                        if robot_name == 'g1':
+                            gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                        elif robot_name == 'ergoCub':
+                            gains['feet'] = np.array([10.] * 3 + [1.0] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
