@@ -241,18 +241,24 @@ def load_navy_env(robot_name, door_pos):
     # account for different robot feet dimensions and restrict inwards motion
     if robot_name == 'g1':
         dom_lbody_lb_l = np.array([-1.6, -0.8, -0.])
+        dom_lbody_lb_r = np.array([-1.6, -0.8, -0.])
+        dom_lbody_ub_l = np.array([1.6, 0.8, 1.2])
         dom_lbody_ub_r = np.array([1.6, 0.8, 1.2])
         knee_knocker_base = HPolyhedron.MakeBox(
             np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
             np.array([0.06, 0.9, 0.4]) + door_pos + door_width)
     elif robot_name == 'valkyrie':
         dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
+        dom_lbody_lb_r = np.array([-1.6, -0.8, -0.])
+        dom_lbody_ub_l = np.array([1.6, 0.8, 1.2])
         dom_lbody_ub_r = np.array([1.6, 0.05, 1.2])
         knee_knocker_base = HPolyhedron.MakeBox(
             np.array([-0.06, -0.9, 0.0]) + door_pos + door_width,
             np.array([0.12, 0.9, 0.45]) + door_pos + door_width)
     elif robot_name == 'ergoCub':
         dom_lbody_lb_l = np.array([-1.6, -0.8, -0.])
+        dom_lbody_lb_r = np.array([-1.6, -0.8, -0.])
+        dom_lbody_ub_l = np.array([1.6, 0.8, 1.0])
         dom_lbody_ub_r = np.array([1.6, 0.8, 1.0])
         knee_knocker_base = HPolyhedron.MakeBox(
             np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
@@ -263,8 +269,6 @@ def load_navy_env(robot_name, door_pos):
         knee_knocker_base = HPolyhedron.MakeBox(
             np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
             np.array([0.12, 0.9, 0.45]) + door_pos + door_width)
-    dom_lbody_ub_l = np.array([1.6, 0.8, 1.2])
-    dom_lbody_lb_r = np.array([-1.6, -0.8, -0.])
     floor = HPolyhedron.MakeBox(
         np.array([-2, -0.9, -0.05]) + door_pos + door_width,
         np.array([2, 0.9, -0.001]) + door_pos + door_width)
@@ -485,10 +489,16 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
 
     # ---- Step 1: L hand to frame
     fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-    motion_frames_seq.add_motion_frame({
-                                        'LH': door_l_inner_location,
-                                        'torso': starting_torso_pos + np.array([0.07, -0.07, 0])
-                                        })
+    if robot_name == 'g1':
+        motion_frames_seq.add_motion_frame({
+                                            'LH': door_l_inner_location,
+                                            'torso': starting_torso_pos + np.array([0.07, -0.07, 0])
+                                            })
+    elif robot_name == 'ergoCub':
+        motion_frames_seq.add_motion_frame({
+                                            'LH': door_l_inner_location,
+                                            'torso': starting_torso_pos + np.array([0.05, -0.07, 0])
+                                            })
     lh_contact_front = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
     lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
     motion_frames_seq.add_contact_surface(lh_contact_front)
