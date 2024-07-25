@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from pnc.planner.multicontact.fastpathplanning.fastpathplanning import unassigned_box_seq_interpolator
+from pnc.planner.multicontact.kin_feasibility.fastpathplanning.fastpathplanning import unassigned_box_seq_interpolator
 
 
 class TestFPPTools(unittest.TestCase):

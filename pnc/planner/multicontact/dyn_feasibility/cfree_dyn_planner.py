@@ -9,7 +9,7 @@ sys.path.append(cwd)
 import crocoddyl
 import numpy as np
 
-from pnc.planner.multicontact.crocoddyl.ConstraintModelRCJ import ConstraintModelRCJ
+from pnc.planner.multicontact.crocoddyl_extensions.ConstraintModelRCJ import ConstraintModelRCJ
 # Collision free description
 from pydrake.geometry.optimization import HPolyhedron
 

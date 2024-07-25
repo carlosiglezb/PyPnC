@@ -1,7 +1,7 @@
 import numpy as np
 
 from crocoddyl.libcrocoddyl_pywrap import *
-from pnc.planner.multicontact.crocoddyl.ResidualDataStateError import ResidualDataStateError
+from pnc.planner.multicontact.crocoddyl_extensions.ResidualDataStateError import ResidualDataStateError
 
 
 class ResidualModelStateError(ResidualModelAbstract):
@@ -10,10 +10,11 @@ class ResidualModelStateError(ResidualModelAbstract):
         tau = args[1]
 
         # implement tau(id1) - tau(id2) = 0
-        data.h[0] = qdot[self.constr_ids[0]] - qdot[self.constr_ids[1]]
+        id1 = self.constr_ids[0]
+        id2 = self.constr_ids[1]
         # data.h[1] = tau[self.constr_ids_u[0]] - tau[self.constr_ids_u[1]]
         # data.h[0] = tau[self.constr_ids[0]] - tau[self.constr_ids[1]]
-        data.residual.r[0] = qdot[self.constr_ids[0]] - qdot[self.constr_ids[1]]
+        data.r[0] = qdot[id1] - qdot[id2]
         # data.residual.r[1] = tau[self.constr_ids_u[0]] - tau[self.constr_ids_u[1]]
 
     def calcDiff(self, data, *args, **kwargs):
@@ -24,10 +25,11 @@ class ResidualModelStateError(ResidualModelAbstract):
         lx[self.constr_ids[1] - 1] = -1
         # lu[self.constr_ids_u[0]] = 1
         # lu[self.constr_ids_u[1]] = -1
-        data.Hx = lx
+        # data.Hx = lx
+        data.Rx = lx
         # data.residual.Hu = lx
         # data.Hu[1] = lu
-        data.residual.Rx = lx
+        # data.residual.Rx = lx
         # data.residual.Ru[1] = lu
 
     def copy(self, ResidualModelStateError, *args, **kwargs):

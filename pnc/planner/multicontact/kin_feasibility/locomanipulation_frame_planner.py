@@ -1,7 +1,9 @@
 from typing import List
 
-import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
+import pnc.planner.multicontact.kin_feasibility.fastpathplanning.fastpathplanning as fpp
 from collections import OrderedDict
+
+import pnc.planner.multicontact.kin_feasibility.multiframe_fpp.multiframe_fpp
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import convert_rgba_to_meshcat_obj
 from util.polytope_math import extract_plane_eqn_from_coeffs
 
@@ -112,8 +114,8 @@ class LocomanipulationFramePlanner:
         A = self.aux_frames
         fixed_frames = self.fixed_frames
         motion_frames_seq = self.motion_frames_seq
-        self.path, self.box_seq, self.points = fpp.plan_multiple_iris(S, R, p_init, T, alpha, verbose, A,
-                                                    fixed_frames, motion_frames_seq, w_rigid, w_rigid_poly)
+        self.path, self.box_seq, self.points = pnc.planner.multicontact.kin_feasibility.multiframe_fpp.multiframe_fpp.plan_multiple_iris(S, R, p_init, T, alpha, verbose, A,
+                                                                                                                                         fixed_frames, motion_frames_seq, w_rigid, w_rigid_poly)
 
     def plot(self, visualizer, static_html=False):
         i = 0

@@ -2,7 +2,7 @@ import numpy as np
 from copy import copy
 from itertools import product
 from bisect import bisect_left, bisect_right
-from pnc.planner.multicontact.fastpathplanning.graph import LineGraph
+from pnc.planner.multicontact.kin_feasibility.fastpathplanning.graph import LineGraph
 
 class Box:
 
@@ -168,7 +168,6 @@ class BoxCollection:
 
     def plot2d(self, subset=None, label=None, frame_ratio=50, **kwargs):
         import matplotlib.pyplot as plt
-        from matplotlib.patches import Rectangle
 
         plot_box = np.array([plt.gca().get_xlim(), plt.gca().get_ylim()]).T
         for i, box in enumerate(self.boxes):

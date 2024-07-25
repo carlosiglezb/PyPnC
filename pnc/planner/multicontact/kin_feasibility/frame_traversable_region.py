@@ -5,7 +5,7 @@ import numpy as np
 from ruamel.yaml import YAML
 
 # package for frame path planning
-import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
+import pnc.planner.multicontact.kin_feasibility.fastpathplanning.fastpathplanning as fpp
 
 # package used for visualization
 import meshcat

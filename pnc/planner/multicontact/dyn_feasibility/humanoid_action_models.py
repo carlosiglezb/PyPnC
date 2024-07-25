@@ -2,7 +2,7 @@ import numpy as np
 import crocoddyl
 import pinocchio as pin
 import util.util
-from pnc.planner.multicontact.crocoddyl.ResidualModelStateError import ResidualModelStateError
+from pnc.planner.multicontact.crocoddyl_extensions.ResidualModelStateError import ResidualModelStateError
 from crocoddyl.utils.biped import SimpleBipedGaitProblem
 
 def createDoubleSupportActionModel(state: crocoddyl.StateMultibody,

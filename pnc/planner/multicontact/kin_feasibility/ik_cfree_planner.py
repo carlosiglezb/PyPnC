@@ -12,7 +12,7 @@ from pink.tasks import FrameTask, JointCouplingTask, PostureTask
 
 import numpy as np
 
-from pnc.planner.multicontact.fastpathplanning.smooth import CompositeBezierCurve
+from pnc.planner.multicontact.path_parameterization import CompositeBezierCurve
 from util import util
 # Planner
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner

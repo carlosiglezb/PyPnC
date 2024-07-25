@@ -1,7 +1,7 @@
 import copy
 from crocoddyl.libcrocoddyl_pywrap import *
 
-from pnc.planner.multicontact.crocoddyl.ConstraintDataRCJ import ConstraintDataRCJ
+from pnc.planner.multicontact.crocoddyl_extensions.ConstraintDataRCJ import ConstraintDataRCJ
 
 
 class ConstraintModelRCJ(ConstraintModelAbstract):

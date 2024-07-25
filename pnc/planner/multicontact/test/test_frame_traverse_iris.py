@@ -3,14 +3,14 @@ import numpy as np
 import scipy as sp
 import meshcat
 
-from pnc.planner.multicontact.fastpathplanning.polygonal import solve_min_reach_iris_distance
-from pnc.planner.multicontact.fastpathplanning.smooth import optimize_multiple_bezier_iris
+from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_polygonal import solve_min_reach_iris_distance
+from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_smooth import optimize_multiple_bezier_iris
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 # IRIS
 from vision.iris.iris_geom_interface import *
 from vision.iris.iris_regions_manager import IrisRegionsManager
 # IRIS sequence planner
-from pnc.planner.multicontact.fastpathplanning.fastpathplanning import plan_multistage_iris_seq
+from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.multiframe_fpp import plan_multistage_iris_seq
 from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
 
 b_visualize = False

@@ -1,5 +1,15 @@
 import numpy as np
 import cvxpy as cp
+from enum import Enum
+from pnc.planner.multicontact.path_parameterization import BezierParam
+
+eps_vel_constr = 0.01
+
+
+class Axis(Enum):
+    X = 0
+    Y = 1
+    Z = 2
 
 
 def create_cvx_norm_eq_relaxation(rigid_pnt_1_idx, rigid_pnt_2_idx, length,
@@ -93,3 +103,65 @@ def populate_rigid_link_constraint(rigid_pnt_1_idx, rigid_pnt_2_idx, link_length
         A_j[:, start_idx_2:start_idx_2 + x_deg] = -np.eye(3)
         A_soc.append(A_j)
         d_soc.append(d_j)
+
+
+def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_accel=True):
+
+    # check if we have multiple contacts occurring in the same segment
+    if type(seg_surface_normal) is list:
+        # figure out which normal we are currently using based on its frame name
+        for i, sn in enumerate(seg_surface_normal):
+            if f_name == sn.contact_frame_name:
+                seg_surface_normal = sn
+                break
+
+            # if we reach this point, the current frame does not have an assigned contact surface at this segment
+            if i == len(seg_surface_normal) - 1:
+                print(f'{f_name} motion frame not found in surface contact {seg_surface_normal.contact_frame_name}')
+                return
+
+    surf_normal = seg_surface_normal.surface_normal
+    if seg_surface_normal is not None:
+        # check that a normal vector has been specified for this frame and segment
+        if f_name not in seg_surface_normal.contact_frame_name:
+            surf_contact_name = seg_surface_normal.contact_frame_name
+            print(f'{f_name} motion frame not found in {surf_contact_name} surface contact.'
+                  f'No velocity/acceleration constraints added for this point.')
+            return
+
+        # apply epsilon motion constraint along specified direction
+        if seg_surface_normal.b_initial_vel:
+            frame_vel_ini = seg_surface_normal.get_contact_breaking_velocity()
+            constraints.append(frame_vel_ini @ point[BezierParam.VEL.value][0] >= 0)
+
+        # final velocity parallel to normal surface
+        normal_mat = np.array([[0, -surf_normal[2], surf_normal[1]],
+                               [surf_normal[2], 0, -surf_normal[0]],
+                               [-surf_normal[1], surf_normal[0], 0]])
+        constraints.append(normal_mat @ point[BezierParam.VEL.value][-1] == 0)
+        # final velocity magnitude
+        normal_tilde = (1. / eps_vel_constr) * surf_normal
+        constraints.append(-normal_tilde @ point[BezierParam.VEL.value][-2] >= 0)
+        # constraints.append(point[BezierParam.VEL.value][-1] == - eps_vel_constr * np.sign(surf_normal))
+    if b_constr_accel:
+        # apply only strictly positive and negative accelerations
+        if surf_normal[Axis.X.value] > 0:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.X.value] >= 0.)  # pos acc
+        elif surf_normal[Axis.X.value] < 0:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.X.value] <= 0.)  # neg acc
+        else:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.X.value] == 0.)  # zero acc
+
+        if surf_normal[Axis.Y.value] > 0:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.Y.value] >= 0.)  # pos acc
+        elif surf_normal[Axis.Y.value] < 0:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.Y.value] <= 0.)  # neg acc
+        else:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.Y.value] == 0.)  # zero acc
+
+        if surf_normal[Axis.Z.value] > 0:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.Z.value] >= 0.)  # pos acc
+        elif surf_normal[Axis.Z.value] < 0:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.Z.value] <= 0.)  # neg acc
+        else:
+            constraints.append(point[BezierParam.ACC.value][-1][Axis.Z.value] == 0.)  # zero acc

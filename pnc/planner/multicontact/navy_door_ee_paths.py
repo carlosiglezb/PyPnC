@@ -13,7 +13,7 @@ r"""
 Note: we assume the kinematic constraint has been specified/learned as convex polytopes
 """
 import numpy as np
-import pnc.planner.multicontact.fastpathplanning.fastpathplanning as fpp
+import pnc.planner.multicontact.kin_feasibility.fastpathplanning.fastpathplanning as fpp
 import matplotlib.pyplot as plt
 
 ##############################
