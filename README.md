@@ -11,6 +11,9 @@ system and stabilizing the system over the trajectories.
 - Activate the environment:<br/>
 ```$ conda activate pypnc```
 
+Note: The multicontact modules have only been tested in Ubuntu 20.04 LTS
+and assumes the environment `pypnc_croc.yml` is activated.
+
 ## Running Examples
 ### Three Link Manipulator Control with Operational Space Control
 - Run the code:<br/>
