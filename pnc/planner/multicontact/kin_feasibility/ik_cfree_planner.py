@@ -4,12 +4,7 @@ from typing import List, OrderedDict
 import meshcat
 from pinocchio.visualize import MeshcatVisualizer
 # kinematics tools
-import qpsolvers
 import pinocchio as pin
-import pink
-from pink import solve_ik
-from pink.tasks import FrameTask, JointCouplingTask, PostureTask
-
 import numpy as np
 
 from pnc.planner.multicontact.path_parameterization import CompositeBezierCurve
@@ -17,6 +12,13 @@ from util import util
 # Planner
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 
+b_use_ik_solver = False
+
+if b_use_ik_solver:
+    import qpsolvers
+    import pink
+    from pink import solve_ik
+    from pink.tasks import FrameTask, JointCouplingTask, PostureTask
 
 def display_visualizer_frames(meshcat_visualizer, frame):
     for visual in meshcat_visualizer.visual_model.geometryObjects:
@@ -31,15 +33,16 @@ def display_visualizer_frames(meshcat_visualizer, frame):
         frame[meshcat_visualizer.getViewerNodeName(
             visual, pin.GeometryType.VISUAL)].set_transform(T)
 
-def set_desired_frame_task(task: pink.FrameTask,
-                           quat: np.array(4),
-                           pos: np.array(3)):
-    task.set_target(pin.SE3(util.quat_to_rot(quat), pos))
+if b_use_ik_solver:
+    def set_desired_frame_task(task: pink.FrameTask,
+                               quat: np.array(4),
+                               pos: np.array(3)):
+        task.set_target(pin.SE3(util.quat_to_rot(quat), pos))
 
 
-def set_desired_posture_task(task: pink.PostureTask,
-                             q_nominal: np.array):
-    task.set_target(q_nominal)
+    def set_desired_posture_task(task: pink.PostureTask,
+                                 q_nominal: np.array):
+        task.set_target(q_nominal)
 
 
 class IKCFreePlanner:
@@ -58,95 +61,97 @@ class IKCFreePlanner:
         if q0 is None:
             q0 = np.zeros(pin_robot_model.nq)
 
-        # PInK robot data configuration
-        self.pink_config = pink.Configuration(pin_robot_model, pin_robot_data, q0)
+        if b_use_ik_solver:
+            # PInK robot data configuration
+            self.pink_config = pink.Configuration(pin_robot_model, pin_robot_data, q0)
 
-        # Compute initial end-effector positions and orientations
-        self.frames_pos, self.frames_quat = {}, {}
-        for p_frame, m_frame in plan_frames_to_model_map.items():
-            self.frames_pos[p_frame] = self.pink_config.get_transform_frame_to_world(m_frame).translation
-            self.frames_quat[p_frame] = util.rot_to_quat(self.pink_config.get_transform_frame_to_world(m_frame).rotation)
+            # Compute initial end-effector positions and orientations
+            self.frames_pos, self.frames_quat = {}, {}
+            for p_frame, m_frame in plan_frames_to_model_map.items():
+                self.frames_pos[p_frame] = self.pink_config.get_transform_frame_to_world(m_frame).translation
+                self.frames_quat[p_frame] = util.rot_to_quat(self.pink_config.get_transform_frame_to_world(m_frame).rotation)
 
-        # PInK tasks
-        self.tasks = self._initialize_tasks()
+            # PInK tasks
+            self.tasks = self._initialize_tasks()
 
-        # Select quadprog solver, if available
-        self.solver = qpsolvers.available_solvers[0]
-        if "quadprog" in qpsolvers.available_solvers:
-            self.solver = "quadprog"
+            # Select quadprog solver, if available
+            self.solver = qpsolvers.available_solvers[0]
+            if "quadprog" in qpsolvers.available_solvers:
+                self.solver = "quadprog"
 
-    def _initialize_tasks(self) -> List[pink.Task]:
-        torso_task = FrameTask(
-            "torso_link",
-            position_cost=0.001,
-            orientation_cost=0.005,
-        )
-        left_foot_task = FrameTask(
-            "left_ankle_roll_link",     #"l_foot_contact",
-            position_cost=1.0,
-            orientation_cost=0.05,
-        )
-        right_foot_task = FrameTask(
-            "right_ankle_roll_link",     #"r_foot_contact",
-            position_cost=5.0,
-            orientation_cost=0.05,
-        )
-        left_knee_task = FrameTask(
-            "left_knee_link",     #"l_knee_fe_ld
-            position_cost=0.05,
-            orientation_cost=0.001,
-        )
-        right_knee_task = FrameTask(
-            "right_knee_link",          #r_knee_fe_ld",
-            position_cost=0.2,
-            orientation_cost=0.001,
-        )
-        left_hand_task = FrameTask(
-            "left_palm_link",       #"l_hand_contact",
-            position_cost=5.0,
-            orientation_cost=0.001,
-            gain=0.1,
-        )
-        right_hand_task = FrameTask(
-            "right_palm_link",       #"r_hand_contact",
-            position_cost=0.01,
-            orientation_cost=0.0001,
-            gain=0.1,
-        )
-        posture_task = PostureTask(
-            cost=1e-3,  # [cost] / [rad]
-        )
-        # ----- Joint coupling task
-        # r_knee_holonomic_task = JointCouplingTask(
-        #     ["r_knee_fe_jp", "r_knee_fe_jd"],
-        #     [1.0, -1.0],
-        #     10.0,
-        #     self.pink_config,
-        #     lm_damping=5e-7,
-        # )
-        # r_knee_holonomic_task.gain = 0.05
-        # l_knee_holonomic_task = JointCouplingTask(
-        #     ["l_knee_fe_jp", "l_knee_fe_jd"],
-        #     [1.0, -1.0],
-        #     10.0,
-        #     self.pink_config,
-        #     lm_damping=5e-7,
-        # )
-        # l_knee_holonomic_task.gain = 0.05
-        self.task_dict = {'torso_task': torso_task,
-                          'lfoot_task': left_foot_task,
-                          'rfoot_task': right_foot_task,
-                          'lknee_task': left_knee_task,
-                          'rknee_task': right_knee_task,
-                          'lhand_task': left_hand_task,
-                          'rhand_task': right_hand_task,}
-                          # 'posture_task': posture_task,
-                          # 'lknee_constr_task': l_knee_holonomic_task,
-                          # 'rknee_constr_task': r_knee_holonomic_task}
+    if b_use_ik_solver:
+        def _initialize_tasks(self) -> List[pink.Task]:
+            torso_task = FrameTask(
+                "torso_link",
+                position_cost=0.001,
+                orientation_cost=0.005,
+            )
+            left_foot_task = FrameTask(
+                "left_ankle_roll_link",     #"l_foot_contact",
+                position_cost=1.0,
+                orientation_cost=0.05,
+            )
+            right_foot_task = FrameTask(
+                "right_ankle_roll_link",     #"r_foot_contact",
+                position_cost=5.0,
+                orientation_cost=0.05,
+            )
+            left_knee_task = FrameTask(
+                "left_knee_link",     #"l_knee_fe_ld
+                position_cost=0.05,
+                orientation_cost=0.001,
+            )
+            right_knee_task = FrameTask(
+                "right_knee_link",          #r_knee_fe_ld",
+                position_cost=0.2,
+                orientation_cost=0.001,
+            )
+            left_hand_task = FrameTask(
+                "left_palm_link",       #"l_hand_contact",
+                position_cost=5.0,
+                orientation_cost=0.001,
+                gain=0.1,
+            )
+            right_hand_task = FrameTask(
+                "right_palm_link",       #"r_hand_contact",
+                position_cost=0.01,
+                orientation_cost=0.0001,
+                gain=0.1,
+            )
+            posture_task = PostureTask(
+                cost=1e-3,  # [cost] / [rad]
+            )
+            # ----- Joint coupling task
+            # r_knee_holonomic_task = JointCouplingTask(
+            #     ["r_knee_fe_jp", "r_knee_fe_jd"],
+            #     [1.0, -1.0],
+            #     10.0,
+            #     self.pink_config,
+            #     lm_damping=5e-7,
+            # )
+            # r_knee_holonomic_task.gain = 0.05
+            # l_knee_holonomic_task = JointCouplingTask(
+            #     ["l_knee_fe_jp", "l_knee_fe_jd"],
+            #     [1.0, -1.0],
+            #     10.0,
+            #     self.pink_config,
+            #     lm_damping=5e-7,
+            # )
+            # l_knee_holonomic_task.gain = 0.05
+            self.task_dict = {'torso_task': torso_task,
+                              'lfoot_task': left_foot_task,
+                              'rfoot_task': right_foot_task,
+                              'lknee_task': left_knee_task,
+                              'rknee_task': right_knee_task,
+                              'lhand_task': left_hand_task,
+                              'rhand_task': right_hand_task,}
+                              # 'posture_task': posture_task,
+                              # 'lknee_constr_task': l_knee_holonomic_task,
+                              # 'rknee_constr_task': r_knee_holonomic_task}
 
-        return [torso_task, left_foot_task, right_foot_task, left_knee_task, right_knee_task,
-                left_hand_task, right_hand_task] #, posture_task,
-                # l_knee_holonomic_task, r_knee_holonomic_task]
+            return [torso_task, left_foot_task, right_foot_task, left_knee_task, right_knee_task,
+                    left_hand_task, right_hand_task] #, posture_task,
+                    # l_knee_holonomic_task, r_knee_holonomic_task]
 
     def set_planner(self, planner: LocomanipulationFramePlanner):
         self.planner = planner
@@ -283,10 +288,11 @@ class IKCFreePlanner:
         if self._b_record_anim:
             visualizer.viewer.set_animation(anim, play=False)
 
-    def solve_ik(self):
-        # Compute velocity and integrate it into next configuration
-        velocity = solve_ik(self.pink_config, self.tasks, self.dt, solver=self.solver)
-        self.pink_config.integrate_inplace(velocity, self.dt)
+    if b_use_ik_solver:
+        def solve_ik(self):
+            # Compute velocity and integrate it into next configuration
+            velocity = solve_ik(self.pink_config, self.tasks, self.dt, solver=self.solver)
+            self.pink_config.integrate_inplace(velocity, self.dt)
 
     @staticmethod
     def _get_bez_segment(frame_bez_paths: CompositeBezierCurve,

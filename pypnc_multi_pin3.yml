@@ -1,0 +1,26 @@
+name: pypnc-multi-pin3
+channels:
+  - anaconda
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pinocchio=3.1.0
+  - crocoddyl=2.1.0
+  - pip
+  - pip:
+      - conda-env-export
+      - drake
+      - meshcat
+      - opencv-python
+      - pybullet
+      - pypoman
+      - ruamel.yaml
+      - networkx
+      - cvxpy
+      - clarabel
+      - tqdm
+#      - pin-pink
+#      - qpsolvers
+#      - open3d
+#      - imageio
+#      - scipy

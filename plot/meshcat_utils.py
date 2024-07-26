@@ -10,7 +10,7 @@ import meshcat.transformations as tf
 
 # Python-Meshcat
 from meshcat.animation import Animation
-from pinocchio.visualize.meshcat_visualizer import isMesh
+from pinocchio.visualize.meshcat_visualizer import hasMeshFileInfo
 
 # Crocoddyl tools
 from crocoddyl.libcrocoddyl_pywrap import *  # noqa
@@ -44,7 +44,7 @@ def get_force_trajectory_from_solver(solver):
                     if model.differential.contacts.contacts[key].active:
                         joint = model.differential.state.pinocchio.frames[
                             contact.frame
-                        ].parent
+                        ].parentJoint
                         oMf = contact.pinocchio.oMi[joint] * contact.jMf
                         fiMo = pin.SE3(
                             contact.pinocchio.oMi[joint].rotation.T,
@@ -255,7 +255,7 @@ class MeshcatPinocchioAnimation:
             # Get mesh pose.
             M = geom_data.oMg[geom_model.getGeometryId(visual.name)]
             # Manage scaling
-            if isMesh(visual):
+            if hasMeshFileInfo(visual):
                 scale = np.asarray(visual.meshScale).flatten()
                 S = np.diag(np.concatenate((scale, [1.0])))
                 # S = visual.placement.homogeneous
