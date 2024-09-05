@@ -15,6 +15,8 @@ from pinocchio.visualize.meshcat_visualizer import hasMeshFileInfo
 # Crocoddyl tools
 from crocoddyl.libcrocoddyl_pywrap import *  # noqa
 
+from util.util import vec_to_roll_pitch
+
 cwd = os.getcwd()
 sys.path.append(cwd)
 
@@ -24,8 +26,8 @@ def get_force_trajectory_from_solver(solver):
     Snippet copied from Crocoddyl's DisplayAbstract class
     """
     fs = []
-    models = [*solver.problem.runningModels.tolist(), solver.problem.terminalModel]
-    datas = [*solver.problem.runningDatas.tolist(), solver.problem.terminalData]
+    models = [*solver.problem.runningModels.tolist()]
+    datas = [*solver.problem.runningDatas.tolist()]
     for i, data in enumerate(datas):
         model = models[i]
         if hasattr(data, "differential"):
@@ -145,6 +147,29 @@ def get_force_trajectory_from_solver(solver):
     return fs
 
 
+def get_scaled_and_oriented_grf_tf(scale,
+                                   pos, ori,
+                                   force_ori,
+                                   arrow_ini_height=0.1):
+    # scale and place GRF on ground plane (level)
+    scale_in_z = tf.scale_matrix(scale, None, np.array([0., 0., 1.]))
+    shift_in_z = tf.translation_matrix(np.array([0., 0., scale * arrow_ini_height / 2]))
+    scaled_arrow_tf = tf.concatenate_matrices(shift_in_z, scale_in_z)
+
+    # rotate according to force direction
+    force_rpy = np.zeros(3)
+    force_rpy[:2] = vec_to_roll_pitch(force_ori)
+    force_ori_mat = tf.euler_matrix(force_rpy[0], force_rpy[1], force_rpy[2], 'sxyz')
+    scaled_arrow_tf = tf.concatenate_matrices(force_ori_mat, scaled_arrow_tf)
+
+    # translate arrow to frame position and orientation
+    tf_pos = tf.translation_matrix(pos)
+    tf_pos[:3, :3] = ori
+    scaled_arrow_tf = tf.concatenate_matrices(tf_pos, scaled_arrow_tf)
+
+    return scaled_arrow_tf
+
+
 class MeshcatPinocchioAnimation:
     def __init__(self, pin_robot_model, collision_model, visual_model,
                  robot_data, visual_data,
@@ -201,23 +226,17 @@ class MeshcatPinocchioAnimation:
         self.viz.viewer[obj_name]["arrow/head"].set_transform(arrow_offset)
 
     def displayForcesFromCrocoddylSolver(self, fs_ti, frame):
-        # fs = get_force_trajectory_from_solver(solver)
-        # for ti in range(len(fs)):
-            for contact in range(len(fs_ti)):
-                pos = fs_ti[contact]['oMf'].translation
-                force_ori = fs_ti[contact]['oMf'].rotation
-                force_dir = fs_ti[contact]['f'].linear
+        for contact in range(len(fs_ti)):
+            pos = fs_ti[contact]['oMf'].translation
+            ori = fs_ti[contact]['oMf'].rotation
+            force_dir = fs_ti[contact]['f'].linear
 
-                scale = force_dir[2] / 1000.
-                # tf_S = tf.scale_matrix(scale, [0., 0., 0.], [0., 0., 1.])
-                tf_S = tf.translation_matrix([0., 0., scale])
-                tf_pos = tf.translation_matrix(pos)
-                tf_pos[:3, :3] = force_ori
-                T_force = tf.concatenate_matrices(tf_pos, tf_S)
-                link_name = self.model.names[int(fs_ti[contact]['key'])]
-                frame['forces'][link_name].set_transform(T_force)
-                # self.viz.viewer['forces'][link_name]["arrow"].set_transform(
-                #     fs[ti][contact]['oMf'].homogeneous)
+            scale = np.linalg.norm(force_dir) / 100.
+            grf_tf = get_scaled_and_oriented_grf_tf(scale, pos, ori, force_dir)
+
+            link_name = self.model.names[int(fs_ti[contact]['key'])]
+            frame['forces'][link_name].set_transform(grf_tf)
+            self.viz.viewer['forces'][link_name].set_transform(grf_tf)
 
     def displayFromCrocoddylSolver(self, solver):
         for it in solver:
@@ -226,7 +245,7 @@ class MeshcatPinocchioAnimation:
 
             fs = get_force_trajectory_from_solver(it)
 
-            for sim_time_idx in np.arange(0, len(dts), self.save_freq):
+            for sim_time_idx in np.arange(0, len(fs), self.save_freq):
                 q = np.array(it.xs[int(sim_time_idx)][:self.robot_nq])
                 self.viz.display(q)
 
@@ -234,7 +253,7 @@ class MeshcatPinocchioAnimation:
 
                 with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
                     self.display_visualizer_frames(frame, q)
-                #     self.displayForcesFromCrocoddylSolver(fs_ti, frame)
+                    self.displayForcesFromCrocoddylSolver(fs_ti, frame)
 
                 self.frame_idx += 1     # increase frame index counter
 

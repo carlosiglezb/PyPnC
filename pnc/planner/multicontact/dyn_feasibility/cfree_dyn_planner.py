@@ -893,32 +893,51 @@ def main(args):
             if i == 0:
                 # Reach door with left hand
                 N_lhand_to_door = N_horizon_lst[i]  # knots for left hand reaching
+                DT = T / (N_lhand_to_door - 1)
+                # for t in np.arange(i*T, (i+1)*T + DT, DT):
                 for t in np.linspace(i*T, (i+1)*T, N_lhand_to_door):
-                    if t == (i+1)*T:
-                        b_terminal_step = True
-                        if robot_name == 'g1':
-                            gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
-                        elif robot_name == 'ergoCub':
-                            gains['feet'] = np.array([10.] * 3 + [1.0] * 3)
+                #     if t == (i+1)*T:
+                #         b_terminal_step = False
+                #         if robot_name == 'g1':
+                #             gains['feet'] = np.array([10.] * 3 + [1.5] * 3)
+                #         elif robot_name == 'ergoCub':
+                #             gains['feet'] = np.array([10.] * 3 + [1.0] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
-                    dmodel = createMultiFrameActionModel(state,
-                                                         actuation,
-                                                         x0,
-                                                         plan_to_model_ids,
-                                                         ['LF', 'RF'],
-                                                         ee_rpy,
-                                                         frame_targets_dict,
-                                                         None,
-                                                         gains=gains,
-                                                         terminal_step=b_terminal_step)
+                    if t <= (i+1)*T - DT:
+                        dmodel = createMultiFrameActionModel(state,
+                                                             actuation,
+                                                             x0,
+                                                             plan_to_model_ids,
+                                                             ['LF', 'RF'],
+                                                             ee_rpy,
+                                                             frame_targets_dict,
+                                                             None,
+                                                             gains=gains,
+                                                             terminal_step=b_terminal_step)
+                        model_seqs += createSequence([dmodel], DT, 1)
+                    else:
+                        dmodel = createMultiFrameFinalActionModel(state,
+                                                             actuation,
+                                                             x0,
+                                                             plan_to_model_ids,
+                                                             ['LF', 'RF'],
+                                                             ee_rpy,
+                                                             frame_targets_dict,
+                                                             None,
+                                                             gains=gains,
+                                                             terminal_step=b_terminal_step)
+                        model_seqs += createFinalSequence([dmodel])
+                        print(f"Applying Impulse model at {i}")
+
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
                     base_targets.append(frame_targets_dict['torso'])
-                    model_seqs += createSequence([dmodel], T/(N_lhand_to_door), 1)
 
             elif i == 1:
                 # Using left-hand support, pass left-leg through door
                 N_base_through_door = N_horizon_lst[i]  # knots per waypoint to pass through door
+                DT = T / (N_base_through_door - 1)
+                # for t in np.arange(i*T, (i+1)*T + DT, DT):
                 for t in np.linspace(i*T, (i+1)*T, N_base_through_door):
                     if t == (i+1)*T:
                         b_terminal_step = True
@@ -927,22 +946,37 @@ def main(args):
                         elif robot_name == 'ergoCub':
                             gains['feet'] = np.array([10.] * 3 + [1.0] * 3)
                     frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
-                    dmodel = createMultiFrameActionModel(state,
-                                                         actuation,
-                                                         x0,
-                                                         plan_to_model_ids,
-                                                         ['LH', 'RF'],
-                                                         ee_rpy,
-                                                         frame_targets_dict,
-                                                         None,
-                                                         gains=gains,
-                                                         terminal_step=b_terminal_step)
+                    if t <= (i + 1) * T - DT:
+                        dmodel = createMultiFrameActionModel(state,
+                                                             actuation,
+                                                             x0,
+                                                             plan_to_model_ids,
+                                                             ['LH', 'RF'],
+                                                             ee_rpy,
+                                                             frame_targets_dict,
+                                                             None,
+                                                             gains=gains,
+                                                             terminal_step=b_terminal_step)
+                        model_seqs += createSequence([dmodel], DT, 1)
+                    else:
+                        dmodel = createMultiFrameFinalActionModel(state,
+                                                                  actuation,
+                                                                  x0,
+                                                                  plan_to_model_ids,
+                                                                  ['LF', 'RF'],
+                                                                  ee_rpy,
+                                                                  frame_targets_dict,
+                                                                  None,
+                                                                  gains=gains,
+                                                                  terminal_step=b_terminal_step)
+                        model_seqs += createFinalSequence([dmodel])
+                        print(f"Applying Impulse model at {i}")
+
                     lh_targets.append(frame_targets_dict['LH'])
                     rh_targets.append(frame_targets_dict['RH'])
                     base_targets.append(frame_targets_dict['torso'])
                     lf_targets.append(frame_targets_dict['LF'])
                     lkn_targets.append(frame_targets_dict['L_knee'])
-                    model_seqs += createSequence([dmodel], T/(N_base_through_door), 1)
 
             elif i == 2:
                 # Reach door with left and right hand from inside
@@ -1074,7 +1108,11 @@ def main(args):
         display.display_targets("lhand_target", lh_targets, [0.5, 0, 0])
         display.display_targets("rhand_target", rh_targets, [0.5, 0, 0])
         display.display_targets("base_target", base_targets, [0, 0.5, 0])
-        # display.displayForcesFromCrocoddylSolver(fddp)
+        # TODO grab joint name below from pinocchio
+        display.add_arrow("forces/left_ankle_roll_joint", color=[1, 0, 0])
+        display.add_arrow("forces/right_ankle_roll_joint", color=[0, 0, 1])
+        display.add_arrow("forces/left_elbow_roll_joint", color=[0, 1, 0])
+        # display.add_arrow("forces/right_elbow_roll_joint", color=[0, 1, 0])
         display.displayFromCrocoddylSolver(fddp)
         viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
                             "lfoot_target", "lknee_target",
@@ -1111,8 +1149,8 @@ def main(args):
 
     if B_SHOW_GRF_PLOTS:
         # Note: contact_links are l_ankle_ie, r_ankle_ie, l_wrist_pitch, r_wrist_pitch
-        sim_steps_list = [len(fddp[i].xs) for i in range(len(fddp))]
-        sim_steps = np.sum(sim_steps_list) + 1
+        sim_steps_list = [len(fddp[i].us) for i in range(len(fddp))]
+        sim_steps = np.sum(sim_steps_list)
         sim_time = np.zeros((sim_steps,))
         rf_lfoot, rf_rfoot, rf_lwrist, rf_rwrist = np.zeros((3, sim_steps)), \
             np.zeros((3, sim_steps)), np.zeros((3, sim_steps)), np.zeros((3, sim_steps))
@@ -1123,19 +1161,22 @@ def main(args):
                 for contact in rf_t:
                     # determine contact link
                     cur_link = int(contact['key'])
-                    if rob_model.names[cur_link] == "l_ankle_ie":
+                    if rob_model.names[cur_link] == "left_ankle_roll_joint":    #  "l_ankle_ie":
                         rf_lfoot[:, time_idx] = contact['f'].linear
-                    elif rob_model.names[cur_link] == "r_ankle_ie":
+                    elif rob_model.names[cur_link] == "right_ankle_roll_joint": # "r_ankle_ie":
                         rf_rfoot[:, time_idx] = contact['f'].linear
-                    elif rob_model.names[cur_link] == "l_wrist_pitch":
+                    elif rob_model.names[cur_link] == "left_elbow_roll_joint":  # l_wrist_pitch
                         rf_lwrist[:, time_idx] = contact['f'].linear
-                    elif rob_model.names[cur_link] == "r_wrist_pitch":
+                    elif rob_model.names[cur_link] == "right_elbow_roll_joint": # r_wrist_pitch
                         rf_rwrist[:, time_idx] = contact['f'].linear
                     else:
-                        print("ERROR: Non-specified contact")
+                        print(f"ERROR: Non-specified contact {rob_model.names[cur_link]}")
                 dt = it.problem.runningModels[0].dt     # assumes constant dt over fddp sequence
-                sim_time[time_idx+1] = sim_time[time_idx] + dt
-                time_idx += 1
+                if time_idx < len(sim_time) - 1:
+                    sim_time[time_idx+1] = sim_time[time_idx] + dt
+                    time_idx += 1
+                else:
+                    continue
 
         plot_vector_traj(sim_time, rf_lfoot.T, 'RF LFoot (Local)', Fxyz_labels)
         plot_vector_traj(sim_time, rf_rfoot.T, 'RF RFoot (Local)', Fxyz_labels)

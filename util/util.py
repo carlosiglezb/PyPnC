@@ -32,6 +32,17 @@ def euler_to_rot(angles):
     return np.copy(ret)
 
 
+def vec_to_roll_pitch(vec):
+    # return zeros if vector is a point
+    if np.linalg.norm(vec) < 1e-3:
+        return 0.0, 0.0
+
+    vec_copy = np.copy(vec)
+    vec_copy = vec_copy / np.linalg.norm(vec)
+    roll = np.arcsin(-vec_copy[1])
+    pitch = np.arctan2(vec_copy[0], vec_copy[2])
+    return roll, pitch
+
 def quat_to_rot(quat):
     """
     Parameters

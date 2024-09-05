@@ -514,9 +514,182 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     return dmodel
 
 
+def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
+                                actuation: crocoddyl.ActuationModelFloatingBase,
+                                x0: np.array,
+                                plan_to_model_ids: dict[str, int],
+                                frames_in_contact: list[str],
+                                ee_rpy: dict[str, list[float]],
+                                frame_targets_dict: dict[str, np.array],
+                                rcj_constraints: crocoddyl.ConstraintModelManager,
+                                gains: dict[str, np.array] = None,
+                                zero_config: np.array = None,
+                                v_ref: np.array = None,
+                                terminal_step: bool = False):
+    mu = 0.9
+
+    # Define the cost sum (cost manager)
+    costs = crocoddyl.CostModelSum(state, actuation.nu)
+
+    # Define contacts (e.g., feet / hand supports)
+    contacts = crocoddyl.ContactModelMultiple(state, actuation.nu)
+
+    # create contact models for each frame in contact
+    for fr_name in frames_in_contact:
+        fr_id = plan_to_model_ids[fr_name]
+
+        # for hand contact frames, set the corresponding rotation
+        SE3_ee = pin.SE3.Identity()
+        if fr_name in ee_rpy.keys():
+            SE3_ee.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
+
+        fr_contact = crocoddyl.ContactModel6D(
+            state,
+            fr_id,
+            SE3_ee,
+            pin.LOCAL_WORLD_ALIGNED,
+            actuation.nu,
+            np.array([0, 50.]),
+        )
+        contacts.addContact(fr_name + "_contact", fr_contact)
+
+        # Add friction cone penalization according to foot or hand contact
+        if 'RH' in fr_name:
+            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., -np.pi/2])), mu, 4, True)
+        elif 'LH' in fr_name:
+            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., np.pi/2])), mu, 4, True)
+        else:
+            floor_rotation = np.eye(3)
+            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, False)     # better if False?
+
+        # friction cone activation function
+        surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
+            crocoddyl.ActivationBounds(surf_cone.lb, surf_cone.ub)
+        )
+        fr_friction = crocoddyl.CostModelResidual(
+            state,
+            surf_activation_friction,
+            crocoddyl.ResidualModelContactFrictionCone(state, fr_id, surf_cone, actuation.nu),
+        )
+        costs.addCost(fr_name + "_friction", fr_friction, 1e1)
+
+    # Add frame-placement cost
+    for fr_name, fr_id in plan_to_model_ids.items():
+        # set higher tracking cost on feet
+        if 'F' in fr_name:
+            w_fr = gains['feet']
+        elif 'H' in fr_name:
+            w_fr = gains['hands']
+        elif 'R_knee' in fr_name:
+            w_fr = gains['R_knee']
+        elif 'L_knee' in fr_name:
+            w_fr = gains['L_knee']
+        elif 'torso' in fr_name:
+            w_fr = gains['torso']
+            if zero_config is not None:
+                w_fr = np.array([0.1] * 3 + [0.01] * 3)
+        else:
+            raise ValueError(f"Weights to track frame {fr_name} were not set")
+
+        # set the desired frame pose
+        fr_Mref = pin.SE3.Identity()
+        if fr_name in ee_rpy.keys():
+            fr_Mref.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
+        fr_Mref.translation = frame_targets_dict[fr_name]
+
+        # add as cost
+        frameVelocityResidual = crocoddyl.ResidualModelFrameVelocity(
+            state,
+            fr_id,
+            pin.Motion.Zero(),
+            pin.LOCAL_WORLD_ALIGNED,
+            actuation.nu,
+        )
+        impulseFootVelCost = crocoddyl.CostModelResidual(
+            state, frameVelocityResidual
+        )
+
+        activation_fr = crocoddyl.ActivationModelWeightedQuad(w_fr ** 2)
+        fr_cost = crocoddyl.CostModelResidual(
+            state,
+            activation_fr,
+            crocoddyl.ResidualModelFramePlacement(state, fr_id, fr_Mref, actuation.nu),
+        )
+        costs.addCost(fr_name + "_goal", fr_cost, 1e4)
+        costs.addCost(fr_name + "_impulseVel", impulseFootVelCost, 1e4)
+
+    # Adding state and control regularization terms
+    if zero_config is not None and terminal_step:
+        x0[3:state.nq] = zero_config[3:]
+    if v_ref is not None:
+        x0[-state.nv:] = v_ref
+    else:
+        x0[-state.nv:] = np.zeros(state.nv)
+    w_x = np.array([0.1] * 3 + [10.0] * 3 + [2.] * (state.nv - 6) + [4.] * state.nv)
+    activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x**2)
+    x_reg_cost = crocoddyl.CostModelResidual(
+        state, activation_xreg, crocoddyl.ResidualModelState(state, x0, actuation.nu)
+    )
+    u_reg_cost = crocoddyl.CostModelResidual(
+        state, crocoddyl.ResidualModelControl(state, actuation.nu)
+    )
+    costs.addCost("xReg", x_reg_cost, 5e1)
+    costs.addCost("uReg", u_reg_cost, 1e-3)
+
+    if rcj_constraints is not None:
+        raise ValueError("Should not be entering here!")
+        # Add the rolling contact joint constraint as cost
+        w_rcj = np.array([0.01])        # (lin, ang)
+        l_activation_rcj = crocoddyl.ActivationModelWeightedQuad(w_rcj**2)
+        l_rcj_residual = ResidualModelStateError(state, 1, nu=actuation.nu)
+        l_rcj_residual.constr_ids = [43, 44]  # left and right foot# left side
+        l_rcj_cost = crocoddyl.CostModelResidual(
+            state,
+            l_activation_rcj,
+            l_rcj_residual,
+        )
+        costs.addCost("l_rcj_cost", l_rcj_cost, 1e-2)
+
+        w_rcj = np.array([0.01])        # (lin, ang)
+        r_activation_rcj = crocoddyl.ActivationModelWeightedQuad(w_rcj**2)
+        r_rcj_residual = ResidualModelStateError(state, 1, nu=actuation.nu)
+        r_rcj_residual.constr_ids = [57, 58]  # right and right foot# left side
+        r_rcj_cost = crocoddyl.CostModelResidual(
+            state,
+            r_activation_rcj,
+            r_rcj_residual,
+        )
+        costs.addCost("r_rcj_cost", r_rcj_cost, 1e-2)
+
+    # Adding the state limits penalization
+    x_lb = np.concatenate([state.lb[1: state.nv + 1], state.lb[-state.nv:]])
+    x_ub = np.concatenate([state.ub[1: state.nv + 1], state.ub[-state.nv:]])
+    activation_xbounds = crocoddyl.ActivationModelQuadraticBarrier(
+        crocoddyl.ActivationBounds(x_lb, x_ub)
+    )
+    x_bounds = crocoddyl.CostModelResidual(
+        state,
+        activation_xbounds,
+        crocoddyl.ResidualModelState(state, nu=actuation.nu),
+    )
+    costs.addCost("xBounds", x_bounds, 500.0)
+
+    # Creating the action model
+    dmodel = crocoddyl.DifferentialActionModelContactFwdDynamics(
+        state, actuation, contacts, costs, 0.0, True
+    )
+    return dmodel
+
+
 def createSequence(dmodels, DT, N):
     return [
         [crocoddyl.IntegratedActionModelEuler(m, DT)] * N
         # + [crocoddyl.IntegratedActionModelEuler(m, 0.0)]
+        for m in dmodels
+    ]
+
+def createFinalSequence(dmodels):
+    return [
+        [crocoddyl.IntegratedActionModelEuler(m, 0)]
         for m in dmodels
     ]
