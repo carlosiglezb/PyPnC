@@ -682,16 +682,23 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 
 
 def createSequence(dmodels, DT, N):
-    control = crocoddyl.ControlParametrizationModelPolyZero(dmodels[0].actuation.nu)
+    control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
+    # return [
+    #     [crocoddyl.IntegratedActionModelEuler(m, DT)] * N
+    #     for m in dmodels
+    # ]
     return [
-        [crocoddyl.IntegratedActionModelEuler(m, control, DT)] * N
-        # + [crocoddyl.IntegratedActionModelEuler(m, 0.0)]
+        [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.four, DT)] * N
         for m in dmodels
     ]
 
 def createFinalSequence(dmodels):
-    control = crocoddyl.ControlParametrizationModelPolyZero(dmodels[0].actuation.nu)
+    control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
+    # return [
+    #     [crocoddyl.IntegratedActionModelEuler(m, 0)]
+    #     for m in dmodels
+    # ]
     return [
-        [crocoddyl.IntegratedActionModelEuler(m, control, 0)]
+        [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.four, 0)]
         for m in dmodels
     ]

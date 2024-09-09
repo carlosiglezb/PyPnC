@@ -577,6 +577,17 @@ def visualize_env(rob_model, rob_collision_model, rob_visual_model, q0, door_pos
     return visualizer, door_model, door_collision_model, door_visual_model
 
 
+def get_g1_lleg_joint_ids(robot_model):
+    lleg_j_ids = []
+    for side in ['left_', 'right_']:
+        lleg_j_ids.append(list(robot_model.names).index(side + 'hip_roll_joint') - 2 + 7)
+        lleg_j_ids.append(list(robot_model.names).index(side + 'hip_pitch_joint') - 2 + 7)
+        lleg_j_ids.append(list(robot_model.names).index(side + 'hip_yaw_joint') - 2 + 7)
+        lleg_j_ids.append(list(robot_model.names).index(side + 'knee_joint') - 2 + 7)
+        lleg_j_ids.append(list(robot_model.names).index(side + 'ankle_roll_joint') - 2 + 7)
+        lleg_j_ids.append(list(robot_model.names).index(side + 'ankle_pitch_joint') - 2 + 7)
+    return lleg_j_ids
+
 def main(args):
     contact_seq = args.sequence
     robot_name = args.robot_name
@@ -870,7 +881,7 @@ def main(args):
                     model_seqs += createSequence([dmodel], T/(N_square_up-1), 1)
         else:
             if robot_name == 'g1':
-                N_horizon_lst = [80, 150, 100, 150, 100]
+                N_horizon_lst = [100, 150, 100, 150, 100]
                 gains = {
                     'torso': np.array([1.0] * 3 + [0.5] * 3),  # (lin, ang)
                     'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
@@ -1169,11 +1180,9 @@ def main(args):
                 us_reduced = np.array(log.us)[:, [l_constr_ids_u[0], l_constr_ids_u[1],
                                                   r_constr_ids_u[0], r_constr_ids_u[1]]]
             elif robot_name == 'g1':
-                idx_lhip_r = list(rob_model.names).index('left_hip_roll_joint') - 2 + 7
-                idx_lhip_p = list(rob_model.names).index('left_hip_pitch_joint') - 2 + 7
-                idx_lhip_y = list(rob_model.names).index('left_hip_yaw_joint') - 2 + 7
-                xs_reduced = np.array(log.xs)[:, [idx_lhip_r, idx_lhip_p, idx_lhip_y]]
-                us_reduced = np.array(log.us)[:, [idx_lhip_r, idx_lhip_p, idx_lhip_y]]
+                g1_leg_joint_ids = get_g1_lleg_joint_ids(rob_model)
+                xs_reduced = np.array(log.xs)[:, g1_leg_joint_ids]
+                us_reduced = np.array(log.us)[:, g1_leg_joint_ids]
             else:
                 xs_reduced = np.array(log.xs)
                 us_reduced = np.array(log.us)
