@@ -19,6 +19,7 @@ from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceConta
 from pnc.planner.multicontact.kin_feasibility.ik_cfree_planner import *
 # Tools for dynamic feasibility
 from humanoid_action_models import *
+from pnc.planner.multicontact.dyn_feasibility.G1MulticontactPlanner import G1MulticontactPlanner
 
 # Visualization tools
 import matplotlib.pyplot as plt
@@ -28,8 +29,8 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 # Save data
 from plot.data_saver import *
 
-B_SHOW_JOINT_PLOTS = False
-B_SHOW_GRF_PLOTS = False
+B_SHOW_JOINT_PLOTS = True
+B_SHOW_GRF_PLOTS = True
 B_VISUALIZE = True
 B_SAVE_DATA = False
 B_VERBOSE = True
@@ -788,7 +789,14 @@ def main(args):
     dyn_solve_time = 0
 
     # Connecting the sequences of models
-    NUM_OF_CONTACT_CONFIGURATIONS = len(motion_frames_seq.motion_frame_lst)
+    NUM_OF_CONTACT_CONFIGURATIONS = 3 #len(motion_frames_seq.motion_frame_lst)
+
+    if robot_name == 'g1':
+        N_horizon_lst = [100, 150, 100, 150, 100]
+        robot_dyn_plan = G1MulticontactPlanner(rob_model, N_horizon_lst, T, ik_cfree_planner)
+        robot_dyn_plan.set_plan_to_model_params(plan_to_model_frames, plan_to_model_ids)
+        robot_dyn_plan.set_initial_configuration(x0)
+        robot_dyn_plan.plan()
 
     lh_targets, rh_targets, lf_targets, rf_targets, lkn_targets, rkn_targets = [], [], [], [], [], []
     base_targets = []
@@ -881,7 +889,6 @@ def main(args):
                     model_seqs += createSequence([dmodel], T/(N_square_up-1), 1)
         else:
             if robot_name == 'g1':
-                N_horizon_lst = [100, 150, 100, 150, 100]
                 gains = {
                     'torso': np.array([1.0] * 3 + [0.5] * 3),  # (lin, ang)
                     'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
@@ -944,6 +951,7 @@ def main(args):
                     base_targets.append(frame_targets_dict['torso'])
 
             elif i == 1:
+                ee_rpy['LH'] = [np.pi/2, 0., 0.]
                 # Using left-hand support, pass left-leg through door
                 N_base_through_door = N_horizon_lst[i]  # knots per waypoint to pass through door
                 DT = T / (N_base_through_door - 1)
@@ -1191,7 +1199,7 @@ def main(args):
             # crocoddyl.plotConvergence(log.costs, log.u_regs, log.x_regs, log.grads,
             #                           log.stops, log.steps, figIndex=fig_idx, show=False)
             # fig_idx +=1
-            plt.show()
+        plt.show()
 
     if B_SHOW_GRF_PLOTS:
         # Note: contact_links are l_ankle_ie, r_ankle_ie, l_wrist_pitch, r_wrist_pitch

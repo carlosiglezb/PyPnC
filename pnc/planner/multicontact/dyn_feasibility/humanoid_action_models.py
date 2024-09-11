@@ -400,12 +400,12 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
 
         # Add friction cone penalization according to foot or hand contact
         if 'RH' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., -np.pi/2])), mu, 4, True)
+            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([-np.pi/2, 0., 0.])), mu, 4, True)
         elif 'LH' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., np.pi/2])), mu, 4, True)
+            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([np.pi/2, 0., 0.])), mu, 4, True)
         else:
             floor_rotation = np.eye(3)
-            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, False)     # better if False?
+            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
@@ -555,12 +555,12 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 
         # Add friction cone penalization according to foot or hand contact
         if 'RH' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., -np.pi/2])), mu, 4, True)
+            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([-np.pi/2,  0., 0.])), mu, 4, True)
         elif 'LH' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([0., 0., np.pi/2])), mu, 4, True)
+            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([np.pi/2, 0., 0.])), mu, 4, True)
         else:
             floor_rotation = np.eye(3)
-            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, False)     # better if False?
+            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
@@ -682,23 +682,23 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 
 
 def createSequence(dmodels, DT, N):
-    control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
-    # return [
-    #     [crocoddyl.IntegratedActionModelEuler(m, DT)] * N
-    #     for m in dmodels
-    # ]
+    # control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
     return [
-        [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.four, DT)] * N
+        [crocoddyl.IntegratedActionModelEuler(m, DT)] * N
         for m in dmodels
     ]
+    # return [
+    #     [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.two, DT)] * N
+    #     for m in dmodels
+    # ]
 
 def createFinalSequence(dmodels):
-    control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
-    # return [
-    #     [crocoddyl.IntegratedActionModelEuler(m, 0)]
-    #     for m in dmodels
-    # ]
+    # control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
     return [
-        [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.four, 0)]
+        [crocoddyl.IntegratedActionModelEuler(m, 0)]
         for m in dmodels
     ]
+    # return [
+    #     [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.two, 0)]
+    #     for m in dmodels
+    # ]

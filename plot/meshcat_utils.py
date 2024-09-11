@@ -164,7 +164,7 @@ def get_scaled_and_oriented_grf_tf(scale,
 
     # translate arrow to frame position and orientation
     tf_pos = tf.translation_matrix(pos)
-    tf_pos[:3, :3] = ori
+    # tf_pos[:3, :3] = ori
     scaled_arrow_tf = tf.concatenate_matrices(tf_pos, scaled_arrow_tf)
 
     return scaled_arrow_tf

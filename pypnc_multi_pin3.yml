@@ -8,7 +8,7 @@ dependencies:
   - crocoddyl=2.1.0
   - pip
   - pip:
-      - conda-env-export
+#      - conda-env-export
       - drake
       - meshcat
       - opencv-python
