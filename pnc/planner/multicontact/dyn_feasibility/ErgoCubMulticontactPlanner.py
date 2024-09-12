@@ -34,7 +34,7 @@ def get_rpy_normal_left_wall():
 def get_rpy_normal_right_wall():
     return [-np.pi / 2, 0., 0.]
 
-def get_terminal_gains():
+def get_terminal_feet_gains():
     return np.array([10.] * 3 + [1.0] * 3)
 
 
@@ -86,7 +86,7 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
             for t in np.linspace(i * T, (i + 1) * T, N_current):
                 if t == (i + 1) * T:
                     b_terminal_step = True
-                    gains['feet'] = get_terminal_gains()
+                    gains['feet'] = get_terminal_feet_gains()
                 frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                 if t < (i + 1) * T:
                     dmodel = createMultiFrameActionModel(state,
@@ -130,7 +130,7 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
             fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
 
             # Solver settings
-            max_iter = 100
+            max_iter = 200
             fddp[i].th_stop = 1e-3
 
             # Set initial guess

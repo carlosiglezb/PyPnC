@@ -394,7 +394,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             SE3_ee,
             pin.LOCAL_WORLD_ALIGNED,
             actuation.nu,
-            np.array([0, 0]),
+            np.array([0, 50]),
         )
         contacts.addContact(fr_name, fr_contact)
 

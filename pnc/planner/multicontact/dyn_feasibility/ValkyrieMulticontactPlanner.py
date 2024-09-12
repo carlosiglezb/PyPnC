@@ -27,12 +27,7 @@ def pack_current_targets(ik_cfree_planner, plan_to_model_frames, t):
     }
     return frame_targets_dict
 
-
-def get_rpy_normal_left_wall():
-    return [np.pi / 2, 0., 0.]
-
-
-def get_terminal_gains():
+def get_terminal_feet_gains():
     return np.array([10.] * 3 + [1.5] * 3)
 
 
@@ -68,7 +63,6 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
             model_seqs = []
             # TODO change for upper call to update_contact_params() or so
             if i == 1:
-                ee_rpy['LH'] = get_rpy_normal_left_wall()
                 frames_in_contact = ['LF']
             elif i == 2:
                 frames_in_contact = ['LF', 'RF']
@@ -79,7 +73,7 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
             for t in np.linspace(i * T, (i + 1) * T, N_current):
                 if t == (i + 1) * T:
                     b_terminal_step = True
-                    gains['feet'] = get_terminal_gains()
+                    gains['feet'] = get_terminal_feet_gains()
                 frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                 if t < (i + 1) * T:
                     dmodel = createMultiFrameActionModel(state,
