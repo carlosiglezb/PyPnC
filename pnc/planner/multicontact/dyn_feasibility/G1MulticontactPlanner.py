@@ -1,4 +1,6 @@
 import time
+from copy import copy
+
 import numpy as np
 import crocoddyl
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import HumanoidMulticontactPlanner
@@ -42,12 +44,13 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         super().__init__(robot_model, knots_lst, time_per_phase, ik_cfree_planner)
 
         self.gains = {
-            'torso': np.array([1.0] * 3 + [0.5] * 3),  # (lin, ang)
+            'torso': np.array([2.5] * 3 + [0.5] * 3),  # (lin, ang)
             'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
             'L_knee': np.array([3.] * 3 + [0.00001] * 3),
             'R_knee': np.array([3.] * 3 + [0.00001] * 3),
             'hands': np.array([2.] * 3 + [0.00001] * 3)
         }
+        self._default_gains = copy(self.gains)
 
     def plan(self):
         dyn_solve_time = 0.
@@ -160,6 +163,6 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
             # Reset desired EE rpy and gains for next contact phase
             ee_rpy = self.ee_rpy
-            gains = self.gains
+            gains = copy(self._default_gains)
 
         print("[Compute Time] Dynamic feasibility check: ", dyn_solve_time)

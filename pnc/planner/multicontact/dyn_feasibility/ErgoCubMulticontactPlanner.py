@@ -1,4 +1,6 @@
 import time
+from copy import copy
+
 import numpy as np
 import crocoddyl
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import HumanoidMulticontactPlanner
@@ -49,6 +51,7 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
             'R_knee': np.array([4.] * 3 + [0.00001] * 3),
             'hands': np.array([2.] * 3 + [0.00001] * 3)
         }
+        self._default_gains = copy(self.gains)
 
     def plan(self):
         dyn_solve_time = 0.
@@ -161,6 +164,6 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
 
             # Reset desired EE rpy and gains
             ee_rpy = self.ee_rpy
-            gains = self.gains
+            gains = copy(self._default_gains)
 
         print("[Compute Time] Dynamic feasibility check: ", dyn_solve_time)
