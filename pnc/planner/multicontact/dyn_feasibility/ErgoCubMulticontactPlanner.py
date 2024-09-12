@@ -35,18 +35,18 @@ def get_rpy_normal_right_wall():
     return [-np.pi / 2, 0., 0.]
 
 def get_terminal_gains():
-    return np.array([10.] * 3 + [1.5] * 3)
+    return np.array([10.] * 3 + [1.0] * 3)
 
 
-class G1MulticontactPlanner(HumanoidMulticontactPlanner):
+class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
     def __init__(self, robot_model, knots_lst, time_per_phase, ik_cfree_planner):
         super().__init__(robot_model, knots_lst, time_per_phase, ik_cfree_planner)
 
         self.gains = {
-            'torso': np.array([1.0] * 3 + [0.5] * 3),  # (lin, ang)
+            'torso': np.array([1.0, 5., 0.5] + [0.8] * 3),  # (lin, ang)
             'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
-            'L_knee': np.array([3.] * 3 + [0.00001] * 3),
-            'R_knee': np.array([3.] * 3 + [0.00001] * 3),
+            'L_knee': np.array([4.] * 3 + [0.00001] * 3),
+            'R_knee': np.array([4.] * 3 + [0.00001] * 3),
             'hands': np.array([2.] * 3 + [0.00001] * 3)
         }
 
@@ -85,7 +85,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             DT = T / (N_current - 1)
             for t in np.linspace(i * T, (i + 1) * T, N_current):
                 if t == (i + 1) * T:
-                    b_terminal_step = False
+                    b_terminal_step = True
                     gains['feet'] = get_terminal_gains()
                 frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                 if t < (i + 1) * T:

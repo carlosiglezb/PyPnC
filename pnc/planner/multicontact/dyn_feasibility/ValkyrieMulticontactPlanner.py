@@ -31,22 +31,20 @@ def pack_current_targets(ik_cfree_planner, plan_to_model_frames, t):
 def get_rpy_normal_left_wall():
     return [np.pi / 2, 0., 0.]
 
-def get_rpy_normal_right_wall():
-    return [-np.pi / 2, 0., 0.]
 
 def get_terminal_gains():
     return np.array([10.] * 3 + [1.5] * 3)
 
 
-class G1MulticontactPlanner(HumanoidMulticontactPlanner):
+class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
     def __init__(self, robot_model, knots_lst, time_per_phase, ik_cfree_planner):
         super().__init__(robot_model, knots_lst, time_per_phase, ik_cfree_planner)
 
         self.gains = {
-            'torso': np.array([1.0] * 3 + [0.5] * 3),  # (lin, ang)
-            'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
-            'L_knee': np.array([3.] * 3 + [0.00001] * 3),
-            'R_knee': np.array([3.] * 3 + [0.00001] * 3),
+            'torso': np.array([3.0] * 3 + [0.5, 0.5, 0.01]),    # (lin, ang)
+            'feet': np.array([6.] * 3 + [0.00001] * 3),         # (lin, ang)
+            'L_knee': np.array([2.] * 3 + [0.00001] * 3),
+            'R_knee': np.array([2.] * 3 + [0.00001] * 3),
             'hands': np.array([2.] * 3 + [0.00001] * 3)
         }
 
@@ -63,7 +61,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         plan_to_model_ids = self.plan_to_model_ids
         ik_cfree_planner = self.ik_cfree_planner
         gains = self.gains
-        frames_in_contact = ['LF', 'RF']
+        frames_in_contact = ['RF']
 
         fddp = self.fddp
         for i in range(self.contact_phases):
@@ -71,21 +69,16 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             # TODO change for upper call to update_contact_params() or so
             if i == 1:
                 ee_rpy['LH'] = get_rpy_normal_left_wall()
-                frames_in_contact = ['LH', 'RF']
+                frames_in_contact = ['LF']
             elif i == 2:
                 frames_in_contact = ['LF', 'RF']
-            elif i == 3:
-                ee_rpy['RH'] = get_rpy_normal_right_wall()
-                frames_in_contact = ['RH', 'LF']
-            elif i == 4:
-                frames_in_contact = ['LF', 'RF']
-            elif i > 4:
+            elif i > 2:
                 raise NotImplementedError(f"Frames for contact sequence {i} not specified.")
             N_current = self.horizon_lst[i]
             DT = T / (N_current - 1)
             for t in np.linspace(i * T, (i + 1) * T, N_current):
                 if t == (i + 1) * T:
-                    b_terminal_step = False
+                    b_terminal_step = True
                     gains['feet'] = get_terminal_gains()
                 frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
                 if t < (i + 1) * T:
@@ -130,7 +123,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
 
             # Solver settings
-            max_iter = 100
+            max_iter = 200
             fddp[i].th_stop = 1e-3
 
             # Set initial guess
@@ -159,7 +152,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             # Set final state as initial state of next phase
             x0 = fddp[i].xs[-1]
 
-            # Reset desired EE rpy and gains
+            # Reset desired EE rpy and gains for next contact phase
             ee_rpy = self.ee_rpy
             gains = self.gains
 

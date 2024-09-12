@@ -16,7 +16,6 @@ class HumanoidMulticontactPlanner:
 
         self.contact_phases = num_contact_phases = len(knots_lst)
         self.fddp = [crocoddyl.SolverFDDP] * num_contact_phases
-        self.model_seqs = []
         self.T = time_per_phase
 
         # TODO set some default values
