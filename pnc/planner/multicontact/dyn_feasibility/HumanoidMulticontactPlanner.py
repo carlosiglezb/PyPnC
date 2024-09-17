@@ -23,11 +23,14 @@ class HumanoidMulticontactPlanner:
         self.x0 = None
         self.plan_to_model_frames = None
         self.plan_to_model_ids = None
+        self.lleg_jnames = None
+        self.rleg_jnames = None
         self.ik_cfree_planner = ik_cfree_planner
 
         # Crocoddyl variables / parameters
         self.state = crocoddyl.StateMultibody(robot_model)
         self.actuation = crocoddyl.ActuationModelFloatingBase(self.state)
+        self.robot_model = robot_model
 
         self.knot_idx = 0
 

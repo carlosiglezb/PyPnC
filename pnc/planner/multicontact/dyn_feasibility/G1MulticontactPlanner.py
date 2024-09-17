@@ -50,6 +50,14 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             'hands': np.array([2.] * 3 + [0.00001] * 3)
         }
 
+        # names of joints used in reduced states (for plotting only)
+        self.lleg_jnames = ['left_hip_roll_joint', 'left_hip_pitch_joint', 'left_hip_yaw_joint',
+                            'left_knee_joint', 'left_ankle_roll_joint', 'left_ankle_pitch_joint']
+
+        self.rleg_jnames = ['right_hip_roll_joint', 'right_hip_pitch_joint', 'right_hip_yaw_joint',
+                            'right_knee_joint', 'right_ankle_roll_joint', 'right_ankle_pitch_joint']
+
+
     def plan(self):
         dyn_solve_time = 0.
         b_terminal_step = False

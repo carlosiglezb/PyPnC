@@ -27,6 +27,7 @@ from pnc.planner.multicontact.dyn_feasibility.ValkyrieMulticontactPlanner import
 import matplotlib.pyplot as plt
 from plot.helper import plot_vector_traj, Fxyz_labels
 import plot.meshcat_utils as vis_tools
+from plot.multiontact_plotter import MulticontactPlotter
 from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterface
 # Save data
 from plot.data_saver import *
@@ -579,18 +580,6 @@ def visualize_env(rob_model, rob_collision_model, rob_visual_model, q0, door_pos
 
     return visualizer, door_model, door_collision_model, door_visual_model
 
-
-def get_g1_lleg_joint_ids(robot_model):
-    lleg_j_ids = []
-    for side in ['left_', 'right_']:
-        lleg_j_ids.append(list(robot_model.names).index(side + 'hip_roll_joint') - 2 + 7)
-        lleg_j_ids.append(list(robot_model.names).index(side + 'hip_pitch_joint') - 2 + 7)
-        lleg_j_ids.append(list(robot_model.names).index(side + 'hip_yaw_joint') - 2 + 7)
-        lleg_j_ids.append(list(robot_model.names).index(side + 'knee_joint') - 2 + 7)
-        lleg_j_ids.append(list(robot_model.names).index(side + 'ankle_roll_joint') - 2 + 7)
-        lleg_j_ids.append(list(robot_model.names).index(side + 'ankle_pitch_joint') - 2 + 7)
-    return lleg_j_ids
-
 def main(args):
     contact_seq = args.sequence
     robot_name = args.robot_name
@@ -830,29 +819,9 @@ def main(args):
         if B_SAVE_HTML:
             display.save_html(cwd + "/data/", robot_name + "_door_crossing.html")
 
-    fig_idx = 1
     if B_SHOW_JOINT_PLOTS:
-        for it in robot_dyn_plan.fddp:
-            log = it.getCallbacks()[0]
-            # Reduced to check Draco3's RCJ constraint
-            if robot_name == 'draco3':
-                xs_reduced = np.array(log.xs)[:, [l_constr_ids[0], l_constr_ids[1],
-                                                  r_constr_ids[0], r_constr_ids[1]]]
-                us_reduced = np.array(log.us)[:, [l_constr_ids_u[0], l_constr_ids_u[1],
-                                                  r_constr_ids_u[0], r_constr_ids_u[1]]]
-            elif robot_name == 'g1':
-                g1_leg_joint_ids = get_g1_lleg_joint_ids(rob_model)
-                xs_reduced = np.array(log.xs)[:, g1_leg_joint_ids]
-                us_reduced = np.array(log.us)[:, g1_leg_joint_ids]
-            else:
-                xs_reduced = np.array(log.xs)
-                us_reduced = np.array(log.us)
-            crocoddyl.plotOCSolution(xs_reduced, us_reduced, figIndex=fig_idx, show=False)
-            fig_idx += 1
-            # crocoddyl.plotConvergence(log.costs, log.u_regs, log.x_regs, log.grads,
-            #                           log.stops, log.steps, figIndex=fig_idx, show=False)
-            # fig_idx +=1
-        plt.show()
+        plan_plotter = MulticontactPlotter(robot_dyn_plan)
+        plan_plotter.plot_reduced_xs_us()
 
     if B_SHOW_GRF_PLOTS:
         # Note: contact_links are l_ankle_ie, r_ankle_ie, l_wrist_pitch, r_wrist_pitch

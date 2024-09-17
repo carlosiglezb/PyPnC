@@ -153,6 +153,28 @@ def plot_vector_traj(time, vector, suptitle, ax_labels=None):
     axes[dim - 1].set_xlabel('time')
     fig.suptitle(suptitle)
 
+def plot_multiple_state_traj(time, states_traj_lst, phase, suptitle=None, ax_labels=None):
+    """
+    Creates 'n_subplots' subplots of 'n_signals' signals. Assumes:
+        states_traj_lst: List of n arrays. Each array is size (time_dur, n_signals) where
+        time_dur is the length of the signals
+        ax_labels: List of names of signals being plotted. Listed in the same order
+        as states_traj_lst
+    """
+    n_subplots = len(states_traj_lst)
+    n_signals = states_traj_lst[0].shape[1]
+    if ax_labels is None:
+        ax_labels = [None] * n_signals
+
+    fig, axes = plt.subplots(n_subplots, 1)
+    for i, states_t in enumerate(states_traj_lst):
+        axes[i].plot(time, states_t, linewidth=3, label=ax_labels[i])
+        plot_phase(axes[i], time, phase)
+        axes[i].grid(True)
+        axes[i].set_xlabel('time')
+        axes[i].legend()
+    fig.suptitle(suptitle)
+
 
 def plot_rf(time, rfs, phase):
     fig, axes = plt.subplots(6, 2)
@@ -217,5 +239,5 @@ def plot_phase(ax, t, data_phse):
     ax.fill_between(t[prev_j:],
                     ll,
                     ul,
-                    facecolor=facecolors[data_phse[prev_j]],
+                    facecolor=facecolors[data_phse[prev_j+1]],
                     alpha=shading)
