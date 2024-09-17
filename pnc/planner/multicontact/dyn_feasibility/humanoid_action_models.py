@@ -505,7 +505,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         activation_xbounds,
         crocoddyl.ResidualModelState(state, nu=actuation.nu),
     )
-    costs.addCost("xBounds", x_bounds, 500.0)
+    costs.addCost("xBounds", x_bounds, 1000.0)
 
     # Creating the action model
     dmodel = crocoddyl.DifferentialActionModelContactFwdDynamics(
