@@ -681,6 +681,60 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
     return dmodel
 
 
+def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
+                                x0: np.array,
+                                plan_to_model_ids: dict[str, int],
+                                frames_in_contact: list[str],
+                                frame_targets_dict: dict[str, np.array],
+                                gains: dict[str, np.array] = None,
+                                zero_config: np.array = None,
+                                v_ref: np.array = None):
+    # Creating a 6D multi-contact model, and then including the supporting foot
+    impulseModel = crocoddyl.ImpulseModelMultiple(state)
+
+    for fr_name in frames_in_contact:
+        fr_id = plan_to_model_ids[fr_name]
+        supportContactModel = crocoddyl.ImpulseModel6D(
+            state, fr_id, pin.LOCAL_WORLD_ALIGNED
+        )
+        impulseModel.addImpulse(
+            fr_name + "_impulse", supportContactModel
+        )
+
+    # Creating the cost model for a contact phase
+    costModel = crocoddyl.CostModelSum(state, 0)
+    # if swingFootTask is not None:
+    #     for i in swingFootTask:
+    #         frameTranslationResidual = crocoddyl.ResidualModelFrameTranslation(
+    #             state, i[0], i[1].translation, 0
+    #         )
+    #         footTrack = crocoddyl.CostModelResidual(
+    #             state, frameTranslationResidual
+    #         )
+    #         costModel.addCost(
+    #             self.rmodel.frames[i[0]].name + "_footTrack", footTrack, 1e8
+    #         )
+
+    # stateWeights = np.array(
+    #     [1.0] * 6 + [0.1] * (state.nv - 6) + [10] * state.nv
+    # )
+    # stateResidual = crocoddyl.ResidualModelState(
+    #     state, x0, 0
+    # )
+    # stateActivation = crocoddyl.ActivationModelWeightedQuad(stateWeights ** 2)
+    # stateReg = crocoddyl.CostModelResidual(
+    #     state, stateActivation, stateResidual
+    # )
+    # costModel.addCost("stateReg", stateReg, 1e1)
+
+    # Creating the action model for the KKT dynamics with simpletic Euler
+    # integration scheme
+    dmodel = crocoddyl.ActionModelImpulseFwdDynamics(
+        state, impulseModel, costModel
+    )
+    return dmodel
+
+
 def createSequence(dmodels, DT, N):
     # control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
     return [
