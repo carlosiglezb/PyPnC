@@ -4,6 +4,7 @@ import crocoddyl
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import HumanoidMulticontactPlanner
 from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (createMultiFrameActionModel,
                                                                              createMultiFrameFinalActionModel,
+                                                                             createMultiFrameFinalImpulseModel,
                                                                              createSequence,
                                                                              createFinalSequence)
 
@@ -100,18 +101,19 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                          terminal_step=b_terminal_step)
                     model_seqs += createSequence([dmodel], DT, 1)
                 else:
-                    dmodel = createMultiFrameFinalActionModel(state,
-                                                              actuation,
-                                                              x0,
-                                                              plan_to_model_ids,
-                                                              frames_in_contact,
-                                                              ee_rpy,
-                                                              frame_targets_dict,
-                                                              None,
-                                                              gains=gains,
-                                                              terminal_step=b_terminal_step)
-                    model_seqs += createFinalSequence([dmodel])
-                    print(f"Applying Impulse model at {i}")
+                    if i != 1:
+                        dmodel = createMultiFrameFinalActionModel(state,
+                                                                  actuation,
+                                                                  x0,
+                                                                  plan_to_model_ids,
+                                                                  frames_in_contact,
+                                                                  ee_rpy,
+                                                                  frame_targets_dict,
+                                                                  None,
+                                                                  gains=gains,
+                                                                  terminal_step=b_terminal_step)
+                        model_seqs += createFinalSequence([dmodel])
+                        print(f"Applying Final Sequence model at {i}")
 
                 self.base_targets[self.knot_idx] = frame_targets_dict['torso']
                 self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
@@ -121,6 +123,17 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 self.rkn_targets[self.knot_idx] = frame_targets_dict['R_knee']
                 self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
                 self.knot_idx += 1
+
+            # test impulse at the end of contact phase 1
+            if i == 1:
+                imp_model = createMultiFrameFinalImpulseModel(state,
+                                                              x0,
+                                                              plan_to_model_ids,
+                                                              frames_in_contact,
+                                                              frame_targets_dict,
+                                                              gains=gains)
+                print(f"Applying Impulse model on {i}")
+                model_seqs = [*model_seqs, [imp_model]]
 
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
             fddp[i] = crocoddyl.SolverFDDP(problem)
