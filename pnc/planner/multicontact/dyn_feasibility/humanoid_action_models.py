@@ -597,18 +597,6 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
             fr_Mref.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
         fr_Mref.translation = frame_targets_dict[fr_name]
 
-        # add as cost
-        frameVelocityResidual = crocoddyl.ResidualModelFrameVelocity(
-            state,
-            fr_id,
-            pin.Motion.Zero(),
-            pin.LOCAL_WORLD_ALIGNED,
-            actuation.nu,
-        )
-        impulseFootVelCost = crocoddyl.CostModelResidual(
-            state, frameVelocityResidual
-        )
-
         activation_fr = crocoddyl.ActivationModelWeightedQuad(w_fr ** 2)
         fr_cost = crocoddyl.CostModelResidual(
             state,
@@ -616,7 +604,6 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
             crocoddyl.ResidualModelFramePlacement(state, fr_id, fr_Mref, actuation.nu),
         )
         costs.addCost(fr_name + "_goal", fr_cost, 1e4)
-        costs.addCost(fr_name + "_impulseVel", impulseFootVelCost, 1e4)
 
     # Adding state and control regularization terms
     if zero_config is not None and terminal_step:
@@ -633,33 +620,8 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
     u_reg_cost = crocoddyl.CostModelResidual(
         state, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
-    costs.addCost("xReg", x_reg_cost, 5e1)
-    costs.addCost("uReg", u_reg_cost, 1e-3)
-
-    if rcj_constraints is not None:
-        raise ValueError("Should not be entering here!")
-        # Add the rolling contact joint constraint as cost
-        w_rcj = np.array([0.01])        # (lin, ang)
-        l_activation_rcj = crocoddyl.ActivationModelWeightedQuad(w_rcj**2)
-        l_rcj_residual = ResidualModelStateError(state, 1, nu=actuation.nu)
-        l_rcj_residual.constr_ids = [43, 44]  # left and right foot# left side
-        l_rcj_cost = crocoddyl.CostModelResidual(
-            state,
-            l_activation_rcj,
-            l_rcj_residual,
-        )
-        costs.addCost("l_rcj_cost", l_rcj_cost, 1e-2)
-
-        w_rcj = np.array([0.01])        # (lin, ang)
-        r_activation_rcj = crocoddyl.ActivationModelWeightedQuad(w_rcj**2)
-        r_rcj_residual = ResidualModelStateError(state, 1, nu=actuation.nu)
-        r_rcj_residual.constr_ids = [57, 58]  # right and right foot# left side
-        r_rcj_cost = crocoddyl.CostModelResidual(
-            state,
-            r_activation_rcj,
-            r_rcj_residual,
-        )
-        costs.addCost("r_rcj_cost", r_rcj_cost, 1e-2)
+    costs.addCost("xReg", x_reg_cost, 5e-2)
+    costs.addCost("uReg", u_reg_cost, 1e-4)
 
     # Adding the state limits penalization
     x_lb = np.concatenate([state.lb[1: state.nv + 1], state.lb[-state.nv:]])

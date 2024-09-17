@@ -19,22 +19,22 @@ class MulticontactPlotter:
         xr_dim = len(self.lleg_joint_ids)
         ur_dim = len(self.lleg_joint_ids)
 
-        xs_l_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, xr_dim))
-        us_l_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, ur_dim))
-        xs_r_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, xr_dim))
-        us_r_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, ur_dim))
-        time = np.zeros(sum(horizon_lst) - len(horizon_lst) + 1)
-        phase = np.zeros(sum(horizon_lst) - len(horizon_lst) + 1, dtype=int)
+        xs_l_reduced = np.zeros((sum(horizon_lst) - 1, xr_dim))
+        us_l_reduced = np.zeros((sum(horizon_lst) - 1, ur_dim))
+        xs_r_reduced = np.zeros((sum(horizon_lst) - 1, xr_dim))
+        us_r_reduced = np.zeros((sum(horizon_lst) - 1, ur_dim))
+        time = np.zeros(sum(horizon_lst) - 1)
+        phase = np.zeros(sum(horizon_lst) - 1, dtype=int)
         curr_idx = 0
         for (it_num, it) in enumerate(fddp):
-            next_idx = curr_idx + horizon_lst[it_num]
+            next_idx = curr_idx + horizon_lst[it_num] + 1   # add terminal impulse models
 
             log = it.getCallbacks()[0]
             xs_l_reduced[curr_idx:next_idx, :] = np.array(log.xs)[:, lleg_jids]
             us_l_reduced[curr_idx:next_idx - 1, :] = np.array(log.us)[:, lleg_jids]
             xs_r_reduced[curr_idx:next_idx, :] = np.array(log.xs)[:, rleg_jids]
             us_r_reduced[curr_idx:next_idx - 1, :] = np.array(log.us)[:, rleg_jids]
-            time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num+1) * T, horizon_lst[it_num])
+            time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num+1) * T, horizon_lst[it_num] + 1)
             phase[curr_idx:next_idx] = int(it_num)
             curr_idx += horizon_lst[it_num] - 1
 

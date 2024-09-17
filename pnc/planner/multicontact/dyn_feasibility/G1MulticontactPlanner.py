@@ -79,12 +79,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             # TODO change for upper call to update_contact_params() or so
             if i == 1:
                 ee_rpy['LH'] = get_rpy_normal_left_wall()
-                frames_in_contact = ['LH', 'RF']
+                frames_in_contact = ['RF', 'LH']
             elif i == 2:
-                frames_in_contact = ['LF', 'RF']
+                frames_in_contact = ['RF', 'LF']
             elif i == 3:
                 ee_rpy['RH'] = get_rpy_normal_right_wall()
-                frames_in_contact = ['RH', 'LF']
+                frames_in_contact = ['LF', 'RH']
             elif i == 4:
                 frames_in_contact = ['LF', 'RF']
             elif i > 4:
@@ -109,19 +109,19 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                          terminal_step=b_terminal_step)
                     model_seqs += createSequence([dmodel], DT, 1)
                 else:
-                    if i != 1:
-                        dmodel = createMultiFrameFinalActionModel(state,
-                                                                  actuation,
-                                                                  x0,
-                                                                  plan_to_model_ids,
-                                                                  frames_in_contact,
-                                                                  ee_rpy,
-                                                                  frame_targets_dict,
-                                                                  None,
-                                                                  gains=gains,
-                                                                  terminal_step=b_terminal_step)
-                        model_seqs += createFinalSequence([dmodel])
-                        print(f"Applying Final Sequence model at {i}")
+                    # in the last time step, we use higher weights on frame orientations
+                    dmodel = createMultiFrameFinalActionModel(state,
+                                                              actuation,
+                                                              x0,
+                                                              plan_to_model_ids,
+                                                              frames_in_contact,
+                                                              ee_rpy,
+                                                              frame_targets_dict,
+                                                              None,
+                                                              gains=gains,
+                                                              terminal_step=b_terminal_step)
+                    model_seqs += createFinalSequence([dmodel])
+                    print(f"Applying Final Sequence model at {i}")
 
                 self.base_targets[self.knot_idx] = frame_targets_dict['torso']
                 self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
@@ -132,16 +132,14 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
                 self.knot_idx += 1
 
-            # test impulse at the end of contact phase 1
-            if i == 1:
-                imp_model = createMultiFrameFinalImpulseModel(state,
-                                                              x0,
-                                                              plan_to_model_ids,
-                                                              frames_in_contact,
-                                                              frame_targets_dict,
-                                                              gains=gains)
-                print(f"Applying Impulse model on {i}")
-                model_seqs = [*model_seqs, [imp_model]]
+            # add impulse model on frames in contact at the end of every contact phase
+            imp_model = createMultiFrameFinalImpulseModel(state,
+                                                          x0,
+                                                          plan_to_model_ids,
+                                                          [frames_in_contact[1]],
+                                                          frame_targets_dict,
+                                                          gains=gains)
+            model_seqs = [*model_seqs, [imp_model]]
 
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
             fddp[i] = crocoddyl.SolverFDDP(problem)
