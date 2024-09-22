@@ -34,8 +34,8 @@ def get_terminal_feet_gains():
 
 
 class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
-    def __init__(self, robot_model, knots_lst, time_per_phase, ik_cfree_planner):
-        super().__init__(robot_model, knots_lst, time_per_phase, ik_cfree_planner)
+    def __init__(self, robot_model, contact_seqs, time_per_phase, ik_cfree_planner):
+        super().__init__(robot_model, contact_seqs, time_per_phase, ik_cfree_planner)
 
         self.gains = {
             'torso': np.array([3.0] * 3 + [0.5, 0.5, 0.01]),    # (lin, ang)
@@ -64,12 +64,8 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
         fddp = self.fddp
         for i in range(self.contact_phases):
             model_seqs = []
-            # TODO change for upper call to update_contact_params() or so
-            if i == 1:
-                frames_in_contact = ['LF']
-            elif i == 2:
-                frames_in_contact = ['LF', 'RF']
-            elif i > 2:
+            frames_in_contact = self.contact_seqs[i]
+            if i > (self.contact_phases - 1):
                 raise NotImplementedError(f"Frames for contact sequence {i} not specified.")
             N_current = self.horizon_lst[i]
             DT = T / (N_current - 1)

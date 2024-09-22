@@ -22,6 +22,7 @@ from humanoid_action_models import *
 from pnc.planner.multicontact.dyn_feasibility.G1MulticontactPlanner import G1MulticontactPlanner
 from pnc.planner.multicontact.dyn_feasibility.ErgoCubMulticontactPlanner import ErgoCubMulticontactPlanner
 from pnc.planner.multicontact.dyn_feasibility.ValkyrieMulticontactPlanner import ValkyrieMulticontactPlanner
+from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import ContactSequence
 
 # Visualization tools
 import matplotlib.pyplot as plt
@@ -778,14 +779,31 @@ def main(args):
     # Dynamic solve
     #
     if robot_name == 'g1':
-        N_horizon_lst = [100, 150, 100, 150, 100]
-        robot_dyn_plan = G1MulticontactPlanner(rob_model, N_horizon_lst, T, ik_cfree_planner)
+        N_horizon_lst = [100, 150, 150, 150, 150]
+        contact_seqs = [['LF', 'RF'],
+                        ['RF', 'LH'],
+                        ['RF', 'LF'],
+                        ['LF', 'RH'],
+                        ['LF', 'RF']]
+        contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
+        robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
     elif robot_name == 'ergoCub':
         N_horizon_lst = [80, 220, 100, 180, 80]
-        robot_dyn_plan = ErgoCubMulticontactPlanner(rob_model, N_horizon_lst, T, ik_cfree_planner)
+        contact_seqs = [['LF', 'RF'],
+                        ['RF', 'LH'],
+                        ['RF', 'LF'],
+                        ['LF', 'RH'],
+                        ['LF', 'RF']]
+        contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
+        robot_dyn_plan = ErgoCubMulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
     elif robot_name == 'valkyrie':
-        N_horizon_lst = [150, 150, 100]
-        robot_dyn_plan = ValkyrieMulticontactPlanner(rob_model, N_horizon_lst, T, ik_cfree_planner)
+        N_horizon_lst = [50, 150, 150, 100]
+        contact_seqs = [['LF', 'RF'],
+                        ['RF'],
+                        ['LF'],
+                        ['LF', 'RF']]
+        contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
+        robot_dyn_plan = ValkyrieMulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
     else:
         raise NotImplementedError(f"Matching multicontact planner for {robot_name} not found")
 
@@ -854,10 +872,10 @@ def main(args):
                 else:
                     continue
 
-        plot_vector_traj(sim_time, rf_lfoot.T, 'RF LFoot (Local)', Fxyz_labels)
-        plot_vector_traj(sim_time, rf_rfoot.T, 'RF RFoot (Local)', Fxyz_labels)
-        plot_vector_traj(sim_time, rf_lwrist.T, 'RF LWrist (Local)', Fxyz_labels)
-        plot_vector_traj(sim_time, rf_rwrist.T, 'RF RWrist (Local)', Fxyz_labels)
+        plot_vector_traj(sim_time, rf_lfoot.T, 'RF LFoot (World)', Fxyz_labels)
+        plot_vector_traj(sim_time, rf_rfoot.T, 'RF RFoot (World)', Fxyz_labels)
+        plot_vector_traj(sim_time, rf_lwrist.T, 'RF LWrist (World)', Fxyz_labels)
+        plot_vector_traj(sim_time, rf_rwrist.T, 'RF RWrist (World)', Fxyz_labels)
         plt.show()
 
 

@@ -41,8 +41,8 @@ def get_terminal_feet_gains():
 
 
 class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
-    def __init__(self, robot_model, knots_lst, time_per_phase, ik_cfree_planner):
-        super().__init__(robot_model, knots_lst, time_per_phase, ik_cfree_planner)
+    def __init__(self, robot_model, contact_seqs, time_per_phase, ik_cfree_planner):
+        super().__init__(robot_model, contact_seqs, time_per_phase, ik_cfree_planner)
 
         self.gains = {
             'torso': np.array([1.0, 5., 0.5] + [0.8] * 3),  # (lin, ang)
@@ -66,23 +66,17 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
         plan_to_model_ids = self.plan_to_model_ids
         ik_cfree_planner = self.ik_cfree_planner
         gains = self.gains
-        frames_in_contact = ['LF', 'RF']
 
         fddp = self.fddp
         for i in range(self.contact_phases):
             model_seqs = []
+            frames_in_contact = self.contact_seqs[i]
             # TODO change for upper call to update_contact_params() or so
             if i == 1:
                 ee_rpy['LH'] = get_rpy_normal_left_wall()
-                frames_in_contact = ['LH', 'RF']
-            elif i == 2:
-                frames_in_contact = ['LF', 'RF']
             elif i == 3:
                 ee_rpy['RH'] = get_rpy_normal_right_wall()
-                frames_in_contact = ['RH', 'LF']
-            elif i == 4:
-                frames_in_contact = ['LF', 'RF']
-            elif i > 4:
+            elif i > (self.contact_phases - 1):
                 raise NotImplementedError(f"Frames for contact sequence {i} not specified.")
             N_current = self.horizon_lst[i]
             DT = T / (N_current - 1)

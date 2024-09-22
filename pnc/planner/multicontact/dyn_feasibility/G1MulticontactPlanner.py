@@ -37,12 +37,12 @@ def get_rpy_normal_right_wall():
     return [-np.pi / 2, 0., 0.]
 
 def get_terminal_feet_gains():
-    return np.array([10.] * 3 + [1.5] * 3)
+    return np.array([10.] * 3 + [2.5] * 3)
 
 
 class G1MulticontactPlanner(HumanoidMulticontactPlanner):
-    def __init__(self, robot_model, knots_lst, time_per_phase, ik_cfree_planner):
-        super().__init__(robot_model, knots_lst, time_per_phase, ik_cfree_planner)
+    def __init__(self, robot_model, contact_seqs, time_per_phase, ik_cfree_planner):
+        super().__init__(robot_model, contact_seqs, time_per_phase, ik_cfree_planner)
 
         self.gains = {
             'torso': np.array([2.5] * 3 + [0.5] * 3),  # (lin, ang)
@@ -74,23 +74,17 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         plan_to_model_ids = self.plan_to_model_ids
         ik_cfree_planner = self.ik_cfree_planner
         gains = self.gains
-        frames_in_contact = ['LF', 'RF']
 
         fddp = self.fddp
         for i in range(self.contact_phases):
             model_seqs = []
+            frames_in_contact = self.contact_seqs[i]
             # TODO change for upper call to update_contact_params() or so
             if i == 1:
                 ee_rpy['LH'] = get_rpy_normal_left_wall()
-                frames_in_contact = ['RF', 'LH']
-            elif i == 2:
-                frames_in_contact = ['RF', 'LF']
             elif i == 3:
                 ee_rpy['RH'] = get_rpy_normal_right_wall()
-                frames_in_contact = ['LF', 'RH']
-            elif i == 4:
-                frames_in_contact = ['LF', 'RF']
-            elif i > 4:
+            elif i > (self.contact_phases - 1):
                 raise NotImplementedError(f"Frames for contact sequence {i} not specified.")
             N_current = self.horizon_lst[i]
             DT = T / (N_current - 1)
@@ -111,20 +105,35 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                          gains=gains,
                                                          terminal_step=b_terminal_step)
                     model_seqs += createSequence([dmodel], DT, 1)
-                else:
-                    # in the last time step, we use higher weights on frame orientations
-                    dmodel = createMultiFrameFinalActionModel(state,
-                                                              actuation,
-                                                              x0,
-                                                              plan_to_model_ids,
-                                                              frames_in_contact,
-                                                              ee_rpy,
-                                                              frame_targets_dict,
-                                                              None,
-                                                              gains=gains,
-                                                              terminal_step=b_terminal_step)
-                    model_seqs += createFinalSequence([dmodel])
-                    print(f"Applying Final Sequence model at {i}")
+                else:   # last time knot in current contact phase
+                    if i != (self.contact_phases - 1):
+                        # in the last time step, we use higher weights on frame orientations
+                        dmodel = createMultiFrameFinalActionModel(state,
+                                                                  actuation,
+                                                                  x0,
+                                                                  plan_to_model_ids,
+                                                                  frames_in_contact,
+                                                                  ee_rpy,
+                                                                  frame_targets_dict,
+                                                                  None,
+                                                                  gains=gains,
+                                                                  terminal_step=b_terminal_step)
+                        model_seqs += createFinalSequence([dmodel])
+                        print(f"Applying Final Sequence model at {i}")
+
+                    # if in final contact phase, add extra knot to match dimensions of other phases
+                    # else:
+                    #     dmodel = createMultiFrameActionModel(state,
+                    #                                          actuation,
+                    #                                          x0,
+                    #                                          plan_to_model_ids,
+                    #                                          frames_in_contact,
+                    #                                          ee_rpy,
+                    #                                          frame_targets_dict,
+                    #                                          None,
+                    #                                          gains=gains,
+                    #                                          terminal_step=b_terminal_step)
+                    #     model_seqs += createSequence([dmodel], DT, 1)
 
                 self.base_targets[self.knot_idx] = frame_targets_dict['torso']
                 self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
@@ -136,13 +145,29 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 self.knot_idx += 1
 
             # add impulse model on frames in contact at the end of every contact phase
-            imp_model = createMultiFrameFinalImpulseModel(state,
+            if i != (self.contact_phases - 1):
+                imp_model = createMultiFrameFinalImpulseModel(state,
+                                                              x0,
+                                                              plan_to_model_ids,
+                                                              [self.contact_seqs[i+1][1]],
+                                                              ee_rpy,
+                                                              frame_targets_dict,
+                                                              gains=gains)
+                model_seqs = [*model_seqs, [imp_model]]
+                print(f"Applied impulse model at {i} on frame {[self.contact_seqs[i + 1][1]]}")
+            else:
+                dmodel = createMultiFrameFinalActionModel(state,
+                                                          actuation,
                                                           x0,
                                                           plan_to_model_ids,
-                                                          [frames_in_contact[1]],
+                                                          frames_in_contact,
+                                                          ee_rpy,
                                                           frame_targets_dict,
-                                                          gains=gains)
-            model_seqs = [*model_seqs, [imp_model]]
+                                                          None,
+                                                          gains=gains,
+                                                          terminal_step=b_terminal_step)
+                model_seqs += createFinalSequence([dmodel])
+                print(f"Applying Final Sequence model at {i}")
 
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
             fddp[i] = crocoddyl.SolverFDDP(problem)
@@ -164,6 +189,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print("Total cost:", fddp[i].cost)
             print("Gradient norm:", fddp[i].stoppingCriteria())
             print("Time to solve:", dyn_seg_solve_time)
+            print("===============")
             dyn_solve_time += dyn_seg_solve_time
 
             # save data
@@ -181,7 +207,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             x0 = fddp[i].xs[-1]
 
             # Reset desired EE rpy and gains for next contact phase
-            ee_rpy = self.ee_rpy
+            ee_rpy = copy(self.ee_rpy)
             gains = copy(self._default_gains)
 
         print("[Compute Time] Dynamic feasibility check: ", dyn_solve_time)

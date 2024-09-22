@@ -449,7 +449,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             activation_fr,
             crocoddyl.ResidualModelFramePlacement(state, fr_id, fr_Mref, actuation.nu),
         )
-        costs.addCost(fr_name + "_goal", fr_cost, 1e2)
+        costs.addCost(fr_name + "_goal", fr_cost, 5e2)
 
     # Adding state and control regularization terms
     if zero_config is not None and terminal_step:
@@ -603,7 +603,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
             activation_fr,
             crocoddyl.ResidualModelFramePlacement(state, fr_id, fr_Mref, actuation.nu),
         )
-        costs.addCost(fr_name + "_goal", fr_cost, 1e4)
+        costs.addCost(fr_name + "_goal", fr_cost, 5e2)
 
     # Adding state and control regularization terms
     if zero_config is not None and terminal_step:
@@ -634,7 +634,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
         activation_xbounds,
         crocoddyl.ResidualModelState(state, nu=actuation.nu),
     )
-    costs.addCost("xBounds", x_bounds, 500.0)
+    costs.addCost("xBounds", x_bounds, 1000.0)
 
     # Creating the action model
     dmodel = crocoddyl.DifferentialActionModelContactFwdDynamics(
@@ -644,13 +644,14 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 
 
 def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
-                                x0: np.array,
-                                plan_to_model_ids: dict[str, int],
-                                frames_in_contact: list[str],
-                                frame_targets_dict: dict[str, np.array],
-                                gains: dict[str, np.array] = None,
-                                zero_config: np.array = None,
-                                v_ref: np.array = None):
+                                      x0: np.array,
+                                      plan_to_model_ids: dict[str, int],
+                                      frames_in_contact: list[str],
+                                      ee_rpy: dict[str, list[float]],
+                                      frame_targets_dict: dict[str, np.array],
+                                      gains: dict[str, np.array] = None,
+                                      zero_config: np.array = None,
+                                      v_ref: np.array = None):
     # Creating a 6D multi-contact model, and then including the supporting foot
     impulseModel = crocoddyl.ImpulseModelMultiple(state)
 
@@ -664,18 +665,53 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
         )
 
     # Creating the cost model for a contact phase
-    costModel = crocoddyl.CostModelSum(state, 0)
-    # if swingFootTask is not None:
-    #     for i in swingFootTask:
-    #         frameTranslationResidual = crocoddyl.ResidualModelFrameTranslation(
-    #             state, i[0], i[1].translation, 0
-    #         )
-    #         footTrack = crocoddyl.CostModelResidual(
-    #             state, frameTranslationResidual
-    #         )
-    #         costModel.addCost(
-    #             self.rmodel.frames[i[0]].name + "_footTrack", footTrack, 1e8
-    #         )
+    costs = crocoddyl.CostModelSum(state, 0)
+
+    # Add frame-placement cost
+    for fr_name, fr_id in plan_to_model_ids.items():
+        # set higher tracking cost on feet
+        if 'F' in fr_name:
+            w_fr = gains['feet']
+        elif 'H' in fr_name:
+            w_fr = gains['hands']
+        elif 'R_knee' in fr_name:
+            w_fr = gains['R_knee']
+        elif 'L_knee' in fr_name:
+            w_fr = gains['L_knee']
+        elif 'torso' in fr_name:
+            w_fr = gains['torso']
+            if zero_config is not None:
+                w_fr = np.array([0.1] * 3 + [0.01] * 3)
+        else:
+            raise ValueError(f"Weights to track frame {fr_name} were not set")
+
+        # set the desired frame pose
+        fr_Mref = pin.SE3.Identity()
+        if fr_name in ee_rpy.keys():
+            fr_Mref.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
+        fr_Mref.translation = frame_targets_dict[fr_name]
+
+        activation_fr = crocoddyl.ActivationModelWeightedQuad(w_fr ** 2)
+        fr_cost = crocoddyl.CostModelResidual(
+            state,
+            activation_fr,
+            crocoddyl.ResidualModelFramePlacement(state, fr_id, fr_Mref, 0),
+        )
+        costs.addCost(fr_name + "_goal", fr_cost, 1e2)
+
+    # Adding state and control regularization terms
+    if zero_config is not None:     # and terminal_step:
+        x0[3:state.nq] = zero_config[3:]
+    if v_ref is not None:
+        x0[-state.nv:] = v_ref
+    else:
+        x0[-state.nv:] = np.zeros(state.nv)
+    w_x = np.array([0.1] * 3 + [10.0] * 3 + [2.] * (state.nv - 6) + [4.] * state.nv)
+    activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x**2)
+    x_reg_cost = crocoddyl.CostModelResidual(
+        state, activation_xreg, crocoddyl.ResidualModelState(state, x0, 0)
+    )
+    costs.addCost("xReg", x_reg_cost, 5e-2)
 
     # stateWeights = np.array(
     #     [1.0] * 6 + [0.1] * (state.nv - 6) + [10] * state.nv
@@ -692,7 +728,7 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
     # Creating the action model for the KKT dynamics with simpletic Euler
     # integration scheme
     dmodel = crocoddyl.ActionModelImpulseFwdDynamics(
-        state, impulseModel, costModel
+        state, impulseModel, costs
     )
     return dmodel
 
