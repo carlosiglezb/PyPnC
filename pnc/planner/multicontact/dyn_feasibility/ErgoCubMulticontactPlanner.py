@@ -7,7 +7,8 @@ from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import
 from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (createMultiFrameActionModel,
                                                                              createMultiFrameFinalActionModel,
                                                                              createSequence,
-                                                                             createFinalSequence)
+                                                                             createFinalSequence,
+                                                                             createMultiFrameFinalImpulseModel)
 
 
 def pack_current_targets(ik_cfree_planner, plan_to_model_frames, t):
@@ -52,6 +53,14 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
             'hands': np.array([2.] * 3 + [0.00001] * 3)
         }
         self._default_gains = copy(self.gains)
+
+        # names of joints used in reduced states (for plotting only)
+        self.lleg_jnames = ['l_hip_roll', 'l_hip_pitch', 'l_hip_yaw',
+                            'l_knee', 'l_ankle_roll', 'l_ankle_pitch']
+
+        self.rleg_jnames = ['r_hip_roll', 'r_hip_pitch', 'r_hip_yaw',
+                            'r_knee', 'r_ankle_roll', 'r_ankle_pitch']
+
 
     def plan(self):
         dyn_solve_time = 0.
@@ -98,18 +107,19 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
                                                          terminal_step=b_terminal_step)
                     model_seqs += createSequence([dmodel], DT, 1)
                 else:
-                    dmodel = createMultiFrameFinalActionModel(state,
-                                                              actuation,
-                                                              x0,
-                                                              plan_to_model_ids,
-                                                              frames_in_contact,
-                                                              ee_rpy,
-                                                              frame_targets_dict,
-                                                              None,
-                                                              gains=gains,
-                                                              terminal_step=b_terminal_step)
-                    model_seqs += createFinalSequence([dmodel])
-                    print(f"Applying Impulse model at {i}")
+                    if i != (self.contact_phases - 1):
+                        dmodel = createMultiFrameFinalActionModel(state,
+                                                                  actuation,
+                                                                  x0,
+                                                                  plan_to_model_ids,
+                                                                  frames_in_contact,
+                                                                  ee_rpy,
+                                                                  frame_targets_dict,
+                                                                  None,
+                                                                  gains=gains,
+                                                                  terminal_step=b_terminal_step)
+                        model_seqs += createFinalSequence([dmodel])
+                        print(f"Applying Impulse model at {i}")
 
                 self.base_targets[self.knot_idx] = frame_targets_dict['torso']
                 self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
@@ -119,6 +129,31 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
                 self.rkn_targets[self.knot_idx] = frame_targets_dict['R_knee']
                 self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
                 self.knot_idx += 1
+
+            # add impulse model on frames in contact at the end of every contact phase
+            if i != (self.contact_phases - 1):
+                imp_model = createMultiFrameFinalImpulseModel(state,
+                                                              x0,
+                                                              plan_to_model_ids,
+                                                              [self.contact_seqs[i+1][1]],
+                                                              ee_rpy,
+                                                              frame_targets_dict,
+                                                              gains=gains)
+                model_seqs = [*model_seqs, [imp_model]]
+                print(f"Applied impulse model at {i} on frame {[self.contact_seqs[i + 1][1]]}")
+            else:
+                dmodel = createMultiFrameFinalActionModel(state,
+                                                          actuation,
+                                                          x0,
+                                                          plan_to_model_ids,
+                                                          frames_in_contact,
+                                                          ee_rpy,
+                                                          frame_targets_dict,
+                                                          None,
+                                                          gains=gains,
+                                                          terminal_step=b_terminal_step)
+                model_seqs += createFinalSequence([dmodel])
+                print(f"Applying Final Sequence model at {i}")
 
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
             fddp[i] = crocoddyl.SolverFDDP(problem)

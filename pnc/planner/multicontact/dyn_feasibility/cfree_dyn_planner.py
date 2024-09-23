@@ -593,6 +593,7 @@ def main(args):
     # Initialize frames to consider for contact planning
     #
     plan_to_model_frames = OrderedDict()
+    force_joint_frames = OrderedDict()
     if robot_name == 'draco3':
         plan_to_model_frames['torso'] = 'torso_link'
         plan_to_model_frames['LF'] = 'l_foot_contact'
@@ -609,6 +610,10 @@ def main(args):
         plan_to_model_frames['R_knee'] = 'right_knee_link'
         plan_to_model_frames['LH'] = 'left_palm_link'
         plan_to_model_frames['RH'] = 'right_palm_link'
+        force_joint_frames['LF'] = "left_ankle_roll_joint"
+        force_joint_frames['RF'] = "right_ankle_roll_joint"
+        force_joint_frames['LH'] = "left_elbow_roll_joint"
+        force_joint_frames['RH'] = "right_elbow_roll_joint"
     elif robot_name == 'valkyrie':
         plan_to_model_frames['torso'] = 'torso'
         plan_to_model_frames['LF'] = 'leftFoot'
@@ -617,6 +622,10 @@ def main(args):
         plan_to_model_frames['R_knee'] = 'rightKneePitchLink'
         plan_to_model_frames['LH'] = 'leftWristLink'
         plan_to_model_frames['RH'] = 'rightWristLink'
+        force_joint_frames['LF'] = "leftAnkleRoll"
+        force_joint_frames['RF'] = "rightAnkleRoll"
+        force_joint_frames['LH'] = "leftWrist"
+        force_joint_frames['RH'] = "rightWrist"
     elif robot_name == 'ergoCub':
         plan_to_model_frames['torso'] = 'root_link'
         plan_to_model_frames['LF'] = 'l_ankle_2'
@@ -625,6 +634,10 @@ def main(args):
         plan_to_model_frames['R_knee'] = 'r_lower_leg'
         plan_to_model_frames['LH'] = 'l_hand_palm'
         plan_to_model_frames['RH'] = 'r_hand_palm'
+        force_joint_frames['LF'] = "l_ankle_roll"   # "l_foot_front_ft_sensor"
+        force_joint_frames['RF'] = "r_ankle_roll"     # "r_foot_front_ft_sensor"
+        force_joint_frames['LH'] = "l_wrist_pitch"
+        force_joint_frames['RH'] = "r_wrist_pitch"
     else:
         raise NotImplementedError('Mapping between planner and robot frames not defined')
 
@@ -778,6 +791,7 @@ def main(args):
     #
     # Dynamic solve
     #
+    # TODO get contact sequence from kinematic planner ... fixed frames, maybe?
     if robot_name == 'g1':
         N_horizon_lst = [100, 150, 150, 150, 150]
         contact_seqs = [['LF', 'RF'],
@@ -788,7 +802,7 @@ def main(args):
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
         robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
     elif robot_name == 'ergoCub':
-        N_horizon_lst = [80, 220, 100, 180, 80]
+        N_horizon_lst = [100, 220, 100, 180, 80]
         contact_seqs = [['LF', 'RF'],
                         ['RF', 'LH'],
                         ['RF', 'LF'],
@@ -797,11 +811,10 @@ def main(args):
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
         robot_dyn_plan = ErgoCubMulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
     elif robot_name == 'valkyrie':
-        N_horizon_lst = [50, 150, 150, 100]
-        contact_seqs = [['LF', 'RF'],
-                        ['RF'],
+        N_horizon_lst = [150, 150, 100]
+        contact_seqs = [['RF'],
                         ['LF'],
-                        ['LF', 'RF']]
+                        ['RF', 'LF']]
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
         robot_dyn_plan = ValkyrieMulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
     else:
@@ -824,11 +837,10 @@ def main(args):
         display.display_targets("lhand_target", robot_dyn_plan.lh_targets, [0.5, 0, 0])
         display.display_targets("rhand_target", robot_dyn_plan.rh_targets, [0.5, 0, 0])
         display.display_targets("base_target", robot_dyn_plan.base_targets, [0, 0.5, 0])
-        # TODO grab joint name below from pinocchio
-        display.add_arrow("forces/left_ankle_roll_joint", color=[1, 0, 0])
-        display.add_arrow("forces/right_ankle_roll_joint", color=[0, 0, 1])
-        display.add_arrow("forces/left_elbow_roll_joint", color=[0, 1, 0])
-        display.add_arrow("forces/right_elbow_roll_joint", color=[0, 1, 0])
+        display.add_arrow("forces/" + force_joint_frames['LF'], color=[1, 0, 0])
+        display.add_arrow("forces/" + force_joint_frames['RF'], color=[0, 0, 1])
+        display.add_arrow("forces/" + force_joint_frames['LH'], color=[0, 1, 0])
+        display.add_arrow("forces/" + force_joint_frames['RH'], color=[0, 1, 0])
         display.displayFromCrocoddylSolver(robot_dyn_plan.fddp)
         viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
                             "lfoot_target", "lknee_target",
@@ -855,13 +867,13 @@ def main(args):
                 for contact in rf_t:
                     # determine contact link
                     cur_link = int(contact['key'])
-                    if rob_model.names[cur_link] == "left_ankle_roll_joint":    #  "l_ankle_ie":
+                    if rob_model.names[cur_link] == force_joint_frames['LF']:
                         rf_lfoot[:, time_idx] = contact['f'].linear
-                    elif rob_model.names[cur_link] == "right_ankle_roll_joint": # "r_ankle_ie":
+                    elif rob_model.names[cur_link] == force_joint_frames['RF']:
                         rf_rfoot[:, time_idx] = contact['f'].linear
-                    elif rob_model.names[cur_link] == "left_elbow_roll_joint":  # l_wrist_pitch
+                    elif rob_model.names[cur_link] == force_joint_frames['LH']:
                         rf_lwrist[:, time_idx] = contact['f'].linear
-                    elif rob_model.names[cur_link] == "right_elbow_roll_joint": # r_wrist_pitch
+                    elif rob_model.names[cur_link] == force_joint_frames['RH']:
                         rf_rwrist[:, time_idx] = contact['f'].linear
                     else:
                         print(f"ERROR: Non-specified contact {rob_model.names[cur_link]}")
