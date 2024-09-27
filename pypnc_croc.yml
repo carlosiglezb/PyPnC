@@ -9,7 +9,7 @@ dependencies:
   - pip
   - pip:
       - casadi==3.6.5
-      - conda-env-export
+# - conda-env-export
       - drake
       - matplotlib
       - meshcat

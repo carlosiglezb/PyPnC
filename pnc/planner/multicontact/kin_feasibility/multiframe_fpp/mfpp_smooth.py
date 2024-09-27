@@ -10,6 +10,7 @@ from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import get_aux_fram
 from pnc.planner.multicontact.path_parameterization import BezierCurve, CompositeBezierCurve
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
+from pnc.planner.multicontact.kin_feasibility.test.test_updater import reach_updater
 
 def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.array],
                                   aux_frames: List[dict],
@@ -211,6 +212,12 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     fr_seg_k_box, frame_idx, seg_idx = 0, 0, 0
     frame_name = frame_list[frame_idx]
     for k in range(num_iris_tot * n_frames):
+        val = points[k][0].value
+        if frame_name == 'torso':
+            #print(frame_name, " in curve: ", val[0])
+            print("entering...")
+            reach_updater(None, frame_list, val[0], True)
+
         num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
         # move on to next segment after the current number of safe boxes
         if (fr_seg_k_box != 0) and fr_seg_k_box % num_iris_current == 0 and seg_idx != (num_iris_tot-1):
