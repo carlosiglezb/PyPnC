@@ -342,9 +342,17 @@ class TestFrameTraverseIris(unittest.TestCase):
         iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_iris_seq_rigid_link()
 
         # test minimum distance method
+        contact_seq_polygonal = []
+        if len(self.fixed_frames_seq[0]) != 0:
+            for current_ff_lst in self.fixed_frames_seq:
+                if current_ff_lst[0] != 'torso':
+                    contact_seq_polygonal.append([current_ff_lst[0]])
+                else:
+                    contact_seq_polygonal.append([current_ff_lst[1]])
         reach = None    # ignore reachable space in this test
         traj, length, _ = solve_min_reach_iris_distance(reach, safe_regions_mgr_dict, iris_seq,
                                                         safe_points_lst,
+                                                        contact_seq=contact_seq_polygonal,
                                                         aux_frames=self.aux_frames)
 
         traj = np.reshape(traj, [2, 12])

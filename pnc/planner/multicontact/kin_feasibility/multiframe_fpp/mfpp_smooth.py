@@ -18,11 +18,10 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                                   alpha: dict[int: float],
                                   safe_points_lst: List[dict[str, np.array]],
                                   fixed_frames=None,
+                                  contact_sequence=None,
                                   surface_normals_lst=None,
                                   weights_rigid_link=None,
                                   n_points=None, **kwargs):
-    stance_foot = 'RF'
-
     if weights_rigid_link is None:
         weights_rigid_link = np.array([3500., 0.5, 10.])     # default for g1
 
@@ -144,15 +143,17 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
     if bool(aux_frames):     # check if empy dictionary
+        link_threshold = 0.05
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
             prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
                 aux_fr, frame_list, num_iris_tot)
 
             # loop through all safe boxes
+            link_length += link_threshold     # threshold for relaxation
             for nb in range(1, num_iris_tot-1):
-                for pnt in range(n_points-1):
-                # for pnt in range(1):
+                # for pnt in range(n_points-1):
+                for pnt in range(1):
                     link_proximal_point = points[prox_fr_idx+nb][0][pnt]
                     link_distal_point = points[dist_fr_idx+nb][0][pnt]
                     create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
@@ -173,15 +174,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                     z_t = points[0 * num_iris_tot + fr_iris_counter + si][0]
 
                     if frame_name == 'torso':
-                        # get corresponding ee frame points to consider for stance reachability constraint
-                        if seg < 1:         # stance_foot = 'RF'
-                            rf_idx = 2      # RF is 3rd in the list
-                            coeffs = reach_region['RF']
-                            z_ee_seg = points[rf_idx * num_iris_tot + fr_iris_counter + si][0]
-                        else:               # stance_foot = 'LF'
-                            lf_idx = 1      # LF is 2nd in the list
-                            coeffs = reach_region['LF']
-                            z_ee_seg = points[lf_idx * num_iris_tot + fr_iris_counter + si][0]
+                        continue
 
                     else:
                         coeffs = reach_region[frame_name]
@@ -191,19 +184,36 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                     H = coeffs['H']
                     d_vec = np.reshape(coeffs['d'], (len(H), 1))
                     d_mat = np.repeat(d_vec, n_points, axis=1)
-                    if frame_name != 'torso':
+                    if frame_name == 'torso' or frame_name == 'LF' or frame_name == 'RF':
                         constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+                    # constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
 
                 fr_iris_counter += num_iris_current
                 k_fr_iris += num_iris_current
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-    prob.solve(solver='CLARABEL')
+    prob.solve(solver='SCS')
 
     if prob.status == 'infeasible':
-        print('Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
+        print('***** Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
         prob.solve(solver='SCS', eps_rel=1e-1, eps_abs=1e-1)
+
+    # check link constraints values
+    if bool(aux_frames):     # check if empy dictionary
+        # apply auxiliary rigid link constraint throughout all safe regions
+        for aux_fr in aux_frames:
+            prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
+                aux_fr, frame_list, num_iris_tot)
+
+            # loop through all safe boxes
+            link_length += link_threshold     # threshold for relaxation
+            for nb in range(1, num_iris_tot-1):
+                # for pnt in range(n_points-1):
+                for pnt in range(1):
+                    link_proximal_point = points[prox_fr_idx+nb][0][pnt]
+                    link_distal_point = points[dist_fr_idx+nb][0][pnt]
+                    print(f"{aux_fr['parent_frame']} Link length discrepancy: {np.linalg.norm(link_proximal_point.value - link_distal_point.value) - link_length}")
 
     # Reconstruct trajectory.
     beziers, path = [], []

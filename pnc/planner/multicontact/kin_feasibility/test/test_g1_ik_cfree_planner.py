@@ -139,7 +139,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         domain_ubody = self.domain_ubody
         domain_lbody = self.domain_lbody
         # shift (feet) iris seed to get nicer IRIS region
-        iris_lf_shift = np.array([0.0, 0., 0.])
+        iris_lf_shift = np.array([0.2, 0., 0.])     # useful in motion stepping on knee-knocker
         iris_rf_shift = np.array([0.0, 0., 0.])
         iris_kn_shift = np.array([0.0, 0., 0.0])
         # get end effector positions via fwd kin
@@ -152,7 +152,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         starting_rf_pos = self.robot_fwdk.get_link_iso(plan_to_model_frames['RF'])[:3, 3]
         final_rf_pos = starting_rf_pos + np.array([goal_step_length, 0., 0.])
         starting_rh_pos = self.robot_fwdk.get_link_iso(plan_to_model_frames['RH'])[:3, 3] + np.array([0.1, 0., 0.])
-        final_rh_pos = starting_rh_pos + np.array([goal_step_length + 0.15, 0., 0.])
+        final_rh_pos = starting_rh_pos + np.array([goal_step_length, 0., 0.])   #+ 0.15 on x
 
         safe_torso_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_torso_pos)
         safe_torso_end_region = IrisGeomInterface(obstacles, domain_ubody, final_torso_pos)
@@ -170,12 +170,12 @@ class TestIKCFreePlanner(unittest.TestCase):
                                  'RF': IrisRegionsManager(safe_rf_start_region, safe_rf_end_region),
                                  'RH': IrisRegionsManager(safe_rh_start_region, safe_rh_end_region)}
         if b_use_knees:
-            starting_lkn_pos = self.robot_fwdk.get_link_iso(plan_to_model_frames['L_knee'])[:3, 3] + np.array([0.02, 0., -0.05])
+            starting_lkn_pos = self.robot_fwdk.get_link_iso(plan_to_model_frames['L_knee'])[:3, 3]
             final_lkn_pos = starting_lkn_pos + np.array([goal_step_length, 0., 0.])
             starting_rkn_pos = self.robot_fwdk.get_link_iso(plan_to_model_frames['R_knee'])[:3, 3]
             final_rkn_pos = starting_rkn_pos + np.array([goal_step_length, 0., 0.])
 
-            safe_lk_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_lkn_pos)
+            safe_lk_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_lkn_pos + + np.array([0.02, 0., -0.05]))
             safe_lk_end_region = IrisGeomInterface(obstacles, domain_lbody, final_lkn_pos + iris_kn_shift)
             safe_rk_start_region = IrisGeomInterface(obstacles, domain_lbody, starting_rkn_pos)
             safe_rk_end_region = IrisGeomInterface(obstacles, domain_lbody, final_rkn_pos + iris_kn_shift)
@@ -330,6 +330,78 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         return fixed_frames, motion_frames_seq
 
+    def get_five_stage_on_knocker_contact_sequence(self, safe_regions_mgr_dict):
+        ###### Previously used key locations
+        # door_l_outer_location = np.array([0.45, 0.35, 1.2])
+        # door_r_outer_location = np.array([0.45, -0.35, 1.2])
+        # G1 settings
+        door_l_inner_location = np.array([0.3, 0.35, 1.0])
+        door_r_inner_location = np.array([0.34, -0.35, 1.0])
+
+        starting_lh_pos = safe_regions_mgr_dict['LH'].iris_list[0].seed_pos
+        starting_rh_pos = safe_regions_mgr_dict['RH'].iris_list[0].seed_pos
+        starting_torso_pos = safe_regions_mgr_dict['torso'].iris_list[0].seed_pos
+        final_lf_pos = safe_regions_mgr_dict['LF'].iris_list[1].seed_pos
+        final_lkn_pos = safe_regions_mgr_dict['L_knee'].iris_list[1].seed_pos
+        final_rf_pos = safe_regions_mgr_dict['RF'].iris_list[1].seed_pos
+        final_torso_pos = safe_regions_mgr_dict['torso'].iris_list[1].seed_pos
+        final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
+        final_rh_pos = safe_regions_mgr_dict['RH'].iris_list[1].seed_pos
+        final_lh_pos = safe_regions_mgr_dict['LH'].iris_list[1].seed_pos
+        intermediate_rf_pos = np.array([0.3, final_rf_pos[1], 0.44])
+
+        # initialize fixed and motion frame sets
+        fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
+
+        # ---- Step 1: L hand to frame
+        fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])  # frames that must not move
+        motion_frames_seq.add_motion_frame({
+            'LH': door_l_inner_location,
+            # 'torso': starting_torso_pos + np.array([0.07, -0.07, 0])
+        })
+        lh_contact_front = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
+        lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
+        motion_frames_seq.add_contact_surface(lh_contact_front)
+
+        # ---- Step 2: step on knee-knocker with right foot
+        fixed_frames.append(['LF', 'L_knee', 'LH'])  # frames that must not move
+        motion_frames_seq.add_motion_frame({
+            'RF': intermediate_rf_pos,
+            'R_knee': intermediate_rf_pos + (final_rkn_pos - final_rf_pos) + np.array([-0.05, 0., 0.035])})
+        rf_contact_knocker = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
+        rf_contact_knocker.set_contact_breaking_velocity(np.array([0, 0, 1]))
+        motion_frames_seq.add_contact_surface(rf_contact_knocker)
+
+        # ---- Step 3: step through door with left foot
+        fixed_frames.append(['RF', 'R_knee', 'LH'])  # frames that must not move
+        motion_frames_seq.add_motion_frame({
+            # 'LH': starting_lh_pos + np.array([0.3, 0., 0.0]),   # <-- G1
+            # 'LH': starting_lh_pos + np.array([0.35, 0.1, 0.0]),   # <-- other
+            # 'torso': final_torso_pos + np.array([-0.15, 0.05, -0.05]),     # good testing
+            'L_knee': final_lkn_pos + np.array([-0.05, 0., 0.035]),
+            'LF': final_lf_pos})
+        lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
+        motion_frames_seq.add_contact_surface(lf_contact_over)
+
+        # ---- Step 4: square up
+        # fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
+        fixed_frames.append(['LF', 'L_knee'])
+        motion_frames_seq.add_motion_frame({
+            'torso': final_torso_pos,
+            'RF': final_rf_pos,
+            'R_knee': final_rkn_pos + np.array([-0.05, 0., 0.035]),
+            'RH': final_rh_pos,  # + np.array([-0.20, 0., 0.]),
+            'LH': final_lh_pos
+        })
+        lf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
+        motion_frames_seq.add_contact_surface(lf_contact_over)
+
+        # ---- Step 5: balance
+        fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
+        motion_frames_seq.add_motion_frame({})
+
+        return fixed_frames, motion_frames_seq
+
     def test_five_stage_plan_feet_knee_hands(self):
         if b_use_knees:
             frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
@@ -444,24 +516,33 @@ class TestIKCFreePlanner(unittest.TestCase):
                                                      motion_frames_seq=motion_frames_seq)
 
         # set planner
+        weights_rigid_link = np.array([3500., 0., 0.])
         ik_cfree_planner.set_planner(frame_planner)
-        ik_cfree_planner.plan(p_init, T, alpha, visualizer)
+        ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer)
 
         self.assertEqual(True, True)  # add assertion here
 
     def test_five_stage_plan_one_hand_at_a_time(self):
-        frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
         if b_use_knees:
+            frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
+            plan_to_model_frames = {
+                'torso': 'torso_link',
+                'LF': 'left_ankle_roll_link',
+                'RF': 'right_ankle_roll_link',
+                'L_knee': 'left_knee_link',
+                'R_knee': 'right_knee_link',
+                'LH': 'left_palm_link',
+                'RH': 'right_palm_link'
+            }
+        else:
             frame_names = ['torso', 'LF', 'RF', 'LH', 'RH']
-        plan_to_model_frames = {
-            'torso': 'torso_link',
-            'LF': 'l_foot_contact',
-            'RF': 'r_foot_contact',
-            # 'L_knee': 'l_knee_fe_ld',
-            # 'R_knee': 'r_knee_fe_ld',
-            'LH': 'l_hand_contact',
-            'RH': 'r_hand_contact'
-        }
+            plan_to_model_frames = {
+                'torso': 'torso_link',
+                'LF': 'left_ankle_roll_link',
+                'RF': 'right_ankle_roll_link',
+                'LH': 'left_palm_link',
+                'RH': 'right_palm_link'
+            }
         ik_cfree_planner = IKCFreePlanner(self.robot.model, self.robot.data, plan_to_model_frames, self.q0)
         ee_halfspace_params = OrderedDict()
         for fr in frame_names:
@@ -533,7 +614,8 @@ class TestIKCFreePlanner(unittest.TestCase):
         p_init['RH'] = self.starting_rh_pos
 
         # hand-chosen five-stage sequence of contacts
-        fixed_frames_seq, motion_frames_seq = self.get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict)
+        # fixed_frames_seq, motion_frames_seq = self.get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict)
+        fixed_frames_seq, motion_frames_seq = self.get_five_stage_on_knocker_contact_sequence(safe_regions_mgr_dict)
 
         # planner parameters
         T = 3
@@ -551,8 +633,9 @@ class TestIKCFreePlanner(unittest.TestCase):
                                                      motion_frames_seq=motion_frames_seq)
 
         # set planner
+        weights_rigid_link = np.array([10, 0., 0.])
         ik_cfree_planner.set_planner(frame_planner)
-        ik_cfree_planner.plan(p_init, T, alpha, visualizer)
+        ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer)
 
         self.assertEqual(True, True)  # add assertion here
 

@@ -96,7 +96,7 @@ class IrisGraph(nx.Graph):
 
         # check if no regions contains point
         if len(ir_idx_lst) == 0:
-            raise ValueError("No IRIS region contains the point.")
+            raise ValueError(f"No IRIS region contains the point {point}.")
 
         return ir_idx_lst
 

@@ -21,12 +21,12 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
                                   iris_regions: dict[str: IrisRegionsManager],
                                   iris_seq: List[dict[str: int]],
                                   safe_points_list: List[dict[str: np.array]],
+                                  contact_seq=None,
                                   aux_frames=None,
                                   weights_rigid: np.array = None) -> [np.array, np.float64, np.float64]:
-    stance_foot = 'LF'
-
     if weights_rigid is None:
-        weights_rigid = np.array([0.1621, 0., 0.0808])
+        weights_rigid = 10*np.array([0.1621, 0., 0.0808])
+        # weights_rigid = np.array([0.0808, 0., 0.1621])
 
     # Make copy of ee reachability region with only end effectors (e.g., excluding torso)
     ee_reach = {}
@@ -93,33 +93,34 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
         x_init_idx += d     # initial point is assumed to be feasible
 
     # Construct end-effector reachability constraints (initial & final points specified)
-    # H = np.zeros((N_planes * (num_iris_tot - 1), d * n_f * (num_iris_tot + 1)))
-    # d_vec = np.zeros((N_planes * (num_iris_tot - 1) * (n_ee - 1),))
-    # for sp_lst in safe_points_list:
-    #     for frame_name in iris_regions.keys():    # go in order
-    #         # get corresponding index
-    #         frame_idx = list(sp_lst.keys()).index(frame_name)
-    #
-    #         if frame_name == 'torso' or frame_name == stance_foot:
-    #             pass
-    #         else:
-    #             coeffs = reach[frame_name]
-    #             for idx_box in range(num_iris_tot - 1):
-    #                 # torso translation terms
-    #                 torso_prev_start_idx = idx_box * d * n_f
-    #                 torso_prev_end_idx = idx_box * d * n_f + d
-    #                 torso_post_start_idx = (idx_box + 1) * d * n_f
-    #                 torso_post_end_idx = (idx_box + 1) * d * n_f + d
-    #                 H[N_planes * (idx_box):N_planes * (idx_box + 1), torso_prev_start_idx:torso_prev_end_idx] = -coeffs['H']
-    #                 H[N_planes * (idx_box):N_planes * (idx_box + 1), torso_post_start_idx:torso_post_end_idx] = coeffs['H']
-    #
-    #                 # term corresponding to current end effector
-    #                 ee_start_idx = d * n_f * (idx_box + 1) + d * frame_idx
-    #                 ee_end_idx = d * n_f * (idx_box + 1) + d * (frame_idx + 1)
-    #                 H[N_planes * (idx_box):N_planes * (idx_box + 1), ee_start_idx:ee_end_idx] = coeffs['H']
-    #
-    #             # the 'd' term is the same for all planes since the shift is included in the torso term
-    #             d_vec = np.tile(coeffs['d'], num_iris_tot - 1)
+    if reach is not None:
+        for sp_idx, sp_lst in enumerate(safe_points_list):
+            # assume ee are reachable at the beginning and end
+            if sp_idx == 0 or sp_idx == len(safe_points_list) - 1:
+                continue
+
+            # get corresponding indices of torso optimization variable
+            t_curr_idx = 0 * num_iris_tot * d + d * sp_idx
+            t_next_idx = t_curr_idx + 3
+            z_t = x[t_curr_idx: t_next_idx]
+
+            for frame_name in sp_lst.keys():
+                # get corresponding frame index
+                frame_idx = list(iris_regions.keys()).index(frame_name)
+
+                # torso must be reachable from contact foot
+                # Note: not including knee reachability eases infeasibility
+                if frame_name == 'torso' or frame_name == 'L_knee' or frame_name == 'R_knee':
+                    continue
+                else:
+                    ee_curr_idx = frame_idx * num_iris_tot * d + d * sp_idx
+                    ee_next_idx = ee_curr_idx + 3
+                z_ee = x[ee_curr_idx: ee_next_idx]
+                coeffs = reach[frame_name]
+
+                H = coeffs['H']
+                d_vec = np.reshape(coeffs['d'], (len(H), ))
+                constr.append(H @ (z_ee - z_t) <= -d_vec)
 
     # add feasibility of end curve point? Perhaps since it depends on torso
 
@@ -129,6 +130,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     soc_constraint = []
     A_soc_debug, d_soc_debug, cost_log_abs_list = [], [], []  # for debug purposes
     if aux_frames is not None:
+        link_threshold = 0.05
         # w_i = cp.Parameter(pos=True, value=1.)
         # w_i = np.array([0.1621, 0.006, 0.0808])    # based on desired distance between foot-shin frames
         for aux_fr in aux_frames:
@@ -137,6 +139,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
                 aux_fr, frame_list, num_iris_tot + 1)
 
             if not np.isnan(prox_idx):
+                link_length += link_threshold  # threshold for relaxation
                 # add convex relaxation of norm constraint
                 A_soc_aux, d_soc_aux = create_cvx_norm_eq_relaxation(
                     prox_idx, dist_idx, link_length, d, num_iris_tot + 1, x)
@@ -153,17 +156,6 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
 
         cost_log_abs = -(cp.sum(cost_log_abs_list))
 
-    # knee-to-foot fixed distance constraint (this should be trivially satisfied when 2 boxes)
-    # for bs_lst in iris_seq:
-    #     num_boxes_current = len(next(iter(bs_lst.values())))
-    #     if (num_boxes_current != 2) and (aux_frames is not None):
-    #         cost_log_abs, soc_constraint, A_soc = create_cvx_norm_eq_relaxation(
-    #                                                         aux_frames, num_iris_tot, d*n_f, x)
-    #     else:
-    #         soc_constraint = []
-    #         A_soc = []
-    #         cost_log_abs = 0.
-
     # minimum distance cost (add distance between points of corresponding frame)
     cost = 0
     for fr in range(n_f):
@@ -179,7 +171,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
 
     if prob.status == 'infeasible':
         print('Polygonal problem was infeasible. Retrying with relaxed tolerances.')
-        prob.solve(solver='SCS', eps_rel=0.1, eps_abs=0.1)
+        prob.solve(solver='SCS', eps_rel=0.05, eps_abs=0.01)
 
     length = prob.value
     traj = x.value
