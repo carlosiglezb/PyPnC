@@ -273,7 +273,7 @@ def load_navy_env(robot_name, door_pos):
         dom_lbody_ub_r = np.array([1.6, 0.8, 1.2])
         knee_knocker_base = HPolyhedron.MakeBox(
             np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
-            np.array([0.12, 0.9, 0.45]) + door_pos + door_width)
+            np.array([0.12, 0.9, 0.41]) + door_pos + door_width)
     floor = HPolyhedron.MakeBox(
         np.array([-2, -0.9, -0.05]) + door_pos + door_width,
         np.array([2, 0.9, -0.001]) + door_pos + door_width)
@@ -575,7 +575,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
     final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
     final_rh_pos = safe_regions_mgr_dict['RH'].iris_list[1].seed_pos
     final_lh_pos = safe_regions_mgr_dict['LH'].iris_list[1].seed_pos
-    intermediate_lf_pos = np.array([0.2, final_lf_pos[1], 0.42])
+    intermediate_rf_pos = np.array([0.3, final_rf_pos[1], 0.44])
 
     # initialize fixed and motion frame sets
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
@@ -585,7 +585,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
     if robot_name == 'g1':
         motion_frames_seq.add_motion_frame({
                                             'LH': door_l_inner_location,
-                                            'torso': starting_torso_pos + np.array([0.07, -0.07, 0])
+                                            # 'torso': starting_torso_pos + np.array([0.07, -0.07, 0])
                                             })
     elif robot_name == 'ergoCub':
         motion_frames_seq.add_motion_frame({
@@ -596,49 +596,41 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
     lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
     motion_frames_seq.add_contact_surface(lh_contact_front)
 
-    # ---- Step 2: step on knee-knocker with left foot
-    fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
+    # ---- Step 2: step on knee-knocker with right foot
+    fixed_frames.append(['LF', 'L_knee', 'LH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
-                        'LF': intermediate_lf_pos,
-                        'L_knee': intermediate_lf_pos})     # + np.array([-0.05, 0., 0.07])
-    lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(lf_contact_over)
+                        'RF': intermediate_rf_pos,
+                        'R_knee': intermediate_rf_pos + (final_rkn_pos - final_rf_pos) + np.array([-0.05, 0., 0.035])})
+    rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
+    motion_frames_seq.add_contact_surface(rf_contact_over)
 
     # ---- Step 3: step through door with right foot
-    fixed_frames.append(['LF', 'L_knee', 'LH'])   # frames that must not move
+    fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                         # 'LH': starting_lh_pos + np.array([0.3, 0., 0.0]),   # <-- G1
                         # 'LH': starting_lh_pos + np.array([0.35, 0.1, 0.0]),   # <-- other
                         # 'torso': final_torso_pos + np.array([-0.15, 0.05, -0.05]),     # good testing
-                        'R_knee': final_rkn_pos + np.array([-0.05, 0., 0.07]),
-                        'RF': final_rf_pos})
-    rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(rf_contact_over)
-
-    # # ---- Step 4: step through door with right foot
-    # # G1 settings
-    # # fixed_frames.append(['LF', 'L_knee', 'RH', 'LH'])   # frames that must not move
-    # # other settings
-    # fixed_frames.append(['LF', 'L_knee', 'RH'])   # frames that must not move
-    # motion_frames_seq.add_motion_frame({
-    #                     'RF': final_rf_pos,
-    #                     'torso': final_torso_pos + np.array([0.0, 0., 0.04]),     # good testing
-    #                     'R_knee': final_rkn_pos + np.array([-0.05, 0., 0.07]),
-    #                     # 'LH': starting_lh_pos + np.array([0.35, 0.0, 0.0])
-    # })
-    # rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-    # motion_frames_seq.add_contact_surface(rf_contact_over)
+                        'L_knee': final_lkn_pos + np.array([-0.05, 0., 0.035]),
+                        'LF': final_lf_pos})
+    lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
+    motion_frames_seq.add_contact_surface(lf_contact_over)
 
     # ---- Step 4: balance / square up
     # fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
-    fixed_frames.append(['RF', 'R_knee'])
+    fixed_frames.append(['LF', 'L_knee'])
     motion_frames_seq.add_motion_frame({
         'torso': final_torso_pos,
-        'LF': final_lf_pos,
-        'L_knee': final_lkn_pos + np.array([-0.05, 0., 0.07]),
+        'RF': final_rf_pos,
+        'R_knee': final_rkn_pos + np.array([-0.05, 0., 0.035]),
         'RH': final_rh_pos, # + np.array([-0.20, 0., 0.]),
         'LH': final_lh_pos
     })
+    rf_square_up = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
+    motion_frames_seq.add_contact_surface(rf_square_up)
+
+    # ---- Step 5: balance
+    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
+    motion_frames_seq.add_motion_frame({})
 
     return fixed_frames, motion_frames_seq
 
@@ -777,7 +769,7 @@ def main(args):
         q0 = get_g1_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.28, 0., 0.])
         step_length = 0.42
-        weights_rigid_link = np.array([3500., 0., 0.])
+        weights_rigid_link = np.array([10., 0., 0.])
     elif robot_name == 'valkyrie':
         q0 = get_val_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.34, 0., 0.])
@@ -851,7 +843,8 @@ def main(args):
     if robot_name == 'valkyrie':
         fixed_frames_seq, motion_frames_seq = get_two_stage_contact_sequence(safe_regions_mgr_dict)
     else:
-        fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict)
+        # fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict)
+        fixed_frames_seq, motion_frames_seq = get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict)
 
     # planner parameters
     T = 3
@@ -907,12 +900,17 @@ def main(args):
     #
     # TODO get contact sequence from kinematic planner ... fixed frames, maybe?
     if robot_name == 'g1':
-        N_horizon_lst = [100, 150, 150, 150, 150]
+        N_horizon_lst = [150, 150, 150, 150, 200]
         # contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames_seq)
+        # contact_seqs = [['LF', 'RF'],
+        #                 ['RF', 'LH'],
+        #                 ['RF', 'LF'],
+        #                 ['LF', 'RH'],
+        #                 ['LF', 'RF']]
         contact_seqs = [['LF', 'RF'],
-                        ['RF', 'LH'],
-                        ['RF', 'LF'],
-                        ['LF', 'RH'],
+                        ['LF', 'LH'],
+                        ['LH', 'RF'],
+                        ['LF'],
                         ['LF', 'RF']]
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
         robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)

@@ -449,7 +449,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             activation_fr,
             crocoddyl.ResidualModelFramePlacement(state, fr_id, fr_Mref, actuation.nu),
         )
-        costs.addCost(fr_name + "_goal", fr_cost, 5e2)
+        costs.addCost(fr_name + "_goal", fr_cost, 5e3)
 
     # Adding state and control regularization terms
     if zero_config is not None and terminal_step:

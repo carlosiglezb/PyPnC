@@ -45,7 +45,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         super().__init__(robot_model, contact_seqs, time_per_phase, ik_cfree_planner)
 
         self.gains = {
-            'torso': np.array([2.5] * 3 + [0.5] * 3),  # (lin, ang)
+            'torso': np.array([4.5] * 3 + [0.5] * 3),  # (lin, ang)
             'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
             'L_knee': np.array([3.] * 3 + [0.00001] * 3),
             'R_knee': np.array([3.] * 3 + [0.00001] * 3),
@@ -82,8 +82,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             # TODO change for upper call to update_contact_params() or so
             if i == 1:
                 ee_rpy['LH'] = get_rpy_normal_left_wall()
-            elif i == 3:
-                ee_rpy['RH'] = get_rpy_normal_right_wall()
+            # elif i == 3:
+            #     ee_rpy['RH'] = get_rpy_normal_right_wall()
             elif i > (self.contact_phases - 1):
                 raise NotImplementedError(f"Frames for contact sequence {i} not specified.")
             N_current = self.horizon_lst[i]
@@ -149,12 +149,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 imp_model = createMultiFrameFinalImpulseModel(state,
                                                               x0,
                                                               plan_to_model_ids,
-                                                              [self.contact_seqs[i+1][1]],
+                                                              [self.contact_seqs[i+1][-1]],
                                                               ee_rpy,
                                                               frame_targets_dict,
                                                               gains=gains)
                 model_seqs = [*model_seqs, [imp_model]]
-                print(f"Applied impulse model at {i} on frame {[self.contact_seqs[i + 1][1]]}")
+                print(f"Applied impulse model at {i} on frame {[self.contact_seqs[i + 1][-1]]}")
             else:
                 dmodel = createMultiFrameFinalActionModel(state,
                                                           actuation,
