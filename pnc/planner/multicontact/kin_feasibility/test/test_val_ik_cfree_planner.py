@@ -525,7 +525,6 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         # generate all frame traversable regions
         traversable_regions_dict = OrderedDict()
-
         for fr in frame_names:
             if fr == 'torso':
                 traversable_regions_dict[fr] = FrameTraversableRegion(fr,
@@ -538,10 +537,8 @@ class TestIKCFreePlanner(unittest.TestCase):
                                                                       b_visualize_reach=b_visualize,
                                                                       b_visualize_safe=b_visualize,
                                                                       visualizer=visualizer)
-                #traversable_regions_dict[fr].update_origin_pose(standing_pos)
-                reach_updater(traversable_regions_dict, frame_names, standing_pos, False)
+                traversable_regions_dict[fr].update_origin_pose(standing_pos)
             traversable_regions_dict[fr].load_iris_regions(safe_regions_mgr_dict[fr])
-        update_dict(traversable_regions_dict)
         self.assertEqual(True, True)
 
         # initial and desired final positions for each frame

@@ -213,10 +213,6 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     frame_name = frame_list[frame_idx]
     for k in range(num_iris_tot * n_frames):
         val = points[k][0].value
-        if frame_name == 'torso':
-            #print(frame_name, " in curve: ", val[0])
-            print("entering...")
-            reach_updater(None, frame_list, val[0], True)
 
         num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
         # move on to next segment after the current number of safe boxes

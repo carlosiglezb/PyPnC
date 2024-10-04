@@ -180,8 +180,6 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
             for b in range(num_iris+1):
                 first_idx = n_poly_points * frame_idx + (b + ir_i) * d
                 last_idx = first_idx + d - 1
-                if frame == 'torso':
-                    print("first, last idx: ", first_idx, "      ", last_idx)
                 if b == 0:
                    ee_traj_idx = np.linspace(first_idx, last_idx, d).astype(int)
                 else:

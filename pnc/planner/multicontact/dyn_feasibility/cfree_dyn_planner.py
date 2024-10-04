@@ -1067,6 +1067,7 @@ def main(args):
         display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
                           rob_data, vis_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
         display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
+        display.display_targets("test_targ", lf_targets, [1, 1, 0])
         display.display_targets("lfoot_target", lf_targets, [1, 1, 0])
         display.display_targets("lknee_target", lkn_targets, [0, 0, 1])
         display.display_targets("rfoot_target", rf_targets, [1, 1, 0])

@@ -220,6 +220,7 @@ class MeshcatPinocchioAnimation:
                 #     fs[ti][contact]['oMf'].homogeneous)
 
     def displayFromCrocoddylSolver(self, solver):
+        self.add_arrow("testing04", [1, 0, 0], 0.5)
         for it in solver:
             models = it.problem.runningModels.tolist() + [it.problem.terminalModel]
             dts = [m.dt if hasattr(m, "differential") else 0. for m in models]
@@ -234,7 +235,7 @@ class MeshcatPinocchioAnimation:
 
                 with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
                     self.display_visualizer_frames(frame, q)
-                #     self.displayForcesFromCrocoddylSolver(fs_ti, frame)
+                    #self.displayForcesFromCrocoddylSolver(fs_ti, frame)
 
                 self.frame_idx += 1     # increase frame index counter
 
@@ -250,7 +251,14 @@ class MeshcatPinocchioAnimation:
         pin.forwardKinematics(self.model, self.robot_data, q)
         pin.updateGeometryPlacements(self.model, self.robot_data,
                                      geom_model, geom_data)
+
+        #Parameters for the cube
+        cube_name = "cube_test"
+        cube_size = 0.5
+        cube_position = np.array([1, 0.0, 0.0])
+
         for visual in geom_model.geometryObjects:
+            #print(visual.name)
             viewer_name = meshcat_visualizer.getViewerNodeName(visual, pin.GeometryType.VISUAL)
             # Get mesh pose.
             M = geom_data.oMg[geom_model.getGeometryId(visual.name)]
@@ -262,8 +270,19 @@ class MeshcatPinocchioAnimation:
                 T = np.array(M.homogeneous).dot(S)
             else:
                 T = M.homogeneous
+            if viewer_name == 'valkyrie/visuals/torso_0':
+                position = M.translation
+                cube_position = position
             # Update viewer configuration.
             frame[viewer_name].set_transform(T)
+
+        #CHECK IF THIS IS CREATING A BUNCH OF CUBES UNECESSARILY
+        meshcat_visualizer.viewer[cube_name].set_object(g.Box([cube_size, cube_size, cube_size]), g.MeshPhongMaterial(color=0x00ff00))  # Green cube
+
+        print(cube_position)
+        # Set the transformation for the cube in the Meshcat viewer
+        tf_transl = tf.translation_matrix(cube_position)  # Transform for the cube position
+        meshcat_visualizer.viewer[cube_name].set_transform(tf_transl)  # Set the transformation for the cube
 
     def display_targets(self, end_effector_name, targets, color=None):
         if color is None:
