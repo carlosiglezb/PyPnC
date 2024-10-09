@@ -690,6 +690,23 @@ def get_contact_seq_from_fixed_frames_seq(fixed_frames_seq):
         contact_frames_seq.append(cf)
 
     # move contact-making to the end
+    for cs_i, cs in enumerate(contact_frames_seq):
+        if cs_i == 0:   # ignore first contact sequence
+            continue
+
+        b_phase_done = False
+        # find new contact to place them at the end for impulse model
+        for ccon in cs:
+            if (not b_phase_done) and (ccon not in contact_frames_seq[cs_i - 1]):
+                contact_frames_seq[cs_i].remove(ccon)
+                contact_frames_seq[cs_i].append(ccon)
+                b_phase_done = True
+
+    # remove hands from last sequence when added for smoothing
+    if contact_frames_seq[-1] == contact_frames:
+        contact_frames_seq.pop(-1)
+        contact_frames_seq.pop(-1)
+
     return contact_frames_seq
 
 
@@ -849,9 +866,15 @@ def main(args):
     # hand-chosen five-stage sequence of contacts
     if robot_name == 'valkyrie':
         fixed_frames_seq, motion_frames_seq = get_two_stage_contact_sequence(safe_regions_mgr_dict)
-    else:
-        # fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict)
-        fixed_frames_seq, motion_frames_seq = get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict)
+    else:   # smaller robots have been set up with different contact sequences
+        if contact_seq == 0:    # step through door
+            fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict)
+        elif contact_seq == 1:  # step on knee-knocker
+            fixed_frames_seq, motion_frames_seq = get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict)
+        else:
+                NotImplementedError(f"Contact sequence {contact_seq} not implemented")
+    contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames_seq)
+
 
     # planner parameters
     T = 3
@@ -905,36 +928,16 @@ def main(args):
     #
     # Dynamic solve
     #
-    # TODO get contact sequence from kinematic planner ... fixed frames, maybe?
     if robot_name == 'g1':
         N_horizon_lst = [180, 200, 200, 150, 200]
-        # contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames_seq)
-        # contact_seqs = [['LF', 'RF'],
-        #                 ['RF', 'LH'],
-        #                 ['RF', 'LF'],
-        #                 ['LF', 'RH'],
-        #                 ['LF', 'RF']]
-        contact_seqs = [['LF', 'RF'],
-                        ['LF', 'RH', 'LH'],
-                        ['LH', 'RH', 'RF'],
-                        ['LF'],
-                        ['LF', 'RF']]
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
         robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
     elif robot_name == 'ergoCub':
         N_horizon_lst = [100, 220, 100, 180, 80]
-        contact_seqs = [['LF', 'RF'],
-                        ['RF', 'LH'],
-                        ['RF', 'LF'],
-                        ['LF', 'RH'],
-                        ['LF', 'RF']]
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
         robot_dyn_plan = ErgoCubMulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
     elif robot_name == 'valkyrie':
         N_horizon_lst = [150, 150, 100]
-        contact_seqs = [['RF'],
-                        ['LF'],
-                        ['RF', 'LF']]
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
         robot_dyn_plan = ValkyrieMulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
     else:
