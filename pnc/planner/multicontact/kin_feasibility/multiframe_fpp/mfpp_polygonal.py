@@ -93,34 +93,34 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
         x_init_idx += d     # initial point is assumed to be feasible
 
     # Construct end-effector reachability constraints (initial & final points specified)
-    if reach is not None:
-        for sp_idx, sp_lst in enumerate(safe_points_list):
-            # assume ee are reachable at the beginning and end
-            if sp_idx == 0 or sp_idx == len(safe_points_list) - 1:
-                continue
-
-            # get corresponding indices of torso optimization variable
-            t_curr_idx = 0 * num_iris_tot * d + d * sp_idx
-            t_next_idx = t_curr_idx + 3
-            z_t = x[t_curr_idx: t_next_idx]
-
-            for frame_name in sp_lst.keys():
-                # get corresponding frame index
-                frame_idx = list(iris_regions.keys()).index(frame_name)
-
-                # torso must be reachable from contact foot
-                # Note: not including knee reachability eases infeasibility
-                if frame_name == 'torso' or frame_name == 'L_knee' or frame_name == 'R_knee':
-                    continue
-                else:
-                    ee_curr_idx = frame_idx * num_iris_tot * d + d * sp_idx
-                    ee_next_idx = ee_curr_idx + 3
-                z_ee = x[ee_curr_idx: ee_next_idx]
-                coeffs = reach[frame_name]
-
-                H = coeffs['H']
-                d_vec = np.reshape(coeffs['d'], (len(H), ))
-                constr.append(H @ (z_ee - z_t) <= -d_vec)
+    # if reach is not None:
+    #     for sp_idx, sp_lst in enumerate(safe_points_list):
+    #         # assume ee are reachable at the beginning and end
+    #         if sp_idx == 0 or sp_idx == len(safe_points_list) - 1:
+    #             continue
+    #
+    #         # get corresponding indices of torso optimization variable
+    #         t_curr_idx = 0 * num_iris_tot * d + d * sp_idx
+    #         t_next_idx = t_curr_idx + 3
+    #         z_t = x[t_curr_idx: t_next_idx]
+    #
+    #         for frame_name in sp_lst.keys():
+    #             # get corresponding frame index
+    #             frame_idx = list(iris_regions.keys()).index(frame_name)
+    #
+    #             # torso must be reachable from contact foot
+    #             # Note: not including knee reachability eases infeasibility
+    #             if frame_name == 'torso' or frame_name == 'L_knee' or frame_name == 'R_knee':
+    #                 continue
+    #             else:
+    #                 ee_curr_idx = frame_idx * num_iris_tot * d + d * sp_idx
+    #                 ee_next_idx = ee_curr_idx + 3
+    #             z_ee = x[ee_curr_idx: ee_next_idx]
+    #             coeffs = reach[frame_name]
+    #
+    #             H = coeffs['H']
+    #             d_vec = np.reshape(coeffs['d'], (len(H), ))
+    #             constr.append(H @ (z_ee - z_t) <= -d_vec)
 
     # add feasibility of end curve point? Perhaps since it depends on torso
 
