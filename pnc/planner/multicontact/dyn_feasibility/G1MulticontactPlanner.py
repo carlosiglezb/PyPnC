@@ -47,8 +47,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         self.gains = {
             'torso': np.array([6.5] * 3 + [0.5, 0.5, 0.001]),  # (lin, ang)
             'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
-            'L_knee': np.array([3.] * 3 + [0.00001] * 3),
-            'R_knee': np.array([5.] * 3 + [0.00001] * 3),
+            'L_knee': np.array([6.] * 3 + [0.00001] * 3),
+            'R_knee': np.array([6.] * 3 + [0.00001] * 3),
             'hands': np.array([2.] * 3 + [0.00001] * 3)
         }
         self._default_gains = copy(self.gains)

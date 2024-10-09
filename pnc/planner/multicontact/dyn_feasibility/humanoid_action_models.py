@@ -467,7 +467,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         state, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
     costs.addCost("xReg", x_reg_cost, 5e-2)
-    costs.addCost("uReg", u_reg_cost, 1e-4)
+    costs.addCost("uReg", u_reg_cost, 1e-5)
 
     if rcj_constraints is not None:
         raise ValueError("Should not be entering here!")
