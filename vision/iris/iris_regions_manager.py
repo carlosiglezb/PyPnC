@@ -144,20 +144,25 @@ class IrisRegionsManager:
             ir.visualize(meshcat_viewer, frame_name + '/' + str(i))
 
     def findShortestPath(self, start: np.array,
-                         goal: np.array) -> List[int]:
+                         goal: np.array,
+                         hint_iris: int = None) -> List[int]:
         # if single IRIS region, return the index of corresponding global IRIS region
         if self.iris_graph is None:
             return [self.iris_idx_seq[0]]
 
         planner, runtime = self.iris_graph.computeShortestPath(goal)
 
-        # find which IRIS region contains the start point
-        ir_start_idx = 0
-        for ir in self.iris_list:
-            if ir.isPointSafe(start):
-                iris_p_init = ir_start_idx
-                break
-            ir_start_idx += 1
+        # find which IRIS region contains the start point (first check hint_iris_region)
+        if hint_iris is not None:
+            if self.iris_list[hint_iris].isPointSafe(start):
+                iris_p_init = hint_iris
+        else:
+            ir_start_idx = 0
+            for ir in self.iris_list:
+                if ir.isPointSafe(start):
+                    iris_p_init = ir_start_idx
+                    break
+                ir_start_idx += 1
 
         # find which IRIS region contains the goal point
         ir_goal_idx = 0
@@ -167,10 +172,13 @@ class IrisRegionsManager:
                 break
             ir_goal_idx += 1
 
+        iris_seq_tmp, length, runtime = planner(start)
         if iris_p_init == iris_p_goal:
             iris_seq = [iris_p_init]
+        elif len(self.iris_graph.regionsContainingPoint(goal)) == 1 and (len(iris_seq_tmp) == 2):
+            iris_seq = [iris_p_init, iris_p_goal]
         else:
-            iris_seq, length, runtime = planner(start)
+            iris_seq = iris_seq_tmp
         return iris_seq
 
     def regionsContainingPoint(self, point: np.array) -> List[int]:

@@ -34,7 +34,7 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
             # get free frames and assign box containing initial position
             for fr, p0 in p_init.items():
                 if fr not in motion_frames[0].keys() and fr not in fixed_frames[0]:
-                    box_seq_dict[fr] = list(iris_regions[fr].regionsContainingPoint(p0))
+                    pack_box_seq_from_point(1, box_seq_dict, box_seq_lst, fr, iris_regions, p0)
             k_transition += 1
             continue
 
@@ -44,8 +44,10 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
             if fm in f_frames:
                 pm_init = get_last_defined_point(safe_points_lst, fm)
                 safe_points_lst[k_transition][fm] = pm_next
-                box_seq_dict[fm] = iris_regions[fm].findShortestPath(pm_init, pm_next)
-                # box_seq_dict[fm] = find_shortest_iris_path(safe_regions[fm], pm_init, pm_next)
+                if len(box_seq_lst) > 1:
+                    box_seq_dict[fm] = iris_regions[fm].findShortestPath(pm_init, pm_next, box_seq_lst[-1][fm][-1])
+                else:
+                    box_seq_dict[fm] = iris_regions[fm].findShortestPath(pm_init, pm_next)
         # maximum number of boxes in a box sequence in the motion frames
         b_max = np.max([len(bs) for bs in box_seq_dict.values()])
 
@@ -60,8 +62,7 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
             # for a fixed frame, the shortest path is the box that contains the point
             pf_prev = safe_points_lst[k_transition - 1][ff]
             safe_points_lst[k_transition][ff] = pf_prev
-            box_pf_prev = next(iter((iris_regions[ff].regionsContainingPoint(pf_prev))))
-            box_seq_dict[ff] = [box_pf_prev] * b_max
+            pack_box_seq_from_point(b_max, box_seq_dict, box_seq_lst, ff, iris_regions, pf_prev)
 
         if k_transition > 1:
             # if one of the old un-assigned frames got a new assignment, fill the gap
@@ -120,8 +121,7 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
     for ff in fixed_frames[-1]:
         pf_prev = get_last_defined_point(safe_points_lst, ff)
         safe_points_lst[-1][ff] = pf_prev
-        box_pf_prev = next(iter((iris_regions[ff].regionsContainingPoint(pf_prev))))
-        box_seq_dict[ff] = [box_pf_prev] * b_max
+        pack_box_seq_from_point(b_max, box_seq_dict, box_seq_lst, ff, iris_regions, pf_prev)
     box_seq_lst.append(copy.deepcopy(box_seq_dict))
 
     # re-assign block sequence (in case last motion frame changed b_max)
@@ -145,6 +145,18 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
             ir.iris_idx_seq.append(box_seq_lst[seg][fname])
 
     return box_seq_lst, safe_points_lst
+
+
+def pack_box_seq_from_point(b_max, box_seq_dict, box_seq_lst, ff, iris_regions, pf_prev):
+    box_pf_prev = (iris_regions[ff].regionsContainingPoint(pf_prev))
+    if len(box_pf_prev) > 1:
+        # check that one of the previous feasible regions is the same as the last from previous contact phase
+        for bpp in box_pf_prev:
+            if bpp == box_seq_lst[-1][ff][-1]:
+                box_seq_dict[ff] = [bpp] * b_max
+                break
+    else:
+        box_seq_dict[ff] = box_pf_prev * b_max
 
 
 def plan_multiple_iris(S, R, p_init, T, alpha,
