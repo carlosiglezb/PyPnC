@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import pinocchio as pin
+from numpy.distutils.exec_command import temp_file_name
 
 # Pinocchio Meshcat
 from pinocchio.visualize import MeshcatVisualizer
@@ -301,31 +302,11 @@ class MeshcatPinocchioAnimation:
         return traversable_regions_dict
 
     def reachable(self, pos, frame, reachable_path):
-        meshcat_visualizer = self.viz
-
         frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
-
         for fr in frame_names:
-            reachable_path[fr].update_origin_pose(pos)
-
-        # Parameters for the cube
-        cube_name = "cube_test"
-        cube_size = 0.5
-        cube_position = pos
-
-        # Create the cube in the Meshcat viewer (only needed once, you can check if the cube already exists)
-        meshcat_visualizer.viewer[cube_name].set_object(
-            g.Box([cube_size, cube_size, cube_size]),
-            g.MeshPhongMaterial(color=0x00ff00)  # Green cube
-        )
-
-        # Set the transformation for the cube in the Meshcat viewer
-        tf_transl = tf.translation_matrix(cube_position)  # Transform for the cube position
-        meshcat_visualizer.viewer[cube_name].set_transform(tf_transl)  # Set the transformation for the cube
-
-        # Set the transformation for the cube
-        frame[cube_name].set_transform(tf_transl)  # Pass the full 4x4 transformation matrix
-        frame['traversable_regions']['reachable'].set_transform(tf_transl)  # Pass the full 4x4 transformation matrix
+            tf_new = reachable_path[fr].update_origin_pose(pos)
+            if(fr != 'torso'):
+                frame['traversable_regions']['reachable'][fr].set_transform(tf_new)  # Pass the full 4x4 transformation matrix
 
     def reachable_viz(self, solver, obj):
         # Use cube for now, get shape of rr later

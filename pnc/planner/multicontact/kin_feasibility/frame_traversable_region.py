@@ -116,17 +116,20 @@ class FrameTraversableRegion:
         if origin_ori_direction is None:
             origin_ori_direction = np.array([0., 0., 1.])
 
+        tf_new = origin_pos
+
         if self._b_visualize_reach and len(self._plane_coeffs) != 0:
             # Note: this does NOT update the actual plane equations, it simply
             # shifts the origin of the STL part to origin_pos. The equations
             # update is currently being done in the LocomanipulationFramePlanner
-            self._update_reachable_viewer(origin_pos,
+            tf_new = self._update_reachable_viewer(origin_pos,
                           origin_ori_angle, origin_ori_direction)
 
         # save new origin
         self._origin_pos = origin_pos
         self._origin_ori_angle = origin_ori_angle
         self._origin_ori_direction = origin_ori_direction
+        return tf_new
 
     def _update_reachable_viewer(self, origin_pos,
                                  origin_ori_angle,
@@ -137,7 +140,8 @@ class FrameTraversableRegion:
         # first translate, then rotate
         tf_new = tf.concatenate_matrices(tf_trans, tf_ori)
         self._vis["traversable_regions"]["reachable"][self.frame_name].set_transform(tf_new)
-        self._vis["traversable_regions"]["reachable"].set_property("visible", False)
+        self._vis["traversable_regions"]["reachable"].set_property("visible", True)
+        return tf_new
 
     def load_collision_free_boxes(self, box_llim, box_ulim):
         self._plan_safe_box_list = fpp.SafeSet(

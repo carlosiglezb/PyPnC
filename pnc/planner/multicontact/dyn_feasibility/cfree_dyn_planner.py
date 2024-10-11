@@ -1083,7 +1083,8 @@ def main(args):
         #display.reachable_viz(fddp,obj)
 
         print(reach_path)
-        traversable_regions_dict = display.create_reach([1,1,1])
+        torso_init = np.array([0., 0., 1.01])
+        traversable_regions_dict = display.create_reach(torso_init)
         display.displayFromCrocoddylSolver(fddp, traversable_regions_dict)
         viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
                             "lfoot_target", "lknee_target",
