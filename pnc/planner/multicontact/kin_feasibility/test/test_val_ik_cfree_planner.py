@@ -19,9 +19,6 @@ from util import util
 from vision.iris.iris_geom_interface import IrisGeomInterface
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
-from test_updater import reach_updater
-from test_updater import update_dict
-
 cwd = os.getcwd()
 sys.path.append(cwd)
 

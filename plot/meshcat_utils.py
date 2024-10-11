@@ -275,11 +275,11 @@ class MeshcatPinocchioAnimation:
             # Update viewer configuration.
             frame[viewer_name].set_transform(T)
 
-    def create_reach(self,pos):
+    def create_reach(self, pos, robotname):
         meshcat_visualizer = self.viz
         frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
         ee_halfspace_params = OrderedDict()
-        reach_path = cwd + '/pnc/reachability_map/output/' + 'valkyrie' + '/' + 'valkyrie'
+        reach_path = cwd + '/pnc/reachability_map/output/' + robotname + '/' + robotname
         for fr in frame_names:
             ee_halfspace_params[fr] = reach_path + '_' + fr + '.yaml'
 
@@ -307,48 +307,6 @@ class MeshcatPinocchioAnimation:
             tf_new = reachable_path[fr].update_origin_pose(pos)
             if(fr != 'torso'):
                 frame['traversable_regions']['reachable'][fr].set_transform(tf_new)  # Pass the full 4x4 transformation matrix
-
-    def reachable_viz(self, solver, obj):
-        # Use cube for now, get shape of rr later
-        cube_name = "cube_test"
-        cube_size = 0.5
-        cube_position = np.array([1, 0.0, 0.0])
-        obj = g.Box([cube_size, cube_size, cube_size])
-        for it in solver:
-            models = it.problem.runningModels.tolist() + [it.problem.terminalModel]
-            dts = [m.dt if hasattr(m, "differential") else 0. for m in models]
-
-            for sim_time_idx in np.arange(0, len(dts), self.save_freq):
-                q = np.array(it.xs[int(sim_time_idx)][:self.robot_nq])
-
-                with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
-                    meshcat_visualizer = self.viz
-                    # Parameters for the cube
-                    cube_name = "cube_test"
-                    cube_size = 0.5
-
-                    # test pos
-                    cube_position = np.array([1.0 + np.sin(self.frame_idx * 0.1), 0.0, 0.0])  # Example of moving the cube along x-axis
-
-                    # Create the cube in the Meshcat viewer (only needed once, you can check if the cube already exists)
-                    meshcat_visualizer.viewer[cube_name].set_object(
-                        g.Box([cube_size, cube_size, cube_size]),
-                        g.MeshPhongMaterial(color=0x00ff00)  # Green cube
-                    )
-
-                    # Set the transformation for the cube in the Meshcat viewer
-                    tf_transl = tf.translation_matrix(cube_position)  # Transform for the cube position
-                    meshcat_visualizer.viewer[cube_name].set_transform(tf_transl)  # Set the transformation for the cube
-
-                    # Set the transformation for the cube
-                    frame[cube_name].set_transform(tf_transl)  # Pass the full 4x4 transformation matrix
-
-                # Increase the frame index counter for animation
-                self.frame_idx += 1
-
-        # save animation
-        self.viz.viewer.set_animation(self.anim, play=False)
-        self.frame_idx = 0
 
     def display_targets(self, end_effector_name, targets, color=None):
         if color is None:

@@ -10,8 +10,6 @@ from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import get_aux_fram
 from pnc.planner.multicontact.path_parameterization import BezierCurve, CompositeBezierCurve
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
-from pnc.planner.multicontact.kin_feasibility.test.test_updater import reach_updater
-
 def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.array],
                                   aux_frames: List[dict],
                                   iris_regions: dict[str: IrisRegionsManager],

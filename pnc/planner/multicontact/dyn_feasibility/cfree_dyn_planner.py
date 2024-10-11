@@ -1074,17 +1074,11 @@ def main(args):
         display.display_targets("lhand_target", lh_targets, [0.5, 0, 0])
         display.display_targets("rhand_target", rh_targets, [0.5, 0, 0])
         display.display_targets("base_target", base_targets, [0, 0.5, 0])
-        # display.displayForcesFromCrocoddylSolver(fddp)
-        ###TEST
-        # make new function for display reachable regions
-        # pass the object as shape, solver only has calc not shape
-        # desired vs actual traj
-        # reachable region stored in solver
-        #display.reachable_viz(fddp,obj)
 
-        print(reach_path)
+        ### READABLE REGION ANIMATION
+        # TODO: desired vs actual traj
         torso_init = np.array([0., 0., 1.01])
-        traversable_regions_dict = display.create_reach(torso_init)
+        traversable_regions_dict = display.create_reach(torso_init, robot_name)
         display.displayFromCrocoddylSolver(fddp, traversable_regions_dict)
         viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
                             "lfoot_target", "lknee_target",
