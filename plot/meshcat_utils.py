@@ -15,6 +15,10 @@ from pinocchio.visualize.meshcat_visualizer import isMesh
 # Crocoddyl tools
 from crocoddyl.libcrocoddyl_pywrap import *  # noqa
 
+from collections import OrderedDict
+from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
+import pnc.planner.multicontact.kin_feasibility.frame_traversable_region
+
 cwd = os.getcwd()
 sys.path.append(cwd)
 
@@ -219,8 +223,7 @@ class MeshcatPinocchioAnimation:
                 # self.viz.viewer['forces'][link_name]["arrow"].set_transform(
                 #     fs[ti][contact]['oMf'].homogeneous)
 
-    def displayFromCrocoddylSolver(self, solver):
-        self.add_arrow("testing04", [1, 0, 0], 0.5)
+    def displayFromCrocoddylSolver(self, solver, reachable_path):
         for it in solver:
             models = it.problem.runningModels.tolist() + [it.problem.terminalModel]
             dts = [m.dt if hasattr(m, "differential") else 0. for m in models]
@@ -234,7 +237,7 @@ class MeshcatPinocchioAnimation:
                 fs_ti = fs[sim_time_idx]
 
                 with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
-                    self.display_visualizer_frames(frame, q)
+                    self.display_visualizer_frames(frame, q, reachable_path)
                     #self.displayForcesFromCrocoddylSolver(fs_ti, frame)
 
                 self.frame_idx += 1     # increase frame index counter
@@ -242,7 +245,7 @@ class MeshcatPinocchioAnimation:
         # save animation
         self.viz.viewer.set_animation(self.anim, play=False)
 
-    def display_visualizer_frames(self, frame, q):
+    def display_visualizer_frames(self, frame, q, reachable_path):
         meshcat_visualizer = self.viz
 
         geom_model = self.visual_model
@@ -251,11 +254,6 @@ class MeshcatPinocchioAnimation:
         pin.forwardKinematics(self.model, self.robot_data, q)
         pin.updateGeometryPlacements(self.model, self.robot_data,
                                      geom_model, geom_data)
-
-        #Parameters for the cube
-        cube_name = "cube_test"
-        cube_size = 0.5
-        cube_position = np.array([1, 0.0, 0.0])
 
         for visual in geom_model.geometryObjects:
             #print(visual.name)
@@ -272,17 +270,104 @@ class MeshcatPinocchioAnimation:
                 T = M.homogeneous
             if viewer_name == 'valkyrie/visuals/torso_0':
                 position = M.translation
-                cube_position = position
+                self.reachable(position, frame, reachable_path)
             # Update viewer configuration.
             frame[viewer_name].set_transform(T)
 
-        #CHECK IF THIS IS CREATING A BUNCH OF CUBES UNECESSARILY
-        meshcat_visualizer.viewer[cube_name].set_object(g.Box([cube_size, cube_size, cube_size]), g.MeshPhongMaterial(color=0x00ff00))  # Green cube
+    def create_reach(self,pos):
+        meshcat_visualizer = self.viz
+        frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
+        ee_halfspace_params = OrderedDict()
+        reach_path = cwd + '/pnc/reachability_map/output/' + 'valkyrie' + '/' + 'valkyrie'
+        for fr in frame_names:
+            ee_halfspace_params[fr] = reach_path + '_' + fr + '.yaml'
 
-        print(cube_position)
+        # generate all frame traversable regions
+        traversable_regions_dict = OrderedDict()
+        for fr in frame_names:
+            if fr == 'torso':
+                traversable_regions_dict[fr] = FrameTraversableRegion(fr,
+                                                                      b_visualize_reach=True,
+                                                                      b_visualize_safe=True,
+                                                                      visualizer=meshcat_visualizer)
+            else:
+                traversable_regions_dict[fr] = FrameTraversableRegion(fr,
+                                                                      ee_halfspace_params[fr],
+                                                                      b_visualize_reach=True,
+                                                                      b_visualize_safe=True,
+                                                                      visualizer=meshcat_visualizer)
+                traversable_regions_dict[fr].update_origin_pose(pos)
+
+        return traversable_regions_dict
+
+    def reachable(self, pos, frame, reachable_path):
+        meshcat_visualizer = self.viz
+
+        frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
+
+        for fr in frame_names:
+            reachable_path[fr].update_origin_pose(pos)
+
+        # Parameters for the cube
+        cube_name = "cube_test"
+        cube_size = 0.5
+        cube_position = pos
+
+        # Create the cube in the Meshcat viewer (only needed once, you can check if the cube already exists)
+        meshcat_visualizer.viewer[cube_name].set_object(
+            g.Box([cube_size, cube_size, cube_size]),
+            g.MeshPhongMaterial(color=0x00ff00)  # Green cube
+        )
+
         # Set the transformation for the cube in the Meshcat viewer
         tf_transl = tf.translation_matrix(cube_position)  # Transform for the cube position
         meshcat_visualizer.viewer[cube_name].set_transform(tf_transl)  # Set the transformation for the cube
+
+        # Set the transformation for the cube
+        frame[cube_name].set_transform(tf_transl)  # Pass the full 4x4 transformation matrix
+        frame['traversable_regions']['reachable'].set_transform(tf_transl)  # Pass the full 4x4 transformation matrix
+
+    def reachable_viz(self, solver, obj):
+        # Use cube for now, get shape of rr later
+        cube_name = "cube_test"
+        cube_size = 0.5
+        cube_position = np.array([1, 0.0, 0.0])
+        obj = g.Box([cube_size, cube_size, cube_size])
+        for it in solver:
+            models = it.problem.runningModels.tolist() + [it.problem.terminalModel]
+            dts = [m.dt if hasattr(m, "differential") else 0. for m in models]
+
+            for sim_time_idx in np.arange(0, len(dts), self.save_freq):
+                q = np.array(it.xs[int(sim_time_idx)][:self.robot_nq])
+
+                with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
+                    meshcat_visualizer = self.viz
+                    # Parameters for the cube
+                    cube_name = "cube_test"
+                    cube_size = 0.5
+
+                    # test pos
+                    cube_position = np.array([1.0 + np.sin(self.frame_idx * 0.1), 0.0, 0.0])  # Example of moving the cube along x-axis
+
+                    # Create the cube in the Meshcat viewer (only needed once, you can check if the cube already exists)
+                    meshcat_visualizer.viewer[cube_name].set_object(
+                        g.Box([cube_size, cube_size, cube_size]),
+                        g.MeshPhongMaterial(color=0x00ff00)  # Green cube
+                    )
+
+                    # Set the transformation for the cube in the Meshcat viewer
+                    tf_transl = tf.translation_matrix(cube_position)  # Transform for the cube position
+                    meshcat_visualizer.viewer[cube_name].set_transform(tf_transl)  # Set the transformation for the cube
+
+                    # Set the transformation for the cube
+                    frame[cube_name].set_transform(tf_transl)  # Pass the full 4x4 transformation matrix
+
+                # Increase the frame index counter for animation
+                self.frame_idx += 1
+
+        # save animation
+        self.viz.viewer.set_animation(self.anim, play=False)
+        self.frame_idx = 0
 
     def display_targets(self, end_effector_name, targets, color=None):
         if color is None:

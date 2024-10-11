@@ -1067,7 +1067,6 @@ def main(args):
         display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
                           rob_data, vis_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
         display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
-        display.display_targets("test_targ", lf_targets, [1, 1, 0])
         display.display_targets("lfoot_target", lf_targets, [1, 1, 0])
         display.display_targets("lknee_target", lkn_targets, [0, 0, 1])
         display.display_targets("rfoot_target", rf_targets, [1, 1, 0])
@@ -1076,7 +1075,16 @@ def main(args):
         display.display_targets("rhand_target", rh_targets, [0.5, 0, 0])
         display.display_targets("base_target", base_targets, [0, 0.5, 0])
         # display.displayForcesFromCrocoddylSolver(fddp)
-        display.displayFromCrocoddylSolver(fddp)
+        ###TEST
+        # make new function for display reachable regions
+        # pass the object as shape, solver only has calc not shape
+        # desired vs actual traj
+        # reachable region stored in solver
+        #display.reachable_viz(fddp,obj)
+
+        print(reach_path)
+        traversable_regions_dict = display.create_reach([1,1,1])
+        display.displayFromCrocoddylSolver(fddp, traversable_regions_dict)
         viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
                             "lfoot_target", "lknee_target",
                             "rfoot_target", "rknee_target"))
