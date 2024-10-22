@@ -313,7 +313,7 @@ def load_robot_model(robot_name):
         robot_urdf_file = package_dir + "/draco3_ft_wrist_mesh_updated.urdf"
     elif robot_name == 'g1':
         package_dir = cwd + "/robot_model/g1_description"
-        robot_urdf_file = package_dir + "/g1.urdf"
+        robot_urdf_file = package_dir + "/g1_simple_collisions.urdf"
     elif robot_name == 'valkyrie':
         package_dir = cwd + "/robot_model/" + robot_name
         robot_urdf_file = package_dir + "/valkyrie_hands.urdf"
@@ -589,7 +589,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
         motion_frames_seq.add_motion_frame({
                                             'LH': door_l_inner_location,
                                             'RH': door_r_inner_location,
-                                            # 'torso': starting_torso_pos + np.array([0.07, -0.07, 0])
+                                            'torso': starting_torso_pos + np.array([0.0, 0.06, 0])
                                             })
     elif robot_name == 'ergoCub':
         motion_frames_seq.add_motion_frame({
