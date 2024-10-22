@@ -952,7 +952,7 @@ def main(args):
         save_freq = 10
         display_idx = np.arange(0, len(robot_dyn_plan.lf_targets), save_freq)
         display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
-                          rob_data, vis_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
+                          rob_data, vis_data, col_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
         display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
         display.display_targets("lfoot_target", robot_dyn_plan.lf_targets[display_idx], [1, 1, 0])
         display.display_targets("lknee_target", robot_dyn_plan.lkn_targets[display_idx], [0, 0, 1])
@@ -976,6 +976,7 @@ def main(args):
     if B_SHOW_JOINT_PLOTS:
         plan_plotter = MulticontactPlotter(robot_dyn_plan)
         plan_plotter.plot_reduced_xs_us()
+        plt.show()
 
     if B_SHOW_GRF_PLOTS:
         # Note: contact_links are l_ankle_ie, r_ankle_ie, l_wrist_pitch, r_wrist_pitch

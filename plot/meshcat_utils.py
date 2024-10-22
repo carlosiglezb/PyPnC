@@ -172,7 +172,7 @@ def get_scaled_and_oriented_grf_tf(scale,
 
 class MeshcatPinocchioAnimation:
     def __init__(self, pin_robot_model, collision_model, visual_model,
-                 robot_data, visual_data,
+                 robot_data, visual_data, collision_data,
                  ctrl_freq=1000, save_freq=50):
         # self.robot = pin_robot_model
         self.robot_data = robot_data
@@ -197,6 +197,8 @@ class MeshcatPinocchioAnimation:
 
         self.visual_model = visual_model
         self.visual_data = visual_data
+        self.collision_model = collision_model
+        self.collision_data = collision_data
 
     def add_robot(self, robot_name, pin_rob_model, collision_model, visual_model,
                   rob_position, rob_quaternion):
@@ -253,6 +255,7 @@ class MeshcatPinocchioAnimation:
 
                 with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
                     self.display_visualizer_frames(frame, q)
+                    self.display_collisions(frame, q)
                     self.displayForcesFromCrocoddylSolver(fs_ti, frame)
 
                 self.frame_idx += 1     # increase frame index counter
@@ -271,6 +274,30 @@ class MeshcatPinocchioAnimation:
                                      geom_model, geom_data)
         for visual in geom_model.geometryObjects:
             viewer_name = meshcat_visualizer.getViewerNodeName(visual, pin.GeometryType.VISUAL)
+            # Get mesh pose.
+            M = geom_data.oMg[geom_model.getGeometryId(visual.name)]
+            # Manage scaling
+            if isMesh(visual):
+                scale = np.asarray(visual.meshScale).flatten()
+                S = np.diag(np.concatenate((scale, [1.0])))
+                # S = visual.placement.homogeneous
+                T = np.array(M.homogeneous).dot(S)
+            else:
+                T = M.homogeneous
+            # Update viewer configuration.
+            frame[viewer_name].set_transform(T)
+
+    def display_collisions(self, frame, q):
+        meshcat_visualizer = self.viz
+
+        geom_model = self.collision_model
+        geom_data = self.collision_data
+
+        pin.forwardKinematics(self.model, self.robot_data, q)
+        pin.updateGeometryPlacements(self.model, self.robot_data,
+                                     geom_model, geom_data)
+        for visual in geom_model.geometryObjects:
+            viewer_name = meshcat_visualizer.getViewerNodeName(visual, pin.GeometryType.COLLISION)
             # Get mesh pose.
             M = geom_data.oMg[geom_model.getGeometryId(visual.name)]
             # Manage scaling

@@ -64,12 +64,12 @@ class MulticontactPlotter:
         lleg_j_ids = []
         robot_model = self._robot_planner.robot_model
         for jname in self._robot_planner.lleg_jnames:
-            lleg_j_ids.append(robot_model.idx_qs[list(robot_model.names).index(jname)])
+            lleg_j_ids.append(robot_model.getJointId(jname) + 7 - 2)
         return lleg_j_ids
 
     def _get_rleg_joint_ids(self):
         rleg_j_ids = []
         robot_model = self._robot_planner.robot_model
         for jname in self._robot_planner.rleg_jnames:
-           rleg_j_ids.append(robot_model.idx_qs[list(robot_model.names).index(jname)])
+           rleg_j_ids.append(robot_model.getJointId(jname) + 7 - 2)
         return rleg_j_ids

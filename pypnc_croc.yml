@@ -9,6 +9,7 @@ dependencies:
   - pip
   - pip:
       - casadi==3.6.5
+      - pycddlib==2.1.7
 #      - conda-env-export
       - drake
       - matplotlib
