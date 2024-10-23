@@ -973,9 +973,12 @@ def main(args):
         if B_SAVE_HTML:
             display.save_html(cwd + "/data/", robot_name + "_door_crossing.html")
 
-    if B_SHOW_JOINT_PLOTS:
+    if B_SHOW_JOINT_PLOTS or B_SHOW_COST_PLOTS:
         plan_plotter = MulticontactPlotter(robot_dyn_plan)
-        plan_plotter.plot_reduced_xs_us()
+        if B_SHOW_JOINT_PLOTS:
+            plan_plotter.plot_reduced_xs_us()
+        if B_SHOW_COST_PLOTS:
+            plan_plotter.plot_costs()
         plt.show()
 
     if B_SHOW_GRF_PLOTS:
