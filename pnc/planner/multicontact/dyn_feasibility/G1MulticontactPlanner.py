@@ -210,4 +210,5 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             ee_rpy = copy(self.ee_rpy)
             gains = copy(self._default_gains)
 
+        super().update_costs_from_solver()
         print("[Compute Time] Dynamic feasibility check: ", dyn_solve_time)

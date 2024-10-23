@@ -153,6 +153,25 @@ def plot_vector_traj(time, vector, suptitle, ax_labels=None):
     axes[dim - 1].set_xlabel('time')
     fig.suptitle(suptitle)
 
+
+def plot_hold_vector_traj(time, vector, suptitle, ax_label=None, legends=None):
+    dim = vector.shape[1]
+    if ax_label is None:
+        ax_label = []
+
+    fig = plt.figure()
+    for i in range(dim):
+        if legends is None:
+            plt.plot(time, vector[:, i], color=facecolors[i], linewidth=3)
+        else:
+            plt.plot(time, vector[:, i], label = legends[i], color=facecolors[i], linewidth=3)
+        plt.ylabel(ax_label)
+        plt.grid(True)
+        plt.legend()
+
+    plt.xlabel('time')
+    fig.suptitle(suptitle)
+
 def plot_multiple_state_traj(time, states_traj_lst, phase, suptitle=None, ax_labels=None):
     """
     Creates 'n_subplots' subplots of 'n_signals' signals. Assumes:

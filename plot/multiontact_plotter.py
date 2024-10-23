@@ -1,6 +1,6 @@
 import numpy as np
 
-from plot.helper import plot_multiple_state_traj
+from plot.helper import plot_multiple_state_traj, plot_hold_vector_traj
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import HumanoidMulticontactPlanner
 
 
@@ -59,6 +59,42 @@ class MulticontactPlotter:
         signals_names = [xs_names, us_names]
         plot_multiple_state_traj(time[:-1], [xs_r_reduced[:-1, :], us_r_reduced[:, :]],
                                  phase, ax_labels=signals_names)
+
+    def plot_costs(self):
+        T = self._robot_planner.T
+        horizon_lst = self._robot_planner.horizon_lst
+        time = np.zeros((sum(horizon_lst) - 1, ))
+        phase = np.zeros((sum(horizon_lst) - 1, ), dtype=int)
+        costsDict = self._robot_planner.costs
+
+        # create time vector (same for all costs)
+        for contact_phase in range(len(horizon_lst)):
+            # get current and next index
+            curr_idx = sum(horizon_lst[:contact_phase])
+            if contact_phase == (len(horizon_lst) - 1):
+                next_idx = curr_idx + horizon_lst[contact_phase] - 1
+                time[curr_idx:next_idx] = np.linspace(T * contact_phase, T * (contact_phase + 1),
+                                                      horizon_lst[contact_phase] - 1)
+            else:
+                next_idx = curr_idx + horizon_lst[contact_phase]
+                time[curr_idx:next_idx] = np.linspace(T * contact_phase, T * (contact_phase + 1), horizon_lst[contact_phase])
+            # time[curr_idx:next_idx] = np.arange(T * contact_phase, T * (contact_phase + 1), T / horizon_lst[contact_phase])
+            phase[curr_idx:next_idx] = contact_phase
+
+        # parse all costs
+        all_costs = np.zeros((sum(horizon_lst) - 1, len(costsDict.keys())))
+        for cost_idx, (cost_name, costs_lst) in enumerate(costsDict.items()):
+            for contact_phase in range(len(horizon_lst)):
+                # get current and next index and populate current costs vector
+                curr_idx = sum(horizon_lst[:contact_phase])
+                if contact_phase == (len(horizon_lst) - 1):
+                    next_idx = curr_idx + horizon_lst[contact_phase] - 1
+                    all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][contact_phase][:-1]
+                else:
+                    next_idx = curr_idx + horizon_lst[contact_phase]
+                    all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][contact_phase]
+
+        plot_hold_vector_traj(time, all_costs, 'Costs', legends=list(costsDict.keys()))
 
     def _get_lleg_joint_ids(self):
         lleg_j_ids = []
