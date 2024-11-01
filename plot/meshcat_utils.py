@@ -263,6 +263,24 @@ class MeshcatPinocchioAnimation:
         # save animation
         self.viz.viewer.set_animation(self.anim, play=False)
 
+    def start_animation(self):
+        self.frame_idx = 0
+
+    def finish_animation(self):
+        # save animation
+        self.viz.viewer.set_animation(self.anim, play=False)
+
+    def animate_single_collision(self, collision_name: str, collision_target: np.array):
+        with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
+            self.display_single_collision(frame, collision_target, collision_name)
+
+    def animate_target(self, end_effector_name, targets, color=None):
+        with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
+            self.display_targets(end_effector_name, targets, color, animation=True)
+
+    def animation_step(self):
+        self.frame_idx += 1
+
     def display_visualizer_frames(self, frame, q):
         meshcat_visualizer = self.viz
 
@@ -311,7 +329,23 @@ class MeshcatPinocchioAnimation:
             # Update viewer configuration.
             frame[viewer_name].set_transform(T)
 
-    def display_targets(self, end_effector_name, targets, color=None):
+    def display_single_collision(self, frame, target, base_name):
+        meshcat_visualizer = self.viz
+
+        geom_model = self.collision_model
+        for visual in geom_model.geometryObjects:
+            if visual.name == base_name:
+                viewer_name = meshcat_visualizer.getViewerNodeName(visual, pin.GeometryType.COLLISION)
+                T = np.array([
+                    [1.0, 0.0, 0.0, target[0]],
+                    [0.0, 1.0, 0.0, target[1]],
+                    [0.0, 0.0, 1.0, target[2]],
+                    [0.0, 0.0, 0.0, 1.0],
+                ])
+                frame[viewer_name].set_transform(T)
+                return
+
+    def display_targets(self, end_effector_name, targets, color=None, animation=False):
         if color is None:
             color = [1, 0, 0]
         material = g.MeshPhongMaterial()
@@ -328,7 +362,10 @@ class MeshcatPinocchioAnimation:
                     [0.0, 0.0, 0.0, 1.0],
                 ]
             )
-            self.viz.viewer[end_effector_name+"/" + str(i)].set_transform(Href)
+            if animation:
+                self.anim.at_frame(self.viz.viewer, self.frame_idx)[end_effector_name + "/" + str(i)].set_transform(Href)
+            else:
+                self.viz.viewer[end_effector_name+"/" + str(i)].set_transform(Href)
 
     def hide_visuals(self, viz_list):
         for viz in viz_list:

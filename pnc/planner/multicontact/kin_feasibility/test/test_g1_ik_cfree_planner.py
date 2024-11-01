@@ -18,6 +18,7 @@ from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 from util import util
 from vision.iris.iris_geom_interface import IrisGeomInterface
 from vision.iris.iris_regions_manager import IrisRegionsManager
+import plot.meshcat_utils as vis_tools
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -125,6 +126,18 @@ class TestIKCFreePlanner(unittest.TestCase):
         self.robot_fwdk.update_system(None, None, None, None,
                              self.q0[:3], self.q0[3:7], np.zeros(3), np.zeros(3),
                                       cmd["joint_pos"], cmd["joint_vel"])
+
+    # needed for self-collision checks
+    @staticmethod
+    def load_robot_model():
+        package_dir = cwd + "/robot_model/g1_description"
+        robot_urdf_file = package_dir + "/g1_simple_collisions.urdf"
+        rob_model, col_model, vis_model = pin.buildModelsFromUrdf(robot_urdf_file,
+                                                                  package_dir,
+                                                                  pin.JointModelFreeFlyer())
+        rob_data, col_data, vis_data = pin.createDatas(rob_model, col_model, vis_model)
+
+        return rob_model, col_model, vis_model, rob_data, col_data, vis_data
 
     def get_navy_door_default_initial_pose(self):
         # rotates, then translates
@@ -635,9 +648,69 @@ class TestIKCFreePlanner(unittest.TestCase):
         # set planner
         weights_rigid_link = np.array([10, 0., 0.])
         ik_cfree_planner.set_planner(frame_planner)
+        ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
         ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer)
 
         self.assertEqual(True, True)  # add assertion here
+        return ik_cfree_planner
 
+    def test_self_collision_avoidance(self):
+        b_visualize = True
+        ik_cfree_planner = self.test_five_stage_plan_one_hand_at_a_time()
+
+        # populate trajectories
+        N_knots = 100
+        base_targets = np.zeros((N_knots, 3))
+        lf_targets = np.zeros((N_knots, 3))
+        rf_targets = np.zeros((N_knots, 3))
+        lkn_targets = np.zeros((N_knots, 3))
+        rkn_targets = np.zeros((N_knots, 3))
+        lh_targets = np.zeros((N_knots, 3))
+        rh_targets = np.zeros((N_knots, 3))
+        n_contacts = len(ik_cfree_planner.planner.fixed_frames)
+        T = 3
+        idx = 0
+        for t in np.linspace(0, n_contacts * T, N_knots):
+            targets_dict = ik_cfree_planner.pack_current_targets(t)
+            base_targets[idx] = targets_dict['torso']
+            lf_targets[idx] = targets_dict['LF']
+            rf_targets[idx] = targets_dict['RF']
+            lkn_targets[idx] = targets_dict['L_knee']
+            rkn_targets[idx] = targets_dict['R_knee']
+            lh_targets[idx] = targets_dict['LH']
+            rh_targets[idx] = targets_dict['RH']
+            idx += 1
+
+        if b_visualize:
+            # load robot model and corresponding robot data
+            rob_model, col_model, vis_model, rob_data, col_data, vis_data = self.load_robot_model()
+
+            save_freq = 1
+            display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
+                                                          rob_data, vis_data, col_data,
+                                                          ctrl_freq=N_knots / (n_contacts * T), save_freq=save_freq)
+            # load (real) door to visualizer
+            door_model, door_collision_model, door_visual_model = pin.buildModelsFromUrdf(
+                cwd + "/robot_model/ground/navy_door.urdf",
+                cwd + "/robot_model/ground", pin.JointModelFreeFlyer())
+
+            door_vis_q = self.get_navy_door_default_initial_pose()
+            display.add_robot("door", door_model, door_collision_model, door_visual_model, door_vis_q[:3], door_vis_q[3:])
+
+            # start animation
+            display.start_animation()
+            for i in range(N_knots):
+                display.animate_single_collision(ik_cfree_planner.plan_to_model_frames['torso'] + '_0', base_targets[i])
+                display.animate_target("lfoot_target", [lf_targets[i]], [1, 1, 0])
+                display.animate_target("lknee_target", [lkn_targets[i]], [0, 0, 1])
+                display.animate_target("rfoot_target", [rf_targets[i]], [1, 1, 0])
+                display.animate_target("rknee_target", [rkn_targets[i]], [0, 0, 1])
+                display.animate_target("lhand_target", [lh_targets[i]], [0.5, 0, 0])
+                display.animate_target("rhand_target", [rh_targets[i]], [0.5, 0, 0])
+                display.animate_target("base_target", [base_targets[i]], [0, 0.5, 0])
+                display.animation_step()
+            display.finish_animation()
+
+        self.assertEqual(True, True)
 if __name__ == '__main__':
     unittest.main()
