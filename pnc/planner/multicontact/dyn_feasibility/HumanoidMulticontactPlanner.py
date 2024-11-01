@@ -33,7 +33,6 @@ class HumanoidMulticontactPlanner:
         # TODO set some default values
         self.gains = None
         self.x0 = None
-        self.plan_to_model_frames = None
         self.plan_to_model_ids = None
         self.lleg_jnames = None
         self.rleg_jnames = None
@@ -70,8 +69,7 @@ class HumanoidMulticontactPlanner:
     def set_initial_configuration(self, x0):
         self.x0 = x0
 
-    def set_plan_to_model_params(self, plan_to_model_frames, plan_to_model_ids):
-        self.plan_to_model_frames = plan_to_model_frames
+    def set_plan_to_model_params(self, plan_to_model_ids):
         self.plan_to_model_ids = plan_to_model_ids
 
     def update_costs_from_solver(self):

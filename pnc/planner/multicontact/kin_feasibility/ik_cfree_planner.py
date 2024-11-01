@@ -55,6 +55,7 @@ class IKCFreePlanner:
         self.dt = dt
         self.task_dict = {}             # filled out in PInk tasks (setup_tasks)
         self.planner = None
+        self.plan_to_model_frames = None
         self._b_record_anim = False
         self.w_rigid_poly = w_rigid_poly
 
@@ -313,3 +314,25 @@ class IKCFreePlanner:
             seg = len(frame_bez_path.beziers) - 1
         bezier_curve = frame_bez_path.beziers[seg]
         return bezier_curve(t)
+
+    def set_plan_to_model_frames(self, plan_to_model_frames: dict[str: str]):
+        self.plan_to_model_frames = plan_to_model_frames
+
+    def pack_current_targets(self, t):
+        lfoot_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('LF'), t)
+        lknee_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('L_knee'), t)
+        rfoot_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('RF'), t)
+        rknee_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('R_knee'), t)
+        lhand_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('LH'), t)
+        rhand_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('RH'), t)
+        base_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('torso'), t)
+        frame_targets_dict = {
+            'torso': base_t,
+            'LF': lfoot_t,
+            'RF': rfoot_t,
+            'L_knee': lknee_t,
+            'R_knee': rknee_t,
+            'LH': lhand_t,
+            'RH': rhand_t
+        }
+        return frame_targets_dict

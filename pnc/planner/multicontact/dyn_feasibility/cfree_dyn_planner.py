@@ -893,6 +893,7 @@ def main(args):
 
     # compute paths and create targets
     ik_cfree_planner.set_planner(frame_planner)
+    ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
     ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer, B_VERBOSE)
 
     #
@@ -943,7 +944,7 @@ def main(args):
     else:
         raise NotImplementedError(f"Matching multicontact planner for {robot_name} not found")
 
-    robot_dyn_plan.set_plan_to_model_params(plan_to_model_frames, plan_to_model_ids)
+    robot_dyn_plan.set_plan_to_model_params(plan_to_model_ids)
     robot_dyn_plan.set_initial_configuration(x0)
     robot_dyn_plan.plan()
 
