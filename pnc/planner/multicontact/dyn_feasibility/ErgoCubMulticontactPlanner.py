@@ -11,26 +11,6 @@ from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (cre
                                                                              createMultiFrameFinalImpulseModel)
 
 
-def pack_current_targets(ik_cfree_planner, plan_to_model_frames, t):
-    lfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LF'), t)
-    lknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('L_knee'), t)
-    rfoot_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('RF'), t)
-    rknee_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('R_knee'), t)
-    lhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('LH'), t)
-    rhand_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('RH'), t)
-    base_t = ik_cfree_planner.get_ee_des_pos(list(plan_to_model_frames.keys()).index('torso'), t)
-    frame_targets_dict = {
-        'torso': base_t,
-        'LF': lfoot_t,
-        'RF': rfoot_t,
-        'L_knee': lknee_t,
-        'R_knee': rknee_t,
-        'LH': lhand_t,
-        'RH': rhand_t
-    }
-    return frame_targets_dict
-
-
 def get_rpy_normal_left_wall():
     return [np.pi / 2, 0., 0.]
 
@@ -71,7 +51,6 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
         x0 = self.x0
         T = self.T
         ee_rpy = self.ee_rpy
-        plan_to_model_frames = self.plan_to_model_frames
         plan_to_model_ids = self.plan_to_model_ids
         ik_cfree_planner = self.ik_cfree_planner
         gains = self.gains
@@ -93,7 +72,7 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
                 if t == (i + 1) * T:
                     b_terminal_step = True
                     gains['feet'] = get_terminal_feet_gains()
-                frame_targets_dict = pack_current_targets(ik_cfree_planner, plan_to_model_frames, t)
+                frame_targets_dict = ik_cfree_planner.pack_current_targets(t)
                 if t < (i + 1) * T:
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
