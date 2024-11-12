@@ -312,7 +312,8 @@ def optimize_multiple_sca_bezier_iris(reach_region: dict[str: np.array, str: np.
     frame_list = list(safe_points_lst[0].keys())
 
     # initialize size of optimization variable
-    x_dim = 3 * num_iris_tot * n_frames * (n_points - 1) * (D + 1)
+    # x_dim = 3 * num_iris_tot * n_frames * (n_points - 1) * (D + 1)
+    x_dim = 3 * num_iris_tot * n_frames * (4 * n_points - 6)
 
     # initialize size of collision-free (IRIS) constraints in OCP
     num_iris_halfspaces = 0
@@ -352,10 +353,13 @@ def optimize_multiple_sca_bezier_iris(reach_region: dict[str: np.array, str: np.
 
     # Initialize constant matrices in equality constraints
     bez_lin_eq_constraints = LinearBezierEqConstraint(x_dim, num_bezier_eq_constraints_tot)
-    start_Cmat_idx = n_points * num_iris_tot * 3
+    i_prev = 0
     # ------------- Bezier dynamics
     for k_f in range(n_frames):
+        b_first_visit = True
         f_name = frame_list[k_f]
+        start_neye_idx = k_f * (x_dim // n_frames)
+        start_Cmat_idx = start_neye_idx + n_points * num_iris_tot * 3
         for i in range(D):
             h = n_points - i - 1
 
@@ -369,7 +373,13 @@ def optimize_multiple_sca_bezier_iris(reach_region: dict[str: np.array, str: np.
                 A_bez_dyn = np.zeros((3 * (n_points - (i + 1)), x_dim))     # set to zero at every iteration
 
                 # add identity-banded matrix in respective location of A_bez_dyn
-                start_neye_idx = 3 * (D + 1) * num_iris_tot * n_points * k_f + 3 * n_points * k_ir  # i+1?
+                if b_first_visit:
+                    pass
+                else:
+                    if i == i_prev:      # the very first time instant
+                        start_neye_idx += 3 * (n_points - i)
+                    else:
+                        start_neye_idx += 3 * (n_points - (i - 1))
                 end_neye_idx = start_neye_idx + 3 * (n_points - (i + 1))
                 A_bez_dyn[:, start_neye_idx:end_neye_idx] -= eye_npmi
                 A_bez_dyn[:, start_neye_idx + 3:end_neye_idx + 3] += eye_npmi
@@ -378,12 +388,22 @@ def optimize_multiple_sca_bezier_iris(reach_region: dict[str: np.array, str: np.
                 ci = get_ci_from_global_ir_idx(num_iris_tot, k_ir, durations, f_name, h)
                 C_mat = -ci * eye_npmi
 
-                if k_ir > 0:
-                    start_Cmat_idx += (n_points - (i+1)) * 3
+                if b_first_visit:
+                    b_first_visit = False
+                else:
+                    if i == i_prev:      # if we still haven't changed to higher degree, use previous i
+                        start_Cmat_idx += (n_points - (i+1)) * 3
+                    else:               # we just changed ti higher degree, i
+                        start_Cmat_idx += (n_points - i) * 3
+
+                # if k_ir > 0:
+                #     start_Cmat_idx += (n_points - (i+1)) * 3
                 next_Cmat_idx = start_Cmat_idx + (n_points - (i+1)) * 3
                 A_bez_dyn[:, start_Cmat_idx:next_Cmat_idx] = copy.copy(C_mat)
                 print(f"k_ir: {k_ir}, i: {i}")
                 bez_lin_eq_constraints.add_lin_eq(A_bez_dyn)
+
+                i_prev = i
 
 
     constraints = []
