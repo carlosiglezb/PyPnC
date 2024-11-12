@@ -120,6 +120,10 @@ def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_
                 print(f'{f_name} motion frame not found in surface contact {seg_surface_normal.contact_frame_name}')
                 return
 
+    # if surface normal does not correspond to current frame, skip adding constraints
+    if f_name != seg_surface_normal.contact_frame_name:
+        return
+
     surf_normal = seg_surface_normal.surface_normal
     if seg_surface_normal is not None:
         # check that a normal vector has been specified for this frame and segment
