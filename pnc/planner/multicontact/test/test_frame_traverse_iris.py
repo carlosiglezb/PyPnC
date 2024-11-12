@@ -9,7 +9,8 @@ import scipy as sp
 import meshcat
 
 from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_polygonal import solve_min_reach_iris_distance
-from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_smooth import optimize_multiple_bezier_iris
+from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_smooth import optimize_multiple_bezier_iris, \
+    optimize_multiple_sca_bezier_iris
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 # IRIS
 from vision.iris.iris_geom_interface import *
@@ -55,9 +56,11 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.aux_frames = LocomanipulationFramePlanner.add_fixed_distance_between_points(aux_frames_path)
 
         link_length = self.aux_frames[0]['length']
+        self.torso_starting_pos = np.array([0., 0., 0.65])
         self.rf_starting_pos = np.array([-0.2, -0.1, 0.001])
         self.rk_starting_pos = np.array([-0.1, -0.1, np.sqrt(link_length**2 - 0.1**2)])
         self.rh_starting_pos = np.array([-0.2, -0.2, 0.8])
+        self.torso_final_pos = np.array([0.2, 0., 0.65])
         self.rf_final_pos = np.array([0.2, -0.1, 0.001])
         self.rk_final_pos = np.array([0.3, -0.1, np.sqrt(link_length**2 - 0.1**2)])
         self.rh_final_pos = np.array([0.2, -0.2, 0.8])
@@ -222,6 +225,98 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.fixed_frames_seq = fixed_frames
         return iris_seq, safe_pnt_lst, safe_regions_mgr_dict
 
+    def test_multistage_torso_iris_seq_multiple_frame(self):
+        # load obstacle, domain, and start / end seed for IRIS
+        obstacles = self.obstacles
+        domain = self.domain
+        rf_starting_pos = self.rf_starting_pos
+        torso_starting_pos = self.torso_starting_pos
+        rf_ending_pos = self.rf_final_pos
+        torso_ending_pos = self.torso_final_pos
+        torso_name = 'torso'
+        rf_name = 'RF'
+
+        # ------------------- IRIS -------------------
+        safe_start_region_rf = IrisGeomInterface(obstacles, domain, rf_starting_pos)
+        safe_start_region_torso = IrisGeomInterface(obstacles, domain, torso_starting_pos)
+        safe_end_region_rf = IrisGeomInterface(obstacles, domain, rf_ending_pos)
+        safe_end_region_torso = IrisGeomInterface(obstacles, domain, torso_ending_pos)
+        safe_regions_mgr_dict = {
+            torso_name: IrisRegionsManager(safe_start_region_torso, safe_end_region_torso),
+            rf_name: IrisRegionsManager(safe_start_region_rf, safe_end_region_rf)
+        }
+        safe_regions_mgr_dict[torso_name].computeIris()
+        safe_regions_mgr_dict[rf_name].computeIris()
+
+        # if start-to-end regions not connected, sample points in between
+        safe_regions_mgr_dict[torso_name].connectIrisSeeds()
+        safe_regions_mgr_dict[rf_name].connectIrisSeeds()
+
+        if b_visualize:
+            # Visualize IRIS regions for "start" and "end" seeds
+            safe_regions_mgr_dict[torso_name].visualize(self.vis, torso_name)
+            safe_regions_mgr_dict[rf_name].visualize(self.vis, rf_name)
+
+        # ------------------- frame planner -------------------
+        step_length = 0.4   # [m]
+        fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
+
+        # starting positions for all frames
+        starting_pos_dict = {torso_name: torso_starting_pos,
+                             rf_name: rf_starting_pos}
+
+        # First sequence: RF
+        fixed_frames.append([torso_name])
+        motion_frames_seq.add_motion_frame({
+                            rf_name: rf_starting_pos + np.array([step_length, 0., 0.])})
+        rf_contact_over = PlannerSurfaceContact(rf_name, np.array([0, 0, 1]))
+        motion_frames_seq.add_contact_surface(rf_contact_over)
+
+        # Second sequence: torso
+        fixed_frames.append([rf_name])
+        motion_frames_seq.add_motion_frame({
+                            torso_name: torso_ending_pos})
+        torso_contact_over = PlannerSurfaceContact(rf_name, None)
+        motion_frames_seq.add_contact_surface(torso_contact_over)
+
+        # plan iris region sequence
+        motion_frames_lst = motion_frames_seq.get_motion_frames()
+        iris_seq, safe_pnt_lst = plan_multistage_iris_seq(safe_regions_mgr_dict,
+                                                         fixed_frames,
+                                                         motion_frames_lst,
+                                                         starting_pos_dict)
+
+        if b_static_html:
+            # create and save locally in static html form
+            res = self.vis.static_html()
+            save_file = './data/multi-iris-door.html'
+            with open(save_file, "w") as f:
+                f.write(res)
+
+        # check no nan boxes
+        for ir in iris_seq:
+            for ir_idx in ir.values():
+                self.assertFalse(np.any(np.isnan(ir_idx)),
+                                 "Box sequence has unassigned box index in sequence")
+
+        # check box sequence and safe point list are correct
+        self.assertTrue(iris_seq[0][rf_name][0] == 0, "RF First Iris region should be the starting position")
+        self.assertTrue(iris_seq[0][rf_name][1] == 2, "RF Second Iris region should be the created one")
+        self.assertTrue(iris_seq[0][rf_name][2] == 1, "RFLast Iris region should be where the goal is")
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[0][rf_name] - rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[1][rf_name] - rf_ending_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[2][rf_name] - rf_ending_pos) < 1e-3)
+
+        # for the torso we might have two solutions, but most likely to stay in the initial IRIS region
+        self.assertTrue(iris_seq[1][torso_name][0] == 0, "torso First box should be the starting position")
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[0][torso_name] - torso_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[1][torso_name] - torso_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(safe_pnt_lst[2][torso_name] - torso_ending_pos) < 1e-3)
+
+        self.motion_frames_seq = motion_frames_seq
+        self.fixed_frames_seq = fixed_frames
+        return iris_seq, safe_pnt_lst, safe_regions_mgr_dict
+
     def test_multistage_iris_seq_rigid_link(self):
         # load obstacle, domain, and start / end seed for IRIS
         obstacles = self.obstacles
@@ -338,6 +433,28 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(traj_rf[1][2] > 0.39, "RF-z should be above the knee knocker")
         self.assertTrue(traj_rf[2][2] > 0.39, "RF-z should be above the knee knocker")
 
+    def test_min_d_iris_seq_multiple_torso_frame(self):
+        iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_torso_iris_seq_multiple_frame()
+
+        # test minimum distance method
+        reach = None    # ignore reachable space in this test
+        traj, length, _ = solve_min_reach_iris_distance(reach, safe_regions_mgr_dict, iris_seq, safe_points_lst)
+
+        traj = np.reshape(traj, [2, 15])
+        traj_torso = traj[0].reshape([5, 3])
+        traj_rf = traj[1].reshape([5, 3])
+        if b_visualize:
+            LocomanipulationFramePlanner.visualize_simple_points(self.vis, 'torso/points', traj_torso, [0, 1, 0, 1])
+            LocomanipulationFramePlanner.visualize_simple_points(self.vis, 'RF/points', traj_rf, [0, 0, 1, 1])
+
+        self.assertTrue(length < 1e9, "Problem seems infeasible")
+        self.assertTrue(sp.linalg.norm(traj_rf[0] - self.rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(traj_rf[-1] - self.rf_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(traj_torso[0] - self.torso_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(traj_torso[-1] - self.torso_final_pos) < 1e-3)
+        self.assertTrue(traj_rf[1][2] > 0.39, "RF-z should be above the knee knocker")
+        self.assertTrue(traj_rf[2][2] > 0.39, "RF-z should be above the knee knocker")
+
     def test_min_d_iris_seq_rigid_link(self):
         iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_iris_seq_rigid_link()
 
@@ -440,6 +557,72 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rh_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(path[1].beziers[2].points[0] - self.rh_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rh_final_pos) < 1e-2)
+
+    def test_optimize_bezier_multiple_torso_frame(self):
+        iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_torso_iris_seq_multiple_frame()
+        motion_frames_seq = self.motion_frames_seq
+        fixed_frames = self.fixed_frames_seq
+
+        # test optimize multiple bezier
+        reach = None    # ignore reachable space in this test
+        aux = []
+        durations=[]        # should be obtained from iris_seq, hard-coded in this test
+        durations.append({'torso': np.array([0.2] * 3),
+                          'RF': np.array([0.2] * 3)})
+        durations.append({'torso': np.array([0.2] * 1),
+                          'RF': np.array([0.2] * 1)})
+        alpha = {1: 0, 2: 0, 3: 1}
+        surface_normals_lst = motion_frames_seq.get_contact_surfaces()
+        path, sol_stats, _ = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+                                                        durations, alpha, safe_points_lst,
+                                                        fixed_frames=fixed_frames,
+                                                        surface_normals_lst=surface_normals_lst)
+
+        # Create points from Bezier curve
+        if b_visualize:
+            i = 0
+            for p in path:
+                for seg in range(len(p.beziers)):
+                    bezier_curve = [p.beziers[seg]]
+                    if i == 0:
+                        fr_name = 'torso'
+                    elif i == 1:
+                        fr_name = 'RF'
+                    LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
+                i += 1
+
+        self.assertTrue(path is not None, "Problem seems to be infeasible")
+        self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.torso_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[0].beziers[3].points[-1] - self.torso_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[3].points[0] - self.rf_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rf_final_pos) < 1e-3)
+
+        path, sol_stats, _ = optimize_multiple_sca_bezier_iris(reach, aux, safe_regions_mgr_dict,
+                                                        durations, alpha, safe_points_lst,
+                                                        fixed_frames=fixed_frames,
+                                                        surface_normals_lst=surface_normals_lst)
+
+        # Create points from Bezier curve
+        if b_visualize:
+            i = 0
+            for p in path:
+                for seg in range(len(p.beziers)):
+                    bezier_curve = [p.beziers[seg]]
+                    if i == 0:
+                        fr_name = 'torso'
+                    elif i == 1:
+                        fr_name = 'RF'
+                    LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
+                i += 1
+
+        self.assertTrue(path is not None, "Problem seems to be infeasible")
+        self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.torso_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[0].beziers[3].points[-1] - self.torso_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[3].points[0] - self.rf_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rf_final_pos) < 1e-3)
+
 
 if __name__ == '__main__':
     unittest.main()
