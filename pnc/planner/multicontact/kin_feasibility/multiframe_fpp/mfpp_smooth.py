@@ -265,25 +265,57 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     return path, sol_stats, points
 
 
-def parse_mat_ineq_constr(A, b, points, opti):
+def parse_mat_leq_constr(A, b, points, constraints, lbg, ubg):
+    """
+    Constraints are of the form:
+    lbg <= constraints(x) <= ubg
+    """
     num_ineq = A.shape[0]
     num_points = points[0].shape[0]
     for k in range(num_ineq):
         for np in range(num_points):
-            opti.subject_to(points[0][np,:] @ A[k] <= b[k])
+            constraints.append(points[0][np,:] @ A[k])
+            lbg.append(-ca.inf)
+            ubg.append(b[k])
 
 
-def parse_repvec_eq_constr(b_vec, points, opti):
+def parse_repvec_eq_constr(b_vec, points, constraints, lbg, ubg):
     num_eq = points.shape[0]
     for k in range(num_eq):
-        opti.subject_to(points[k,:] == b_vec)
+        for j in range(3):
+            constraints.append(points[k,j] - b_vec[0,j])
+            lbg.append(0.)
+            ubg.append(0.)
 
 
-def parse_mat_eq_constr(b_mat, points, opti):
+def parse_vec_eq_constr(b_vec, point, constraints, lbg, ubg):
+    for k in range(3):
+        constraints.append(point[k] - b_vec[k])
+        lbg.append(0.)
+        ubg.append(0.)
+
+
+def parse_mat_eq_constr(b_mat, points, constraints, lbg, ubg):
     num_eq = points.shape[0]
     for k in range(num_eq):
-        opti.subject_to(points[k,:] == b_mat[k,:])
+        for j in range(3):
+            constraints.append(points[k,j] - b_mat[k,j])
+            lbg.append(0.)
+            ubg.append(0.)
 
+
+def unpack_sol_to_points(x_sol, num_iris_all_frames, n_points, D, d):
+    sol_points = [None] * num_iris_all_frames
+    for k in range(num_iris_all_frames):
+        sol_points[k] = [None] * (D + 1)
+    curr_idx = 0
+    for k in range(num_iris_all_frames):
+        for i in range(D + 1):
+            next_idx = curr_idx + (n_points - i) * d
+            sol_points[k][i] = x_sol[curr_idx:next_idx].reshape(n_points-i, d, order='F')
+            curr_idx = next_idx
+
+    return sol_points
 
 def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: np.array],
                                   aux_frames: List[dict],
@@ -291,6 +323,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                   durations: List[dict[str, np.array]],
                                   alpha: dict[int: float],
                                   safe_points_lst: List[dict[str, np.array]],
+                                  robot_geom_data: dict[str: np.array],
                                   fixed_frames=None,
                                   contact_sequence=None,
                                   surface_normals_lst=None,
@@ -315,16 +348,17 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         n_points = (D + 1) * 2
 
     # Control points of the curves and their derivatives.
-    opti = ca.Opti()
     points = {}
     for k in range(num_iris_tot * n_frames):
         points[k] = {}
         for i in range(D + 1):
             size = (n_points - i, d)
-            points[k][i] = opti.variable(size[0], size[1])
+            points[k][i] = ca.SX.sym("p" + str(k), size[0], size[1])
 
     frame_list = list(safe_points_lst[0].keys())
     constraints = []
+    lbg = []
+    ubg = []
 
     # Loop through IRIS regions
     cost = 0
@@ -340,50 +374,37 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         A = iris_regions[f_name].iris_list[sequenced_idx].iris_region.A()
         b = iris_regions[f_name].iris_list[sequenced_idx].iris_region.b()
         b = np.reshape(b, (len(b), 1))
-        parse_mat_ineq_constr(A, b, points[k], opti)
+        parse_mat_leq_constr(A, b, points[k], constraints, lbg, ubg)
         num_iris_current = len(iris_regions[f_name].iris_idx_seq[seg_idx])
 
         # Enforce given positions
         if k % num_iris_tot == 0:          # initial position for each frame
             # if also a fixed frame, repeat for entire segment duration
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
-                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points, axis=0)
-                constraints.append(points[k][0] == fixed_frame_pos_mat)
-                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0], opti)
-                # opti.subject_to(points[k][0] == fixed_frame_pos_mat)
+                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0], constraints, lbg, ubg)
             else:   # assign for just the first time instant
-                constraints.append(points[k][0][0,:].T == safe_points_lst[0][f_name])   # initial position
-                opti.subject_to(points[k][0][0,:].T == safe_points_lst[0][f_name])   # initial position
+                parse_vec_eq_constr(safe_points_lst[0][f_name], points[k][0][0,:], constraints, lbg, ubg)
                 # check if it has a final safe point assigned
                 if fr_seg_k_box == (num_iris_current-1) and f_name in safe_points_lst[seg_idx+1].keys():
-                    constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])
-                    opti.subject_to(points[k][0][-1,:].T == safe_points_lst[seg_idx+1][f_name])
+                    parse_vec_eq_constr(safe_points_lst[seg_idx+1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
                     # TODO add vel constraint
                     # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
         elif (k + 1) % num_iris_tot == 0:  # final position for each frame
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
-                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
-                constraints.append(points[k][0][1:, :] == fixed_frame_pos_mat)
-                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], opti)
-                # opti.subject_to(points[k][0][1:, :] == fixed_frame_pos_mat)
+                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
             else:
-                constraints.append(points[k][0][-1] == safe_points_lst[-1][f_name])
-                opti.subject_to(points[k][0][-1,:].T == safe_points_lst[-1][f_name])
+                parse_vec_eq_constr(safe_points_lst[-1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
                 # TODO add vel contraint
                 # add_vel_acc_constr(f_name, surface_normals_lst[-1], points[k], constraints)
         else:       # safe and fixed positions at other times
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
-                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
-                constraints.append(points[k][0][1:, :] == fixed_frame_pos_mat)
-                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], opti)
-                # opti.subject_to(points[k][0][1:, :] == fixed_frame_pos_mat)
+                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
             # Check if safe_point is available for the current frame
             elif f_name in safe_points_lst[seg_idx+1].keys():
                 # Enforce (pre-computed) safe points at the end of each desired motion
                 # note: the initial point within a segment is defined by the continuity constraint below
                 if fr_seg_k_box == (num_iris_current-1):
-                    constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])  # pos
-                    opti.subject_to(points[k][0][-1,:].T == safe_points_lst[seg_idx+1][f_name])  # pos
+                    parse_vec_eq_constr(safe_points_lst[seg_idx+1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
                     # TODO add vel contraint
                     # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
 
@@ -391,16 +412,14 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         for i in range(D):
             h = n_points - i - 1
             ci = durations[seg_idx][f_name][fr_seg_k_box] / h
-            constraints.append(points[k][i][1:, :] - points[k][i][:-1, :] == ci * points[k][i + 1])
-            parse_mat_eq_constr(ci * points[k][i + 1], points[k][i][1:, :] - points[k][i][:-1, :], opti)
+            parse_mat_eq_constr(ci * points[k][i + 1], points[k][i][1:, :] - points[k][i][:-1, :], constraints, lbg, ubg)
 
         # if we are in the same frame, enforce dynamics, continuity, differentiability, and cost
         if (k+1) % num_iris_tot != 0:
             # Continuity and differentiability.
             if fr_seg_k_box < num_iris_current:
                 for i in range(D + 1):
-                    constraints.append(points[k][i][-1,:] == points[k + 1][i][0,:])
-                    opti.subject_to(points[k][i][-1,:] == points[k + 1][i][0,:])
+                    parse_vec_eq_constr(points[k + 1][i][0,:], points[k][i][-1,:].T, constraints, lbg, ubg)
                     if i > 0:
                         continuity[k][i] = constraints[-1]
 
@@ -481,11 +500,26 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     #             k_fr_iris += num_iris_current
 
     # Solve problem
-    opti.minimize(cost + cost_log_abs_sum)
-    opti.solver('ipopt')
-    # opti.solver('ipopt', {'verbose': 0})
+    nlp = {'x': ca.vertcat(
+                            ca.reshape(points[0][0], 24, 1), ca.reshape(points[0][1], 21, 1), ca.reshape(points[0][2], 18, 1), ca.reshape(points[0][3], 15,1),
+                            ca.reshape(points[1][0], 24, 1), ca.reshape(points[1][1], 21, 1), ca.reshape(points[1][2], 18, 1), ca.reshape(points[1][3], 15,1),
+                            ca.reshape(points[2][0], 24, 1), ca.reshape(points[2][1], 21, 1), ca.reshape(points[2][2], 18, 1), ca.reshape(points[2][3], 15,1),
+                            ca.reshape(points[3][0], 24, 1), ca.reshape(points[3][1], 21, 1), ca.reshape(points[3][2], 18, 1), ca.reshape(points[3][3], 15,1),
+                            ca.reshape(points[4][0], 24, 1), ca.reshape(points[4][1], 21, 1), ca.reshape(points[4][2], 18, 1), ca.reshape(points[4][3], 15,1),
+                            ca.reshape(points[5][0], 24, 1), ca.reshape(points[5][1], 21, 1), ca.reshape(points[5][2], 18, 1), ca.reshape(points[5][3], 15,1),
+                            ca.reshape(points[6][0], 24, 1), ca.reshape(points[6][1], 21, 1), ca.reshape(points[6][2], 18, 1), ca.reshape(points[6][3], 15,1),
+                            ca.reshape(points[7][0], 24, 1), ca.reshape(points[7][1], 21, 1), ca.reshape(points[7][2], 18, 1), ca.reshape(points[7][3], 15,1)
+                            ),
+           'f': cost + cost_log_abs_sum,
+           'g': ca.vertcat(*constraints)
+           }
+    solver = nlpsol('solver', 'ipopt', nlp)
 
-    sol = opti.solve()
+    sol = solver(lbg=lbg, ubg=ubg)
+
+    x_sol = sol['x'].full()
+
+    sol_points = unpack_sol_to_points(x_sol, num_iris_tot * n_frames, n_points, D, d)
 
     # if prob.status == 'infeasible':
     #     print('***** Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
@@ -526,7 +560,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             fr_seg_k_box = 0
 
         b = a + durations[seg_idx][frame_name][fr_seg_k_box]
-        beziers.append(BezierCurve(sol.value(points[k][0]), a, b))
+        beziers.append(BezierCurve(sol_points[k][0], a, b))
         a = b
         fr_seg_k_box += 1
         # skip the final positions, those are assigned later
@@ -543,10 +577,10 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     cost_breakdown = {}
 
     # Solution statistics.
-    sol_stats_all = sol.stats()
+    # sol_stats_all = sol.stats()
     sol_stats = {}
     # sol_stats['cost'] = prob.value
-    sol_stats['runtime'] = sol_stats_all['t_wall_total']
+    # sol_stats['runtime'] = sol_stats_all['t_wall_total']
     # sol_stats['cost_breakdown'] = cost_breakdown
     # sol_stats['retiming_weights'] = retiming_weights
 

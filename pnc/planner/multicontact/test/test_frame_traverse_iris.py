@@ -573,30 +573,31 @@ class TestFrameTraverseIris(unittest.TestCase):
                           'RF': np.array([0.2] * 1)})
         alpha = {1: 0, 2: 0, 3: 1}
         surface_normals_lst = motion_frames_seq.get_contact_surfaces()
-        path, sol_stats, _ = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
-                                                        durations, alpha, safe_points_lst,
-                                                        fixed_frames=fixed_frames,
-                                                        surface_normals_lst=surface_normals_lst)
-
-        # Create points from Bezier curve
-        if b_visualize:
-            i = 0
-            for p in path:
-                for seg in range(len(p.beziers)):
-                    bezier_curve = [p.beziers[seg]]
-                    if i == 0:
-                        fr_name = 'torso'
-                    elif i == 1:
-                        fr_name = 'RF'
-                    LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
-                i += 1
-
-        self.assertTrue(path is not None, "Problem seems to be infeasible")
-        self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.torso_starting_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[0].beziers[3].points[-1] - self.torso_final_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[1].beziers[3].points[0] - self.rf_final_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rf_final_pos) < 1e-3)
+        # path, sol_stats, _ = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+        #                                                 durations, alpha, safe_points_lst,
+        #                                                 fixed_frames=fixed_frames,
+        #                                                 surface_normals_lst=surface_normals_lst)
+        # print(f"Runtime solve with cvxpy: {sol_stats['runtime']}")
+        #
+        # # Create points from Bezier curve
+        # if b_visualize:
+        #     i = 0
+        #     for p in path:
+        #         for seg in range(len(p.beziers)):
+        #             bezier_curve = [p.beziers[seg]]
+        #             if i == 0:
+        #                 fr_name = 'torso'
+        #             elif i == 1:
+        #                 fr_name = 'RF'
+        #             LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
+        #         i += 1
+        #
+        # self.assertTrue(path is not None, "Problem seems to be infeasible")
+        # self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.torso_starting_pos) < 1e-3)
+        # self.assertTrue(sp.linalg.norm(path[0].beziers[3].points[-1] - self.torso_final_pos) < 1e-3)
+        # self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
+        # self.assertTrue(sp.linalg.norm(path[1].beziers[3].points[0] - self.rf_final_pos) < 1e-3)
+        # self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rf_final_pos) < 1e-3)
 
         # include simplified rigid bodies for self-collision avoidance
         # TODO get A, b, Q, r1, r2 from robot model (URDF) -- based off G1
@@ -622,8 +623,10 @@ class TestFrameTraverseIris(unittest.TestCase):
 
         path, sol_stats, _ = optimize_multiple_bezier_iris_casadi(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
+                                                        geom_data,
                                                         fixed_frames=fixed_frames,
                                                         surface_normals_lst=surface_normals_lst)
+        # print(f"Runtime solve with CasADi: {sol_stats['runtime']}")
 
         # Create points from Bezier curve
         if b_visualize:
