@@ -10,7 +10,7 @@ import meshcat
 
 from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_polygonal import solve_min_reach_iris_distance
 from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_smooth import optimize_multiple_bezier_iris, \
-    optimize_multiple_sca_bezier_iris
+    optimize_multiple_bezier_iris_casadi
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 # IRIS
 from vision.iris.iris_geom_interface import *
@@ -476,8 +476,8 @@ class TestFrameTraverseIris(unittest.TestCase):
         traj_rf = traj[0].reshape([4, 3])
         traj_rk = traj[1].reshape([4, 3])
         if b_visualize:
-            LocomanipulationFramePlanner.visualize_simple_points(self.vis, 'RF/points', traj_rf, [0, 0, 1, 1])
-            LocomanipulationFramePlanner.visualize_simple_points(self.vis, 'RK/points', traj_rk, [1, 1, 0, 1])
+            LocomanipulationFramePlanner.visualize_simple_points(self.vis, 'RF/points', traj_rf, [1, 1, 0, 1])
+            LocomanipulationFramePlanner.visualize_simple_points(self.vis, 'RK/points', traj_rk, [0, 0, 1, 1])
 
         self.assertTrue(length < 1e9, "Problem seems infeasible")
         self.assertTrue(sp.linalg.norm(traj_rf[0] - self.rf_starting_pos) < 1e-3)
@@ -598,7 +598,29 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(path[1].beziers[3].points[0] - self.rf_final_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rf_final_pos) < 1e-3)
 
-        path, sol_stats, _ = optimize_multiple_sca_bezier_iris(reach, aux, safe_regions_mgr_dict,
+        # include simplified rigid bodies for self-collision avoidance
+        # TODO get A, b, Q, r1, r2 from robot model (URDF) -- based off G1
+        A = np.array([[1, 0, 0],
+                      [0, 1, 0],
+                      [0, 0, 1],
+                      [-1, 0, 0],
+                      [0, -1, 0],
+                      [0, 0, -1]
+                      ])
+        b = np.array([[0.07],
+                     [0.105],
+                     [0.175],
+                     [0.07],
+                     [0.105],
+                     [0.175]]
+                     )
+        Q = np.eye(3)
+        radius = 0.03
+        U = (1/radius) * np.eye(3)       # Cholesky factorization of end effector's sphere radius
+        geom_data = {'A': A, 'b': b, 'Q': Q, 'U': U}
+
+
+        path, sol_stats, _ = optimize_multiple_bezier_iris_casadi(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
                                                         fixed_frames=fixed_frames,
                                                         surface_normals_lst=surface_normals_lst)

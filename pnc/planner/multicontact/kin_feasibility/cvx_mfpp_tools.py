@@ -136,7 +136,7 @@ def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_
         # apply epsilon motion constraint along specified direction
         if seg_surface_normal.b_initial_vel:
             frame_vel_ini = seg_surface_normal.get_contact_breaking_velocity()
-            constraints.append(frame_vel_ini @ point[BezierParam.VEL.value][0] >= 0)
+            constraints.append(frame_vel_ini @ point[BezierParam.VEL.value][0,:] >= 0)
 
         # final velocity parallel to normal surface
         normal_mat = np.array([[0, -surf_normal[2], surf_normal[1]],
@@ -150,22 +150,22 @@ def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_
     if b_constr_accel:
         # apply only strictly positive and negative accelerations
         if surf_normal[Axis.X.value] > 0:
-            constraints.append(point[BezierParam.ACC.value][-1][Axis.X.value] >= 0.)  # pos acc
+            constraints.append(point[BezierParam.ACC.value][-1,:][Axis.X.value] >= 0.)  # pos acc
         elif surf_normal[Axis.X.value] < 0:
-            constraints.append(point[BezierParam.ACC.value][-1][Axis.X.value] <= 0.)  # neg acc
+            constraints.append(point[BezierParam.ACC.value][-1,:][Axis.X.value] <= 0.)  # neg acc
         else:
-            constraints.append(point[BezierParam.ACC.value][-1][Axis.X.value] == 0.)  # zero acc
+            constraints.append(point[BezierParam.ACC.value][-1,:][Axis.X.value] == 0.)  # zero acc
 
         if surf_normal[Axis.Y.value] > 0:
-            constraints.append(point[BezierParam.ACC.value][-1][Axis.Y.value] >= 0.)  # pos acc
+            constraints.append(point[BezierParam.ACC.value][-1,:][Axis.Y.value] >= 0.)  # pos acc
         elif surf_normal[Axis.Y.value] < 0:
-            constraints.append(point[BezierParam.ACC.value][-1][Axis.Y.value] <= 0.)  # neg acc
+            constraints.append(point[BezierParam.ACC.value][-1,:][Axis.Y.value] <= 0.)  # neg acc
         else:
-            constraints.append(point[BezierParam.ACC.value][-1][Axis.Y.value] == 0.)  # zero acc
+            constraints.append(point[BezierParam.ACC.value][-1,:][Axis.Y.value] == 0.)  # zero acc
 
         if surf_normal[Axis.Z.value] > 0:
-            constraints.append(point[BezierParam.ACC.value][-1][Axis.Z.value] >= 0.)  # pos acc
+            constraints.append(point[BezierParam.ACC.value][-1,:][Axis.Z.value] >= 0.)  # pos acc
         elif surf_normal[Axis.Z.value] < 0:
-            constraints.append(point[BezierParam.ACC.value][-1][Axis.Z.value] <= 0.)  # neg acc
+            constraints.append(point[BezierParam.ACC.value][-1,:][Axis.Z.value] <= 0.)  # neg acc
         else:
-            constraints.append(point[BezierParam.ACC.value][-1][Axis.Z.value] == 0.)  # zero acc
+            constraints.append(point[BezierParam.ACC.value][-1,:][Axis.Z.value] == 0.)  # zero acc

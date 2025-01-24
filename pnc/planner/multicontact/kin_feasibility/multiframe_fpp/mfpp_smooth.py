@@ -1,8 +1,10 @@
 import copy
 from typing import List
 
+import casadi as ca
 import cvxpy as cp
 import numpy as np
+from casadi import nlpsol
 from scipy.special import binom
 from scipy.optimize import minimize
 
@@ -263,6 +265,294 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     return path, sol_stats, points
 
 
+def parse_mat_ineq_constr(A, b, points, opti):
+    num_ineq = A.shape[0]
+    num_points = points[0].shape[0]
+    for k in range(num_ineq):
+        for np in range(num_points):
+            opti.subject_to(points[0][np,:] @ A[k] <= b[k])
+
+
+def parse_repvec_eq_constr(b_vec, points, opti):
+    num_eq = points.shape[0]
+    for k in range(num_eq):
+        opti.subject_to(points[k,:] == b_vec)
+
+
+def parse_mat_eq_constr(b_mat, points, opti):
+    num_eq = points.shape[0]
+    for k in range(num_eq):
+        opti.subject_to(points[k,:] == b_mat[k,:])
+
+
+def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: np.array],
+                                  aux_frames: List[dict],
+                                  iris_regions: dict[str: IrisRegionsManager],
+                                  durations: List[dict[str, np.array]],
+                                  alpha: dict[int: float],
+                                  safe_points_lst: List[dict[str, np.array]],
+                                  fixed_frames=None,
+                                  contact_sequence=None,
+                                  surface_normals_lst=None,
+                                  weights_rigid_link=None,
+                                  n_points=None, **kwargs):
+    if weights_rigid_link is None:
+        weights_rigid_link = np.array([3500., 0.5, 10.])     # default for g1
+
+    # number of frames
+    n_frames = len(safe_points_lst[0].keys())
+
+    # Problem size. Assume for now same number of boxes for all frames
+    first_fr_iris = next(iter(iris_regions.values()))
+    d = first_fr_iris.iris_list[0].iris_region.ambient_dimension()
+    num_iris_tot = 0
+    for seg_dur in durations:
+        num_iris_tot += len(seg_dur[next(iter(seg_dur))])
+    D = max(alpha)
+
+    # default number of points for Bezier curve
+    if n_points is None:
+        n_points = (D + 1) * 2
+
+    # Control points of the curves and their derivatives.
+    opti = ca.Opti()
+    points = {}
+    for k in range(num_iris_tot * n_frames):
+        points[k] = {}
+        for i in range(D + 1):
+            size = (n_points - i, d)
+            points[k][i] = opti.variable(size[0], size[1])
+
+    frame_list = list(safe_points_lst[0].keys())
+    constraints = []
+
+    # Loop through IRIS regions
+    cost = 0
+    continuity = {}
+    frame_idx, fr_seg_k_box = 0, 0
+    seg_idx, k = 0, 0
+    for k in range(num_iris_tot * n_frames):
+        continuity[k] = {}
+
+        # Update frame name and number of boxes within segment/interval
+        f_name = frame_list[frame_idx]
+        sequenced_idx = iris_regions[f_name].iris_idx_seq[seg_idx][fr_seg_k_box]
+        A = iris_regions[f_name].iris_list[sequenced_idx].iris_region.A()
+        b = iris_regions[f_name].iris_list[sequenced_idx].iris_region.b()
+        b = np.reshape(b, (len(b), 1))
+        parse_mat_ineq_constr(A, b, points[k], opti)
+        num_iris_current = len(iris_regions[f_name].iris_idx_seq[seg_idx])
+
+        # Enforce given positions
+        if k % num_iris_tot == 0:          # initial position for each frame
+            # if also a fixed frame, repeat for entire segment duration
+            if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
+                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points, axis=0)
+                constraints.append(points[k][0] == fixed_frame_pos_mat)
+                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0], opti)
+                # opti.subject_to(points[k][0] == fixed_frame_pos_mat)
+            else:   # assign for just the first time instant
+                constraints.append(points[k][0][0,:].T == safe_points_lst[0][f_name])   # initial position
+                opti.subject_to(points[k][0][0,:].T == safe_points_lst[0][f_name])   # initial position
+                # check if it has a final safe point assigned
+                if fr_seg_k_box == (num_iris_current-1) and f_name in safe_points_lst[seg_idx+1].keys():
+                    constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])
+                    opti.subject_to(points[k][0][-1,:].T == safe_points_lst[seg_idx+1][f_name])
+                    # TODO add vel constraint
+                    # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
+        elif (k + 1) % num_iris_tot == 0:  # final position for each frame
+            if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
+                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
+                constraints.append(points[k][0][1:, :] == fixed_frame_pos_mat)
+                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], opti)
+                # opti.subject_to(points[k][0][1:, :] == fixed_frame_pos_mat)
+            else:
+                constraints.append(points[k][0][-1] == safe_points_lst[-1][f_name])
+                opti.subject_to(points[k][0][-1,:].T == safe_points_lst[-1][f_name])
+                # TODO add vel contraint
+                # add_vel_acc_constr(f_name, surface_normals_lst[-1], points[k], constraints)
+        else:       # safe and fixed positions at other times
+            if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
+                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
+                constraints.append(points[k][0][1:, :] == fixed_frame_pos_mat)
+                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], opti)
+                # opti.subject_to(points[k][0][1:, :] == fixed_frame_pos_mat)
+            # Check if safe_point is available for the current frame
+            elif f_name in safe_points_lst[seg_idx+1].keys():
+                # Enforce (pre-computed) safe points at the end of each desired motion
+                # note: the initial point within a segment is defined by the continuity constraint below
+                if fr_seg_k_box == (num_iris_current-1):
+                    constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])  # pos
+                    opti.subject_to(points[k][0][-1,:].T == safe_points_lst[seg_idx+1][f_name])  # pos
+                    # TODO add vel contraint
+                    # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
+
+        # Bezier dynamics.
+        for i in range(D):
+            h = n_points - i - 1
+            ci = durations[seg_idx][f_name][fr_seg_k_box] / h
+            constraints.append(points[k][i][1:, :] - points[k][i][:-1, :] == ci * points[k][i + 1])
+            parse_mat_eq_constr(ci * points[k][i + 1], points[k][i][1:, :] - points[k][i][:-1, :], opti)
+
+        # if we are in the same frame, enforce dynamics, continuity, differentiability, and cost
+        if (k+1) % num_iris_tot != 0:
+            # Continuity and differentiability.
+            if fr_seg_k_box < num_iris_current:
+                for i in range(D + 1):
+                    constraints.append(points[k][i][-1,:] == points[k + 1][i][0,:])
+                    opti.subject_to(points[k][i][-1,:] == points[k + 1][i][0,:])
+                    if i > 0:
+                        continuity[k][i] = constraints[-1]
+
+        # Cost function
+        for i, ai in alpha.items():
+            h = n_points - 1 - i
+            A = np.zeros((h + 1, h + 1))
+            for m in range(h + 1):
+                for n in range(h + 1):
+                    A[m, n] = binom(h, m) * binom(h, n) / binom(2 * h, m + n)
+            A *= durations[seg_idx][f_name][fr_seg_k_box] / (2 * h + 1)
+            A = np.kron(A, np.eye(d))
+            p = ca.vec(points[k][i].T)
+            cost += ai * ca.bilin(A, p, p)
+
+        # Adjust frame name, segment and box numbers
+        if (k+1) % num_iris_tot == 0:
+            frame_idx += 1
+            seg_idx = 0
+            fr_seg_k_box = 0
+        else:           # move to next segment if this is the last box
+            if fr_seg_k_box == (num_iris_current - 1):   # or (k % num_iris_current == 0)
+                fr_seg_k_box = 0        # reset the box count
+                seg_idx += 1            # increase segment
+            else:
+                fr_seg_k_box += 1
+
+    # Rigid links (e.g., shin link length) constraint relaxation
+    soc_constraint, cost_log_abs = [], []
+    cost_log_abs_sum = 0.
+    if bool(aux_frames):     # check if empy dictionary
+        link_threshold = 0.05
+        # apply auxiliary rigid link constraint throughout all safe regions
+        for aux_fr in aux_frames:
+            prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
+                aux_fr, frame_list, num_iris_tot)
+
+            # loop through all safe boxes
+            link_length += link_threshold     # threshold for relaxation
+            for nb in range(1, num_iris_tot-1):
+                # for pnt in range(n_points-1):
+                for pnt in range(1):
+                    link_proximal_point = points[prox_fr_idx+nb][0][pnt]
+                    link_distal_point = points[dist_fr_idx+nb][0][pnt]
+                    create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
+                                             link_distal_point, soc_constraint, cost_log_abs,
+                                                         wi=weights_rigid_link)
+
+        cost_log_abs_sum = -(cp.sum(cost_log_abs))
+
+    # Reachability constraints
+    # if reach_region is not None:
+    #     k_fr_iris = 0
+    #     for fr_idx, frame_name in enumerate(frame_list):
+    #         fr_iris_counter = 0
+    #         for seg in range(len(durations)):
+    #
+    #             num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg])
+    #             for si in range(num_iris_current):
+    #                 z_t = points[0 * num_iris_tot + fr_iris_counter + si][0]
+    #
+    #                 if frame_name == 'torso':
+    #                     continue
+    #
+    #                 else:
+    #                     coeffs = reach_region[frame_name]
+    #                     z_ee_seg = points[fr_idx * num_iris_tot + fr_iris_counter + si][0]
+    #
+    #                 # reachable constraint
+    #                 H = coeffs['H']
+    #                 d_vec = np.reshape(coeffs['d'], (len(H), 1))
+    #                 d_mat = np.repeat(d_vec, n_points, axis=1)
+    #                 if frame_name == 'torso' or frame_name == 'LF' or frame_name == 'RF':
+    #                     constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+    #                 # constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+    #
+    #             fr_iris_counter += num_iris_current
+    #             k_fr_iris += num_iris_current
+
+    # Solve problem
+    opti.minimize(cost + cost_log_abs_sum)
+    opti.solver('ipopt')
+    # opti.solver('ipopt', {'verbose': 0})
+
+    sol = opti.solve()
+
+    # if prob.status == 'infeasible':
+    #     print('***** Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
+    #     prob.solve(solver='SCS', eps_rel=1e-1, eps_abs=1e-1)
+
+    # check link constraints values
+    if bool(aux_frames):     # check if empy dictionary
+        # apply auxiliary rigid link constraint throughout all safe regions
+        for aux_fr in aux_frames:
+            prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
+                aux_fr, frame_list, num_iris_tot)
+
+            # loop through all safe boxes
+            link_length += link_threshold     # threshold for relaxation
+            for nb in range(1, num_iris_tot-1):
+                # for pnt in range(n_points-1):
+                for pnt in range(1):
+                    link_proximal_point = points[prox_fr_idx+nb][0][pnt]
+                    link_distal_point = points[dist_fr_idx+nb][0][pnt]
+                    print(f"{aux_fr['parent_frame']} Link length discrepancy: {np.linalg.norm(link_proximal_point.value - link_distal_point.value) - link_length}")
+
+    # Reconstruct trajectory.
+    beziers, path = [], []
+    a = 0
+    fr_seg_k_box, frame_idx, seg_idx = 0, 0, 0
+    frame_name = frame_list[frame_idx]
+    for k in range(num_iris_tot * n_frames):
+        num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
+        # move on to next segment after the current number of safe boxes
+        if (fr_seg_k_box != 0) and fr_seg_k_box % num_iris_current == 0 and seg_idx != (num_iris_tot-1):
+            seg_idx += 1
+            fr_seg_k_box = 0
+
+        # move on to next frame after all boxes processed for each frame
+        if k != 0 and (k % num_iris_tot) == 0:
+            frame_idx += 1
+            frame_name = frame_list[frame_idx]
+            fr_seg_k_box = 0
+
+        b = a + durations[seg_idx][frame_name][fr_seg_k_box]
+        beziers.append(BezierCurve(sol.value(points[k][0]), a, b))
+        a = b
+        fr_seg_k_box += 1
+        # skip the final positions, those are assigned later
+        if (k + 1) % num_iris_tot == 0:
+            fr_seg_k_box = 0  # might be redundant
+            seg_idx = 0
+            path.append(copy.deepcopy(CompositeBezierCurve(beziers)))
+            beziers.clear()
+            a = 0
+
+    retiming_weights = {}
+
+    # Reconstruct costs.
+    cost_breakdown = {}
+
+    # Solution statistics.
+    sol_stats_all = sol.stats()
+    sol_stats = {}
+    # sol_stats['cost'] = prob.value
+    sol_stats['runtime'] = sol_stats_all['t_wall_total']
+    # sol_stats['cost_breakdown'] = cost_breakdown
+    # sol_stats['retiming_weights'] = retiming_weights
+
+    return path, sol_stats, points
+
+
 def get_ci_from_global_ir_idx(total_iris_regions, k_ir, durations, f_name, h):
     # find the current iris index in the global list
     c_seq, curr_ir_num = 0, 0
@@ -395,16 +685,34 @@ def optimize_multiple_sca_bezier_iris(reach_region: dict[str: np.array, str: np.
                         start_Cmat_idx += (n_points - (i+1)) * 3
                     else:               # we just changed ti higher degree, i
                         start_Cmat_idx += (n_points - i) * 3
-
-                # if k_ir > 0:
-                #     start_Cmat_idx += (n_points - (i+1)) * 3
                 next_Cmat_idx = start_Cmat_idx + (n_points - (i+1)) * 3
                 A_bez_dyn[:, start_Cmat_idx:next_Cmat_idx] = copy.copy(C_mat)
-                print(f"k_ir: {k_ir}, i: {i}")
                 bez_lin_eq_constraints.add_lin_eq(A_bez_dyn)
 
-                i_prev = i
+                i_prev = i      # store previous degree for house-keeping of variables/constraints order
 
+    # ------------- Bezier continuity constraints
+    A_bez_cont = np.zeros((3 * (num_iris_tot - 1) * (D+1) * n_frames, x_dim))
+    y_Acond_curr_idx = 0
+    b_first_visit = True
+    for k_f in range(n_frames):
+        for i in range(D+1):
+            # matrices that remain fixed per degree of differentiation i = 0, ..., D-1
+            Acont = np.zeros((3 * (num_iris_tot - 1), 3 * (n_points - i) * num_iris_tot))
+
+            for k_ir in range(num_iris_tot-1):
+                Acont[D*k_ir, D * k_ir * n_points + D*(n_points-1):D*n_points] = np.eye(D)
+                Acont[D*k_ir, D * k_ir * n_points + D*n_points:D*(n_points+1)] = -np.eye(D)
+
+            x_Acond_curr_idx = k_f * D * (num_iris_tot-1) * (D+1) + D * (num_iris_tot - 1) * i
+            x_Acond_next_idx = x_Acond_curr_idx + D * (num_iris_tot - 1)
+            if b_first_visit:
+                b_first_visit = False
+            else:
+                y_Acond_curr_idx += Acont.shape[1]
+            y_Acond_next_idx = y_Acond_curr_idx + Acont.shape[1]
+            A_bez_cont[x_Acond_curr_idx:x_Acond_next_idx, y_Acond_curr_idx:y_Acond_next_idx] = copy.copy(Acont)
+            bez_lin_eq_constraints.add_lin_eq(A_bez_cont)
 
     constraints = []
     cost = 0
