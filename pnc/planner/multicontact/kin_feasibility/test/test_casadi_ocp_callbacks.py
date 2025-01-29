@@ -61,6 +61,58 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         self.assertTrue(current_distance > 0, "Pair in collision")  # add assertion here
         self.assertTrue(np.linalg.norm(current_distance - (actual_distance)) < 1e-6, "Distance not correct")
 
+    def test_dcol_min_poly_distance_callback(self):
+        A1 = np.array([[1, 0, 0],
+                      [0, 1, 0],
+                      [0, 0, 1],
+                      [-1, 0, 0],
+                      [0, -1, 0],
+                      [0, 0, -1]
+                      ])
+        b1 = np.array([[0.07],
+                     [0.105],
+                     [0.175],
+                     [0.07],
+                     [0.105],
+                     [0.175]]
+                     )
+        A2 = np.array([[1, 0, 0],
+                      [0, 1, 0],
+                      [0, 0, 1],
+                      [-1, 0, 0],
+                      [0, -1, 0],
+                      [0, 0, -1]
+                      ])
+        radius = 0.03
+        b2 = np.array([[radius],
+                     [radius],
+                     [radius],
+                     [radius],
+                     [radius],
+                     [radius]]
+                     )
+        Q = np.eye(3)
+        geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
+
+        # create Casadi vector
+        r1 = MX.sym('r1', 3)
+        r2 = MX.sym('r2', 3)
+
+        # set initial locations of each simplified rigid body
+        r1_val = vertcat(0., 0., 0.5)
+        r2_val = vertcat(0., 0., 0.0)
+        actual_distance = 0.5 - 0.175 - radius
+
+        f = DColMinPolytopesDistanceCallback('f', geom_data)
+        g_dist = Function('g_dist', [r1, r2], [f(r1, r2)])
+        current_distance = g_dist(r1_val, r2_val)
+        self.assertTrue(current_distance > 0, "Pair in collision")  # add assertion here
+        self.assertTrue(np.linalg.norm(current_distance - (actual_distance)) < 1e-6, "Distance not correct")
+
+        expected_jac = np.array([[0.], [0.], [4.87805], [0.], [0.], [-4.87805]]).T
+        J = Function('J', [r1, r2], [jacobian(f(r1, r2), vertcat(r1, r2))])
+        self.assertTrue(np.linalg.norm(expected_jac - J(r1_val, r2_val)) < 1e-3, "Jacobian not correct")
+
 
 if __name__ == '__main__':
     unittest.main()
