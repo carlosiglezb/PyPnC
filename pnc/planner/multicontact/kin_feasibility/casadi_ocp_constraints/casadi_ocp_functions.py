@@ -33,15 +33,15 @@ class DColMinDistancePairsCallback(Callback):
         return Sparsity.dense(1, 1)
 
     def eval(self, arg):
-        r1 = np.array(arg[0]).reshape(3)   # torso center
-        r2 = np.array(arg[1]).reshape(3)   # end effector (sphere) center
+        r1 = np.array(arg[0])   # torso center
+        r2 = np.array(arg[1])   # end effector (sphere) center
 
         # find distance via optimization (dcol)
         alpha = cp.Variable(1)
-        x = cp.Variable(3)
+        x = cp.Variable((3,1))
 
         A = self.A
-        b = self.b.reshape(-1)
+        b = self.b
         Q = self.Q
         U = self.U
         constraints = []
@@ -54,6 +54,22 @@ class DColMinDistancePairsCallback(Callback):
         alpha_val = alpha.value
         x_val = x.value
         solver_time = prob.solver_stats.solve_time
+
+        min_distance = np.linalg.norm(r1 - r2 + (r2 - r1) / alpha_val)
+        cp_torso = r1 + (x_val - r1) / alpha_val
+        cp_sphere = r2 + (x_val - r2) / alpha_val
+        print(f"alpha: {alpha_val}")
+        print(f"contact in torso: {cp_torso.T}, contact in sphere: {cp_sphere.T}")
+        print(f"min distance: {min_distance}")
+
+        self.h1 = self.A @ self.Q.T @ r1
+        self.h2[1:] = -self.U @ self.Q.T @ r2
+        dual_v = list((prob.solution.dual_vars).values())
+        dual_v[-1] = np.reshape(dual_v[-1], (1, 1))
+        dual_v[-2] = np.reshape(dual_v[-2], (1, 1))
+        self.z = np.concatenate(dual_v)
+
+        return [min_distance]
 
 class DColMinPolytopesDistanceCallback(Callback):
     def __init__(self, name, geom_data, opts={}):

@@ -2,10 +2,10 @@ import unittest
 import os, sys
 import copy
 
-from pnc.planner.multicontact.kin_feasibility.casadi_ocp_constraints.casadi_ocp_functions import *
-
 cwd = os.getcwd()
 sys.path.append(cwd)
+
+from pnc.planner.multicontact.kin_feasibility.casadi_ocp_constraints.casadi_ocp_functions import *
 
 class TestCasadiOcpCallbacks(unittest.TestCase):
     def test_dcol_min_distance_callback(self):
