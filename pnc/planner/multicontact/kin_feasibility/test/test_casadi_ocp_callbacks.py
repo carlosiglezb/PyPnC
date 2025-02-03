@@ -97,21 +97,33 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         # create Casadi vector
         r1 = MX.sym('r1', 3)
         r2 = MX.sym('r2', 3)
+        x = vertcat(r1,r2)
 
         # set initial locations of each simplified rigid body
         r1_val = vertcat(0., 0., 0.5)
         r2_val = vertcat(0., 0., 0.0)
-        actual_distance = 0.5 - 0.175 - radius
 
-        f = DColMinPolytopesDistanceCallback('f', geom_data)
-        g_dist = Function('g_dist', [r1, r2], [f(r1, r2)])
-        current_distance = g_dist(r1_val, r2_val)
-        self.assertTrue(current_distance > 0, "Pair in collision")  # add assertion here
-        self.assertTrue(np.linalg.norm(current_distance - (actual_distance)) < 1e-6, "Distance not correct")
+        f = DColMinSinglePolytopesDistanceCallback('f', geom_data)
+        g_dist = Function('g_dist', [x], [f(x)])
+
+        # test point 1 NOT in collision
+        x_val = vertcat(r1_val, r2_val)
+        current_distance = g_dist(x_val)
+        self.assertTrue(current_distance > 1, "Pair in collision")  # add assertion here
 
         expected_jac = np.array([[0.], [0.], [4.87805], [0.], [0.], [-4.87805]]).T
-        J = Function('J', [r1, r2], [jacobian(f(r1, r2), vertcat(r1, r2))])
-        self.assertTrue(np.linalg.norm(expected_jac - J(r1_val, r2_val)) < 1e-3, "Jacobian not correct")
+        J = Function('J', [x], [jacobian(f(x), x)])
+        self.assertTrue(np.linalg.norm(expected_jac - J(x_val)) < 1e-3, "Jacobian not correct")
+
+        # test point 2 in collision
+        x_val = vertcat(0.2, 0., 0.6, 0.2, -0.1, 0.6)
+        current_distance = g_dist(x_val)        # need to run eval again to update dual variables
+        self.assertTrue(current_distance < 1, "Pair not in collision")  # add assertion here
+
+        expected_jac = np.array([[0.], [7.4074], [0.], [0.], [-7.4074], [0.]]).T
+        self.assertTrue(np.linalg.norm(expected_jac - J(x_val)) < 1e-3, "Jacobian not correct")
+
+
 
 
 if __name__ == '__main__':
