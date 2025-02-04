@@ -16,7 +16,7 @@ Note: The multicontact modules have only been tested in Ubuntu 20.04 LTS.
 ## Common Issues
 If you get an error related to cython (e.g., when installing `pypoman`), 
 make sure you have installed the [libccd](https://github.com/danfis/libccd) 
-library for collision detection:
+library for collision detection:<br/>
 ```$ sudo apt install libccd-dev```
 
 ## Running Examples
