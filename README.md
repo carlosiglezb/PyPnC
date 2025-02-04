@@ -5,14 +5,19 @@ system and stabilizing the system over the trajectories.
 ## Installation
 - Install [anaconda](https://docs.anaconda.com/anaconda/install/)
 - Clone the repository:<br/>
-```$ git clone https://github.com/junhyeokahn/PyPnC.git```
-- Create a virtual environment and install dependancies:<br/>
-```$ conda env create -f pypnc.yml```
+```$ git clone https://github.com/carlosiglezb/PyPnC.git```
+- Create a virtual environment and install dependencies:<br/>
+```$ conda env create -f pypnc_croc.yml```
 - Activate the environment:<br/>
-```$ conda activate pypnc```
+```$ conda activate pypnc-multicontact```
 
-Note: The multicontact modules have only been tested in Ubuntu 20.04 LTS
-and assumes the environment `pypnc_croc.yml` is activated.
+Note: The multicontact modules have only been tested in Ubuntu 20.04 LTS.
+
+## Common Issues
+If you get an error related to cython (e.g., when installing `pypoman`), 
+make sure you have installed the [libccd](https://github.com/danfis/libccd) 
+library for collision detection:
+```$ sudo apt install libccd-dev```
 
 ## Running Examples
 ### Three Link Manipulator Control with Operational Space Control
