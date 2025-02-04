@@ -226,102 +226,214 @@ class DColMinSinglePolytopesDistanceCallback(Callback):
         A2 = self.A2
         b2 = self.b2
         Q = self.Q
-        x_val, alpha_val, dual_val = solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1, r2)
-
-        min_distance = np.linalg.norm(r1 - r2 + (r2 - r1) / alpha_val)
-        cp_torso = r1 + (x_val - r1) / alpha_val
-        cp_sphere = r2 + (x_val - r2) / alpha_val
-        print(f"alpha: {alpha_val}")
-        print(f"contact in torso: {cp_torso.T}, contact in sphere: {cp_sphere.T}")
-        print(f"min distance: {min_distance}")
+        x_val, alpha_val, dual_val = solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1, r2, True)
 
         self.jac_callback.update_dual_vars(dual_val)
 
         return [alpha_val]
 
-    # def get_jacobian(self, *args):
-    #     G1 = self.G1
-    #     G2 = self.G2
-    #
-    #     # provide first order Jacobians
-    #     r1 = MX.sym('r1', 3, 1)
-    #     r2 = MX.sym('r2', 3, 1)
-    #     x = MX.sym('x', 3, 1)
-    #     alpha = MX.sym('alpha', 1)
-    #     f = MX(1, 1)
-    #     # xsol = vertcat(x, alpha)
-    #     xsol = self.xsol
-    #
-    #     # reconstruct cone matrices with implicit parameters
-    #     h1 = self.A1 @ self.Q.T @ r1
-    #     h2 = self.A2 @ self.Q.T @ r2
-    #     h = vertcat(h1, h2)
-    #     G = vertcat(G1, G2)
-    #
-    #     # optimality condition
-    #     g_impl = G @ xsol - h
-    #     # g_impl = Function('g_impl', [x, alpha, r1, r2, f], [G @ xsol - h])
-    #     grad_g = jacobian(g_impl, r1)
-    #     grad_eval = self.z[:-1].T @ grad_g
-    #
-    #     # g_impl = Function('g_impl', [x, alpha, r1, r2, f], [self.z[:-1].T @ jacobian(G @ xsol - h, r1)])
-    #     # z = self.z
-    #     # f = MX(1, 1)
-    #     # grad_r1 = jacobian(solve_polytope_min_prox, r1)
-    #     # grad_r2 = jacobian(solve_polytope_min_prox, r2)
-    #     # Df =  Function('Df', [x, f], [z.T @ (G1 @ x - h1)])
-    #
-    #     return g_impl
+class JacFun(Callback):
+    def __init__(self, name, A1, b1, A2, b2, Q, num_iris_regions, z, opts={}):
+        Callback.__init__(self)
+        self.A1 = A1
+        self.b1 = b1
+        self.A2 = A2
+        self.b2 = b2
+        self.Q = Q
+        self.z = z
+
+        # dimensions of robot geometry
+        self.num_halfplanes_A1 = self.A1.shape[0]
+        self.num_halfplanes_A2 = self.A2.shape[0]
+
+        # dimensions to characterize the optimization variable
+        space_dim = self.A1.shape[1]
+        self.D = space_dim
+        self.n_points = (space_dim + 1) * 2
+        self.n_frames = 2
+        self.state_dim_per_frame = 3 * ((self.D + 1) * self.n_points - (self.D + 3)) * num_iris_regions
+        self.num_iris_regions_per_frame = num_iris_regions
+
+        self.construct(name, opts)
+
+    def get_n_in(self):
+        """
+        Jacobian input arguments are 2: x, f(x)
+        """
+        return 2
+
+    def get_n_out(self):
+        """
+        Jacobian returns 1 output: gradient of the function.
+        """
+        return 1
+
+    def get_sparsity_in(self, i):
+        if i == 0:  # nominal input
+            return Sparsity.dense(self.n_frames * self.state_dim_per_frame, 1)
+        elif i == 1:  # nominal output
+            return Sparsity.dense(self.n_points * self.num_iris_regions_per_frame, 1)
+
+    def get_sparsity_out(self, i):
+        if i == 0:
+            return Sparsity.dense(self.n_points * self.num_iris_regions_per_frame, self.n_frames * self.state_dim_per_frame)
+
+    def update_dual_vars(self, z):
+        self.z = z
+
+    # Evaluate numerically
+    def eval(self, arg):
+        x = np.array(arg[0])
+        n_hp_A1 = self.num_halfplanes_A1
+        n_hp_A2 = self.num_halfplanes_A2
+
+        # extract position indices
+        bezier_higher_derivatives = 3 * ((self.D + 1) * self.n_points - (self.D + 3))
+        p1_start_idx = np.arange(0, self.state_dim_per_frame, step=bezier_higher_derivatives, dtype=int)
+        p2_start_idx = np.arange(self.state_dim_per_frame, self.n_frames*self.state_dim_per_frame + 3*self.n_points, step=bezier_higher_derivatives, dtype=int)
+        n_hp_A1 = self.num_halfplanes_A1
+        n_hp_A2 = self.num_halfplanes_A2
+        num_constr_per_point = n_hp_A1 + n_hp_A2 + 1
+        jac_alpha_x = np.zeros((self.num_iris_regions_per_frame*self.n_points, self.n_frames * self.state_dim_per_frame))
+
+        for ir in range(self.num_iris_regions_per_frame):
+            last_ir1_pos_idx = p1_start_idx[ir] + self.n_points * 3
+            last_ir2_pos_idx = p2_start_idx[ir] + self.n_points * 3
+            pos1_curr_ir = np.arange(p1_start_idx[ir], last_ir1_pos_idx, step=3, dtype=int)
+            pos2_curr_ir = np.arange(p2_start_idx[ir], last_ir2_pos_idx, step=3, dtype=int)
+            for pnt in range(self.n_points):
+                # reconstruct cone matrices with implicit parameters
+                # h1 = self.A1 @ self.Q.T @ r1
+                # h2 = self.A2 @ self.Q.T @ r2
+                # h = np.concatenate((h1, h2))
+                # G = np.concatenate((self.G1, self.G2))
+                current_idx = pnt * num_constr_per_point
+                next_idx = current_idx + num_constr_per_point
+                curr_overall_idx = ir*self.n_points + pnt
+
+                ret1 = self.z[:-1, curr_overall_idx].T @ (np.concatenate((-self.A1 @ self.Q.T, np.zeros((n_hp_A2, 3)))))
+                ret2 = self.z[:-1, curr_overall_idx].T @ (np.concatenate((np.zeros((n_hp_A1, 3)), -self.A2 @ self.Q.T)))
+
+                jac_alpha_x[curr_overall_idx, pos1_curr_ir[pnt]: pos1_curr_ir[pnt] + 3] = ret1
+                jac_alpha_x[curr_overall_idx, pos2_curr_ir[pnt]: pos2_curr_ir[pnt] + 3] = ret2
+
+        return [jac_alpha_x]
+
+class DColMinPolytopesDistanceCallback(Callback):
+    def __init__(self, name, geom_data, space_dim, num_iris_regions, opts={}):
+        Callback.__init__(self)
+        self.A1 = geom_data['A1']      # torso halfspace
+        self.b1 = geom_data['b1']      # torso halfspace offset
+        self.A2 = geom_data['A2']      # torso halfspace
+        self.b2 = geom_data['b2']      # torso halfspace offset
+        self.Q = geom_data['Q']      # torso rotation
+
+        # dimensions of robot geometry
+        self.num_halfplanes_A1 = self.A1.shape[0]
+        self.num_halfplanes_A2 = self.A2.shape[0]
+
+        # dimensions to characterize the optimization variable
+        self.D = space_dim
+        self.num_iris_regions_per_frame = num_iris_regions
+        self.n_points = (space_dim + 1) * 2
+        self.n_frames = 2   # TODO make general later
+        self.state_dim_per_frame = 3 * ((self.D + 1) * self.n_points - (self.D + 3)) * num_iris_regions
+
+        # torso cone representation matrices
+        self.G1 = np.zeros((self.num_halfplanes_A1, 4))
+        self.G1[:, :3] = self.A1 @ self.Q.T
+        self.G1[:, 3:] = -self.b1
+        self.G2 = np.zeros((self.num_halfplanes_A2, 4))
+        self.G2[:, :3] = self.A2 @ self.Q.T
+        self.G2[:, 3:] = -self.b2
+
+        # DCOL dual variable
+        self.z = np.zeros((self.num_halfplanes_A1 + self.num_halfplanes_A2 + 1, self.n_points * num_iris_regions))
+
+        # initialize object construction
+        self.construct(name, opts)
+
+    def init(self):
+        print('Initializing DColMinPolytopesDistanceCallback')
+
+    def get_n_in(self):
+        """
+        Number of input arguments: x = [b1_pos; b1_vel; b1_acc; b1_jerk; ... ; b_np_jerk].
+        These correspond to the bezier points (position, velocity, acceleration, jerk) center of
+        the torso (r1) and the end effector (r2).
+        """
+        return 1
+
+    def get_sparsity_in(self, i):
+        """
+        Input arguments is x \in \mathbb{R}^{n_f * D * n_p}
+        """
+        return Sparsity.dense(self.n_frames * self.state_dim_per_frame, 1)
+
+    def get_sparsity_out(self, i):
+        """
+        Output argument is the minimum distance between the two polytopes.
+        """
+        return Sparsity.dense(self.n_points * self.num_iris_regions_per_frame, 1)
+
+    def has_jacobian(self, *_args):
+        return True
 
     def get_jacobian(self, name, inames, onames, opts):
         # It is required to keep a reference alive to the returned Callback object
-        # self.jac_callback = self.jac_fcn
         self.jac_callback = JacFun(name, self.A1, self.b1, self.A2, self.b2, self.Q, self.num_iris_regions_per_frame, self.z)
         return self.jac_callback
 
-
     def eval(self, arg):
-        r1 = np.array(arg[0])   # torso center
-        r2 = np.array(arg[1])   # end effector (sphere) center
+        z = np.array(arg[0])
 
-        # find distance via optimization (dcol)
-        x = cp.Variable((3,1))
-        alpha = cp.Variable(1)
+        # extract position indices
+        bezier_higher_derivatives = 3*((self.D + 1) * self.n_points - (self.D + 3))
+        p1_start_idx = np.arange(0, self.state_dim_per_frame, step=bezier_higher_derivatives, dtype=int)
+        p2_start_idx = np.arange(self.state_dim_per_frame, self.n_frames*self.state_dim_per_frame, step=bezier_higher_derivatives, dtype=int)
+        r1 = z[p1_start_idx]      # get only position values for first frame (torso)
+        r2 = z[p2_start_idx]      # get only position values for second frame (end-effector)
 
         A1 = self.A1
         b1 = self.b1
         A2 = self.A2
         b2 = self.b2
         Q = self.Q
-        constraints = []
-        constraints.append(A1 @ Q.T @ (x - r1) <= alpha * b1)
-        constraints.append(A2 @ Q.T @ (x - r2) <= alpha * b2)
-        constraints.append(alpha >= 0)
-        prob = cp.Problem(cp.Minimize(alpha), constraints)
-        prob.solve(solver='CLARABEL')
+        n_points = self.n_points
+        n_frames = self.n_frames
+        num_iris_regions = self.num_iris_regions_per_frame
+        n_hp_A1 = self.num_halfplanes_A1
+        n_hp_A2 = self.num_halfplanes_A2
+        num_constr_per_point = n_hp_A1 + n_hp_A2 + 1
+        dual_all = np.zeros((n_hp_A1 + n_hp_A2 + 1, n_points * num_iris_regions))
+        alpha_vec = np.zeros((n_points * num_iris_regions, 1))
 
-        alpha_val = alpha.value
-        x_val = x.value
-        solver_time = prob.solver_stats.solve_time
+        # solve min distance for each pair of points
+        for ir in range(num_iris_regions):
+            last_ir1_pos_idx = p1_start_idx[ir] + n_points * 3
+            last_ir2_pos_idx = p2_start_idx[ir] + n_points * 3
+            pos1_curr_ir = np.arange(p1_start_idx[ir], last_ir1_pos_idx, step=3, dtype=int)
+            pos2_curr_ir = np.arange(p2_start_idx[ir], last_ir2_pos_idx, step=3, dtype=int)
+            assert(len(pos1_curr_ir) == n_points)
+            assert(len(pos2_curr_ir) == n_points)
+            for pnt in range(self.n_points):
+                # get current point
+                r1_cp = z[pos1_curr_ir[pnt]:pos1_curr_ir[pnt]+3]
+                r2_cp = z[pos2_curr_ir[pnt]:pos2_curr_ir[pnt]+3]
+                x_val, alpha_val, dual_val = solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1_cp, r2_cp)
 
-        self.xsol = np.concatenate((x_val, alpha_val.reshape((1,1))))
+                # self.xsol = np.concatenate((x_val, alpha_val.reshape((1,1))))
+                # self.h1 = self.A1 @ self.Q.T @ r1
+                # self.h2 = self.A2 @ self.Q.T @ r2
+                alpha_vec[ir*n_points + pnt] = alpha_val
+                dual_all[:, ir*n_points + pnt] = dual_val[:, 0]
 
-        min_distance = np.linalg.norm(r1 - r2 + (r2 - r1) / alpha_val)
-        cp_torso = r1 + (x_val - r1) / alpha_val
-        cp_foot = r2 + (x_val - r2) / alpha_val
-        print(f"alpha: {alpha_val}")
-        print(f"contact in torso: {cp_torso.T}, contact in foot: {cp_foot.T}")
-        print(f"min distance: {min_distance}")
+        self.jac_callback.update_dual_vars(dual_all)
 
-        # self.h1 = self.A1 @ self.Q.T @ r1
-        # self.h2 = self.A2 @ self.Q.T @ r2
-        z_lst = list((prob.solution.dual_vars).values())
-        z_lst[-1] = np.reshape(z_lst[-1], (1,1))
-        self.z = np.concatenate(z_lst)
+        return [alpha_vec]
 
-        return [min_distance]
 
-def solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1, r2):
+def solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1, r2, b_print_info=False):
     # find distance via optimization (dcol-style)
     alpha = cp.Variable(1)
     x = cp.Variable((3, 1))
@@ -341,8 +453,35 @@ def solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1, r2):
 
     solver_time = prob.solver_stats.solve_time
 
+    # print solution information
+    if b_print_info:
+        min_distance = np.linalg.norm(r1 - r2 + (r2 - r1) / alpha.value)
+        cp_torso = r1 + (x.value - r1) / alpha.value
+        cp_foot = r2 + (x.value - r2) / alpha.value
+        print(f"alpha: {alpha.value}")
+        print(f"contact in torso: {cp_torso.T}, contact in foot: {cp_foot.T}")
+        print(f"min distance: {min_distance}")
+
     return x.value, alpha.value, z_lst
 
+
+
+def solve_polytope_min_prox(A, b, Q, U, r1, r2):
+    # find distance via optimization (dcol-style)
+    alpha = cp.Variable(1)
+    x = cp.Variable((3, 1))
+
+    constraints = []
+    constraints.append(A @ Q.T @ (x - r1) <= alpha * b)
+    constraints.append(cp.norm(U @ Q.T @ (x - r2)) <= alpha)
+    constraints.append(alpha >= 0)
+    prob = cp.Problem(cp.Minimize(alpha), constraints)
+    prob.solve(solver='CLARABEL')
+
+    z = np.concatenate(list((prob.solution.dual_vars).values()))
+    solver_time = prob.solver_stats.solve_time
+
+    return x.value, alpha.value, z
 
 
         min_distance = np.linalg.norm(r1 - r2 + (r2 - r1) / alpha_val)

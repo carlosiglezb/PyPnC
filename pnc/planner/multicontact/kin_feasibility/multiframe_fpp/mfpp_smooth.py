@@ -8,6 +8,8 @@ from casadi import nlpsol
 from scipy.special import binom
 from scipy.optimize import minimize
 
+from pnc.planner.multicontact.kin_feasibility.casadi_ocp_constraints.casadi_ocp_functions import \
+    DColMinPolytopesDistanceCallback
 from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import get_aux_frame_idx, \
     create_bezier_cvx_norm_eq_relaxation, add_vel_acc_constr
 from pnc.planner.multicontact.kin_feasibility.scipy_ocp_constraints.scipy_ocp_functions import \
@@ -317,6 +319,26 @@ def unpack_sol_to_points(x_sol, num_iris_all_frames, n_points, D, d):
 
     return sol_points
 
+
+def pack_points_to_single_vector(points, vec_type: str):
+    num_iris_traversed = len(points)
+    num_points = points[0][0].shape[0]
+    alpha_deg = len(points[0])
+    d = alpha_deg - 1
+    vector_out = []
+    for ir in range(num_iris_traversed):
+        for i in range(alpha_deg):
+            vec_size = (num_points - i) * d
+            if vec_type == 'casadi':
+                vector_out = ca.vertcat(vector_out, ca.reshape(points[ir][i], vec_size, 1))
+            elif vec_type == 'numpy':
+                vector_out = np.concatenate((vector_out, *points[ir][i].value))
+            else:
+                raise ValueError('Invalid vector type specified. Use either casadi or numpy.')
+
+    return vector_out
+
+
 def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: np.array],
                                   aux_frames: List[dict],
                                   iris_regions: dict[str: IrisRegionsManager],
@@ -327,6 +349,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                   fixed_frames=None,
                                   contact_sequence=None,
                                   surface_normals_lst=None,
+                                  initial_guess=None,
                                   weights_rigid_link=None,
                                   n_points=None, **kwargs):
     if weights_rigid_link is None:
@@ -353,7 +376,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         points[k] = {}
         for i in range(D + 1):
             size = (n_points - i, d)
-            points[k][i] = ca.SX.sym("p" + str(k), size[0], size[1])
+            points[k][i] = ca.MX.sym("p" + str(k), size[0], size[1])
 
     frame_list = list(safe_points_lst[0].keys())
     constraints = []
@@ -499,23 +522,30 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     #             fr_iris_counter += num_iris_current
     #             k_fr_iris += num_iris_current
 
-    # Solve problem
-    nlp = {'x': ca.vertcat(
-                            ca.reshape(points[0][0], 24, 1), ca.reshape(points[0][1], 21, 1), ca.reshape(points[0][2], 18, 1), ca.reshape(points[0][3], 15,1),
-                            ca.reshape(points[1][0], 24, 1), ca.reshape(points[1][1], 21, 1), ca.reshape(points[1][2], 18, 1), ca.reshape(points[1][3], 15,1),
-                            ca.reshape(points[2][0], 24, 1), ca.reshape(points[2][1], 21, 1), ca.reshape(points[2][2], 18, 1), ca.reshape(points[2][3], 15,1),
-                            ca.reshape(points[3][0], 24, 1), ca.reshape(points[3][1], 21, 1), ca.reshape(points[3][2], 18, 1), ca.reshape(points[3][3], 15,1),
-                            ca.reshape(points[4][0], 24, 1), ca.reshape(points[4][1], 21, 1), ca.reshape(points[4][2], 18, 1), ca.reshape(points[4][3], 15,1),
-                            ca.reshape(points[5][0], 24, 1), ca.reshape(points[5][1], 21, 1), ca.reshape(points[5][2], 18, 1), ca.reshape(points[5][3], 15,1),
-                            ca.reshape(points[6][0], 24, 1), ca.reshape(points[6][1], 21, 1), ca.reshape(points[6][2], 18, 1), ca.reshape(points[6][3], 15,1),
-                            ca.reshape(points[7][0], 24, 1), ca.reshape(points[7][1], 21, 1), ca.reshape(points[7][2], 18, 1), ca.reshape(points[7][3], 15,1)
-                            ),
-           'f': cost + cost_log_abs_sum,
-           'g': ca.vertcat(*constraints)
-           }
-    solver = nlpsol('solver', 'ipopt', nlp)
+    # Simplified no self-collision function and constraints bounds
+    f_dist = DColMinPolytopesDistanceCallback('f_dist', robot_geom_data, D, num_iris_tot)
+    [lbg.append(1.0) for _ in range(num_iris_tot * n_points)]
+    [ubg.append(ca.inf) for _ in range(num_iris_tot * n_points)]
 
-    sol = solver(lbg=lbg, ubg=ubg)
+    # Collect points into a single vector
+    points_all = pack_points_to_single_vector(points, 'casadi')
+
+    # Solve problem
+    nlp = {'x': points_all,
+           'f': cost + cost_log_abs_sum,
+           'g': ca.vertcat(*constraints, f_dist(points_all))
+           }
+    opts = {
+        "ipopt": {
+            "hessian_approximation": "limited-memory",
+            "max_iter": 100}
+    }
+    solver = nlpsol('solver', 'ipopt', nlp, opts)
+
+    if initial_guess is not None:
+        sol = solver(x0=initial_guess, lbg=lbg, ubg=ubg)
+    else:
+        sol = solver(lbg=lbg, ubg=ubg)
 
     x_sol = sol['x'].full()
 
