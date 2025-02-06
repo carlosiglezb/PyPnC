@@ -1,5 +1,7 @@
 from typing import List
 
+from pydrake.geometry.optimization import HPolyhedron
+
 import pnc.planner.multicontact.kin_feasibility.fastpathplanning.fastpathplanning as fpp
 from collections import OrderedDict
 
@@ -11,6 +13,9 @@ import meshcat.geometry as g
 import meshcat.transformations as tf
 import numpy as np
 from ruamel.yaml import YAML
+
+from util.pydrake_meshcat_interface import pydrake_geom_to_meshcat
+from visualizer.meshcat_tools.meshcat_palette import meshcat_reach_obj, meshcat_safe_obj
 
 
 class LocomanipulationFramePlanner:
@@ -213,6 +218,38 @@ class LocomanipulationFramePlanner:
                 vis_viewer["paths"][frame][str(segment)][str(pt_number)].set_object(
                     obj, g.MeshLambertMaterial(color=obj.color))
                 vis_viewer["paths"][frame][str(segment)][str(pt_number)].set_transform(tf_pos)
+
+                pt_number += 1
+            seg_number += 1
+
+    @staticmethod
+    def visualize_bezier_polytope(vis_viewer, frame, bezier_curve, segment, A, b):
+        color_waypoint = [0., 1., 0., 0.6]      # blue
+        color_transition = [1., 1., 0., 0.6]    # yellow
+        r_bezier_pts = 0.01
+        pt_number, seg_number = 0, 1
+        polyhedron = HPolyhedron(A, b)
+        collision_poly = pydrake_geom_to_meshcat(polyhedron)
+
+        for bez in bezier_curve:
+            t, points = bez.get_sample_points()
+            if np.ndim(points) == 3:
+                points = points[0, :]
+            for p in points:
+                obj = g.Sphere(r_bezier_pts)
+                tf_pos = tf.translation_matrix(p)
+
+                # check if "in-between" waypoint or "transition" waypoint
+                if (pt_number == seg_number*(len(points))-1) or (pt_number == (seg_number-1) * (len(points))):
+                    convert_rgba_to_meshcat_obj(obj, color_transition)
+                else:
+                    convert_rgba_to_meshcat_obj(obj, color_waypoint)
+                vis_viewer["paths"][frame][str(segment)][str(pt_number)].set_object(
+                    obj, g.MeshLambertMaterial(color=obj.color))
+                vis_viewer["paths"][frame][str(segment)][str(pt_number)].set_transform(tf_pos)
+
+                vis_viewer["paths"][frame+'_col'][str(segment)][str(pt_number)].set_object(collision_poly, meshcat_safe_obj())
+                vis_viewer["paths"][frame+'_col'][str(segment)][str(pt_number)].set_transform(tf_pos)
 
                 pt_number += 1
             seg_number += 1

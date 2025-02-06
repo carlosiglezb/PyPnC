@@ -653,9 +653,14 @@ class TestFrameTraverseIris(unittest.TestCase):
                     bezier_curve = [p.beziers[seg]]
                     if i == 0:
                         fr_name = 'torso'
+                        A = A1
+                        b = b1
                     elif i == 1:
                         fr_name = 'RF'
-                    LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
+                        A = A2
+                        b = b2
+                    LocomanipulationFramePlanner.visualize_bezier_polytope(self.vis, fr_name, bezier_curve, seg, A, b)
+                    # LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
                 i += 1
 
         self.assertTrue(path is not None, "Problem seems to be infeasible")
