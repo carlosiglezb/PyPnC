@@ -332,7 +332,8 @@ def pack_points_to_single_vector(points, vec_type: str):
             if vec_type == 'casadi':
                 vector_out = ca.vertcat(vector_out, ca.reshape(points[ir][i], vec_size, 1))
             elif vec_type == 'numpy':
-                vector_out = np.concatenate((vector_out, *points[ir][i].value))
+                parsed_vec = np.reshape(points[ir][i].value, (vec_size, 1), order='F')
+                vector_out = np.concatenate((vector_out, *parsed_vec))
             else:
                 raise ValueError('Invalid vector type specified. Use either casadi or numpy.')
 
