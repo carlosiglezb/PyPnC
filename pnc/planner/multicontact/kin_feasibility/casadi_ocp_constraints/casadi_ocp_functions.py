@@ -254,6 +254,25 @@ class JacFun(Callback):
         self.state_dim_per_frame = 3 * ((self.D + 1) * self.n_points - (self.D + 3)) * num_iris_regions
         self.num_iris_regions_per_frame = num_iris_regions
 
+        # sparse Jacobian entries
+        bezier_higher_derivatives = 3 * ((self.D + 1) * self.n_points - (self.D + 3))
+        self.p1_start_idx = np.arange(0, self.state_dim_per_frame, step=bezier_higher_derivatives, dtype=int)
+        self.p2_start_idx = np.arange(self.state_dim_per_frame, self.n_frames*self.state_dim_per_frame + 3*self.n_points, step=bezier_higher_derivatives, dtype=int)
+        self.jac_dm = np.zeros((self.n_points * self.num_iris_regions_per_frame, self.n_frames * self.state_dim_per_frame), dtype=bool)
+        n_points = self.n_points
+        p1_start_idx = self.p1_start_idx
+        p2_start_idx = self.p2_start_idx
+        for ir in range(self.num_iris_regions_per_frame):
+            last_ir1_pos_idx = p1_start_idx[ir] + self.n_points * 3
+            last_ir2_pos_idx = p2_start_idx[ir] + self.n_points * 3
+            pos1_curr_ir = np.arange(p1_start_idx[ir], last_ir1_pos_idx, step=3, dtype=int)
+            pos2_curr_ir = np.arange(p2_start_idx[ir], last_ir2_pos_idx, step=3, dtype=int)
+            assert (len(pos1_curr_ir) == n_points)
+            assert (len(pos2_curr_ir) == n_points)
+            for pnt in range(self.n_points):
+                self.jac_dm[ir * n_points + pnt, pos1_curr_ir[pnt]: pos1_curr_ir[pnt] + 3] = 1
+                self.jac_dm[ir * n_points + pnt, pos2_curr_ir[pnt]: pos2_curr_ir[pnt] + 3] = 1
+
         self.construct(name, opts)
 
     def get_n_in(self):
@@ -275,8 +294,10 @@ class JacFun(Callback):
             return Sparsity.dense(self.n_points * self.num_iris_regions_per_frame, 1)
 
     def get_sparsity_out(self, i):
+        # build selection matrix of non-zero Jacobian elements
         if i == 0:
-            return Sparsity.dense(self.n_points * self.num_iris_regions_per_frame, self.n_frames * self.state_dim_per_frame)
+            return sparsify(DM(self.jac_dm.tolist())).sparsity()
+            # return Sparsity.dense(self.n_points * self.num_iris_regions_per_frame, self.n_frames * self.state_dim_per_frame)
 
     def update_dual_vars(self, z):
         self.z = z
@@ -288,14 +309,13 @@ class JacFun(Callback):
         n_hp_A2 = self.num_halfplanes_A2
 
         # extract position indices
-        bezier_higher_derivatives = 3 * ((self.D + 1) * self.n_points - (self.D + 3))
-        p1_start_idx = np.arange(0, self.state_dim_per_frame, step=bezier_higher_derivatives, dtype=int)
-        p2_start_idx = np.arange(self.state_dim_per_frame, self.n_frames*self.state_dim_per_frame + 3*self.n_points, step=bezier_higher_derivatives, dtype=int)
+        p1_start_idx = self.p1_start_idx
+        p2_start_idx = self.p2_start_idx
         n_hp_A1 = self.num_halfplanes_A1
         n_hp_A2 = self.num_halfplanes_A2
         num_constr_per_point = n_hp_A1 + n_hp_A2 + 1
-        jac_alpha_x = np.zeros((self.num_iris_regions_per_frame*self.n_points, self.n_frames * self.state_dim_per_frame))
-
+        # jac_alpha_x = np.zeros((self.num_iris_regions_per_frame*self.n_points, self.n_frames * self.state_dim_per_frame))
+        jac_alpha_x = DM(self.num_iris_regions_per_frame*self.n_points, self.n_frames * self.state_dim_per_frame)
         for ir in range(self.num_iris_regions_per_frame):
             last_ir1_pos_idx = p1_start_idx[ir] + self.n_points * 3
             last_ir2_pos_idx = p2_start_idx[ir] + self.n_points * 3
