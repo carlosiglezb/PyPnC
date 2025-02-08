@@ -1,6 +1,6 @@
 import unittest
 import os, sys
-import copy
+import casadi
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -140,6 +140,66 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         self.assertTrue(np.linalg.norm(expected_jac - jac_val.T) < 1e-3, "Jacobian from Hessian not correct")
 
 
+
+    def test_min_distance_polytopes_dcol_2points(self):
+        A1 = np.array([[1, 0, 0],
+                      [0, 1, 0],
+                      [0, 0, 1],
+                      [-1, 0, 0],
+                      [0, -1, 0],
+                      [0, 0, -1]
+                      ])
+        b1 = np.array([[0.07],
+                     [0.105],
+                     [0.175],
+                     [0.07],
+                     [0.105],
+                     [0.175]]
+                     )
+        A2 = np.array([[1, 0, 0],
+                      [0, 1, 0],
+                      [0, 0, 1],
+                      [-1, 0, 0],
+                      [0, -1, 0],
+                      [0, 0, -1]
+                      ])
+        radius = 0.03
+        b2 = np.array([[radius],
+                     [radius],
+                     [radius],
+                     [radius],
+                     [radius],
+                     [radius]]
+                     )
+        Q = np.eye(3)
+        geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
+
+        # optimization problem formulation
+        p1 = MX.sym('p1', 3)
+        p2 = MX.sym('p2', 3)
+        x = vertcat(p1, p2)
+        f = DColMinSinglePolytopesDistanceCallback('f', geom_data)
+        dist_p1_p2 = norm_2(x[:3] - x[3:])     # (x,y)-distance between two points
+        nlp = {'x': x,
+               'f': dist_p1_p2,
+               'g': f(x)
+               }
+        opts = {
+            "ipopt": {
+                "hessian_approximation": "exact",  # limited-memory
+                "max_iter": 100}
+        }
+        solver = nlpsol('solver', 'ipopt', nlp, opts)
+
+        x_init = np.array([0.0, 0.0, 0.1, 0.0, 0.0, 0.0])
+        sol = solver(x0=x_init,lbg=1.0, ubg=casadi.inf)
+        x_sol = sol['x'].full()
+
+        # check if the solution is correct
+        if x_init[2] > x_init[-1]:  # if initialized with p_1 above p2
+            self.assertTrue(np.linalg.norm(x_sol[:3] - x_sol[3:]) - (0.175+radius) < 1e-3, "Min. Distance between points is not correct")
+        else:
+            self.assertTrue(True, False)    # test this case
 
 if __name__ == '__main__':
     unittest.main()
