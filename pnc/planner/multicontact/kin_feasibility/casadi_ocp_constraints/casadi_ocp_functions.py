@@ -119,6 +119,37 @@ class DColMinDistancePairsCallback(Callback):
         return [min_distance]
 
 
+class SingleHessFun(Callback):
+    def __init__(self, name, opts):
+        Callback.__init__(self)
+        self.construct(name, opts)
+
+    def get_n_in(self):
+        return 3
+
+    def get_n_out(self):
+        return 2
+
+    def get_sparsity_in(self, i):
+        if i == 0:      # nominal input, x
+            return Sparsity.dense(6, 1)
+        elif i == 1:    # nominal output, f(x)
+            return Sparsity.dense(1, 1)
+        elif i == 2:    # nominal jac, J(x)
+            return Sparsity.dense(1, 6)
+
+    def get_sparsity_out(self, i):
+        if i == 0:      # hessian
+            return Sparsity.dense(6, 6)
+        elif i == 1:    # jacobian
+            return Sparsity.dense(6, 1)
+
+    def eval(self, arg):
+        x = np.array(arg[0])
+        alpha = np.array(arg[1])
+        jac = np.array(arg[2])
+        return DM(6, 6), DM(6,1)
+
 class SingleJacFun(Callback):
     def __init__(self, name, A1, b1, A2, b2, Q, z, opts={}):
         Callback.__init__(self)
@@ -128,6 +159,7 @@ class SingleJacFun(Callback):
         self.b2 = b2
         self.Q = Q
         self.z = z
+        self.hess_callback = SingleHessFun(name, opts)
         self.construct(name, opts)
 
     def get_n_in(self):
@@ -148,6 +180,13 @@ class SingleJacFun(Callback):
 
     def update_dual_vars(self, z):
         self.z = z
+
+    def has_jacobian(self, *_args):
+        return True
+
+    def get_jacobian(self, name, inames, onames, opts):
+        # It is required to keep a reference alive to the returned Callback object
+        return self.hess_callback
 
     # Evaluate numerically
     def eval(self, arg):

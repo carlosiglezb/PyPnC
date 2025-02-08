@@ -106,23 +106,38 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         f = DColMinSinglePolytopesDistanceCallback('f', geom_data)
         g_dist = Function('g_dist', [x], [f(x)])
 
-        # test point 1 NOT in collision
+        # =========== test point 1 NOT in collision
         x_val = vertcat(r1_val, r2_val)
         current_distance = g_dist(x_val)
-        self.assertTrue(current_distance > 1, "Pair in collision")  # add assertion here
+        self.assertTrue(current_distance > 1, "Pair in collision")
 
+        # -- test Jacobian
         expected_jac = np.array([[0.], [0.], [4.87805], [0.], [0.], [-4.87805]]).T
         J = Function('J', [x], [jacobian(f(x), x)])
         self.assertTrue(np.linalg.norm(expected_jac - J(x_val)) < 1e-3, "Jacobian not correct")
 
-        # test point 2 in collision
+        # -- test Hessian
+        expected_hess = np.zeros((6,6))
+        H = Function('H', [x], hessian(f(x), x))
+        hess_val, jac_val = H(x_val)
+        self.assertTrue(np.linalg.norm(expected_hess - hess_val) < 1e-3, "Hessian not correct")
+        self.assertTrue(np.linalg.norm(expected_jac - jac_val.T) < 1e-3, "Jacobian from Hessian not correct")
+
+        # =========== test point 2 IN COLLISION
         x_val = vertcat(0.2, 0., 0.6, 0.2, -0.1, 0.6)
         current_distance = g_dist(x_val)        # need to run eval again to update dual variables
         self.assertTrue(current_distance < 1, "Pair not in collision")  # add assertion here
 
+        # -- test Jacobian
         expected_jac = np.array([[0.], [7.4074], [0.], [0.], [-7.4074], [0.]]).T
         self.assertTrue(np.linalg.norm(expected_jac - J(x_val)) < 1e-3, "Jacobian not correct")
 
+        # -- test Hessian
+        expected_hess = np.zeros((6,6))
+        H = Function('H', [x], hessian(f(x), x))
+        hess_val, jac_val = H(x_val)
+        self.assertTrue(np.linalg.norm(expected_hess - hess_val) < 1e-3, "Hessian not correct")
+        self.assertTrue(np.linalg.norm(expected_jac - jac_val.T) < 1e-3, "Jacobian from Hessian not correct")
 
 
 
