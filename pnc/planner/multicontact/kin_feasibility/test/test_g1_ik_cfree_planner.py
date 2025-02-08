@@ -4,6 +4,9 @@ import os
 import sys
 from collections import OrderedDict
 
+cwd = os.getcwd()
+sys.path.append(cwd)
+
 import numpy as np
 import pinocchio as pin
 from pinocchio.visualize import MeshcatVisualizer
@@ -19,9 +22,6 @@ from util import util
 from vision.iris.iris_geom_interface import IrisGeomInterface
 from vision.iris.iris_regions_manager import IrisRegionsManager
 import plot.meshcat_utils as vis_tools
-
-cwd = os.getcwd()
-sys.path.append(cwd)
 
 b_visualize = True
 b_use_knees = True
