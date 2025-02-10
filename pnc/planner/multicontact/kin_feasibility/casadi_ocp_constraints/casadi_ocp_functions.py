@@ -541,13 +541,3 @@ def solve_polytope_min_prox(A, b, Q, U, r1, r2):
     solver_time = prob.solver_stats.solve_time
 
     return x.value, alpha.value, z
-
-
-        min_distance = np.linalg.norm(r1 - r2 + (r2 - r1) / alpha_val)
-        cp_torso = r1 + (x_val - r1) / alpha_val
-        cp_sphere = r2 + (x_val - r2) / alpha_val
-        print(f"alpha: {alpha_val}")
-        print(f"contact in torso: {cp_torso}, contact in sphere: {cp_sphere}")
-        print(f"min distance: {min_distance}")
-
-        return [min_distance]
