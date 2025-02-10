@@ -265,7 +265,7 @@ class DColMinSinglePolytopesDistanceCallback(Callback):
         A2 = self.A2
         b2 = self.b2
         Q = self.Q
-        x_val, alpha_val, dual_val = solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1, r2, True)
+        x_val, alpha_val, dual_val = solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1, r2, False)
 
         self.jac_callback.update_dual_vars(dual_val)
 
