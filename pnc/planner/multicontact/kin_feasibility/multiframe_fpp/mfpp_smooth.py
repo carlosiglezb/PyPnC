@@ -321,6 +321,11 @@ def unpack_sol_to_points(x_sol, num_iris_all_frames, n_points, D, d):
 
 
 def pack_points_to_single_vector(points, vec_type: str):
+    """
+    Casadi's reshape method follows a column-major order, so we reshape the matrices
+    accordingly to output:
+    x = [p0_x, p0_y, p0_z, p1_x, p1_y, p1_z, ..., velocities, accelerations, ...]
+    """
     num_iris_traversed = len(points)
     num_points = points[0][0].shape[0]
     alpha_deg = len(points[0])
@@ -330,9 +335,10 @@ def pack_points_to_single_vector(points, vec_type: str):
         for i in range(alpha_deg):
             vec_size = (num_points - i) * d
             if vec_type == 'casadi':
-                vector_out = ca.vertcat(vector_out, ca.reshape(points[ir][i], vec_size, 1))
+                transposed_mat = ca.reshape(points[ir][i], 3, num_points - i)
+                vector_out = ca.vertcat(vector_out, ca.reshape(transposed_mat, vec_size, 1))
             elif vec_type == 'numpy':
-                parsed_vec = np.reshape(points[ir][i].value, (vec_size, 1), order='F')
+                parsed_vec = np.reshape(points[ir][i].value, (vec_size, 1), order='C')
                 vector_out = np.concatenate((vector_out, *parsed_vec))
             else:
                 raise ValueError('Invalid vector type specified. Use either casadi or numpy.')
