@@ -140,8 +140,8 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         self.assertTrue(np.linalg.norm(expected_jac - jac_val.T) < 1e-3, "Jacobian from Hessian not correct")
 
 
-
     def test_min_distance_polytopes_dcol_2points(self):
+        N_tests = 10
         A1 = np.array([[1, 0, 0],
                       [0, 1, 0],
                       [0, 0, 1],
@@ -173,6 +173,7 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
                      )
         Q = np.eye(3)
         geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
+        expected_z_distance = 0.175+radius
 
         # optimization problem formulation
         p1 = MX.sym('p1', 3)
@@ -195,15 +196,25 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         }
         solver = nlpsol('solver', 'ipopt', nlp, opts)
 
-        x_init = np.array([0.0, 0.0, 0.1, 0.0, 0.0, 0.0])
-        sol = solver(x0=x_init,lbg=1.0, ubg=casadi.inf)
-        x_sol = sol['x'].full()
+        x_init = np.array([0.0, 0.0, 2.25, 0.0, 0.0, 0.0])
+        for i in range(N_tests):
+            x_init[:2] = 0.2*np.random.random(2)
+            x_init[2] = 2.25 + 0.4*np.random.random()
+            print(f"Test points {i}: p1 = {x_init[:3]}, p2 = {x_init[3:]}")
+            sol = solver(x0=x_init,lbg=1.0, ubg=casadi.inf)
 
-        # check if the solution is correct
-        if x_init[2] > x_init[-1]:  # if initialized with p_1 above p2
-            self.assertTrue(np.linalg.norm(x_sol[:3] - x_sol[3:]) - (0.175+radius) < 1e-3, "Min. Distance between points is not correct")
-        else:
-            self.assertTrue(True, False)    # test this case
+            sol_stats = solver.stats()
+            self.assertTrue(sol_stats['success'], "Optimization failed")
+
+            # check if the solution seems correct
+            x_sol = sol['x'].full()
+            if x_init[2] > x_init[-1]:  # if initialized with p_1 above p2
+                computed_z_dist = np.linalg.norm(x_sol[:3] - x_sol[3:])
+                dist_z_error = computed_z_dist - expected_z_distance
+                self.assertTrue(dist_z_error < 1e-3, f"Min. Distance between points is {dist_z_error}")
+                self.assertTrue(dist_z_error + 0.01 > 1e-3, f"Min. Distance between points is {dist_z_error}")
+            else:
+                self.assertTrue(False, "Points were not mostly above/below each other")
 
 if __name__ == '__main__':
     unittest.main()
