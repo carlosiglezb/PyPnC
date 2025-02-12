@@ -9,7 +9,7 @@ from scipy.special import binom
 from scipy.optimize import minimize
 
 from pnc.planner.multicontact.kin_feasibility.casadi_ocp_constraints.casadi_ocp_functions import \
-    DColMinPolytopesDistanceCallback
+    DColIndexedPolytopesConstraint
 from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import get_aux_frame_idx, \
     create_bezier_cvx_norm_eq_relaxation, add_vel_acc_constr
 from pnc.planner.multicontact.kin_feasibility.scipy_ocp_constraints.scipy_ocp_functions import \
@@ -324,7 +324,7 @@ def pack_points_to_single_vector(points, vec_type: str):
     """
     Casadi's reshape method follows a column-major order, so we reshape the matrices
     accordingly to output:
-    x = [p0_x, p0_y, p0_z, p1_x, p1_y, p1_z, ..., velocities, accelerations, ...]
+    x = [p0_x, p0_y, p0_z, v0_x, v0_y, v0_z, ..., p1_x, p1_y, p1_z, v1_x, v1_y, v1_z, ...]
     """
     num_iris_traversed = len(points)
     num_points = points[0][0].shape[0]
@@ -529,23 +529,39 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     #             fr_iris_counter += num_iris_current
     #             k_fr_iris += num_iris_current
 
-    # Simplified no self-collision function and constraints bounds
-    f_dist = DColMinPolytopesDistanceCallback('f_dist', robot_geom_data, D, num_iris_tot)
-    [lbg.append(1.0) for _ in range(num_iris_tot * n_points)]
-    [ubg.append(ca.inf) for _ in range(num_iris_tot * n_points)]
-
     # Collect points into a single vector
     points_all = pack_points_to_single_vector(points, 'casadi')
+
+    # Simplified no self-collision function and constraints bounds for specified index pairs
+    mfpp_bezier_data = {'current_frames': (0, 1),   # make first and second frames SCA
+                        'n_points': n_points,
+                        'num_derivatives': D,
+                        'num_iris_per_frame': num_iris_tot,
+                        'num_frames': 2     #n_frames
+                        }
+
+    sca_constraints = []
+    f_dist = {}
+    for i in range(num_iris_tot * n_points):
+        mfpp_bezier_data['current_point'] = i
+        i_name = 'f_dist'+ str(i)
+        current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
+        f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, robot_geom_data, current_mfpp_data)
+        sca_constraints.append(f_dist[i_name](points_all))
+        lbg.append(1.0)
+        ubg.append(ca.inf)
 
     # Solve problem
     nlp = {'x': points_all,
            'f': cost + cost_log_abs_sum,
-           'g': ca.vertcat(*constraints, f_dist(points_all))
+           'g': ca.vertcat(*constraints, *sca_constraints)
            }
     opts = {
         "ipopt": {
-            "hessian_approximation": "limited-memory",
-            "max_iter": 100}
+            "hessian_approximation": "exact",   # limited-memory
+            "max_iter": 100,
+            "mu_init": 1e-8,
+            "tol": 2e-1}
     }
     solver = nlpsol('solver', 'ipopt', nlp, opts)
 
