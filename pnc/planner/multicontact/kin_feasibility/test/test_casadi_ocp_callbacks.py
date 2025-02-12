@@ -187,7 +187,11 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         opts = {
             "ipopt": {
                 "hessian_approximation": "exact",  # limited-memory
-                "max_iter": 100}
+                "max_iter": 100,
+                "derivative_test": "second-order",
+                "derivative_test_print_all": "no",
+                "derivative_test_perturbation": 1e-6,
+                "derivative_test_tol": 0.001}
         }
         solver = nlpsol('solver', 'ipopt', nlp, opts)
 
