@@ -19,7 +19,7 @@ from vision.iris.iris_regions_manager import IrisRegionsManager
 from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.multiframe_fpp import plan_multistage_iris_seq
 from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
 
-b_visualize = False
+b_visualize = True
 b_static_html = False
 
 
@@ -501,7 +501,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         durations.append({'RF': np.array([0.2] * 3)})
         alpha = {1: 1, 2: 2, 3: 0.1}
         surface_normals_lst = motion_frames_seq.get_contact_surfaces()
-        path, sol_stats, _ = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+        path, sol_stats, _, _ = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
                                                         fixed_frames=fixed_frames,
                                                         surface_normals_lst=surface_normals_lst)
@@ -533,7 +533,7 @@ class TestFrameTraverseIris(unittest.TestCase):
                           'RH': np.array([0.3] * 2)})
         alpha = {1: 1, 2: 1, 3: 0.1}
         surface_normals_lst = motion_frames_seq.get_contact_surfaces()
-        path, sol_stats, _ = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+        path, sol_stats, _, _ = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
                                                         fixed_frames=fixed_frames,
                                                         surface_normals_lst=surface_normals_lst)
@@ -573,31 +573,15 @@ class TestFrameTraverseIris(unittest.TestCase):
                           'RF': np.array([0.2] * 1)})
         alpha = {1: 1, 2: 0, 3: 0}
         surface_normals_lst = motion_frames_seq.get_contact_surfaces()
-        path, sol_stats, bez_points = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+        path, sol_stats, bez_points, dual_vars = optimize_multiple_bezier_iris_casadi(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
                                                         fixed_frames=fixed_frames,
                                                         surface_normals_lst=surface_normals_lst)
+        # path, sol_stats, bez_points, dvars = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+        #                                                 durations, alpha, safe_points_lst,
+        #                                                 fixed_frames=fixed_frames,
+        #                                                 surface_normals_lst=surface_normals_lst)
         # print(f"Runtime solve with cvxpy: {sol_stats['runtime']}")
-
-        # Create points from Bezier curve
-        if b_visualize:
-            i = 0
-            for p in path:
-                for seg in range(len(p.beziers)):
-                    bezier_curve = [p.beziers[seg]]
-                    if i == 0:
-                        fr_name = 'torso'
-                    elif i == 1:
-                        fr_name = 'RF'
-                    LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
-                i += 1
-
-        self.assertTrue(path is not None, "Problem seems to be infeasible")
-        self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.torso_starting_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[0].beziers[3].points[-1] - self.torso_final_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[1].beziers[3].points[0] - self.rf_final_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rf_final_pos) < 1e-3)
 
         # include simplified rigid bodies for self-collision avoidance
         # TODO get A, b, Q, r1, r2 from robot model (URDF) -- based off G1
@@ -630,14 +614,43 @@ class TestFrameTraverseIris(unittest.TestCase):
                      [radius],
                      [radius]]
                      )
+
+        # Create points from Bezier curve
+        if b_visualize:
+            i = 0
+            for p in path:
+                for seg in range(len(p.beziers)):
+                    bezier_curve = [p.beziers[seg]]
+                    if i == 0:
+                        fr_name = 'torso'
+                        A = A1
+                        b = b1
+                    elif i == 1:
+                        fr_name = 'RF'
+                        A = A2
+                        b = b2
+                    LocomanipulationFramePlanner.visualize_bezier_polytope(self.vis, fr_name, bezier_curve, seg, A, b)
+                    # LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
+                i += 1
+
+        self.assertTrue(path is not None, "Problem seems to be infeasible")
+        self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.torso_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[0].beziers[3].points[-1] - self.torso_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[3].points[0] - self.rf_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rf_final_pos) < 1e-3)
+
         Q = np.eye(3)
         # radius = 0.03
         # U = (1/radius) * np.eye(3)       # Cholesky factorization of end effector's sphere radius
         geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
 
         # parse initial guess from previous solution
-        bez_initial_guess = pack_points_to_single_vector(bez_points, 'numpy')
-        path, sol_stats, _ = optimize_multiple_bezier_iris_casadi(reach, aux, safe_regions_mgr_dict,
+        bez_initial_guess = {}
+        bez_initial_guess['x0'] = pack_points_to_single_vector(bez_points, 'numpy')
+        bez_initial_guess['lam_g0'] = dual_vars['lam_g0']
+        bez_initial_guess['lam_x0'] = dual_vars['lam_x0']
+        path, sol_stats, _, _ = optimize_multiple_bezier_iris_casadi(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
                                                         geom_data,
                                                         fixed_frames=fixed_frames,
@@ -664,11 +677,16 @@ class TestFrameTraverseIris(unittest.TestCase):
                 i += 1
 
         self.assertTrue(path is not None, "Problem seems to be infeasible")
-        self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.torso_starting_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[0].beziers[3].points[-1] - self.torso_final_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[1].beziers[3].points[0] - self.rf_final_pos) < 1e-3)
-        self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rf_final_pos) < 1e-3)
+        error = path[0].beziers[0].points[0] - self.torso_starting_pos
+        self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Starting torso distance error: {error}")
+        error = path[0].beziers[3].points[-1] - self.torso_final_pos
+        self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Final torso distance error: {error}")
+        error = path[1].beziers[0].points[0] - self.rf_starting_pos
+        self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Starting RF distance error: {error}")
+        error = path[1].beziers[3].points[0] - self.rf_final_pos
+        self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Final RF distance error: {error}")
+        error = path[1].beziers[-1].points[-1] - self.rf_final_pos
+        self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Final RF distance error: {error}")
 
 
 if __name__ == '__main__':

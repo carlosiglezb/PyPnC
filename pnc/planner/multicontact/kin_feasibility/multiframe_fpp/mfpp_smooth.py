@@ -263,8 +263,10 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     sol_stats['runtime'] = prob.solver_stats.solve_time
     sol_stats['cost_breakdown'] = cost_breakdown
     sol_stats['retiming_weights'] = retiming_weights
+    dual_vars = {}
+    dual_vars['lam_g0'] = prob.solution.dual_vars
 
-    return path, sol_stats, points
+    return path, sol_stats, points, dual_vars
 
 
 def parse_mat_leq_constr(A, b, points, constraints, lbg, ubg):
@@ -337,8 +339,11 @@ def pack_points_to_single_vector(points, vec_type: str):
             if vec_type == 'casadi':
                 transposed_mat = ca.reshape(points[ir][i], 3, num_points - i)
                 vector_out = ca.vertcat(vector_out, ca.reshape(transposed_mat, vec_size, 1))
-            elif vec_type == 'numpy':
+            elif vec_type == 'cxvpy':
                 parsed_vec = np.reshape(points[ir][i].value, (vec_size, 1), order='C')
+                vector_out = np.concatenate((vector_out, *parsed_vec))
+            elif vec_type == 'numpy':
+                parsed_vec = np.reshape(points[ir][i], (vec_size, 1), order='C')
                 vector_out = np.concatenate((vector_out, *parsed_vec))
             else:
                 raise ValueError('Invalid vector type specified. Use either casadi or numpy.')
@@ -352,7 +357,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                   durations: List[dict[str, np.array]],
                                   alpha: dict[int: float],
                                   safe_points_lst: List[dict[str, np.array]],
-                                  robot_geom_data: dict[str: np.array],
+                                  robot_geom_data: dict[str: np.array]=None,
                                   fixed_frames=None,
                                   contact_sequence=None,
                                   surface_normals_lst=None,
@@ -495,7 +500,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                     link_proximal_point = points[prox_fr_idx+nb][0][pnt]
                     link_distal_point = points[dist_fr_idx+nb][0][pnt]
                     create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-                                             link_distal_point, soc_constraint, cost_log_abs,
+                                                         link_distal_point, soc_constraint, cost_log_abs,
                                                          wi=weights_rigid_link)
 
         cost_log_abs_sum = -(cp.sum(cost_log_abs))
@@ -532,41 +537,59 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     # Collect points into a single vector
     points_all = pack_points_to_single_vector(points, 'casadi')
 
-    # Simplified no self-collision function and constraints bounds for specified index pairs
-    mfpp_bezier_data = {'current_frames': (0, 1),   # make first and second frames SCA
-                        'n_points': n_points,
-                        'num_derivatives': D,
-                        'num_iris_per_frame': num_iris_tot,
-                        'num_frames': 2     #n_frames
-                        }
-
-    sca_constraints = []
-    f_dist = {}
-    for i in range(num_iris_tot * n_points):
-        mfpp_bezier_data['current_point'] = i
-        i_name = 'f_dist'+ str(i)
-        current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-        f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, robot_geom_data, current_mfpp_data)
-        sca_constraints.append(f_dist[i_name](points_all))
-        lbg.append(1.0)
-        ubg.append(ca.inf)
-
-    # Solve problem
-    nlp = {'x': points_all,
-           'f': cost + cost_log_abs_sum,
-           'g': ca.vertcat(*constraints, *sca_constraints)
-           }
     opts = {
         "ipopt": {
             "hessian_approximation": "exact",   # limited-memory
             "max_iter": 100,
-            "mu_init": 1e-8,
-            "tol": 2e-1}
+            "mu_init": 1e-5,
+            "tol": 1e-3,
+            # "derivative_test": "first-order",
+            # "derivative_test_print_all": "no",
+            # "derivative_test_perturbation": 1e-6,
+            # "derivative_test_tol": 0.0005
+        }
     }
+
+    sca_constraints = []
+    if robot_geom_data is not None:
+        # Simplified no self-collision function and constraints bounds for specified index pairs
+        mfpp_bezier_data = {'current_frames': (0, 1),   # make torso and RK frames SCA
+                            'n_points': n_points,
+                            'num_derivatives': D,
+                            'num_iris_per_frame': num_iris_tot,
+                            'num_frames': n_frames     # 2
+                            }
+        f_dist = {}
+        sca_bez_points = range(0, num_iris_tot * n_points, 1)
+        for i in sca_bez_points:
+            mfpp_bezier_data['current_point'] = i
+            i_name = 'f_dist'+ str(i)
+            current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
+            f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, robot_geom_data, current_mfpp_data)
+            sca_constraints.append(f_dist[i_name](points_all))
+            lbg.append(1.0)
+            ubg.append(ca.inf)
+
+        # assume lagrange multipliers of SCA constraints are zero
+        initial_guess['lam_g0'] = np.vstack((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
+
+        opts["ipopt"]["warm_start_init_point"] = "yes"
+        opts["ipopt"]["warm_start_mult_bound_push"] = 1e-6
+        opts["ipopt"]["warm_start_slack_bound_push"] = 1e-6
+        opts["ipopt"]["warm_start_bound_push"] = 1e-6
+
+        # Solve problem
+    nlp = {'x': points_all,
+           'f': cost + cost_log_abs_sum,
+           'g': ca.vertcat(*constraints, *sca_constraints)
+           }
     solver = nlpsol('solver', 'ipopt', nlp, opts)
 
     if initial_guess is not None:
-        sol = solver(x0=initial_guess, lbg=lbg, ubg=ubg)
+        sol = solver(x0=initial_guess['x0'],
+                     lam_g0=initial_guess['lam_g0'],
+                     lam_x0=initial_guess['lam_x0'],
+                     lbg=lbg, ubg=ubg)
     else:
         sol = solver(lbg=lbg, ubg=ubg)
 
@@ -636,8 +659,10 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     # sol_stats['runtime'] = sol_stats_all['t_wall_total']
     # sol_stats['cost_breakdown'] = cost_breakdown
     # sol_stats['retiming_weights'] = retiming_weights
+    dual_vars = {'lam_g0': sol['lam_g'].full(),
+                 'lam_x0': sol['lam_x'].full()}
 
-    return path, sol_stats, points
+    return path, sol_stats, sol_points, dual_vars
 
 
 def get_ci_from_global_ir_idx(total_iris_regions, k_ir, durations, f_name, h):

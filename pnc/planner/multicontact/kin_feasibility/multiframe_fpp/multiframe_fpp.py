@@ -4,7 +4,8 @@ import numpy as np
 
 from pnc.planner.multicontact.kin_feasibility.fastpathplanning.fastpathplanning import distribute_box_seq, distribute_free_frames
 from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_polygonal import solve_min_reach_iris_distance
-from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_smooth import optimize_multiple_bezier_iris
+from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_smooth import optimize_multiple_bezier_iris, \
+    optimize_multiple_bezier_iris_casadi, pack_points_to_single_vector
 from pnc.planner.multicontact.kin_feasibility.fpp_sequencer_tools import get_last_defined_point
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
@@ -228,7 +229,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
             parsed_contact_seq.append([current_ff_lst[1]] * num_segs)
 
     surface_normals_lst = motion_frames_seq.get_contact_surfaces()
-    paths, sol_stats, points = optimize_multiple_bezier_iris(R, A, S, durations, alpha, safe_pnt_lst,
+    paths, sol_stats, points, dvars = optimize_multiple_bezier_iris(R, A, S, durations, alpha, safe_pnt_lst,
                                                              fixed_frames=fixed_frames,
                                                              contact_sequence=parsed_contact_seq,
                                                              surface_normals_lst=surface_normals_lst,
@@ -236,5 +237,49 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                              verbose=verbose)
     if verbose:
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
+
+    # TODO get from URDF and pass through argument
+    A1 = np.array([[1, 0, 0],
+                  [0, 1, 0],
+                  [0, 0, 1],
+                  [-1, 0, 0],
+                  [0, -1, 0],
+                  [0, 0, -1]
+                  ])
+    b1 = np.array([[0.07],
+                 [0.105],
+                 [0.175],
+                 [0.07],
+                 [0.105],
+                 [0.175]]
+                 )
+    A2 = np.array([[1, 0, 0],
+                  [0, 1, 0],
+                  [0, 0, 1],
+                  [-1, 0, 0],
+                  [0, -1, 0],
+                  [0, 0, -1]
+                  ])
+    radius = 0.03
+    b2 = np.array([[radius],
+                 [radius],
+                 [radius],
+                 [radius],
+                 [radius],
+                 [radius]]
+                 )
+    Q = np.eye(3)
+    geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
+
+    bez_initial_guess = pack_points_to_single_vector(points, 'numpy')
+    initial_guess = {'x0': bez_initial_guess, 'lam_g0': dvars['lam_g0']}
+    paths, sol_stats, points = optimize_multiple_bezier_iris_casadi(R, A, S, durations, alpha, safe_pnt_lst,
+                                                             geom_data,
+                                                             fixed_frames=fixed_frames,
+                                                             contact_sequence=parsed_contact_seq,
+                                                             surface_normals_lst=surface_normals_lst,
+                                                             weights_rigid_link=w_rigid,
+                                                             initial_guess=initial_guess,
+                                                             verbose=verbose)
 
     return paths, iris_seq, points
