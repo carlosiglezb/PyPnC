@@ -525,12 +525,17 @@ def solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1, r2, b_print_info=False):
 
 
 class IndexedHessFun(Callback):
-    def __init__(self, name, dim_optim_var, opts):
+    def __init__(self, name, dim_optim_var, pos1_curr_ir, pos2_curr_ir, opts):
         Callback.__init__(self)
         self.dim_optim_var = dim_optim_var
 
         self.jac_dm = np.zeros((dim_optim_var, 1), dtype=bool)
         self.hess_dm = np.zeros((dim_optim_var, dim_optim_var), dtype=bool)
+
+        # Sparse entries in Jacobian
+        self.jac_dm[pos1_curr_ir:pos1_curr_ir + 3, 0] = 1
+        self.jac_dm[pos2_curr_ir:pos2_curr_ir + 3, 0] = 1
+        self.jac_dm_in = self.jac_dm.reshape(1, -1)
 
         self.jac_np = np.zeros((self.dim_optim_var, 1))
         self.hess_np = np.zeros((self.dim_optim_var, self.dim_optim_var))
@@ -549,7 +554,8 @@ class IndexedHessFun(Callback):
         elif i == 1:    # nominal output, f(x)
             return Sparsity.dense(1, 1)
         elif i == 2:    # nominal jac, J(x)
-            return Sparsity.dense(1, self.dim_optim_var)
+            return sparsify(DM(self.jac_dm_in.tolist())).sparsity()
+            # return Sparsity.dense(1, self.dim_optim_var)
 
     def get_sparsity_out(self, i):
         if i == 0:      # hessian
@@ -586,16 +592,25 @@ class IndexedJacFun(Callback):
         self.state_dim_per_frame = self.bezier_higher_derivatives * self.num_iris_regions_per_frame
         self.dim_optim_var = self.state_dim_per_frame * self.n_frames
 
+        current_frames = mfpp_bezier_data['current_frames']
+        num_iris_regions = mfpp_bezier_data['num_iris_per_frame']
         # ------- sparse entries in Jacobian
         self.jac_dm = np.zeros((1, self.dim_optim_var), dtype=bool)
         # get current point and solve min distance for each pair of points
-        curr_ir = self.current_point % self.num_iris_regions_per_frame
-        pos1_curr_ir = self.current_frames[0] * self.bezier_higher_derivatives + 3 * curr_ir
-        pos2_curr_ir = self.current_frames[1] * self.bezier_higher_derivatives + 3 * curr_ir
+        curr_pnt_in_iris = self.current_point % self.n_points
+        curr_ir = self.current_point // self.n_points
+        pos1_curr_ir = (current_frames[0] * self.bezier_higher_derivatives * num_iris_regions +
+                        self.bezier_higher_derivatives * curr_ir +
+                        3 * curr_pnt_in_iris)
+        pos2_curr_ir = (current_frames[1] * self.bezier_higher_derivatives * num_iris_regions +
+                        self.bezier_higher_derivatives * curr_ir +
+                        3 * curr_pnt_in_iris)
         self.jac_dm[0, pos1_curr_ir:pos1_curr_ir + 3] = 1
         self.jac_dm[0, pos2_curr_ir:pos2_curr_ir + 3] = 1
 
-        self.hess_callback = IndexedHessFun(name, self.dim_optim_var, opts)
+        self.hess_callback = IndexedHessFun(name, self.dim_optim_var, pos1_curr_ir, pos2_curr_ir, opts)
+        self.pos1_curr_ir = pos1_curr_ir
+        self.pos2_curr_ir = pos2_curr_ir
         self.construct(name, opts)
 
     def get_n_in(self):
@@ -640,15 +655,8 @@ class IndexedJacFun(Callback):
 
         # ---- distribute to corresponding indices in Jacobian
         # aesthetics
-        current_point = self.current_point
-        num_iris_regions = self.num_iris_regions_per_frame
-        current_frames = self.current_frames
-        bezier_higher_derivatives = self.bezier_higher_derivatives
-
-        # get current point and solve min distance for each pair of points
-        curr_ir = current_point % num_iris_regions
-        pos1_curr_ir = current_frames[0] * bezier_higher_derivatives + 3 * curr_ir
-        pos2_curr_ir = current_frames[1] * bezier_higher_derivatives + 3 * curr_ir
+        pos1_curr_ir = self.pos1_curr_ir
+        pos2_curr_ir = self.pos2_curr_ir
 
         jac_z = np.zeros((1, self.dim_optim_var))
         jac_z[0, pos1_curr_ir:pos1_curr_ir + 3] = ret1
@@ -739,9 +747,14 @@ class DColIndexedPolytopesConstraint(Callback):
         bezier_higher_derivatives = self.bezier_higher_derivatives
 
         # get current point and solve min distance for each pair of points
-        curr_ir = current_point % num_iris_regions
-        pos1_curr_ir = current_frames[0] * bezier_higher_derivatives + 3 * curr_ir
-        pos2_curr_ir = current_frames[1] * bezier_higher_derivatives + 3 * curr_ir
+        curr_pnt_in_iris = current_point % self.n_points
+        curr_ir = current_point // self.n_points
+        pos1_curr_ir = (current_frames[0] * bezier_higher_derivatives * num_iris_regions +
+                        bezier_higher_derivatives * curr_ir +
+                        3 * curr_pnt_in_iris)
+        pos2_curr_ir = (current_frames[1] * bezier_higher_derivatives * num_iris_regions +
+                        bezier_higher_derivatives * curr_ir +
+                        3 * curr_pnt_in_iris)
         r1_cp = z[pos1_curr_ir:pos1_curr_ir + 3]
         r2_cp = z[pos2_curr_ir:pos2_curr_ir + 3]
         x_val, alpha_val, dual_val = solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1_cp, r2_cp)
