@@ -601,16 +601,18 @@ class IndexedJacFun(Callback):
         curr_ir = self.current_point // self.n_points
         pos1_curr_ir = (current_frames[0] * self.bezier_higher_derivatives * num_iris_regions +
                         self.bezier_higher_derivatives * curr_ir +
-                        3 * curr_pnt_in_iris)
+                        curr_pnt_in_iris)
         pos2_curr_ir = (current_frames[1] * self.bezier_higher_derivatives * num_iris_regions +
                         self.bezier_higher_derivatives * curr_ir +
-                        3 * curr_pnt_in_iris)
-        self.jac_dm[0, pos1_curr_ir:pos1_curr_ir + 3] = 1
-        self.jac_dm[0, pos2_curr_ir:pos2_curr_ir + 3] = 1
+                        curr_pnt_in_iris)
+        pos1_idxs = np.arange(pos1_curr_ir, pos1_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
+        pos2_idxs = np.arange(pos2_curr_ir, pos2_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
+        self.jac_dm[0, pos1_idxs] = 1
+        self.jac_dm[0, pos2_idxs] = 1
 
         self.hess_callback = IndexedHessFun(name, self.dim_optim_var, pos1_curr_ir, pos2_curr_ir, opts)
-        self.pos1_curr_ir = pos1_curr_ir
-        self.pos2_curr_ir = pos2_curr_ir
+        self.pos1_idxs = pos1_idxs
+        self.pos2_idxs = pos2_idxs
         self.construct(name, opts)
 
     def get_n_in(self):
@@ -655,12 +657,12 @@ class IndexedJacFun(Callback):
 
         # ---- distribute to corresponding indices in Jacobian
         # aesthetics
-        pos1_curr_ir = self.pos1_curr_ir
-        pos2_curr_ir = self.pos2_curr_ir
+        pos1_idxs = self.pos1_idxs
+        pos2_idxs = self.pos2_idxs
 
         jac_z = np.zeros((1, self.dim_optim_var))
-        jac_z[0, pos1_curr_ir:pos1_curr_ir + 3] = ret1
-        jac_z[0, pos2_curr_ir:pos2_curr_ir + 3] = ret2
+        jac_z[0, pos1_idxs] = ret1
+        jac_z[0, pos2_idxs] = ret2
 
         return [jac_z]
 
@@ -751,12 +753,14 @@ class DColIndexedPolytopesConstraint(Callback):
         curr_ir = current_point // self.n_points
         pos1_curr_ir = (current_frames[0] * bezier_higher_derivatives * num_iris_regions +
                         bezier_higher_derivatives * curr_ir +
-                        3 * curr_pnt_in_iris)
+                        curr_pnt_in_iris)
         pos2_curr_ir = (current_frames[1] * bezier_higher_derivatives * num_iris_regions +
                         bezier_higher_derivatives * curr_ir +
-                        3 * curr_pnt_in_iris)
-        r1_cp = z[pos1_curr_ir:pos1_curr_ir + 3]
-        r2_cp = z[pos2_curr_ir:pos2_curr_ir + 3]
+                        curr_pnt_in_iris)
+        pos1_idxs = np.arange(pos1_curr_ir, pos1_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
+        pos2_idxs = np.arange(pos2_curr_ir, pos2_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
+        r1_cp = z[pos1_idxs]
+        r2_cp = z[pos2_idxs]
         x_val, alpha_val, dual_val = solve_two_polytope_min_prox(A1, b1, A2, b2, Q, r1_cp, r2_cp)
 
         # update dual variables to use in Jacobian
