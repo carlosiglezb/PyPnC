@@ -268,46 +268,6 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     return path, sol_stats, points, dual_vars
 
-
-def parse_mat_leq_constr(A, b, points, constraints, lbg, ubg):
-    """
-    Constraints are of the form:
-    lbg <= constraints(x) <= ubg
-    """
-    num_ineq = A.shape[0]
-    num_points = points[0].shape[0]
-    for k in range(num_ineq):
-        for np in range(num_points):
-            constraints.append(points[0][np,:] @ A[k])
-            lbg.append(-ca.inf)
-            ubg.append(b[k])
-
-
-def parse_repvec_eq_constr(b_vec, points, constraints, lbg, ubg):
-    num_eq = points.shape[0]
-    for k in range(num_eq):
-        for j in range(3):
-            constraints.append(points[k,j] - b_vec[0,j])
-            lbg.append(0.)
-            ubg.append(0.)
-
-
-def parse_vec_eq_constr(b_vec, point, constraints, lbg, ubg):
-    for k in range(3):
-        constraints.append(point[k] - b_vec[k])
-        lbg.append(0.)
-        ubg.append(0.)
-
-
-def parse_mat_eq_constr(b_mat, points, constraints, lbg, ubg):
-    num_eq = points.shape[0]
-    for k in range(num_eq):
-        for j in range(3):
-            constraints.append(points[k,j] - b_mat[k,j])
-            lbg.append(0.)
-            ubg.append(0.)
-
-
 def unpack_sol_to_points(x_sol, num_iris_all_frames, n_points, D, d):
     sol_points = [None] * num_iris_all_frames
     for k in range(num_iris_all_frames):
@@ -429,7 +389,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
             else:
                 parse_vec_eq_constr(safe_points_lst[-1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
-                # TODO add vel contraint
+                # TODO add vel constraint
                 # add_vel_acc_constr(f_name, surface_normals_lst[-1], points[k], constraints)
         else:       # safe and fixed positions at other times
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
@@ -441,7 +401,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 if fr_seg_k_box == (num_iris_current-1):
                     parse_vec_eq_constr(safe_points_lst[seg_idx+1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
                     # TODO add vel contraint
-                    # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
+                    # add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx], points[k], constraints, lbg, ubg)
 
         # Bezier dynamics.
         for i in range(D):
