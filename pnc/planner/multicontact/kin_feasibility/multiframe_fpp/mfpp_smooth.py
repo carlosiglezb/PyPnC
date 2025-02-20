@@ -10,8 +10,10 @@ from scipy.optimize import minimize
 
 from pnc.planner.multicontact.kin_feasibility.casadi_ocp_constraints.casadi_ocp_functions import \
     DColIndexedPolytopesConstraint
+from pnc.planner.multicontact.kin_feasibility.constraint_parsers import parse_mat_leq_constr, parse_repvec_eq_constr, \
+    parse_vec_eq_constr, parse_mat_eq_constr
 from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import get_aux_frame_idx, \
-    create_bezier_cvx_norm_eq_relaxation, add_vel_acc_constr
+    create_bezier_cvx_norm_eq_relaxation, add_vel_acc_constr, add_vel_acc_constr_casadi
 from pnc.planner.multicontact.kin_feasibility.scipy_ocp_constraints.scipy_ocp_functions import \
     LinearBezierIneqConstraint, LinearBezierEqConstraint
 from pnc.planner.multicontact.path_parameterization import BezierCurve, CompositeBezierCurve
@@ -87,14 +89,16 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 # check if it has a final safe point assigned
                 if fr_seg_k_box == (num_iris_current-1) and f_name in safe_points_lst[seg_idx+1].keys():
                     constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])
-                    add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
+                    # TODO uncomment below after fixing casadi version
+                    # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
         elif (k + 1) % num_iris_tot == 0:  # final position for each frame
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
                 constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
             else:
                 constraints.append(points[k][0][-1] == safe_points_lst[-1][f_name])
-                add_vel_acc_constr(f_name, surface_normals_lst[-1], points[k], constraints)
+                # TODO uncomment below after fixing casadi version
+                # add_vel_acc_constr(f_name, surface_normals_lst[-1], points[k], constraints)
         else:       # safe and fixed positions at other times
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
@@ -105,7 +109,8 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 # note: the initial point within a segment is defined by the continuity constraint below
                 if fr_seg_k_box == (num_iris_current-1):
                     constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])  # pos
-                    add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
+                    # TODO uncomment below after fixing casadi version
+                    # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
 
         # Bezier dynamics.
         for i in range(D):
@@ -193,7 +198,6 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                     d_mat = np.repeat(d_vec, n_points, axis=1)
                     if frame_name == 'torso' or frame_name == 'LF' or frame_name == 'RF':
                         constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
-                    # constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
 
                 fr_iris_counter += num_iris_current
                 k_fr_iris += num_iris_current
@@ -265,6 +269,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     sol_stats['retiming_weights'] = retiming_weights
     dual_vars = {}
     dual_vars['lam_g0'] = prob.solution.dual_vars
+    dual_vars['lam_x0'] = np.zeros(prob.size_metrics.num_scalar_variables)
 
     return path, sol_stats, points, dual_vars
 
@@ -299,8 +304,8 @@ def pack_points_to_single_vector(points, vec_type: str):
             if vec_type == 'casadi':
                 transposed_mat = ca.reshape(points[ir][i], 3, num_points - i)
                 vector_out = ca.vertcat(vector_out, ca.reshape(transposed_mat, vec_size, 1))
-            elif vec_type == 'cxvpy':
-                parsed_vec = np.reshape(points[ir][i].value, (vec_size, 1), order='C')
+            elif vec_type == 'cvxpy':
+                parsed_vec = np.reshape(points[ir][i].value, (vec_size, 1), order='F')
                 vector_out = np.concatenate((vector_out, *parsed_vec))
             elif vec_type == 'numpy':
                 parsed_vec = np.reshape(points[ir][i], (vec_size, 1), order='C')
@@ -310,6 +315,50 @@ def pack_points_to_single_vector(points, vec_type: str):
 
     return vector_out
 
+
+def pack_points_for_single_vector(points, vec_type: str):
+    """
+    Casadi's reshape method follows a column-major order, so we reshape the matrices
+    accordingly to output:
+    x = [p0_x, p0_y, p0_z, v0_x, v0_y, v0_z, ..., p1_x, p1_y, p1_z, v1_x, v1_y, v1_z, ...]
+    where p0_x \in \mathbb{R}^(n_points)
+    """
+    vector_out = []
+    if type(points) is dict:
+        for k, v in points.items():      # loop through all IRIS regions
+            if type(v) is dict:
+                for k_deg in v.keys():
+                    n_pnt, x_dim = points[k][k_deg].shape
+                    vec_size = (n_pnt * x_dim)
+                    if vec_type == 'casadi':
+                        transposed_mat = ca.reshape(points[k][k_deg], x_dim, n_pnt)
+                        vector_out = ca.vertcat(vector_out, ca.reshape(transposed_mat, vec_size, 1))
+                    elif vec_type == 'cvxpy':
+                        parsed_vec = np.reshape(points[k][k_deg].value, (vec_size, 1), order='F')
+                        vector_out = np.concatenate((vector_out, *parsed_vec))
+                    elif vec_type == 'numpy':
+                        parsed_vec = np.reshape(points[k][k_deg], (vec_size, 1), order='C')
+                        vector_out = np.concatenate((vector_out, *parsed_vec))
+                    else:
+                        raise ValueError(f'Invalid vector type {vec_type}. Use either casadi, numpy, or cvxpy.')
+            elif type(v) is np.ndarray:     # this can be the dual variables from cvxpy
+                vec_size = np.prod(v.shape)
+                if vec_type == 'cvxpy':
+                    parsed_vec = np.reshape(v, (vec_size, 1), order='C')
+                    vector_out = np.concatenate((vector_out, *parsed_vec))
+                else:
+                    raise NotImplementedError(f'Parsing of {vec_type} into single vector not implemented.')
+
+    elif type(points) is list:      # solution from casadi comes as list of lists
+        for (_, pnt_mats) in enumerate(points):
+            for (_, p_mat) in enumerate(pnt_mats):
+                vec_size = np.prod(p_mat.shape)
+                if vec_type == 'casadi':
+                    parsed_vec = np.reshape(p_mat, (vec_size, 1), order='F')
+                    vector_out = np.concatenate((vector_out, *parsed_vec))
+                else:
+                    raise NotImplementedError(f'Parsing of {vec_type} into single vector not implemented.')
+    return vector_out
 
 def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: np.array],
                                   aux_frames: List[dict],
@@ -443,7 +492,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 fr_seg_k_box += 1
 
     # Rigid links (e.g., shin link length) constraint relaxation
-    soc_constraint, cost_log_abs = [], []
+    # soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
     if bool(aux_frames):     # check if empy dictionary
         link_threshold = 0.05
@@ -457,51 +506,51 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             for nb in range(1, num_iris_tot-1):
                 # for pnt in range(n_points-1):
                 for pnt in range(1):
-                    link_proximal_point = points[prox_fr_idx+nb][0][pnt]
-                    link_distal_point = points[dist_fr_idx+nb][0][pnt]
-                    create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-                                                         link_distal_point, soc_constraint, cost_log_abs,
-                                                         wi=weights_rigid_link)
+                    link_proximal_point = points[prox_fr_idx+nb][0][pnt,:]
+                    link_distal_point = points[dist_fr_idx+nb][0][pnt,:]
+                    # --- as equality constraint
+                    constraints.append(ca.norm_2(link_proximal_point - link_distal_point) - link_length)
+                    lbg.append(0.)
+                    ubg.append(link_threshold)
+                    initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.array([0.])))
 
-        cost_log_abs_sum = -(cp.sum(cost_log_abs))
+        # cost_log_abs_sum = -(cp.sum(cost_log_abs))
 
     # Reachability constraints
-    # if reach_region is not None:
-    #     k_fr_iris = 0
-    #     for fr_idx, frame_name in enumerate(frame_list):
-    #         fr_iris_counter = 0
-    #         for seg in range(len(durations)):
-    #
-    #             num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg])
-    #             for si in range(num_iris_current):
-    #                 z_t = points[0 * num_iris_tot + fr_iris_counter + si][0]
-    #
-    #                 if frame_name == 'torso':
-    #                     continue
-    #
-    #                 else:
-    #                     coeffs = reach_region[frame_name]
-    #                     z_ee_seg = points[fr_idx * num_iris_tot + fr_iris_counter + si][0]
-    #
-    #                 # reachable constraint
-    #                 H = coeffs['H']
-    #                 d_vec = np.reshape(coeffs['d'], (len(H), 1))
-    #                 d_mat = np.repeat(d_vec, n_points, axis=1)
-    #                 if frame_name == 'torso' or frame_name == 'LF' or frame_name == 'RF':
-    #                     constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
-    #                 # constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
-    #
-    #             fr_iris_counter += num_iris_current
-    #             k_fr_iris += num_iris_current
+    if reach_region is not None:
+        k_fr_iris = 0
+        for fr_idx, frame_name in enumerate(frame_list):
+            fr_iris_counter = 0
+            for seg in range(len(durations)):
+
+                num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg])
+                for si in range(num_iris_current):
+                    z_t = points[0 * num_iris_tot + fr_iris_counter + si][0]
+
+                    if frame_name == 'torso':
+                        continue
+
+                    else:
+                        coeffs = reach_region[frame_name]
+                        z_ee_seg = points[fr_idx * num_iris_tot + fr_iris_counter + si][0]
+
+                    # reachable constraint
+                    H = coeffs['H']
+                    d_vec = np.reshape(coeffs['d'], (len(H), 1))
+                    if frame_name == 'torso' or frame_name == 'LF' or frame_name == 'RF':
+                        parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
+                        # constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+                fr_iris_counter += num_iris_current
+                k_fr_iris += num_iris_current
 
     # Collect points into a single vector
-    points_all = pack_points_to_single_vector(points, 'casadi')
+    points_all = pack_points_for_single_vector(points, 'casadi')
 
     opts = {
         "ipopt": {
             "hessian_approximation": "exact",   # limited-memory
-            "max_iter": 100,
-            "mu_init": 1e-5,
+            # "max_iter": 50,
+            "mu_init": 1e-4,
             "tol": 1e-3,
             # "derivative_test": "first-order",
             # "derivative_test_print_all": "no",
@@ -512,31 +561,37 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     sca_constraints = []
     if robot_geom_data is not None:
-        # Simplified no self-collision function and constraints bounds for specified index pairs
-        mfpp_bezier_data = {'current_frames': (0, 1),   # make torso and RK frames SCA
-                            'n_points': n_points,
-                            'num_derivatives': D,
-                            'num_iris_per_frame': num_iris_tot,
-                            'num_frames': n_frames     # 2
-                            }
         f_dist = {}
-        sca_bez_points = range(0, num_iris_tot * n_points, 1)
-        for i in sca_bez_points:
-            mfpp_bezier_data['current_point'] = i
-            i_name = 'f_dist'+ str(i)
-            current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-            f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, robot_geom_data, current_mfpp_data)
-            sca_constraints.append(f_dist[i_name](points_all))
-            lbg.append(1.0)
-            ubg.append(ca.inf)
+        for knee_idx in [3, 4]:
+            # Simplified no self-collision function and constraints bounds for specified index pairs
+            mfpp_bezier_data = {'current_frames': (0, int(knee_idx)),   # make torso and RK frames SCA
+                                'n_points': n_points,
+                                'num_derivatives': D,
+                                'num_iris_per_frame': num_iris_tot,
+                                'num_frames': n_frames
+                                }
+            sca_bez_points = range(0, num_iris_tot * n_points, 1)
+            for i in sca_bez_points:
+                mfpp_bezier_data['current_point'] = i
+                if knee_idx == 3:
+                    i_name = 'f_dist_L' + str(i)
+                elif knee_idx == 4:
+                    i_name = 'f_dist_R'+ str(i)
+                current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
+                f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, robot_geom_data, current_mfpp_data)
+                sca_constraints.append(f_dist[i_name](points_all))
+                lbg.append(1.0)
+                ubg.append(ca.inf)
 
-        # assume lagrange multipliers of SCA constraints are zero
-        initial_guess['lam_g0'] = np.vstack((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
+            # assume lagrange multipliers of SCA constraints are zero
+            # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
+            initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points),1))))
 
+        opts["ipopt"]["max_iter"] = 100
         opts["ipopt"]["warm_start_init_point"] = "yes"
-        opts["ipopt"]["warm_start_mult_bound_push"] = 1e-6
-        opts["ipopt"]["warm_start_slack_bound_push"] = 1e-6
-        opts["ipopt"]["warm_start_bound_push"] = 1e-6
+        opts["ipopt"]["warm_start_mult_bound_push"] = 1e-4
+        opts["ipopt"]["warm_start_slack_bound_push"] = 1e-4
+        opts["ipopt"]["warm_start_bound_push"] = 1e-4
 
         # Solve problem
     nlp = {'x': points_all,
@@ -573,9 +628,9 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             for nb in range(1, num_iris_tot-1):
                 # for pnt in range(n_points-1):
                 for pnt in range(1):
-                    link_proximal_point = points[prox_fr_idx+nb][0][pnt]
-                    link_distal_point = points[dist_fr_idx+nb][0][pnt]
-                    print(f"{aux_fr['parent_frame']} Link length discrepancy: {np.linalg.norm(link_proximal_point.value - link_distal_point.value) - link_length}")
+                    link_proximal_point = sol_points[prox_fr_idx+nb][0][pnt]
+                    link_distal_point = sol_points[dist_fr_idx+nb][0][pnt]
+                    print(f"{aux_fr['parent_frame']} Link length discrepancy: {np.linalg.norm(link_proximal_point - link_distal_point) - link_length}")
 
     # Reconstruct trajectory.
     beziers, path = [], []

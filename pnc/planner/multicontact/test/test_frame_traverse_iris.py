@@ -10,7 +10,7 @@ import meshcat
 
 from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_polygonal import solve_min_reach_iris_distance
 from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_smooth import optimize_multiple_bezier_iris, \
-    optimize_multiple_bezier_iris_casadi, pack_points_to_single_vector
+    optimize_multiple_bezier_iris_casadi, pack_points_for_single_vector
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 # IRIS
 from vision.iris.iris_geom_interface import *
@@ -566,14 +566,14 @@ class TestFrameTraverseIris(unittest.TestCase):
         # test optimize multiple bezier
         reach = None    # ignore reachable space in this test
         aux = []
-        durations=[]        # should be obtained from iris_seq, hard-coded in this test
+        durations = []        # should be obtained from iris_seq, hard-coded in this test
         durations.append({'torso': np.array([0.2] * 3),
                           'RF': np.array([0.2] * 3)})
         durations.append({'torso': np.array([0.2] * 1),
                           'RF': np.array([0.2] * 1)})
-        alpha = {1: 1, 2: 0, 3: 0}
+        alpha = {1: 1, 2: 1, 3: 0}
         surface_normals_lst = motion_frames_seq.get_contact_surfaces()
-        path, sol_stats, bez_points, dual_vars = optimize_multiple_bezier_iris_casadi(reach, aux, safe_regions_mgr_dict,
+        path, sol_stats, bez_points, dual_vars = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
                                                         fixed_frames=fixed_frames,
                                                         surface_normals_lst=surface_normals_lst)
@@ -633,6 +633,24 @@ class TestFrameTraverseIris(unittest.TestCase):
                     # LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
                 i += 1
 
+            # plot raw bezier points output by casadi
+            # for (n_bp, bp_val) in enumerate(bez_points):
+            #     if n_bp < 4:
+            #         fr_name = 'torso'
+            #     elif n_bp < 8:
+            #         fr_name = 'RF'
+            #     # grab only the position index
+            #     LocomanipulationFramePlanner.visualize_simple_points(self.vis, fr_name + "_bez/" + str(n_bp), bp_val[0], [0,0,0,1])
+
+            # plot raw bezier points output by cvxpy
+            for n_bp, bp_val in bez_points.items():
+                if n_bp < 4:
+                    fr_name = 'torso'
+                elif n_bp < 8:
+                    fr_name = 'RF'
+                # grab only the position index
+                LocomanipulationFramePlanner.visualize_simple_points(self.vis, fr_name + "_bez/" + str(n_bp), bp_val[0].value, [0,0,0,1])
+
         self.assertTrue(path is not None, "Problem seems to be infeasible")
         self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.torso_starting_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(path[0].beziers[3].points[-1] - self.torso_final_pos) < 1e-3)
@@ -647,10 +665,11 @@ class TestFrameTraverseIris(unittest.TestCase):
 
         # parse initial guess from previous solution
         bez_initial_guess = {}
-        bez_initial_guess['x0'] = pack_points_to_single_vector(bez_points, 'numpy')
-        bez_initial_guess['lam_g0'] = dual_vars['lam_g0']
+        bez_initial_guess['x0'] = pack_points_for_single_vector(bez_points, 'cvxpy')
+        bez_initial_guess['lam_g0'] = pack_points_for_single_vector(dual_vars['lam_g0'], 'cvxpy')
+        # bez_initial_guess['lam_g0'] = dual_vars['lam_g0']
         bez_initial_guess['lam_x0'] = dual_vars['lam_x0']
-        path, sol_stats, _, _ = optimize_multiple_bezier_iris_casadi(reach, aux, safe_regions_mgr_dict,
+        path, sol_stats, bez_points, _ = optimize_multiple_bezier_iris_casadi(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
                                                         geom_data,
                                                         fixed_frames=fixed_frames,
@@ -675,6 +694,15 @@ class TestFrameTraverseIris(unittest.TestCase):
                     LocomanipulationFramePlanner.visualize_bezier_polytope(self.vis, fr_name, bezier_curve, seg, A, b)
                     # LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg)
                 i += 1
+
+            # plot raw bezier points output by casadi
+            for (n_bp, bp_val) in enumerate(bez_points):
+                if n_bp < 4:
+                    fr_name = 'torso'
+                elif n_bp < 8:
+                    fr_name = 'RF'
+                # grab only the position index
+                LocomanipulationFramePlanner.visualize_simple_points(self.vis, fr_name + "_bez/" + str(n_bp), bp_val[0], [0,0,0,1])
 
         self.assertTrue(path is not None, "Problem seems to be infeasible")
         error = path[0].beziers[0].points[0] - self.torso_starting_pos
