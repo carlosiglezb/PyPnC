@@ -17,7 +17,7 @@ class TestCollisionConfigurations(unittest.TestCase):
         # Initialize self-collision checker
         robot_model_path = cwd + "/robot_model/g1_description/"
         urdf_path = robot_model_path + "g1_simple_collisions.urdf"
-        srdf_path = robot_model_path + "config/g1.srdf"
+        srdf_path = robot_model_path + "config/g1_cube_points.srdf"
 
         self_collision_checker = SelfCollisionChecker(robot_model_path,
                                                       urdf_path,
