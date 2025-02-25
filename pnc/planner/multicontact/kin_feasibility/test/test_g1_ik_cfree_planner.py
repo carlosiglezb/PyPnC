@@ -4,6 +4,8 @@ import os
 import sys
 from collections import OrderedDict
 
+from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
+
 cwd = os.getcwd()
 sys.path.append(cwd)
 
@@ -65,7 +67,9 @@ class TestIKCFreePlanner(unittest.TestCase):
 
     def setUp(self):
         robot_name = 'g1'
+        self.b_use_knees = True
         self.robot_name = robot_name
+        self.frame_names, self.plan_to_model_frames = self.get_robot_link_names()
         self.aux_frames_path = cwd + '/pnc/reachability_map/output/' + robot_name + '/' + \
                                 robot_name + '_aux_frames.yaml'
 
@@ -127,17 +131,42 @@ class TestIKCFreePlanner(unittest.TestCase):
                              self.q0[:3], self.q0[3:7], np.zeros(3), np.zeros(3),
                                       cmd["joint_pos"], cmd["joint_vel"])
 
+        # load robot model and corresponding robot data for self-collision avoidance
+        self.package_dir = cwd + "/robot_model/g1_description"
+        self.robot_urdf_file = self.package_dir + "/g1_cube_collisions.urdf"
+
     # needed for self-collision checks
     @staticmethod
-    def load_robot_model():
-        package_dir = cwd + "/robot_model/g1_description"
-        robot_urdf_file = package_dir + "/g1_simple_collisions.urdf"
+    def load_robot_model(package_dir, robot_urdf_file):
         rob_model, col_model, vis_model = pin.buildModelsFromUrdf(robot_urdf_file,
                                                                   package_dir,
                                                                   pin.JointModelFreeFlyer())
         rob_data, col_data, vis_data = pin.createDatas(rob_model, col_model, vis_model)
 
         return rob_model, col_model, vis_model, rob_data, col_data, vis_data
+
+    def get_robot_link_names(self):
+        if self.b_use_knees:
+            frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
+            plan_to_model_frames = {
+                'torso': 'torso_link',
+                'LF': 'left_ankle_roll_link',
+                'RF': 'right_ankle_roll_link',
+                'L_knee': 'left_knee_link',
+                'R_knee': 'right_knee_link',
+                'LH': 'left_palm_link',
+                'RH': 'right_palm_link'
+            }
+        else:
+            frame_names = ['torso', 'LF', 'RF', 'LH', 'RH']
+            plan_to_model_frames = {
+                'torso': 'torso_link',
+                'LF': 'left_ankle_roll_link',
+                'RF': 'right_ankle_roll_link',
+                'LH': 'left_palm_link',
+                'RH': 'right_palm_link'
+            }
+        return frame_names, plan_to_model_frames
 
     def get_navy_door_default_initial_pose(self):
         # rotates, then translates
@@ -182,7 +211,7 @@ class TestIKCFreePlanner(unittest.TestCase):
                                  'LH': IrisRegionsManager(safe_lh_start_region, safe_lh_end_region),
                                  'RF': IrisRegionsManager(safe_rf_start_region, safe_rf_end_region),
                                  'RH': IrisRegionsManager(safe_rh_start_region, safe_rh_end_region)}
-        if b_use_knees:
+        if self.b_use_knees:
             starting_lkn_pos = self.robot_fwdk.get_link_iso(plan_to_model_frames['L_knee'])[:3, 3]
             final_lkn_pos = starting_lkn_pos + np.array([goal_step_length, 0., 0.])
             starting_rkn_pos = self.robot_fwdk.get_link_iso(plan_to_model_frames['R_knee'])[:3, 3]
@@ -227,7 +256,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         final_rf_pos = safe_regions_mgr_dict['RF'].iris_list[1].seed_pos
         intermediate_lh_pos_door = np.array([self.door_pos[0], 0.37, 0.9])
         final_torso_pos = safe_regions_mgr_dict['torso'].iris_list[1].seed_pos
-        if b_use_knees:
+        if self.b_use_knees:
             final_lkn_pos = safe_regions_mgr_dict['L_knee'].iris_list[1].seed_pos
             final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
 
@@ -235,7 +264,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
         # ---- Step 1: L hand to frame
-        if b_use_knees:
+        if self.b_use_knees:
             fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
         else:
             fixed_frames.append(['LF', 'RF'])   # frames that must not move
@@ -245,7 +274,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         motion_frames_seq.add_contact_surface(lh_contact_front)
 
         # ---- Step 2: step through door with left foot
-        if b_use_knees:
+        if self.b_use_knees:
             fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
             motion_frames_seq.add_motion_frame({
                 'LF': final_lf_pos,
@@ -416,26 +445,9 @@ class TestIKCFreePlanner(unittest.TestCase):
         return fixed_frames, motion_frames_seq
 
     def test_five_stage_plan_feet_knee_hands(self):
-        if b_use_knees:
-            frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
-            plan_to_model_frames = {
-                'torso': 'torso_link',
-                'LF': 'left_ankle_roll_link',
-                'RF': 'right_ankle_roll_link',
-                'L_knee': 'left_knee_link',
-                'R_knee': 'right_knee_link',
-                'LH': 'left_palm_link',
-                'RH': 'right_palm_link'
-            }
-        else:
-            frame_names = ['torso', 'LF', 'RF', 'LH', 'RH']
-            plan_to_model_frames = {
-                'torso': 'torso_link',
-                'LF': 'left_ankle_roll_link',
-                'RF': 'right_ankle_roll_link',
-                'LH': 'left_palm_link',
-                'RH': 'right_palm_link'
-            }
+        frame_names = self.frame_names
+        plan_to_model_frames = self.plan_to_model_frames
+
         ik_cfree_planner = IKCFreePlanner(self.robot.model, self.robot.data, plan_to_model_frames, self.q0)
         ee_halfspace_params = OrderedDict()
         reach_path = cwd + '/pnc/reachability_map/output/' + self.robot_name + '/' + self.robot_name
@@ -505,7 +517,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         # planner parameters
         T = 3
         alpha = [0, 0, 1]
-        if b_use_knees:
+        if self.b_use_knees:
             traversable_regions = [traversable_regions_dict['torso'],
                                    traversable_regions_dict['LF'],
                                    traversable_regions_dict['RF'],
@@ -535,31 +547,14 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         self.assertEqual(True, True)  # add assertion here
 
-    def test_five_stage_plan_one_hand_at_a_time(self):
-        if b_use_knees:
-            frame_names = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
-            plan_to_model_frames = {
-                'torso': 'torso_link',
-                'LF': 'left_ankle_roll_link',
-                'RF': 'right_ankle_roll_link',
-                'L_knee': 'left_knee_link',
-                'R_knee': 'right_knee_link',
-                'LH': 'left_palm_link',
-                'RH': 'right_palm_link'
-            }
-        else:
-            frame_names = ['torso', 'LF', 'RF', 'LH', 'RH']
-            plan_to_model_frames = {
-                'torso': 'torso_link',
-                'LF': 'left_ankle_roll_link',
-                'RF': 'right_ankle_roll_link',
-                'LH': 'left_palm_link',
-                'RH': 'right_palm_link'
-            }
+    def test_five_stage_plan_one_hand_at_a_time(self, sca_geometry=None):
+        frame_names = self.frame_names
+        plan_to_model_frames = self.plan_to_model_frames
+
         ik_cfree_planner = IKCFreePlanner(self.robot.model, self.robot.data, plan_to_model_frames, self.q0)
         ee_halfspace_params = OrderedDict()
         for fr in frame_names:
-            ee_halfspace_params[fr] = cwd + '/pnc/reachability_map/output/draco3_' + fr + '.yaml'
+            ee_halfspace_params[fr] = cwd + '/pnc/reachability_map/output/g1/g1_' + fr + '.yaml'
 
         # process vision and create IRIS regions
         standing_pos = self.q0[:3]
@@ -579,7 +574,7 @@ class TestIKCFreePlanner(unittest.TestCase):
                 )
                 print(err)
                 sys.exit(0)
-            visualizer.loadViewerModel(rootNodeName="draco3")
+            visualizer.loadViewerModel(rootNodeName="g1")
             visualizer.display(self.q0)
 
             # load (real) door to visualizer
@@ -620,7 +615,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         p_init['torso'] = self.starting_torso_pos
         p_init['LF'] = self.starting_lf_pos
         p_init['RF'] = self.starting_rf_pos
-        if b_use_knees:
+        if self.b_use_knees:
             p_init['L_knee'] = self.starting_lkn_pos
             p_init['R_knee'] = self.starting_rkn_pos
         p_init['LH'] = self.starting_lh_pos
@@ -643,7 +638,8 @@ class TestIKCFreePlanner(unittest.TestCase):
         frame_planner = LocomanipulationFramePlanner(traversable_regions,
                                                      aux_frames_path=self.aux_frames_path,
                                                      fixed_frames=fixed_frames_seq,
-                                                     motion_frames_seq=motion_frames_seq)
+                                                     motion_frames_seq=motion_frames_seq,
+                                                     sca_robot_geom=sca_geometry)
 
         # set planner
         weights_rigid_link = np.array([10, 0., 0.])
@@ -682,8 +678,9 @@ class TestIKCFreePlanner(unittest.TestCase):
             idx += 1
 
         if b_visualize:
-            # load robot model and corresponding robot data
-            rob_model, col_model, vis_model, rob_data, col_data, vis_data = self.load_robot_model()
+            package_dir = self.package_dir
+            robot_urdf_file = self.robot_urdf_file
+            rob_model, col_model, vis_model, rob_data, col_data, vis_data = self.load_robot_model(package_dir, robot_urdf_file)
 
             save_freq = 1
             display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
@@ -712,5 +709,70 @@ class TestIKCFreePlanner(unittest.TestCase):
             display.finish_animation()
 
         self.assertEqual(True, True)
+
+
+    def test_sca_plan_five_stage_plan_one_hand_at_a_time(self):
+        b_visualize = True
+
+        plan_to_model_frames = self.plan_to_model_frames
+        sca_geometry = SCARobotGeometry(self.package_dir, self.robot_urdf_file, plan_to_model_frames)
+        sca_kin_cfree_planner = self.test_five_stage_plan_one_hand_at_a_time(sca_geometry)
+
+        # populate trajectories
+        N_knots = 100
+        base_targets = np.zeros((N_knots, 3))
+        lf_targets = np.zeros((N_knots, 3))
+        rf_targets = np.zeros((N_knots, 3))
+        lkn_targets = np.zeros((N_knots, 3))
+        rkn_targets = np.zeros((N_knots, 3))
+        lh_targets = np.zeros((N_knots, 3))
+        rh_targets = np.zeros((N_knots, 3))
+        n_contacts = len(sca_kin_cfree_planner.planner.fixed_frames)
+        T = 3
+        idx = 0
+        for t in np.linspace(0, n_contacts * T, N_knots):
+            targets_dict = sca_kin_cfree_planner.pack_current_targets(t)
+            base_targets[idx] = targets_dict['torso']
+            lf_targets[idx] = targets_dict['LF']
+            rf_targets[idx] = targets_dict['RF']
+            lkn_targets[idx] = targets_dict['L_knee']
+            rkn_targets[idx] = targets_dict['R_knee']
+            lh_targets[idx] = targets_dict['LH']
+            rh_targets[idx] = targets_dict['RH']
+            idx += 1
+
+        if b_visualize:
+            package_dir = self.package_dir
+            robot_urdf_file = self.robot_urdf_file
+            rob_model, col_model, vis_model, rob_data, col_data, vis_data = self.load_robot_model(package_dir, robot_urdf_file)
+
+            save_freq = 1
+            display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
+                                                          rob_data, vis_data, col_data,
+                                                          ctrl_freq=N_knots / (n_contacts * T), save_freq=save_freq)
+            # load (real) door to visualizer
+            door_model, door_collision_model, door_visual_model = pin.buildModelsFromUrdf(
+                cwd + "/robot_model/ground/navy_door.urdf",
+                cwd + "/robot_model/ground", pin.JointModelFreeFlyer())
+
+            door_vis_q = self.get_navy_door_default_initial_pose()
+            display.add_robot("door", door_model, door_collision_model, door_visual_model, door_vis_q[:3], door_vis_q[3:])
+
+            # start animation
+            display.start_animation()
+            for i in range(N_knots):
+                display.animate_single_collision(sca_kin_cfree_planner.plan_to_model_frames['torso'] + '_0', base_targets[i])
+                display.animate_target("lfoot_target", [lf_targets[i]], [1, 1, 0])
+                display.animate_target("lknee_target", [lkn_targets[i]], [0, 0, 1])
+                display.animate_target("rfoot_target", [rf_targets[i]], [1, 1, 0])
+                display.animate_target("rknee_target", [rkn_targets[i]], [0, 0, 1])
+                display.animate_target("lhand_target", [lh_targets[i]], [0.5, 0, 0])
+                display.animate_target("rhand_target", [rh_targets[i]], [0.5, 0, 0])
+                display.animate_target("base_target", [base_targets[i]], [0, 0.5, 0])
+                display.animation_step()
+            display.finish_animation()
+
+        self.assertEqual(True, True)
+
 if __name__ == '__main__':
     unittest.main()
