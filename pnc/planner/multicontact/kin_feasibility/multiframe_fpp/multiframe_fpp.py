@@ -7,7 +7,9 @@ from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_polygonal impo
 from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_smooth import optimize_multiple_bezier_iris, \
     optimize_multiple_bezier_iris_casadi, pack_points_for_single_vector
 from pnc.planner.multicontact.kin_feasibility.fpp_sequencer_tools import get_last_defined_point
+from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 from vision.iris.iris_regions_manager import IrisRegionsManager
+from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 
 
 def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
@@ -162,7 +164,9 @@ def pack_box_seq_from_point(b_max, box_seq_dict, box_seq_lst, ff, iris_regions, 
 
 def plan_multiple_iris(S, R, p_init, T, alpha,
                   verbose=True, A=None, fixed_frames=None,
-                  motion_frames_seq=None, w_rigid=None, w_rigid_poly=None):
+                  motion_frames_seq=None,
+                  sca_robot_geometry: SCARobotGeometry=None,
+                  w_rigid=None, w_rigid_poly=None):
     # Find IRIS sequence and minimize length between safe points
     motion_frames_lst = motion_frames_seq.get_motion_frames()
     iris_seq, safe_pnt_lst = plan_multistage_iris_seq(S, fixed_frames, motion_frames_lst, p_init)
@@ -238,45 +242,12 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     if verbose:
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
 
-    # TODO get from URDF and pass through argument
-    A1 = np.array([[1, 0, 0],
-                  [0, 1, 0],
-                  [0, 0, 1],
-                  [-1, 0, 0],
-                  [0, -1, 0],
-                  [0, 0, -1]
-                  ])
-    b1 = np.array([[0.07],
-                 [0.105],
-                 [0.175],
-                 [0.07],
-                 [0.105],
-                 [0.175]]
-                 )
-    A2 = np.array([[1, 0, 0],
-                  [0, 1, 0],
-                  [0, 0, 1],
-                  [-1, 0, 0],
-                  [0, -1, 0],
-                  [0, 0, -1]
-                  ])
-    radius = 0.03
-    b2 = np.array([[radius],
-                 [radius],
-                 [radius],
-                 [radius],
-                 [radius],
-                 [radius]]
-                 )
-    Q = np.eye(3)
-    geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
-
     initial_guess = {}
     initial_guess['x0'] = pack_points_for_single_vector(points, 'cvxpy')
     initial_guess['lam_g0'] = pack_points_for_single_vector(dvars['lam_g0'], 'cvxpy')
     initial_guess['lam_x0'] = dvars['lam_x0']
     paths, sol_stats, points, _ = optimize_multiple_bezier_iris_casadi(R, A, S, durations, alpha, safe_pnt_lst,
-                                                             geom_data,
+                                                             sca_robot_geometry,
                                                              fixed_frames=fixed_frames,
                                                              contact_sequence=parsed_contact_seq,
                                                              surface_normals_lst=surface_normals_lst,

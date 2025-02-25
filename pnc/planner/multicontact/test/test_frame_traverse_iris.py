@@ -1,6 +1,9 @@
 import unittest
 
 import os, sys
+
+from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
+
 cwd = os.getcwd()
 sys.path.append(cwd)
 
@@ -584,36 +587,22 @@ class TestFrameTraverseIris(unittest.TestCase):
         # print(f"Runtime solve with cvxpy: {sol_stats['runtime']}")
 
         # include simplified rigid bodies for self-collision avoidance
-        # TODO get A, b, Q, r1, r2 from robot model (URDF) -- based off G1
-        A1 = np.array([[1, 0, 0],
-                      [0, 1, 0],
-                      [0, 0, 1],
-                      [-1, 0, 0],
-                      [0, -1, 0],
-                      [0, 0, -1]
-                      ])
-        b1 = np.array([[0.07],
-                     [0.105],
-                     [0.175],
-                     [0.07],
-                     [0.105],
-                     [0.175]]
-                     )
-        A2 = np.array([[1, 0, 0],
-                      [0, 1, 0],
-                      [0, 0, 1],
-                      [-1, 0, 0],
-                      [0, -1, 0],
-                      [0, 0, -1]
-                      ])
-        radius = 0.03
-        b2 = np.array([[radius],
-                     [radius],
-                     [radius],
-                     [radius],
-                     [radius],
-                     [radius]]
-                     )
+        robot_model_path = cwd + "/robot_model/g1_description/"
+        urdf_path = robot_model_path + "g1_cube_collisions.urdf"
+        plan_to_model_frames = {
+            'torso': 'torso_link',
+            'LF': 'left_ankle_roll_link',
+            'RF': 'right_ankle_roll_link',
+            'L_knee': 'left_knee_link',
+            'R_knee': 'right_knee_link',
+            'LH': 'left_palm_link',
+            'RH': 'right_palm_link'
+        }
+        sca_geom = SCARobotGeometry(robot_model_path, urdf_path, plan_to_model_frames)
+        A1 = sca_geom.get_box_representation('torso')['A']
+        b1 = sca_geom.get_box_representation('torso')['b']
+        A2 = sca_geom.get_box_representation('RF')['A']
+        b2 = sca_geom.get_box_representation('RF')['b']
 
         # Create points from Bezier curve
         if b_visualize:
@@ -658,11 +647,6 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(path[1].beziers[3].points[0] - self.rf_final_pos) < 1e-3)
         self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rf_final_pos) < 1e-3)
 
-        Q = np.eye(3)
-        # radius = 0.03
-        # U = (1/radius) * np.eye(3)       # Cholesky factorization of end effector's sphere radius
-        geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
-
         # parse initial guess from previous solution
         bez_initial_guess = {}
         bez_initial_guess['x0'] = pack_points_for_single_vector(bez_points, 'cvxpy')
@@ -671,7 +655,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         bez_initial_guess['lam_x0'] = dual_vars['lam_x0']
         path, sol_stats, bez_points, _ = optimize_multiple_bezier_iris_casadi(reach, aux, safe_regions_mgr_dict,
                                                         durations, alpha, safe_points_lst,
-                                                        geom_data,
+                                                        sca_geom,
                                                         fixed_frames=fixed_frames,
                                                         surface_normals_lst=surface_normals_lst,
                                                         initial_guess=bez_initial_guess)

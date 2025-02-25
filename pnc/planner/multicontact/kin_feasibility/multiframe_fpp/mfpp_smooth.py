@@ -17,6 +17,7 @@ from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import get_aux_fram
 from pnc.planner.multicontact.kin_feasibility.scipy_ocp_constraints.scipy_ocp_functions import \
     LinearBezierIneqConstraint, LinearBezierEqConstraint
 from pnc.planner.multicontact.path_parameterization import BezierCurve, CompositeBezierCurve
+from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
 
@@ -366,7 +367,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                   durations: List[dict[str, np.array]],
                                   alpha: dict[int: float],
                                   safe_points_lst: List[dict[str, np.array]],
-                                  robot_geom_data: dict[str: np.array]=None,
+                                  robot_geom_data: SCARobotGeometry=None,
                                   fixed_frames=None,
                                   contact_sequence=None,
                                   surface_normals_lst=None,
@@ -494,7 +495,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     # Rigid links (e.g., shin link length) constraint relaxation
     # soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
-    if bool(aux_frames):     # check if empy dictionary
+    if bool(aux_frames):     # check if empty dictionary
         link_threshold = 0.05
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
@@ -509,9 +510,9 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                     link_proximal_point = points[prox_fr_idx+nb][0][pnt,:]
                     link_distal_point = points[dist_fr_idx+nb][0][pnt,:]
                     # --- as equality constraint
-                    constraints.append(ca.norm_2(link_proximal_point - link_distal_point) - link_length)
-                    lbg.append(0.)
-                    ubg.append(link_threshold)
+                    constraints.append(ca.norm_2(link_proximal_point - link_distal_point))
+                    lbg.append(link_length)
+                    ubg.append(link_length)
                     initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.array([0.])))
 
         # cost_log_abs_sum = -(cp.sum(cost_log_abs))
@@ -561,24 +562,39 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     sca_constraints = []
     if robot_geom_data is not None:
+        print(f'{"*" * 10} Solving with Primitive Self Collision Avoidance! {"*" * 10}')
         f_dist = {}
-        for knee_idx in [3, 4]:
+        Q = np.eye(3)
+
+        # get indices of links to check for simplified rigid body collisions
+        torso_idx = None
+        sca_col_link_idxs = []
+        for i, fr in enumerate(frame_list):
+            if fr == 'torso':
+                A1 = robot_geom_data.get_box_representation(fr)['A']
+                b1 = robot_geom_data.get_box_representation(fr)['b']
+                torso_idx = i
+            elif robot_geom_data.is_link_in_sca_list(fr):
+                sca_col_link_idxs.append(i)
+        print(f'Checking for self-collision with: {[frame_list[i] for i in sca_col_link_idxs]}')
+        for col_idx in sca_col_link_idxs:
+            A2 = robot_geom_data.get_box_representation(frame_list[col_idx])['A']
+            b2 = robot_geom_data.get_box_representation(frame_list[col_idx])['b']
+
             # Simplified no self-collision function and constraints bounds for specified index pairs
-            mfpp_bezier_data = {'current_frames': (0, int(knee_idx)),   # make torso and RK frames SCA
+            mfpp_bezier_data = {'current_frames': (torso_idx, col_idx),   # make torso and RK frames SCA
                                 'n_points': n_points,
                                 'num_derivatives': D,
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
             sca_bez_points = range(0, num_iris_tot * n_points, 1)
+            col_pair_geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
             for i in sca_bez_points:
                 mfpp_bezier_data['current_point'] = i
-                if knee_idx == 3:
-                    i_name = 'f_dist_L' + str(i)
-                elif knee_idx == 4:
-                    i_name = 'f_dist_R'+ str(i)
+                i_name = 'f_dist_' + str(frame_list[col_idx]) + str(i)
                 current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-                f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, robot_geom_data, current_mfpp_data)
+                f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, col_pair_geom_data, current_mfpp_data)
                 sca_constraints.append(f_dist[i_name](points_all))
                 lbg.append(1.0)
                 ubg.append(ca.inf)

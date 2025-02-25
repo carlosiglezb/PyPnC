@@ -5,7 +5,7 @@ from pydrake.geometry.optimization import HPolyhedron
 import pnc.planner.multicontact.kin_feasibility.fastpathplanning.fastpathplanning as fpp
 from collections import OrderedDict
 
-import pnc.planner.multicontact.kin_feasibility.multiframe_fpp.multiframe_fpp
+from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.multiframe_fpp import plan_multiple_iris
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import convert_rgba_to_meshcat_obj
 from util.polytope_math import extract_plane_eqn_from_coeffs
 
@@ -23,7 +23,8 @@ class LocomanipulationFramePlanner:
                  starting_stance_foot='LF',
                  aux_frames_path=None,
                  fixed_frames=None,
-                 motion_frames_seq=None):
+                 motion_frames_seq=None,
+                 sca_robot_geom=None):
 
         # fixed, motion, and free frames filled out in the creation of hyperplanes
         self.fixed_frames, self.motion_frames_seq, self.free_frames = [], [], []
@@ -74,6 +75,7 @@ class LocomanipulationFramePlanner:
         else:
             self.aux_frames = aux_frames_path
 
+        self.sca_robot_geom = sca_robot_geom
 
     def add_offset_to_plane_eqn_from_file(self, frame_name,
                                           ee_offset_file_path,
@@ -119,8 +121,14 @@ class LocomanipulationFramePlanner:
         A = self.aux_frames
         fixed_frames = self.fixed_frames
         motion_frames_seq = self.motion_frames_seq
-        self.path, self.box_seq, self.points = pnc.planner.multicontact.kin_feasibility.multiframe_fpp.multiframe_fpp.plan_multiple_iris(S, R, p_init, T, alpha, verbose, A,
-                                                                                                                                         fixed_frames, motion_frames_seq, w_rigid, w_rigid_poly)
+        sca_robot_geom = self.sca_robot_geom
+        self.path, self.box_seq, self.points = plan_multiple_iris(S, R, p_init, T,
+                                                                  alpha, verbose,
+                                                                  A, fixed_frames,
+                                                                  motion_frames_seq,
+                                                                  sca_robot_geom,
+                                                                  w_rigid,
+                                                                  w_rigid_poly)
 
     def plot(self, visualizer, static_html=False):
         i = 0
