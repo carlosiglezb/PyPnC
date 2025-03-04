@@ -2,6 +2,46 @@ from casadi import *
 import numpy as np
 import cvxpy as cp
 
+class EllipsoidPairJacFun(Callback):
+    def __init__(self, name, geom_data, z, opts={}):
+        Callback.__init__(self)
+
+        self.A = geom_data['A']      # torso halfspace
+        self.b = geom_data['b']      # torso halfspace offset
+        self.Q = geom_data['Q']      # torso rotation
+        self.U = geom_data['U']      # torso center
+        self.z = z
+
+        self.construct(name, opts)
+
+    def get_n_in(self):
+        return 2
+
+    def get_n_out(self):
+        return 1
+
+    def get_sparsity_in(self, i):
+        if i == 0:
+            return Sparsity.dense(6, 1)
+        elif i == 1:
+            return Sparsity.dense(1, 1)
+
+    def get_sparsity_out(self, i):
+        return Sparsity.dense(1, 6)
+
+    def update_dual_vars(self, z):
+        self.z = z
+
+    def eval(self, arg):
+        z = np.array(arg[0])
+        grad_polytope = -self.A @ self.Q.T
+        grad_ellipse = np.vstack((np.zeros((1,3)), self.U @ self.Q.T))
+        ret1 = self.z[:-1].T @ (np.concatenate((grad_polytope, np.zeros((4, 3)))))
+        ret2 = self.z[:-1].T @ (np.concatenate((np.zeros((6, 3)), grad_ellipse)))
+        grad_g = np.hstack((ret1, ret2))
+        return [grad_g]
+
+
 class DColMinDistancePairsCallback(Callback):
     def __init__(self, name, geom_data, opts={}):
         Callback.__init__(self)
@@ -15,7 +55,7 @@ class DColMinDistancePairsCallback(Callback):
         self.G1[:, :3] = self.A @ self.Q.T
         self.G1[:, 3:] = -self.b
         self.h1 = np.zeros((6,6))    # needs to be updated in eval
-        self.z = np.zeros((10,1))     # DCOL dual variable
+        self.z = np.zeros((11,1))     # DCOL dual variable
 
         # end effector sphere representation matrices
         self.G2 = np.zeros((4,4))
@@ -24,6 +64,7 @@ class DColMinDistancePairsCallback(Callback):
         self.h2 = np.zeros((4,1))    # needs to be updated in eval
 
         # initialize object construction
+        self.jac_callback = EllipsoidPairJacFun(name, geom_data, self.z)
         self.construct(name, opts)
 
     def init(self):
@@ -34,13 +75,13 @@ class DColMinDistancePairsCallback(Callback):
         Number of input arguments: r1, r2.
         These correspond to the center of the torso (r1) and the end effector (r2).
         """
-        return 2
+        return 1
 
     def get_sparsity_in(self, i):
         """
         Sparsity pattern of input arguments: 3-D coordinates.
         """
-        return Sparsity.dense(3, 1)
+        return Sparsity.dense(6, 1)
 
     def get_sparsity_out(self, i):
         return Sparsity.dense(1, 1)
@@ -49,39 +90,12 @@ class DColMinDistancePairsCallback(Callback):
         return True
 
     def get_jacobian(self, *args):
-        # FIXME: need to finish implementing and test this method
-        G1 = self.G1
-        G2 = self.G2
-
-        # provide first order Jacobians
-        r1 = MX.sym('r1', 3, 1)
-        r2 = MX.sym('r2', 3, 1)
-        x = MX.sym('x', 3, 1)
-        alpha = MX.sym('alpha', 1)
-        xsol = vertcat(x, alpha)
-
-        # reconstruct cone matrices with implicit parameters
-        h1 = self.A @ self.Q.T @ r1
-        h2 = vertcat(0, -self.U @ self.Q.T @ r2)
-        h = vertcat(h1, h2)
-        G = vertcat(G1, G2)
-
-        # optimality condition
-        g_impl = G @ xsol - h
-        grad_g = jacobian(g_impl, r1)
-
-        # z = self.z
-        # f = MX(1, 1)
-        # grad_r1 = jacobian(solve_polytope_min_prox, r1)
-        # grad_r2 = jacobian(solve_polytope_min_prox, r2)
-        # Df =  Function('Df', [x, f], [z.T @ (G1 @ x - h1)])
-
-        return grad_g
-
+        return self.jac_callback
 
     def eval(self, arg):
-        r1 = np.array(arg[0])   # torso center
-        r2 = np.array(arg[1])   # end effector (sphere) center
+        z = np.array(arg[0])   # torso center
+        r1 = z[:3]   # torso center
+        r2 = z[3:]   # end effector (sphere) center
 
         # find distance via optimization (dcol)
         alpha = cp.Variable(1)
@@ -93,7 +107,8 @@ class DColMinDistancePairsCallback(Callback):
         U = self.U
         constraints = []
         constraints.append(A @ Q.T @ (x - r1) <= alpha * b)
-        constraints.append(cp.norm(U @ Q.T @ (x - r2)) <= alpha)
+        # ellispoid constraint: norm(U @ Q.T @ (x - r2)) <= alpha
+        constraints.append(cp.SOC(alpha, U @ Q.T @ (x - r2)))
         constraints.append(alpha >= 0)
         prob = cp.Problem(cp.Minimize(alpha), constraints)
         prob.solve(solver='CLARABEL')
@@ -112,11 +127,12 @@ class DColMinDistancePairsCallback(Callback):
         self.h1 = self.A @ self.Q.T @ r1
         self.h2[1:] = -self.U @ self.Q.T @ r2
         dual_v = list((prob.solution.dual_vars).values())
-        dual_v[-1] = np.reshape(dual_v[-1], (1, 1))
-        dual_v[-2] = np.reshape(dual_v[-2], (1, 1))
+        dual_v[-1] = np.reshape(dual_v[-1], (-1, 1))
+        dual_v[-2] = np.reshape(dual_v[-2], (-1, 1))
         self.z = np.concatenate(dual_v)
 
-        return [min_distance]
+        self.jac_callback.update_dual_vars(self.z)
+        return [alpha_val]
 
 
 class SingleHessFun(Callback):
