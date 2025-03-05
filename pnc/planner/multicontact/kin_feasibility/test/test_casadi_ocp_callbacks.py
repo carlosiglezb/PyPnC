@@ -42,7 +42,7 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         Q = np.eye(3)
         radius = 0.03
         U = (1/radius) * np.eye(3)       # Cholesky factorization of end effector's sphere radius
-        geom_data = {'A': A, 'b': b, 'Q': Q, 'U': U}
+        geom_data = {'A1': A, 'b1': b, 'Q': Q, 'U': U}
 
         # create Casadi vector
         r1 = MX.sym('r1', 3)
@@ -55,7 +55,7 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         r2_val = vertcat(0.0, 0.0, 0.0)
         x_val = vertcat(r1_val, r2_val)
 
-        f = DColPolytopeEllipsoidPairsCallback('f', geom_data)
+        f = SinglePolytopeEllipsoidDistanceCallback('f', geom_data)
         g_dist = Function('g_dist', [x], [f(x)])
         current_alpha = g_dist(x_val)
         expected_alpha = 2.439
@@ -178,7 +178,7 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         r1_val = vertcat(0., 0., 0.5)
         r2_val = vertcat(0., 0., 0.0)
 
-        f = DColMinSinglePolytopesDistanceCallback('f', geom_data)
+        f = SinglePolytopePolytopeDistanceCallback('f', geom_data)
         g_dist = Function('g_dist', [x], [f(x)])
 
         # =========== test point 1 NOT in collision
@@ -254,7 +254,7 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         p1 = MX.sym('p1', 3)
         p2 = MX.sym('p2', 3)
         x = vertcat(p1, p2)
-        f = DColMinSinglePolytopesDistanceCallback('f', geom_data)
+        f = SinglePolytopePolytopeDistanceCallback('f', geom_data)
         dist_p1_p2 = norm_2(x[:3] - x[3:])     # (x,y)-distance between two points
         nlp = {'x': x,
                'f': dist_p1_p2,
