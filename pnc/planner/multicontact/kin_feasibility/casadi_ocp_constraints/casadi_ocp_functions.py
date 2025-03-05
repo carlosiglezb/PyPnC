@@ -2,7 +2,39 @@ from casadi import *
 import numpy as np
 import cvxpy as cp
 
-class EllipsoidPairJacFun(Callback):
+class PolytopeEllipsoidPairHessFun(Callback):
+    def __init__(self, name, opts={}):
+        Callback.__init__(self)
+        self.construct(name, opts)
+
+    def get_n_in(self):
+        return 3
+
+    def get_n_out(self):
+        return 2
+
+    def get_sparsity_in(self, i):
+        if i == 0:      # nominal input, x
+            return Sparsity.dense(6, 1)
+        elif i == 1:    # nominal output, f(x)
+            return Sparsity.dense(1, 1)
+        elif i == 2:    # nominal jac, J(x)
+            return Sparsity.dense(1, 6)
+
+    def get_sparsity_out(self, i):
+        if i == 0:      # hessian
+            return Sparsity.dense(6, 6)
+        elif i == 1:    # jacobian
+            return Sparsity.dense(6, 1)
+
+    def eval(self, arg):
+        x = np.array(arg[0])
+        alpha = np.array(arg[1])
+        jac = np.array(arg[2])
+        return DM(6, 6), DM(6,1)
+
+
+class PolytopeEllipsoidPairJacFun(Callback):
     def __init__(self, name, geom_data, z, opts={}):
         Callback.__init__(self)
 
@@ -12,6 +44,7 @@ class EllipsoidPairJacFun(Callback):
         self.U = geom_data['U']      # torso center
         self.z = z
 
+        self.hess_callback = PolytopeEllipsoidPairHessFun(name, opts)
         self.construct(name, opts)
 
     def get_n_in(self):
@@ -32,6 +65,13 @@ class EllipsoidPairJacFun(Callback):
     def update_dual_vars(self, z):
         self.z = z
 
+    def has_jacobian(self, *_args):
+        return True
+
+    def get_jacobian(self, name, inames, onames, opts):
+        # It is required to keep a reference alive to the returned Callback object
+        return self.hess_callback
+
     def eval(self, arg):
         z = np.array(arg[0])
         grad_polytope = -self.A @ self.Q.T
@@ -42,7 +82,7 @@ class EllipsoidPairJacFun(Callback):
         return [grad_g]
 
 
-class DColMinDistancePairsCallback(Callback):
+class DColPolytopeEllipsoidPairsCallback(Callback):
     def __init__(self, name, geom_data, opts={}):
         Callback.__init__(self)
         self.A = geom_data['A']      # torso halfspace
@@ -64,11 +104,11 @@ class DColMinDistancePairsCallback(Callback):
         self.h2 = np.zeros((4,1))    # needs to be updated in eval
 
         # initialize object construction
-        self.jac_callback = EllipsoidPairJacFun(name, geom_data, self.z)
+        self.jac_callback = PolytopeEllipsoidPairJacFun(name, geom_data, self.z)
         self.construct(name, opts)
 
     def init(self):
-        print('Initializing DColMinDistancePairsCallback')
+        print('Initializing DColPolytopeEllipsoidPairsCallback')
 
     def get_n_in(self):
         """

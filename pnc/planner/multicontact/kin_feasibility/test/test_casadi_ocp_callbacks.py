@@ -57,7 +57,7 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         r2_val = vertcat(0.0, 0.0, 0.0)
         x_val = vertcat(r1_val, r2_val)
 
-        f = DColMinDistancePairsCallback('f', geom_data)
+        f = DColPolytopeEllipsoidPairsCallback('f', geom_data)
         g_dist = Function('g_dist', [x], [f(x)])
         current_alpha = g_dist(x_val)
         expected_alpha = 2.439
@@ -69,6 +69,13 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         J = Function('J', [x], [jacobian(f(x), x)])
         print(f"Jacobian at {x_val} is {J(x_val)}")
         self.assertTrue(np.linalg.norm(expected_jac - J(x_val)) < 1e-3, "Jacobian not correct")
+
+        # -- test Hessian
+        expected_hess = np.zeros((6, 6))
+        H = Function('H', [x], hessian(f(x), x))
+        hess_val, jac_val = H(x_val)
+        self.assertTrue(np.linalg.norm(expected_hess - hess_val) < 1e-3, "Hessian not correct")
+        self.assertTrue(np.linalg.norm(expected_jac - jac_val.T) < 1e-3, "Jacobian from Hessian not correct")
 
         # =========== test point 2 NOT IN COLLISION
         x_val = vertcat(0.2, 0., 0.6, 0.0, -0.1, 0.2)
@@ -83,6 +90,13 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         jac_error = np.linalg.norm(expected_jac - J(x_val))
         self.assertTrue(jac_error < 5e-2, f"Jacobian off by {jac_error}")
 
+        # -- test Hessian
+        expected_hess = np.zeros((6, 6))
+        H = Function('H', [x], hessian(f(x), x))
+        hess_val, jac_val = H(x_val)
+        self.assertTrue(np.linalg.norm(expected_hess - hess_val) < 1e-3, "Hessian not correct")
+        self.assertTrue(np.linalg.norm(expected_jac - jac_val.T) < 5e-2, "Jacobian from Hessian not correct")
+
         # =========== test point 3 NOT IN COLLISION
         x_val = vertcat(-0.1, 0., 0.6, 0.0, 0.2, 0.3)
         current_alpha = g_dist(x_val)        # need to run eval again to update dual variables
@@ -96,6 +110,13 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         jac_error = np.linalg.norm(expected_jac - J(x_val))
         self.assertTrue(jac_error < 5e-2, f"Jacobian off by {jac_error}")
 
+        # -- test Hessian
+        expected_hess = np.zeros((6, 6))
+        H = Function('H', [x], hessian(f(x), x))
+        hess_val, jac_val = H(x_val)
+        self.assertTrue(np.linalg.norm(expected_hess - hess_val) < 1e-3, "Hessian not correct")
+        self.assertTrue(np.linalg.norm(expected_jac - jac_val.T) < 5e-2, "Jacobian from Hessian not correct")
+
         # =========== test point 4 NOT IN COLLISION
         x_val = vertcat(0., 0., 0.6, 0.1, 0.15, 0.5)
         current_alpha = g_dist(x_val)        # need to run eval again to update dual variables
@@ -108,6 +129,13 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         print(f"Jacobian at {x_val} is {J(x_val)}")
         jac_error = np.linalg.norm(expected_jac - J(x_val))
         self.assertTrue(jac_error < 5e-2, f"Jacobian off by {jac_error}")
+
+        # -- test Hessian
+        expected_hess = np.zeros((6, 6))
+        H = Function('H', [x], hessian(f(x), x))
+        hess_val, jac_val = H(x_val)
+        self.assertTrue(np.linalg.norm(expected_hess - hess_val) < 1e-3, "Hessian not correct")
+        self.assertTrue(np.linalg.norm(expected_jac - jac_val.T) < 5e-2, "Jacobian from Hessian not correct")
 
 
     def test_dcol_min_poly_distance_callback(self):
