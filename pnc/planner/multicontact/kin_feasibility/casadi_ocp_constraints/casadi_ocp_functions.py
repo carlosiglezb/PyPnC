@@ -327,6 +327,184 @@ class DColMinSinglePolytopesDistanceCallback(Callback):
 
         return [alpha_val]
 
+
+"""
+Superclasses to derive separate collision primitives from
+"""
+class PrimitiveHessFun(Callback):
+    def __init__(self, name, opts={}):
+        Callback.__init__(self)
+        self.construct(name, opts)
+
+    def get_n_in(self):
+        return 3
+
+    def get_n_out(self):
+        return 2
+
+    def get_sparsity_in(self, i):
+        if i == 0:      # nominal input, x
+            return Sparsity.dense(6, 1)
+        elif i == 1:    # nominal output, f(x)
+            return Sparsity.dense(1, 1)
+        elif i == 2:    # nominal jac, J(x)
+            return Sparsity.dense(1, 6)
+
+    def get_sparsity_out(self, i):
+        if i == 0:      # hessian
+            return Sparsity.dense(6, 6)
+        elif i == 1:    # jacobian
+            return Sparsity.dense(6, 1)
+
+    def eval(self, arg):
+        x = np.array(arg[0])
+        alpha = np.array(arg[1])
+        jac = np.array(arg[2])
+        return DM(6, 6), DM(6,1)
+
+
+class PrimitiveJacFun(Callback):
+    def __init__(self, name, geom_data, z, opts={}):
+        self.A1 = geom_data['A1']
+        self.b1 = geom_data['b1']
+        self.Q = geom_data['Q']
+        self.z = z
+        self.hess_callback = None
+
+    def get_n_in(self):
+        return 2
+
+    def get_n_out(self):
+        return 1
+
+    def get_sparsity_in(self, i):
+        if i == 0:  # nominal input
+            return Sparsity.dense(6, 1)
+        elif i == 1:  # nominal output
+            return Sparsity(1, 1)
+
+    def get_sparsity_out(self, i):
+        if i == 0:
+            return Sparsity.dense(1, 6)
+
+    def update_dual_vars(self, z):
+        self.z = z
+
+    def has_jacobian(self, *_args):
+        return True
+
+    def get_jacobian(self, name, inames, onames, opts):
+        # It is required to keep a reference alive to the returned Callback object
+        return self.hess_callback
+
+
+class SinglePrimitivesDistanceCallback(Callback):
+    def __init__(self, name, geom_data, opts={}):
+        self.A1 = geom_data['A1']      # torso halfspace
+        self.b1 = geom_data['b1']      # torso halfspace offset
+        self.Q = geom_data['Q']        # torso rotation
+
+        # torso cone representation matrices
+        self.G1 = np.zeros((6,4))
+        self.G1[:, :3] = self.A1 @ self.Q.T
+        self.G1[:, 3:] = -self.b1
+
+        # initialize object construction
+        self.jac_callback = None
+
+    def init(self):
+        print('Initializing DColMinSinglePolytopesDistanceCallback')
+
+    def get_n_in(self):
+        """
+        Number of input arguments: r1, r2.
+        These correspond to the center of the torso (r1) and the end effector (r2).
+        """
+        return 1
+
+    def get_sparsity_in(self, i):
+        """
+        Both input arguments r1 and r2 are in 3-D coordinates.
+        """
+        return Sparsity.dense(6, 1)
+
+    def get_sparsity_out(self, i):
+        return Sparsity.dense(1, 1)
+
+    def has_jacobian(self, *_args):
+        return True
+
+    def get_jacobian(self, name, inames, onames, opts):
+        # It is required to keep a reference alive to the returned Callback object
+        return self.jac_callback
+
+
+"""
+Derived classes
+"""
+class SinglePolytopeEllipsoidJacFun(PrimitiveJacFun):
+    def __init__(self, name, geom_data, z, opts={}):
+        Callback.__init__(self)
+        super().__init__(name, geom_data, z)
+        self.U = geom_data['U']
+        self.z = z
+        self.hess_callback = PrimitiveHessFun(name, opts)
+        self.construct(name, opts)
+
+    def has_jacobian(self, *_args):
+        return True
+
+    def get_jacobian(self, name, inames, onames, opts):
+        # It is required to keep a reference alive to the returned Callback object
+        return self.hess_callback
+
+    # Evaluate numerically
+    def eval(self, arg):
+        p = np.array(arg[0])
+        r1 = p[:3]
+        r2 = p[3:]
+
+        grad_polytope = -self.A1 @ self.Q.T
+        grad_ellipse = np.vstack((np.zeros((1,3)), self.U @ self.Q.T))
+        ret1 = self.z[:-1].T @ (np.concatenate((grad_polytope, np.zeros((4, 3)))))
+        ret2 = self.z[:-1].T @ (np.concatenate((np.zeros((6, 3)), grad_ellipse)))
+        grad_g = np.hstack((ret1, ret2))
+
+        return [grad_g]
+
+class SinglePolytopeEllipsoidDistanceCallback(SinglePrimitivesDistanceCallback):
+    def __init__(self, name, geom_data, opts={}):
+        Callback.__init__(self)
+        super().__init__(name, geom_data, opts)
+
+        # pending properties
+        self.U = geom_data['U']
+        self.G2 = np.zeros((4,4))
+        self.G2[1:, :3] = -self.U @ self.Q.T
+        self.G2[0, -1] = -1
+        self.h2 = np.zeros((4,1))    # needs to be updated in eval
+        self.z = np.zeros((11,1))
+        self.jac_callback = SinglePolytopeEllipsoidJacFun(name, geom_data, self.z)
+
+        # initialize object construction
+        self.construct(name, opts)
+
+    def eval(self, arg):
+        p = np.array(arg[0])
+        r1 = p[:3]   # torso center
+        r2 = p[3:]   # end effector (sphere) center
+
+        A1 = self.A1
+        b1 = self.b1
+        U = self.U
+        Q = self.Q
+        x_val, alpha_val, dual_val = solve_polytope_ellipsoid_min_prox(A1, b1, Q, U, r1, r2)
+
+        self.jac_callback.update_dual_vars(dual_val)
+
+        return [alpha_val]
+
+
 class JacFun(Callback):
     def __init__(self, name, A1, b1, A2, b2, Q, num_iris_regions, z, opts={}):
         Callback.__init__(self)
@@ -824,19 +1002,22 @@ class DColIndexedPolytopesConstraint(Callback):
 
         return [alpha_val]
 
-def solve_polytope_min_prox(A, b, Q, U, r1, r2):
+def solve_polytope_ellipsoid_min_prox(A, b, Q, U, r1, r2, verbose=False):
     # find distance via optimization (dcol-style)
     alpha = cp.Variable(1)
     x = cp.Variable((3, 1))
 
     constraints = []
     constraints.append(A @ Q.T @ (x - r1) <= alpha * b)
-    constraints.append(cp.norm(U @ Q.T @ (x - r2)) <= alpha)
+    constraints.append(cp.SOC(alpha, U @ Q.T @ (x - r2)))
     constraints.append(alpha >= 0)
     prob = cp.Problem(cp.Minimize(alpha), constraints)
     prob.solve(solver='CLARABEL')
 
-    z = np.concatenate(list((prob.solution.dual_vars).values()))
+    dual_v = list((prob.solution.dual_vars).values())
+    dual_v[-1] = np.reshape(dual_v[-1], (-1, 1))
+    dual_v[-2] = np.reshape(dual_v[-2], (-1, 1))
+    dual_v = np.concatenate(dual_v)
     solver_time = prob.solver_stats.solve_time
 
-    return x.value, alpha.value, z
+    return x.value, alpha.value, dual_v

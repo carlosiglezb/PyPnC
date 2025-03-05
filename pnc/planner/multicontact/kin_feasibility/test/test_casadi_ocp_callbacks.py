@@ -25,8 +25,6 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
         # pin.removeCollisionPairs(robot.model, geom_model, srdf_path)
         #
         # q_test = copy.copy(robot.q0)
-
-        # TODO get A, b, Q, r1, r2 from robot model (URDF)
         A = np.array([[1, 0, 0],
                       [0, 1, 0],
                       [0, 0, 1],
@@ -292,6 +290,70 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
                 self.assertTrue(dist_z_error + 0.01 > 1e-3, f"Min. Distance between points is {dist_z_error}")
             else:
                 self.assertTrue(False, "Points were not mostly above/below each other")
+
+
+    def test_min_distance_polytope_ellipsoid_dcol_2points(self):
+        N_tests = 10
+        A1 = np.array([[1, 0, 0],
+                      [0, 1, 0],
+                      [0, 0, 1],
+                      [-1, 0, 0],
+                      [0, -1, 0],
+                      [0, 0, -1]
+                      ])
+        b1 = np.array([[0.07],
+                     [0.105],
+                     [0.175],
+                     [0.07],
+                     [0.105],
+                     [0.175]]
+                     )
+        Q = np.eye(3)
+        radius = 0.03
+        U = (1/radius) * np.eye(3)       # Cholesky factorization of end effector's sphere radius
+        geom_data = {'A1': A1, 'b1': b1, 'Q': Q, 'U': U}
+        expected_z_distance = 0.175+radius
+
+        # optimization problem formulation
+        p1 = MX.sym('p1', 3)
+        p2 = MX.sym('p2', 3)
+        x = vertcat(p1, p2)
+        f = SinglePolytopeEllipsoidDistanceCallback('f', geom_data)
+        dist_p1_p2 = norm_2(x[:3] - x[3:])     # (x,y)-distance between two points
+        nlp = {'x': x,
+               'f': dist_p1_p2,
+               'g': f(x)
+               }
+        opts = {
+            "ipopt": {
+                "hessian_approximation": "exact",  # limited-memory
+                "max_iter": 100,
+                "derivative_test": "second-order",
+                "derivative_test_print_all": "no",
+                "derivative_test_perturbation": 1e-6,
+                "derivative_test_tol": 0.005}
+        }
+        solver = nlpsol('solver', 'ipopt', nlp, opts)
+
+        x_init = np.array([0.0, 0.0, 2.25, 0.0, 0.0, 0.0])
+        for i in range(N_tests):
+            x_init[:2] = 0.2*np.random.random(2)
+            x_init[2] = 2.25 + 0.4*np.random.random()
+            print(f"Test points {i}: p1 = {x_init[:3]}, p2 = {x_init[3:]}")
+            sol = solver(x0=x_init,lbg=1.0, ubg=casadi.inf)
+
+            sol_stats = solver.stats()
+            self.assertTrue(sol_stats['success'], "Optimization failed")
+
+            # check if the solution seems correct
+            x_sol = sol['x'].full()
+            if x_init[2] > x_init[-1]:  # if initialized with p_1 above p2
+                computed_z_dist = np.linalg.norm(x_sol[:3] - x_sol[3:])
+                dist_z_error = computed_z_dist - expected_z_distance
+                self.assertTrue(dist_z_error < 1e-3, f"Min. Distance between points is {dist_z_error}")
+            else:
+                self.assertTrue(False, "Points were not mostly above/below each other")
+
 
 if __name__ == '__main__':
     unittest.main()
