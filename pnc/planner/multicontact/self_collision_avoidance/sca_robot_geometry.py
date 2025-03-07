@@ -23,12 +23,16 @@ class SCARobotGeometry:
                 # TODO figure out what to do with cascaded collision bodies
                 # This will currently only save the settings of the last collision item
                 if lnk in gm.name:
-                    if gm.meshPath != 'BOX':
-                        raise NotImplementedError("Only box primitives are currently supported")
                     halfspace_params = {}
-                    box_half_side = gm.geometry.halfSide.reshape(-1, 1)
-                    halfspace_params['A'] = np.vstack((np.eye(3), -np.eye(3)))
-                    halfspace_params['b'] = np.vstack((box_half_side, box_half_side))
+                    if gm.meshPath == 'BOX':
+                        box_half_side = gm.geometry.halfSide.reshape(-1, 1)
+                        halfspace_params['A'] = np.vstack((np.eye(3), -np.eye(3)))
+                        halfspace_params['b'] = np.vstack((box_half_side, box_half_side))
+                    elif gm.meshPath == 'SPHERE':
+                        sphere_radius = gm.geometry.radius
+                        halfspace_params['U'] = 1./sphere_radius * np.eye(3)
+                    else:
+                        raise NotImplementedError("Only box primitives are currently supported")
                     self._geometry_primitives[lnk] = halfspace_params
 
         self.geom_model = geom_model
@@ -36,6 +40,17 @@ class SCARobotGeometry:
 
     def get_box_representation(self, link_name: str) -> dict[str, np.array]:
         return self._geometry_primitives[self._plan_to_model_frames.get(link_name)]
+
+    def get_sphere_representation(self, link_name: str) -> dict[str, np.array]:
+        return self._geometry_primitives[self._plan_to_model_frames.get(link_name)]
+
+    def get_primitive_shape_type(self, link_name: str) -> str:
+        if 'A' in self._geometry_primitives[self._plan_to_model_frames.get(link_name)]:
+            return 'box'
+        elif 'U' in self._geometry_primitives[self._plan_to_model_frames.get(link_name)]:
+            return 'sphere'
+        return 'unknown'
+
 
     def is_link_in_sca_list(self, link_name) -> bool:
         return self._plan_to_model_frames[link_name] in self._geometry_primitives.keys()

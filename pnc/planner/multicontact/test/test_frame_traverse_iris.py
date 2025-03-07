@@ -701,5 +701,123 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Final RF distance error: {error}")
 
 
+    def test_optimize_bezier_multiple_torso_spheres_frame(self):
+        iris_seq, safe_points_lst, safe_regions_mgr_dict = self.test_multistage_torso_iris_seq_multiple_frame()
+        motion_frames_seq = self.motion_frames_seq
+        fixed_frames = self.fixed_frames_seq
+
+        # test optimize multiple bezier
+        reach = None    # ignore reachable space in this test
+        aux = []
+        durations = []        # should be obtained from iris_seq, hard-coded in this test
+        durations.append({'torso': np.array([0.2] * 3),
+                          'RF': np.array([0.2] * 3)})
+        durations.append({'torso': np.array([0.2] * 1),
+                          'RF': np.array([0.2] * 1)})
+        alpha = {1: 1, 2: 1, 3: 0}
+        surface_normals_lst = motion_frames_seq.get_contact_surfaces()
+        path, sol_stats, bez_points, dual_vars = optimize_multiple_bezier_iris(reach, aux, safe_regions_mgr_dict,
+                                                        durations, alpha, safe_points_lst,
+                                                        fixed_frames=fixed_frames,
+                                                        surface_normals_lst=surface_normals_lst)
+
+        # include simplified rigid bodies for self-collision avoidance
+        robot_model_path = cwd + "/robot_model/g1_description/"
+        urdf_path = robot_model_path + "g1_cube_sphere_collisions.urdf"
+        plan_to_model_frames = {
+            'torso': 'torso_link',
+            'LF': 'left_ankle_roll_link',
+            'RF': 'right_ankle_roll_link',
+            'L_knee': 'left_knee_link',
+            'R_knee': 'right_knee_link',
+            'LH': 'left_palm_link',
+            'RH': 'right_palm_link'
+        }
+        sca_geom = SCARobotGeometry(robot_model_path, urdf_path, plan_to_model_frames)
+        A1 = sca_geom.get_box_representation('torso')['A']
+        b1 = sca_geom.get_box_representation('torso')['b']
+        U = sca_geom.get_sphere_representation('RF')['U']
+
+        # Create points from Bezier curve
+        if b_visualize:
+            i = 0
+            for p in path:
+                for seg in range(len(p.beziers)):
+                    bezier_curve = [p.beziers[seg]]
+                    if i == 0:
+                        fr_name = 'torso'
+                        LocomanipulationFramePlanner.visualize_bezier_polytope(self.vis, fr_name, bezier_curve, seg, A1, b1)
+                    elif i == 1:
+                        fr_name = 'RF'
+                        radius = 1 / U[0,0]
+                        LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg, radius=radius)
+                i += 1
+
+            # plot raw bezier points output by cvxpy
+            for n_bp, bp_val in bez_points.items():
+                if n_bp < 4:
+                    fr_name = 'torso'
+                elif n_bp < 8:
+                    fr_name = 'RF'
+                # grab only the position index
+                LocomanipulationFramePlanner.visualize_simple_points(self.vis, fr_name + "_bez/" + str(n_bp), bp_val[0].value, [0,0,0,1])
+
+        self.assertTrue(path is not None, "Problem seems to be infeasible")
+        self.assertTrue(sp.linalg.norm(path[0].beziers[0].points[0] - self.torso_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[0].beziers[3].points[-1] - self.torso_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[0].points[0] - self.rf_starting_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[3].points[0] - self.rf_final_pos) < 1e-3)
+        self.assertTrue(sp.linalg.norm(path[1].beziers[-1].points[-1] - self.rf_final_pos) < 1e-3)
+
+        # parse initial guess from previous solution
+        bez_initial_guess = {}
+        bez_initial_guess['x0'] = pack_points_for_single_vector(bez_points, 'cvxpy')
+        bez_initial_guess['lam_g0'] = pack_points_for_single_vector(dual_vars['lam_g0'], 'cvxpy')
+        # bez_initial_guess['lam_g0'] = dual_vars['lam_g0']
+        bez_initial_guess['lam_x0'] = dual_vars['lam_x0']
+        path, sol_stats, bez_points, _ = optimize_multiple_bezier_iris_casadi(reach, aux, safe_regions_mgr_dict,
+                                                        durations, alpha, safe_points_lst,
+                                                        sca_geom,
+                                                        fixed_frames=fixed_frames,
+                                                        surface_normals_lst=surface_normals_lst,
+                                                        initial_guess=bez_initial_guess)
+
+        # Create points from Bezier curve
+        if b_visualize:
+            i = 0
+            for p in path:
+                for seg in range(len(p.beziers)):
+                    bezier_curve = [p.beziers[seg]]
+                    if i == 0:
+                        fr_name = 'torso'
+                        LocomanipulationFramePlanner.visualize_bezier_polytope(self.vis, fr_name, bezier_curve, seg, A1, b1)
+                    elif i == 1:
+                        fr_name = 'RF'
+                        radius = 1 / U[0,0]
+                        LocomanipulationFramePlanner.visualize_bezier_points(self.vis, fr_name, bezier_curve, seg, radius=radius)
+                i += 1
+
+            # plot raw bezier points output by casadi
+            for (n_bp, bp_val) in enumerate(bez_points):
+                if n_bp < 4:
+                    fr_name = 'torso'
+                elif n_bp < 8:
+                    fr_name = 'RF'
+                # grab only the position index
+                LocomanipulationFramePlanner.visualize_simple_points(self.vis, fr_name + "_bez/" + str(n_bp), bp_val[0], [0,0,0,1])
+
+        self.assertTrue(path is not None, "Problem seems to be infeasible")
+        error = path[0].beziers[0].points[0] - self.torso_starting_pos
+        self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Starting torso distance error: {error}")
+        error = path[0].beziers[3].points[-1] - self.torso_final_pos
+        self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Final torso distance error: {error}")
+        error = path[1].beziers[0].points[0] - self.rf_starting_pos
+        self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Starting RF distance error: {error}")
+        error = path[1].beziers[3].points[0] - self.rf_final_pos
+        self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Final RF distance error: {error}")
+        error = path[1].beziers[-1].points[-1] - self.rf_final_pos
+        self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Final RF distance error: {error}")
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -9,7 +9,7 @@ from scipy.special import binom
 from scipy.optimize import minimize
 
 from pnc.planner.multicontact.kin_feasibility.casadi_ocp_constraints.casadi_ocp_functions import \
-    DColIndexedPolytopesConstraint
+    IndexedPolytopeEllipsoidConstraint, IndexedPolytopePolytopeConstraint
 from pnc.planner.multicontact.kin_feasibility.constraint_parsers import parse_mat_leq_constr, parse_repvec_eq_constr, \
     parse_vec_eq_constr, parse_mat_eq_constr
 from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import get_aux_frame_idx, \
@@ -503,7 +503,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 aux_fr, frame_list, num_iris_tot)
 
             # loop through all safe boxes
-            link_length += link_threshold     # threshold for relaxation
+            # link_length += link_threshold     # threshold for relaxation
             for nb in range(1, num_iris_tot-1):
                 # for pnt in range(n_points-1):
                 for pnt in range(1):
@@ -511,8 +511,8 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                     link_distal_point = points[dist_fr_idx+nb][0][pnt,:]
                     # --- as equality constraint
                     constraints.append(ca.norm_2(link_proximal_point - link_distal_point))
-                    lbg.append(link_length)
-                    ubg.append(link_length)
+                    lbg.append(link_length - link_threshold/2)
+                    ubg.append(link_length + link_threshold/2)
                     initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.array([0.])))
 
         # cost_log_abs_sum = -(cp.sum(cost_log_abs))
@@ -578,9 +578,6 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 sca_col_link_idxs.append(i)
         print(f'Checking for self-collision with: {[frame_list[i] for i in sca_col_link_idxs]}')
         for col_idx in sca_col_link_idxs:
-            A2 = robot_geom_data.get_box_representation(frame_list[col_idx])['A']
-            b2 = robot_geom_data.get_box_representation(frame_list[col_idx])['b']
-
             # Simplified no self-collision function and constraints bounds for specified index pairs
             mfpp_bezier_data = {'current_frames': (torso_idx, col_idx),   # make torso and RK frames SCA
                                 'n_points': n_points,
@@ -589,12 +586,30 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                 'num_frames': n_frames
                                 }
             sca_bez_points = range(0, num_iris_tot * n_points, 1)
-            col_pair_geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
+
+            # populate col_pair_geom_data with respective primitive shape pair type information
+            ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])
+            if ee_geom_type == 'box':
+                A2 = robot_geom_data.get_box_representation(frame_list[col_idx])['A']
+                b2 = robot_geom_data.get_box_representation(frame_list[col_idx])['b']
+                col_pair_geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
+            elif ee_geom_type == 'sphere':
+                U = robot_geom_data.get_sphere_representation(frame_list[col_idx])['U']
+                col_pair_geom_data = {'A1': A1, 'b1': b1, 'U': U, 'Q': Q}
+            else:
+                raise ValueError(f'Invalid primitive shape {ee_geom_type} type specified for SCA.')
+
             for i in sca_bez_points:
                 mfpp_bezier_data['current_point'] = i
                 i_name = 'f_dist_' + str(frame_list[col_idx]) + str(i)
                 current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-                f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, col_pair_geom_data, current_mfpp_data)
+                if ee_geom_type == 'box':
+                    f_dist[i_name] = IndexedPolytopePolytopeConstraint(i_name, col_pair_geom_data, current_mfpp_data)
+                elif ee_geom_type == 'sphere':
+                    f_dist[i_name] = IndexedPolytopeEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
+                else:
+                    raise ValueError(f'Invalid primitive shape type {ee_geom_type} specified for SCA.')
+                # f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, col_pair_geom_data, current_mfpp_data)
                 sca_constraints.append(f_dist[i_name](points_all))
                 lbg.append(1.0)
                 ubg.append(ca.inf)

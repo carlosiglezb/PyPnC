@@ -205,10 +205,10 @@ class LocomanipulationFramePlanner:
             pt_number += 1
 
     @staticmethod
-    def visualize_bezier_points(vis_viewer, frame, bezier_curve, segment=0):
+    def visualize_bezier_points(vis_viewer, frame, bezier_curve, segment=0, radius=0.01):
         color_waypoint = [0., 1., 0., 0.6]      # blue
         color_transition = [1., 1., 0., 0.6]    # yellow
-        r_bezier_pts = 0.01
+        r_bezier_pts = radius
         pt_number, seg_number = 0, 1
         for bez in bezier_curve:
             t, points = bez.get_sample_points()
