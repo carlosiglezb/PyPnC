@@ -24,6 +24,7 @@ from util import util
 from vision.iris.iris_geom_interface import IrisGeomInterface
 from vision.iris.iris_regions_manager import IrisRegionsManager
 import plot.meshcat_utils as vis_tools
+from pnc.data_saver import DataSaver
 
 b_visualize = True
 b_use_knees = True
@@ -133,7 +134,8 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         # load robot model and corresponding robot data for self-collision avoidance
         self.package_dir = cwd + "/robot_model/g1_description"
-        self.robot_urdf_file = self.package_dir + "/g1_cube_collisions.urdf"
+        # self.robot_urdf_file = self.package_dir + "/g1_cube_collisions.urdf"
+        self.robot_urdf_file = self.package_dir + "/g1_cube_sphere_collisions.urdf"
 
     # needed for self-collision checks
     @staticmethod
@@ -647,7 +649,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
         ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer)
 
-        self.assertEqual(True, True)  # add assertion here
+        self.assertEqual(True, True)
         return ik_cfree_planner
 
     def test_self_collision_avoidance(self):
@@ -713,6 +715,7 @@ class TestIKCFreePlanner(unittest.TestCase):
 
     def test_sca_plan_five_stage_plan_one_hand_at_a_time(self):
         b_visualize = True
+        b_save_plan = True
 
         plan_to_model_frames = self.plan_to_model_frames
         sca_geometry = SCARobotGeometry(self.package_dir, self.robot_urdf_file, plan_to_model_frames)
@@ -771,6 +774,13 @@ class TestIKCFreePlanner(unittest.TestCase):
                 display.animate_target("base_target", [base_targets[i]], [0, 0.5, 0])
                 display.animation_step()
             display.finish_animation()
+
+        if b_save_plan:
+            save_filename = 'sca_five_stage_plan.pkl'
+            data_saver = DataSaver(save_filename)
+            data_saver.add('frame_paths', sca_kin_cfree_planner.planner.path)
+            data_saver.advance()
+            data_saver.close()
 
         self.assertEqual(True, True)
 
