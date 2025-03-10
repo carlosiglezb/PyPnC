@@ -1,0 +1,335 @@
+# ---------------------------------- 
+# PYBULLET 
+# ---------------------------------- 
+
+Link index: 0, Link name: base_link * 
+Link index: 1, Link name: top_lidar_link * 
+Link index: 2, Link name: bottom_lidar_link * 
+Link index: 3, Link name: back__sensor_link * 
+Link index: 4, Link name: left__sensor_link * 
+Link index: 5, Link name: right__sensor_link * 
+Link index: 6, Link name: front_right__sensor_link * 
+Link index: 7, Link name: front_left__sensor_link * 
+Link index: 8, Link name: front_right__base_link * 
+Link index: 9, Link name: front_right__cluster_1_base_link * 
+Link index: 10, Link name: front_right__cluster_1_proximal_link * 
+Link index: 11, Link name: front_right__cluster_1_distal_link * 
+Link index: 12, Link name: front_right__cluster_1_end_link * 
+Link index: 13, Link name: front_right__cluster_2_base_link * 
+Link index: 14, Link name: front_right__cluster_2_proximal_link * 
+Link index: 15, Link name: front_right__cluster_2_distal_link * 
+Link index: 16, Link name: front_right__cluster_2_end_link * 
+Link index: 17, Link name: front_right__cluster_3_base_link * 
+Link index: 18, Link name: front_right__cluster_3_proximal_link * 
+Link index: 19, Link name: front_right__cluster_3_distal_link * 
+Link index: 20, Link name: front_right__cluster_3_mid_link * 
+Link index: 21, Link name: front_right__cluster_3_wrist_link * 
+Link index: 22, Link name: front_right__cluster_3_end_link * 
+Link index: 23, Link name: front_right__foot_link * 
+Link index: 24, Link name: front_left__base_link
+Link index: 25, Link name: front_left__cluster_1_base_link
+Link index: 26, Link name: front_left__cluster_1_proximal_link
+Link index: 27, Link name: front_left__cluster_1_distal_link
+Link index: 28, Link name: front_left__cluster_1_end_link
+Link index: 29, Link name: front_left__cluster_2_base_link
+Link index: 30, Link name: front_left__cluster_2_proximal_link
+Link index: 31, Link name: front_left__cluster_2_distal_link
+Link index: 32, Link name: front_left__cluster_2_end_link
+Link index: 33, Link name: front_left__cluster_3_base_link
+Link index: 34, Link name: front_left__cluster_3_proximal_link
+Link index: 35, Link name: front_left__cluster_3_distal_link
+Link index: 36, Link name: front_left__cluster_3_mid_link
+Link index: 37, Link name: front_left__cluster_3_wrist_link
+Link index: 38, Link name: front_left__cluster_3_end_link
+Link index: 39, Link name: front_left__foot_link
+Link index: 40, Link name: back_right__base_link
+Link index: 41, Link name: back_right__cluster_1_base_link
+Link index: 42, Link name: back_right__cluster_1_proximal_link
+Link index: 43, Link name: back_right__cluster_1_distal_link
+Link index: 44, Link name: back_right__cluster_1_end_link
+Link index: 45, Link name: back_right__cluster_2_base_link
+Link index: 46, Link name: back_right__cluster_2_proximal_link
+Link index: 47, Link name: back_right__cluster_2_distal_link
+Link index: 48, Link name: back_right__cluster_2_end_link
+Link index: 49, Link name: back_right__cluster_3_base_link
+Link index: 50, Link name: back_right__cluster_3_proximal_link
+Link index: 51, Link name: back_right__cluster_3_distal_link
+Link index: 52, Link name: back_right__cluster_3_mid_link
+Link index: 53, Link name: back_right__cluster_3_wrist_link
+Link index: 54, Link name: back_right__cluster_3_end_link
+Link index: 55, Link name: back_right__foot_link
+Link index: 56, Link name: back_left__base_link
+Link index: 57, Link name: back_left__cluster_1_base_link
+Link index: 58, Link name: back_left__cluster_1_proximal_link
+Link index: 59, Link name: back_left__cluster_1_distal_link
+Link index: 60, Link name: back_left__cluster_1_end_link
+Link index: 61, Link name: back_left__cluster_2_base_link
+Link index: 62, Link name: back_left__cluster_2_proximal_link
+Link index: 63, Link name: back_left__cluster_2_distal_link
+Link index: 64, Link name: back_left__cluster_2_end_link
+Link index: 65, Link name: back_left__cluster_3_base_link
+Link index: 66, Link name: back_left__cluster_3_proximal_link
+Link index: 67, Link name: back_left__cluster_3_distal_link
+Link index: 68, Link name: back_left__cluster_3_mid_link
+Link index: 69, Link name: back_left__cluster_3_wrist_link
+Link index: 70, Link name: back_left__cluster_3_end_link
+Link index: 71, Link name: back_left__foot_link
+
+Joint names and their indices:
+Joint index: 0, Joint name: base_joint
+Joint index: 1, Joint name: top_lidar_base_joint
+Joint index: 2, Joint name: bottom_lidar_base_joint
+Joint index: 3, Joint name: base_link_back__sensor_joint
+Joint index: 4, Joint name: base_link_left__sensor_joint
+Joint index: 5, Joint name: base_link_right__sensor_joint
+Joint index: 6, Joint name: base_link_front_right__sensor_joint
+Joint index: 7, Joint name: base_link_front_left__sensor_joint
+Joint index: 8, Joint name: base_link_front_right__joint
+Joint index: 9, Joint name: front_right__cluster_1_base_fix
+Joint index: 10, Joint name: front_right__cluster_1_roll
+Joint index: 11, Joint name: front_right__cluster_1_pitch
+Joint index: 12, Joint name: front_right__cluster_1_end_joint
+Joint index: 13, Joint name: front_right__cluster_2_base_fix
+Joint index: 14, Joint name: front_right__cluster_2_roll
+Joint index: 15, Joint name: front_right__cluster_2_pitch
+Joint index: 16, Joint name: front_right__cluster_2_end_joint
+Joint index: 17, Joint name: front_right__cluster_3_base_fix
+Joint index: 18, Joint name: front_right__cluster_3_roll
+Joint index: 19, Joint name: front_right__cluster_3_pitch
+Joint index: 20, Joint name: front_right__cluster_3_mid_joint
+Joint index: 21, Joint name: front_right__cluster_3_wrist
+Joint index: 22, Joint name: front_right__cluster_3_end_joint
+Joint index: 23, Joint name: front_right__cluster_3_wrist_link_foot_joint
+Joint index: 24, Joint name: base_link_front_left__joint
+Joint index: 25, Joint name: front_left__cluster_1_base_fix
+Joint index: 26, Joint name: front_left__cluster_1_roll
+Joint index: 27, Joint name: front_left__cluster_1_pitch
+Joint index: 28, Joint name: front_left__cluster_1_end_joint
+Joint index: 29, Joint name: front_left__cluster_2_base_fix
+Joint index: 30, Joint name: front_left__cluster_2_roll
+Joint index: 31, Joint name: front_left__cluster_2_pitch
+Joint index: 32, Joint name: front_left__cluster_2_end_joint
+Joint index: 33, Joint name: front_left__cluster_3_base_fix
+Joint index: 34, Joint name: front_left__cluster_3_roll
+Joint index: 35, Joint name: front_left__cluster_3_pitch
+Joint index: 36, Joint name: front_left__cluster_3_mid_joint
+Joint index: 37, Joint name: front_left__cluster_3_wrist
+Joint index: 38, Joint name: front_left__cluster_3_end_joint
+Joint index: 39, Joint name: front_left__cluster_3_wrist_link_foot_joint
+Joint index: 40, Joint name: base_link_back_right__joint
+Joint index: 41, Joint name: back_right__cluster_1_base_fix
+Joint index: 42, Joint name: back_right__cluster_1_roll
+Joint index: 43, Joint name: back_right__cluster_1_pitch
+Joint index: 44, Joint name: back_right__cluster_1_end_joint
+Joint index: 45, Joint name: back_right__cluster_2_base_fix
+Joint index: 46, Joint name: back_right__cluster_2_roll
+Joint index: 47, Joint name: back_right__cluster_2_pitch
+Joint index: 48, Joint name: back_right__cluster_2_end_joint
+Joint index: 49, Joint name: back_right__cluster_3_base_fix
+Joint index: 50, Joint name: back_right__cluster_3_roll
+Joint index: 51, Joint name: back_right__cluster_3_pitch
+Joint index: 52, Joint name: back_right__cluster_3_mid_joint
+Joint index: 53, Joint name: back_right__cluster_3_wrist
+Joint index: 54, Joint name: back_right__cluster_3_end_joint
+Joint index: 55, Joint name: back_right__cluster_3_wrist_link_foot_joint
+Joint index: 56, Joint name: base_link_back_left__joint
+Joint index: 57, Joint name: back_left__cluster_1_base_fix
+Joint index: 58, Joint name: back_left__cluster_1_roll
+Joint index: 59, Joint name: back_left__cluster_1_pitch
+Joint index: 60, Joint name: back_left__cluster_1_end_joint
+Joint index: 61, Joint name: back_left__cluster_2_base_fix
+Joint index: 62, Joint name: back_left__cluster_2_roll
+Joint index: 63, Joint name: back_left__cluster_2_pitch
+Joint index: 64, Joint name: back_left__cluster_2_end_joint
+Joint index: 65, Joint name: back_left__cluster_3_base_fix
+Joint index: 66, Joint name: back_left__cluster_3_roll
+Joint index: 67, Joint name: back_left__cluster_3_pitch
+Joint index: 68, Joint name: back_left__cluster_3_mid_joint
+Joint index: 69, Joint name: back_left__cluster_3_wrist
+Joint index: 70, Joint name: back_left__cluster_3_end_joint
+Joint index: 71, Joint name: back_left__cluster_3_wrist_link_foot_joint
+
+# ---------------------------------- 
+# PINOCCHIO 
+# ---------------------------------- 
+
+Joint names and their indices:
+Joint index: 0, Joint name: universe
+Joint index: 1, Joint name: back_left__cluster_1_roll
+Joint index: 2, Joint name: back_left__cluster_1_pitch
+Joint index: 3, Joint name: back_left__cluster_2_roll
+Joint index: 4, Joint name: back_left__cluster_2_pitch
+Joint index: 5, Joint name: back_left__cluster_3_roll
+Joint index: 6, Joint name: back_left__cluster_3_pitch
+Joint index: 7, Joint name: back_left__cluster_3_wrist
+Joint index: 8, Joint name: back_right__cluster_1_roll
+Joint index: 9, Joint name: back_right__cluster_1_pitch
+Joint index: 10, Joint name: back_right__cluster_2_roll
+Joint index: 11, Joint name: back_right__cluster_2_pitch
+Joint index: 12, Joint name: back_right__cluster_3_roll
+Joint index: 13, Joint name: back_right__cluster_3_pitch
+Joint index: 14, Joint name: back_right__cluster_3_wrist
+Joint index: 15, Joint name: front_left__cluster_1_roll
+Joint index: 16, Joint name: front_left__cluster_1_pitch
+Joint index: 17, Joint name: front_left__cluster_2_roll
+Joint index: 18, Joint name: front_left__cluster_2_pitch
+Joint index: 19, Joint name: front_left__cluster_3_roll
+Joint index: 20, Joint name: front_left__cluster_3_pitch
+Joint index: 21, Joint name: front_left__cluster_3_wrist
+Joint index: 22, Joint name: front_right__cluster_1_roll
+Joint index: 23, Joint name: front_right__cluster_1_pitch
+Joint index: 24, Joint name: front_right__cluster_2_roll
+Joint index: 25, Joint name: front_right__cluster_2_pitch
+Joint index: 26, Joint name: front_right__cluster_3_roll
+Joint index: 27, Joint name: front_right__cluster_3_pitch
+Joint index: 28, Joint name: front_right__cluster_3_wrist
+
+Link (frame) names and their indices:
+Frame index: 0, Frame name: universe
+Frame index: 1, Frame name: root_joint
+Frame index: 2, Frame name: base_footprint
+Frame index: 3, Frame name: base_joint
+Frame index: 4, Frame name: base_link
+Frame index: 5, Frame name: base_link_back__sensor_joint
+Frame index: 6, Frame name: back__sensor_link
+Frame index: 7, Frame name: base_link_back_left__joint
+Frame index: 8, Frame name: back_left__base_link
+Frame index: 9, Frame name: back_left__cluster_1_base_fix
+Frame index: 10, Frame name: back_left__cluster_1_base_link
+Frame index: 11, Frame name: back_left__cluster_1_roll
+Frame index: 12, Frame name: back_left__cluster_1_proximal_link
+Frame index: 13, Frame name: back_left__cluster_1_pitch
+Frame index: 14, Frame name: back_left__cluster_1_distal_link
+Frame index: 15, Frame name: back_left__cluster_1_end_joint
+Frame index: 16, Frame name: back_left__cluster_1_end_link
+Frame index: 17, Frame name: back_left__cluster_2_base_fix
+Frame index: 18, Frame name: back_left__cluster_2_base_link
+Frame index: 19, Frame name: back_left__cluster_2_roll
+Frame index: 20, Frame name: back_left__cluster_2_proximal_link
+Frame index: 21, Frame name: back_left__cluster_2_pitch
+Frame index: 22, Frame name: back_left__cluster_2_distal_link
+Frame index: 23, Frame name: back_left__cluster_2_end_joint
+Frame index: 24, Frame name: back_left__cluster_2_end_link
+Frame index: 25, Frame name: back_left__cluster_3_base_fix
+Frame index: 26, Frame name: back_left__cluster_3_base_link
+Frame index: 27, Frame name: back_left__cluster_3_roll
+Frame index: 28, Frame name: back_left__cluster_3_proximal_link
+Frame index: 29, Frame name: back_left__cluster_3_pitch
+Frame index: 30, Frame name: back_left__cluster_3_distal_link
+Frame index: 31, Frame name: back_left__cluster_3_mid_joint
+Frame index: 32, Frame name: back_left__cluster_3_mid_link
+Frame index: 33, Frame name: back_left__cluster_3_wrist
+Frame index: 34, Frame name: back_left__cluster_3_wrist_link
+Frame index: 35, Frame name: back_left__cluster_3_end_joint
+Frame index: 36, Frame name: back_left__cluster_3_end_link
+Frame index: 37, Frame name: back_left__cluster_3_wrist_link_foot_joint
+Frame index: 38, Frame name: back_left__foot_link
+Frame index: 39, Frame name: base_link_back_right__joint
+Frame index: 40, Frame name: back_right__base_link
+Frame index: 41, Frame name: back_right__cluster_1_base_fix
+Frame index: 42, Frame name: back_right__cluster_1_base_link
+Frame index: 43, Frame name: back_right__cluster_1_roll
+Frame index: 44, Frame name: back_right__cluster_1_proximal_link
+Frame index: 45, Frame name: back_right__cluster_1_pitch
+Frame index: 46, Frame name: back_right__cluster_1_distal_link
+Frame index: 47, Frame name: back_right__cluster_1_end_joint
+Frame index: 48, Frame name: back_right__cluster_1_end_link
+Frame index: 49, Frame name: back_right__cluster_2_base_fix
+Frame index: 50, Frame name: back_right__cluster_2_base_link
+Frame index: 51, Frame name: back_right__cluster_2_roll
+Frame index: 52, Frame name: back_right__cluster_2_proximal_link
+Frame index: 53, Frame name: back_right__cluster_2_pitch
+Frame index: 54, Frame name: back_right__cluster_2_distal_link
+Frame index: 55, Frame name: back_right__cluster_2_end_joint
+Frame index: 56, Frame name: back_right__cluster_2_end_link
+Frame index: 57, Frame name: back_right__cluster_3_base_fix
+Frame index: 58, Frame name: back_right__cluster_3_base_link
+Frame index: 59, Frame name: back_right__cluster_3_roll
+Frame index: 60, Frame name: back_right__cluster_3_proximal_link
+Frame index: 61, Frame name: back_right__cluster_3_pitch
+Frame index: 62, Frame name: back_right__cluster_3_distal_link
+Frame index: 63, Frame name: back_right__cluster_3_mid_joint
+Frame index: 64, Frame name: back_right__cluster_3_mid_link
+Frame index: 65, Frame name: back_right__cluster_3_wrist
+Frame index: 66, Frame name: back_right__cluster_3_wrist_link
+Frame index: 67, Frame name: back_right__cluster_3_end_joint
+Frame index: 68, Frame name: back_right__cluster_3_end_link
+Frame index: 69, Frame name: back_right__cluster_3_wrist_link_foot_joint
+Frame index: 70, Frame name: back_right__foot_link
+Frame index: 71, Frame name: base_link_front_left__joint
+Frame index: 72, Frame name: front_left__base_link
+Frame index: 73, Frame name: front_left__cluster_1_base_fix
+Frame index: 74, Frame name: front_left__cluster_1_base_link
+Frame index: 75, Frame name: front_left__cluster_1_roll
+Frame index: 76, Frame name: front_left__cluster_1_proximal_link
+Frame index: 77, Frame name: front_left__cluster_1_pitch
+Frame index: 78, Frame name: front_left__cluster_1_distal_link
+Frame index: 79, Frame name: front_left__cluster_1_end_joint
+Frame index: 80, Frame name: front_left__cluster_1_end_link
+Frame index: 81, Frame name: front_left__cluster_2_base_fix
+Frame index: 82, Frame name: front_left__cluster_2_base_link
+Frame index: 83, Frame name: front_left__cluster_2_roll
+Frame index: 84, Frame name: front_left__cluster_2_proximal_link
+Frame index: 85, Frame name: front_left__cluster_2_pitch
+Frame index: 86, Frame name: front_left__cluster_2_distal_link
+Frame index: 87, Frame name: front_left__cluster_2_end_joint
+Frame index: 88, Frame name: front_left__cluster_2_end_link
+Frame index: 89, Frame name: front_left__cluster_3_base_fix
+Frame index: 90, Frame name: front_left__cluster_3_base_link
+Frame index: 91, Frame name: front_left__cluster_3_roll
+Frame index: 92, Frame name: front_left__cluster_3_proximal_link
+Frame index: 93, Frame name: front_left__cluster_3_pitch
+Frame index: 94, Frame name: front_left__cluster_3_distal_link
+Frame index: 95, Frame name: front_left__cluster_3_mid_joint
+Frame index: 96, Frame name: front_left__cluster_3_mid_link
+Frame index: 97, Frame name: front_left__cluster_3_wrist
+Frame index: 98, Frame name: front_left__cluster_3_wrist_link
+Frame index: 99, Frame name: front_left__cluster_3_end_joint
+Frame index: 100, Frame name: front_left__cluster_3_end_link
+Frame index: 101, Frame name: front_left__cluster_3_wrist_link_foot_joint
+Frame index: 102, Frame name: front_left__foot_link
+Frame index: 103, Frame name: base_link_front_left__sensor_joint
+Frame index: 104, Frame name: front_left__sensor_link
+Frame index: 105, Frame name: base_link_front_right__joint
+Frame index: 106, Frame name: front_right__base_link
+Frame index: 107, Frame name: front_right__cluster_1_base_fix
+Frame index: 108, Frame name: front_right__cluster_1_base_link
+Frame index: 109, Frame name: front_right__cluster_1_roll
+Frame index: 110, Frame name: front_right__cluster_1_proximal_link
+Frame index: 111, Frame name: front_right__cluster_1_pitch
+Frame index: 112, Frame name: front_right__cluster_1_distal_link
+Frame index: 113, Frame name: front_right__cluster_1_end_joint
+Frame index: 114, Frame name: front_right__cluster_1_end_link
+Frame index: 115, Frame name: front_right__cluster_2_base_fix
+Frame index: 116, Frame name: front_right__cluster_2_base_link
+Frame index: 117, Frame name: front_right__cluster_2_roll
+Frame index: 118, Frame name: front_right__cluster_2_proximal_link
+Frame index: 119, Frame name: front_right__cluster_2_pitch
+Frame index: 120, Frame name: front_right__cluster_2_distal_link
+Frame index: 121, Frame name: front_right__cluster_2_end_joint
+Frame index: 122, Frame name: front_right__cluster_2_end_link
+Frame index: 123, Frame name: front_right__cluster_3_base_fix
+Frame index: 124, Frame name: front_right__cluster_3_base_link
+Frame index: 125, Frame name: front_right__cluster_3_roll
+Frame index: 126, Frame name: front_right__cluster_3_proximal_link
+Frame index: 127, Frame name: front_right__cluster_3_pitch
+Frame index: 128, Frame name: front_right__cluster_3_distal_link
+Frame index: 129, Frame name: front_right__cluster_3_mid_joint
+Frame index: 130, Frame name: front_right__cluster_3_mid_link
+Frame index: 131, Frame name: front_right__cluster_3_wrist
+Frame index: 132, Frame name: front_right__cluster_3_wrist_link
+Frame index: 133, Frame name: front_right__cluster_3_end_joint
+Frame index: 134, Frame name: front_right__cluster_3_end_link
+Frame index: 135, Frame name: front_right__cluster_3_wrist_link_foot_joint
+Frame index: 136, Frame name: front_right__foot_link
+Frame index: 137, Frame name: base_link_front_right__sensor_joint
+Frame index: 138, Frame name: front_right__sensor_link
+Frame index: 139, Frame name: base_link_left__sensor_joint
+Frame index: 140, Frame name: left__sensor_link
+Frame index: 141, Frame name: base_link_right__sensor_joint
+Frame index: 142, Frame name: right__sensor_link
+Frame index: 143, Frame name: bottom_lidar_base_joint
+Frame index: 144, Frame name: bottom_lidar_link
+Frame index: 145, Frame name: top_lidar_base_joint
+Frame index: 146, Frame name: top_lidar_link
+

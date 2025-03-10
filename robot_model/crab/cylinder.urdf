@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<robot name="cylinder">
+
+  <!--=============================== root (torso) ===========================-->
+  <link name="cylinder">
+
+    <visual>
+
+      <origin rpy="0 -0 0" xyz="0 0 0"/>
+      <geometry>
+        <cylinder radius="2.0" length="10"/>
+      </geometry>
+
+    </visual>
+
+    <collision>
+
+      <origin rpy="0 -0 0" xyz="0 0 0"/>
+      <geometry>
+        <cylinder radius="2.0" length="10"/>
+      </geometry>
+
+    </collision>
+
+    <inertial>
+
+      <origin rpy="0 0 0" xyz="-31.658e-03 -0.03865e-03 125.19e-03"/>
+      <mass value="6.456"/>
+      <inertia ixx="178517.35e-06" ixy="-18.968e-06" ixz="28376.527e-06" iyy="181767.801e-06" iyz="-50.398e-06" izz="37147.31e-06"/>
+
+    </inertial>
+
+  </link>
+
+</robot>

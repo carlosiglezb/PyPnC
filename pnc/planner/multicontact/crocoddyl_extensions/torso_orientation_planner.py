@@ -4,11 +4,11 @@ import crocoddyl
 import numpy as np
 import pinocchio as pin
 
-import plot.meshcat_utils as vis_tools
-import util.util
-
 cwd = os.getcwd()
 sys.path.append(cwd)
+
+import plot.meshcat_utils as vis_tools
+import util.util
 
 def createNoSupportTorsoActionModel(base_target=None):
     # Define the cost sum (cost manager)
