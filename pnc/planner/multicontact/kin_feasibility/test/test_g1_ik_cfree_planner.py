@@ -3,6 +3,7 @@ import unittest
 import os
 import sys
 from collections import OrderedDict
+import copy
 
 from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 
@@ -776,9 +777,11 @@ class TestIKCFreePlanner(unittest.TestCase):
             display.finish_animation()
 
         if b_save_plan:
-            save_filename = 'sca_five_stage_plan.pkl'
+            save_filename = self.robot_name + 'sca_five_stage_plan.pkl'
             data_saver = DataSaver(save_filename)
-            data_saver.add('frame_paths', sca_kin_cfree_planner.planner.path)
+            sca_kin_cfree_planner.planner.safe_boxes = []  # cannot copy/save iris objects
+            sca_kin_cfree_planner.planner.sca_robot_geom = None
+            data_saver.add('ik_cfree_planner', sca_kin_cfree_planner)
             data_saver.advance()
             data_saver.close()
 

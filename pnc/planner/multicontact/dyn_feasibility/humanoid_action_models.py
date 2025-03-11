@@ -606,13 +606,19 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
         costs.addCost(fr_name + "_goal", fr_cost, 5e2)
 
     # Adding state and control regularization terms
+    x_reg_weight = 5e-2
+    u_reg_weight = 1e-4
+    w_x = np.array([0.1] * 3 + [10.0] * 3 + [2.] * (state.nv - 6) + [4.] * state.nv)
     if zero_config is not None and terminal_step:
-        x0[3:state.nq] = zero_config[3:]
+        # x0[3:7] = zero_config[3:7]    # use initial orientation as reference
+        x0[7+11:state.nq] = zero_config[7+11:]    # use (x,y,z)-position from references
+        w_x[:7+11] = 1e-3               # don't track lower body
+        # w_x[3:7] = 10                   # track orientation
+        w_x[-state.nv:] = 100.0          # penalize high velocities returning to zero configuration
     if v_ref is not None:
         x0[-state.nv:] = v_ref
     else:
         x0[-state.nv:] = np.zeros(state.nv)
-    w_x = np.array([0.1] * 3 + [10.0] * 3 + [2.] * (state.nv - 6) + [4.] * state.nv)
     activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x**2)
     x_reg_cost = crocoddyl.CostModelResidual(
         state, activation_xreg, crocoddyl.ResidualModelState(state, x0, actuation.nu)
@@ -620,8 +626,8 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
     u_reg_cost = crocoddyl.CostModelResidual(
         state, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
-    costs.addCost("xReg", x_reg_cost, 5e-2)
-    costs.addCost("uReg", u_reg_cost, 1e-4)
+    costs.addCost("xReg", x_reg_cost, x_reg_weight)
+    costs.addCost("uReg", u_reg_cost, u_reg_weight)
 
     # Adding the state limits penalization
     x_lb = np.concatenate([state.lb[1: state.nv + 1], state.lb[-state.nv:]])

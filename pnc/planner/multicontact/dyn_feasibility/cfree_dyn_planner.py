@@ -1,4 +1,5 @@
 import os
+import pickle
 import sys
 import time
 from collections import OrderedDict
@@ -330,6 +331,12 @@ def load_robot_model(robot_name):
     return rob_model, col_model, vis_model, rob_data, col_data, vis_data
 
 
+def load_navy_door_models():
+    return pin.buildModelsFromUrdf(
+        cwd + "/robot_model/ground/navy_door.urdf",
+        cwd + "/robot_model/ground", pin.JointModelFreeFlyer())
+
+
 def compute_iris_regions_mgr(obstacles,
                              domain_ubody,
                              domain_lbody_l,
@@ -658,9 +665,7 @@ def visualize_env(rob_model, rob_collision_model, rob_visual_model, q0, door_pos
     visualizer.display(q0)
 
     # load (real) door to visualizer
-    door_model, door_collision_model, door_visual_model = pin.buildModelsFromUrdf(
-        cwd + "/robot_model/ground/navy_door.urdf",
-        cwd + "/robot_model/ground", pin.JointModelFreeFlyer())
+    door_model, door_collision_model, door_visual_model = load_navy_door_models()
 
     door_vis = MeshcatVisualizer(door_model, door_collision_model, door_visual_model)
     door_vis.initViewer(visualizer.viewer)
@@ -713,6 +718,7 @@ def get_contact_seq_from_fixed_frames_seq(fixed_frames_seq):
 def main(args):
     contact_seq = args.sequence
     robot_name = args.robot_name
+    kin_plan_path = args.kin_plan_path
 
     if B_SAVE_DATA:
         # Saving data tools
@@ -783,6 +789,16 @@ def main(args):
     # load robot model and corresponding robot data
     rob_model, col_model, vis_model, rob_data, col_data, vis_data = load_robot_model(robot_name)
 
+    # Getting the frame ids
+    plan_to_model_ids = {}
+    plan_to_model_ids['RF'] = rob_model.getFrameId(plan_to_model_frames['RF'])
+    plan_to_model_ids['LF'] = rob_model.getFrameId(plan_to_model_frames['LF'])
+    plan_to_model_ids['R_knee'] = rob_model.getFrameId(plan_to_model_frames['R_knee'])
+    plan_to_model_ids['L_knee'] = rob_model.getFrameId(plan_to_model_frames['L_knee'])
+    plan_to_model_ids['LH'] = rob_model.getFrameId(plan_to_model_frames['LH'])
+    plan_to_model_ids['RH'] = rob_model.getFrameId(plan_to_model_frames['RH'])
+    plan_to_model_ids['torso'] = rob_model.getFrameId(plan_to_model_frames['torso'])
+
     # load navy environment (with respective door offset) and initial robot pose
     door_pos = np.array([0.32, 0., 0.])
     step_length = 0.35
@@ -793,7 +809,7 @@ def main(args):
         door_pos = np.array([0.28, 0., 0.])
         step_length = 0.42
         # weights_rigid_link = np.array([10., 0., 3.])    # step over door in single step
-        weights_rigid_link = np.array([10., 0., 0.])    # step on knee knocker
+        weights_rigid_link = np.array([10., 0., 0.])  # step on knee knocker
     elif robot_name == 'valkyrie':
         q0 = get_val_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.34, 0., 0.])
@@ -806,95 +822,104 @@ def main(args):
         weights_rigid_link = np.array([6500., 0., 1500.])
     else:
         raise NotImplementedError('Robot default configuration not specified')
-    door_pose, obstacles, domain_ubody, domain_lbody_l, domain_lbody_r = load_navy_env(robot_name, door_pos)
     v0 = np.zeros(rob_model.nv)
     x0 = np.concatenate([q0, v0])
+    door_pose, obstacles, domain_ubody, domain_lbody_l, domain_lbody_r = load_navy_env(robot_name, door_pos)
 
-    # Update Pinocchio model
-    pin.forwardKinematics(rob_model, rob_data, q0)
-    pin.updateFramePlacements(rob_model, rob_data)
+    if kin_plan_path is None:
 
-    # Getting the frame ids
-    plan_to_model_ids = {}
-    plan_to_model_ids['RF'] = rob_model.getFrameId(plan_to_model_frames['RF'])
-    plan_to_model_ids['LF'] = rob_model.getFrameId(plan_to_model_frames['LF'])
-    plan_to_model_ids['R_knee'] = rob_model.getFrameId(plan_to_model_frames['R_knee'])
-    plan_to_model_ids['L_knee'] = rob_model.getFrameId(plan_to_model_frames['L_knee'])
-    plan_to_model_ids['LH'] = rob_model.getFrameId(plan_to_model_frames['LH'])
-    plan_to_model_ids['RH'] = rob_model.getFrameId(plan_to_model_frames['RH'])
-    plan_to_model_ids['torso'] = rob_model.getFrameId(plan_to_model_frames['torso'])
+        # Update Pinocchio model
+        pin.forwardKinematics(rob_model, rob_data, q0)
+        pin.updateFramePlacements(rob_model, rob_data)
 
-    # Generate IRIS regions
-    standing_pos = q0[:3]
-    safe_regions_mgr_dict, p_init = compute_iris_regions_mgr(obstacles, domain_ubody,
-                                                             domain_lbody_l, domain_lbody_r,
-                                                             rob_data, plan_to_model_ids,
-                                                             standing_pos, step_length)
+        # Generate IRIS regions
+        standing_pos = q0[:3]
+        safe_regions_mgr_dict, p_init = compute_iris_regions_mgr(obstacles, domain_ubody,
+                                                                 domain_lbody_l, domain_lbody_r,
+                                                                 rob_data, plan_to_model_ids,
+                                                                 standing_pos, step_length)
 
-    if B_VISUALIZE:
-        visualizer, door_model, door_collision_model, door_visual_model \
-            = visualize_env(rob_model, col_model, vis_model, q0, door_pose)
-    else:
-        visualizer = None
-
-    #
-    # Initialize IK Frame Planner
-    #
-    if robot_name == 'valkyrie':
-        w_rigid_poly = np.array([0.1621, 0.0, 0.])
-    else:
-        w_rigid_poly = None
-    ik_cfree_planner = IKCFreePlanner(rob_model, rob_data, plan_to_model_frames, q0, w_rigid_poly=w_rigid_poly)
-
-    # generate all frame traversable regions
-    traversable_regions_dict = OrderedDict()
-    for fr in plan_to_model_frames.keys():
-        if fr == 'torso':
-            traversable_regions_dict[fr] = FrameTraversableRegion(fr,
-                                                                  b_visualize_reach=B_VISUALIZE,
-                                                                  b_visualize_safe=B_VISUALIZE,
-                                                                  visualizer=visualizer)
+        if B_VISUALIZE:
+            visualizer, door_model, door_collision_model, door_visual_model \
+                = visualize_env(rob_model, col_model, vis_model, q0, door_pose)
         else:
-            traversable_regions_dict[fr] = FrameTraversableRegion(fr,
-                                                                  ee_halfspace_params[fr],
-                                                                  b_visualize_reach=B_VISUALIZE,
-                                                                  b_visualize_safe=B_VISUALIZE,
-                                                                  visualizer=visualizer)
-            traversable_regions_dict[fr].update_origin_pose(standing_pos)
-        traversable_regions_dict[fr].load_iris_regions(safe_regions_mgr_dict[fr])
+            visualizer = None
 
-    # hand-chosen five-stage sequence of contacts
-    if robot_name == 'valkyrie':
-        fixed_frames_seq, motion_frames_seq = get_two_stage_contact_sequence(safe_regions_mgr_dict)
-    else:   # smaller robots have been set up with different contact sequences
-        if contact_seq == 0:    # step through door
-            fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict)
-        elif contact_seq == 1:  # step on knee-knocker
-            fixed_frames_seq, motion_frames_seq = get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict)
+        #
+        # Initialize IK Frame Planner
+        #
+        if robot_name == 'valkyrie':
+            w_rigid_poly = np.array([0.1621, 0.0, 0.])
         else:
-                NotImplementedError(f"Contact sequence {contact_seq} not implemented")
-    contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames_seq)
+            w_rigid_poly = None
+        ik_cfree_planner = IKCFreePlanner(rob_model, rob_data, plan_to_model_frames, q0, w_rigid_poly=w_rigid_poly)
 
+        # generate all frame traversable regions
+        traversable_regions_dict = OrderedDict()
+        for fr in plan_to_model_frames.keys():
+            if fr == 'torso':
+                traversable_regions_dict[fr] = FrameTraversableRegion(fr,
+                                                                      b_visualize_reach=B_VISUALIZE,
+                                                                      b_visualize_safe=B_VISUALIZE,
+                                                                      visualizer=visualizer)
+            else:
+                traversable_regions_dict[fr] = FrameTraversableRegion(fr,
+                                                                      ee_halfspace_params[fr],
+                                                                      b_visualize_reach=B_VISUALIZE,
+                                                                      b_visualize_safe=B_VISUALIZE,
+                                                                      visualizer=visualizer)
+                traversable_regions_dict[fr].update_origin_pose(standing_pos)
+            traversable_regions_dict[fr].load_iris_regions(safe_regions_mgr_dict[fr])
 
-    # planner parameters
-    T = 3
-    alpha = [0, 0, 1]
-    traversable_regions = [traversable_regions_dict['torso'],
-                           traversable_regions_dict['LF'],
-                           traversable_regions_dict['RF'],
-                           traversable_regions_dict['L_knee'],
-                           traversable_regions_dict['R_knee'],
-                           traversable_regions_dict['LH'],
-                           traversable_regions_dict['RH']]
-    frame_planner = LocomanipulationFramePlanner(traversable_regions,
-                                                 aux_frames_path=aux_frames_path,
-                                                 fixed_frames=fixed_frames_seq,
-                                                 motion_frames_seq=motion_frames_seq)
+        # hand-chosen five-stage sequence of contacts
+        if robot_name == 'valkyrie':
+            fixed_frames_seq, motion_frames_seq = get_two_stage_contact_sequence(safe_regions_mgr_dict)
+        else:   # smaller robots have been set up with different contact sequences
+            if contact_seq == 0:    # step through door
+                fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict)
+            elif contact_seq == 1:  # step on knee-knocker
+                fixed_frames_seq, motion_frames_seq = get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict)
+            else:
+                    NotImplementedError(f"Contact sequence {contact_seq} not implemented")
+        contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames_seq)
 
-    # compute paths and create targets
-    ik_cfree_planner.set_planner(frame_planner)
-    ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
-    ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer, B_VERBOSE)
+        # planner parameters
+        T = 3
+        alpha = [0, 0, 1]
+        traversable_regions = [traversable_regions_dict['torso'],
+                               traversable_regions_dict['LF'],
+                               traversable_regions_dict['RF'],
+                               traversable_regions_dict['L_knee'],
+                               traversable_regions_dict['R_knee'],
+                               traversable_regions_dict['LH'],
+                               traversable_regions_dict['RH']]
+        frame_planner = LocomanipulationFramePlanner(traversable_regions,
+                                                     aux_frames_path=aux_frames_path,
+                                                     fixed_frames=fixed_frames_seq,
+                                                     motion_frames_seq=motion_frames_seq)
+
+        # compute paths and create targets
+        ik_cfree_planner.set_planner(frame_planner)
+        ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
+        ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer, B_VERBOSE)
+
+    else:
+        print(f' {"*" * 8} Loading solution from {kin_plan_path} {"*" * 8}')
+        with open(str(kin_plan_path), 'rb') as file:
+            while True:
+                try:
+                    d = pickle.load(file)
+                    ik_cfree_planner = d['ik_cfree_planner']
+                except EOFError:
+                    break
+        # get parameters needed for reconstruction in croccodyl
+        contact_seqs = get_contact_seq_from_fixed_frames_seq(ik_cfree_planner.planner.fixed_frames)
+        contact_seqs[-1].remove('LH')
+        contact_seqs[-1].remove('RH')
+        T = ik_cfree_planner.planner.path[0].beziers[0].b
+
+        # load knee knocker visualization and collision models
+        door_model, door_collision_model, door_visual_model = load_navy_door_models()
 
     #
     # Start Dynamic Feasibility Check
@@ -933,6 +958,9 @@ def main(args):
         N_horizon_lst = [180, 200, 200, 150, 200]
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
         robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
+        if contact_seq == 1:    # step on knee knocker
+            robot_dyn_plan.reset_default_gains('torso', np.array([2.5, 3.5, 0.5] + [0.5, 0.5, 0.001]))
+            robot_dyn_plan.set_zero_configuration(q0)
     elif robot_name == 'ergoCub':
         N_horizon_lst = [100, 220, 100, 180, 80]
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
@@ -1023,9 +1051,11 @@ def main(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sequence", type=int, default=0,
+    parser.add_argument("--sequence", type=int, default=1,
                         help="Contact sequence to solve for")
     parser.add_argument("--robot_name", type=str, default='g1',
                         help="Robot name to use for planning")
+    parser.add_argument("--kin_plan_path", type=str, default=None,
+                        help="Path to pkl file containing mfpp paths")
     args = parser.parse_args()
     main(args)

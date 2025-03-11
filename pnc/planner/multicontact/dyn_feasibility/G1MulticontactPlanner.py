@@ -33,6 +33,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             'hands': np.array([2.] * 3 + [0.00001] * 3)
         }
         self._default_gains = copy(self.gains)
+        self._zero_config = None
 
         # names of joints used in reduced states (for plotting only)
         self.lleg_jnames = ['left_hip_roll_joint', 'left_hip_pitch_joint', 'left_hip_yaw_joint',
@@ -54,6 +55,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         plan_to_model_ids = self.plan_to_model_ids
         ik_cfree_planner = self.ik_cfree_planner
         gains = self.gains
+        zero_config = self._zero_config
 
         fddp = self.fddp
         for i in range(self.contact_phases):
@@ -144,8 +146,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                           ee_rpy,
                                                           frame_targets_dict,
                                                           None,
+                                                          zero_config=zero_config,
                                                           gains=gains,
-                                                          terminal_step=b_terminal_step)
+                                                          terminal_step=False)
                 model_seqs += createFinalSequence([dmodel])
                 print(f"Applying Final Sequence model at {i}")
 
@@ -192,3 +195,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
         super().update_costs_from_solver()
         print("[Compute Time] Dynamic feasibility check: ", dyn_solve_time)
+
+    def reset_default_gains(self, frame_name: str, updated_gains: np.array):
+        self._default_gains[frame_name] = updated_gains
+
+    def set_zero_configuration(self, joint_configuartion):
+        self._zero_config = joint_configuartion
