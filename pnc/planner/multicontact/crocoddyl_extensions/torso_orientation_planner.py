@@ -106,7 +106,9 @@ def get_default_initial_pose():
     q0[33] = 0.                         # right_ezgripper_knuckle_palm_L1_2
     q0[34] = 0.                         # right_ezgripper_knuckle_L1_L2_2
 
+    # additional 7 dof 
     floating_base = np.array([0., 0., 0., 0., 0., 0., 1.])
+    
     return np.concatenate((floating_base, q0))
 
 

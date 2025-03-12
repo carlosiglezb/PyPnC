@@ -106,8 +106,9 @@ def get_default_initial_pose():
     q0[33] = 0.                         # right_ezgripper_knuckle_palm_L1_2
     q0[34] = 0.                         # right_ezgripper_knuckle_L1_L2_2
 
-    floating_base = np.array([0., 0., 0., 0., 0., 0., 1.])
-    return np.concatenate((floating_base, q0))
+    # floating_base = np.array([0., 0., 0., 0., 0., 0., 1.])
+    # return np.concatenate((floating_base, q0))
+    return q0 
 
 
 # Load robot
@@ -125,7 +126,7 @@ v0 = np.zeros(rob_model.nv)
 x0 = np.concatenate([q0, v0])
 
 # Getting the frame ids
-base_id = rob_model.getFrameId("torso_link")
+base_id = rob_model.getFrameId("base_link")
 
 # Define the robot's state and actuation
 state = crocoddyl.StateMultibody(rob_model)
@@ -168,4 +169,6 @@ save_freq = 1
 display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
                   rob_data, vis_data, col_data, ctrl_freq=1/DT, save_freq=save_freq)
 display.displayFromCrocoddylSolver(fddp)
+
+print("Done") 
 
