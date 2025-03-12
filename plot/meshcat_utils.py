@@ -2,7 +2,7 @@ import os
 import sys
 import numpy as np
 import pinocchio as pin
-
+import time
 # Pinocchio Meshcat
 from pinocchio.visualize import MeshcatVisualizer
 import meshcat.geometry as g
@@ -171,6 +171,7 @@ def get_scaled_and_oriented_grf_tf(scale,
 
 
 class MeshcatPinocchioAnimation:
+    
     def __init__(self, pin_robot_model, collision_model, visual_model,
                  robot_data, visual_data, collision_data,
                  ctrl_freq=1000, save_freq=50):
@@ -179,6 +180,7 @@ class MeshcatPinocchioAnimation:
         self.model = pin_robot_model
         self.robot_nq = pin_robot_model.nq
         self.viz = MeshcatVisualizer(self.model, collision_model, visual_model)
+        
         try:
             self.viz.initViewer(open=True)
             self.viz.viewer.wait()
@@ -188,6 +190,7 @@ class MeshcatPinocchioAnimation:
             )
             print(err)
             sys.exit(0)
+            
         self.viz.loadViewerModel(rootNodeName=self.model.name)
 
         # animation settings
@@ -249,7 +252,10 @@ class MeshcatPinocchioAnimation:
 
             for sim_time_idx in np.arange(0, len(fs), self.save_freq):
                 q = np.array(it.xs[int(sim_time_idx)][:self.robot_nq])
+                
                 self.viz.display(q)
+                # time.sleep(0.01) 
+                print("sim_time_idx: ", sim_time_idx)
 
                 fs_ti = fs[sim_time_idx]
 
@@ -261,7 +267,8 @@ class MeshcatPinocchioAnimation:
                 self.frame_idx += 1     # increase frame index counter
 
         # save animation
-        self.viz.viewer.set_animation(self.anim, play=False)
+        # self.viz.viewer.set_animation(self.anim, play=False)
+        self.viz.viewer.set_animation(self.anim, play=True)
 
     def start_animation(self):
         self.frame_idx = 0

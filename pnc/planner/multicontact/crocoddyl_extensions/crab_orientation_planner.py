@@ -111,9 +111,9 @@ def get_default_initial_pose():
 
 
 # Load robot
-draco_urdf_file = cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf"
-package_dir = cwd + "/robot_model/draco3"
-rob_model, col_model, vis_model = pin.buildModelsFromUrdf(draco_urdf_file,
+crab_urdf_file = cwd + "/robot_model/crab/crab.urdf"
+package_dir = cwd + "/robot_model/crab"
+rob_model, col_model, vis_model = pin.buildModelsFromUrdf(crab_urdf_file,
                                                           package_dir, pin.JointModelFreeFlyer())
 # remove gravity
 rob_model.gravity = pin.Motion.Zero()
@@ -169,4 +169,3 @@ display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
                   rob_data, vis_data, col_data, ctrl_freq=1/DT, save_freq=save_freq)
 display.displayFromCrocoddylSolver(fddp)
 
-print("Done") 
