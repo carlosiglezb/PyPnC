@@ -7,7 +7,7 @@ from pinocchio.visualize import MeshcatVisualizer
 import pinocchio as pin
 import numpy as np
 
-from pnc.planner.multicontact.path_parameterization import CompositeBezierCurve
+from util.path_parameterization import CompositeBezierCurve
 from util import util
 # Planner
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner

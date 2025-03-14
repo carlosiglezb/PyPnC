@@ -6,8 +6,7 @@ from scipy.special import binom
 
 from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import create_bezier_cvx_norm_eq_relaxation, get_aux_frame_idx, \
     add_vel_acc_constr
-
-from pnc.planner.multicontact.path_parameterization import BezierCurve, CompositeBezierCurve
+from util.path_parameterization import BezierCurve, CompositeBezierCurve
 
 
 def optimize_bezier(L, U, durations, alpha, initial, final,

@@ -16,8 +16,8 @@ from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import get_aux_fram
     create_bezier_cvx_norm_eq_relaxation, add_vel_acc_constr, add_vel_acc_constr_casadi
 from pnc.planner.multicontact.kin_feasibility.scipy_ocp_constraints.scipy_ocp_functions import \
     LinearBezierIneqConstraint, LinearBezierEqConstraint
-from pnc.planner.multicontact.path_parameterization import BezierCurve, CompositeBezierCurve
 from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
+from util.path_parameterization import BezierCurve, CompositeBezierCurve
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
 

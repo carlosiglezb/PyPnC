@@ -5,7 +5,7 @@ from enum import Enum
 
 from pnc.planner.multicontact.kin_feasibility.constraint_parsers import parse_mat_leq_constr, parse_mat_eq_constr, \
     parse_vec_eq_constr
-from pnc.planner.multicontact.path_parameterization import BezierParam
+from util.path_parameterization import BezierParam
 
 eps_vel_constr = 0.01
 
