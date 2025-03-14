@@ -7,7 +7,7 @@ from pinocchio.visualize import MeshcatVisualizer
 import pinocchio as pin
 import numpy as np
 
-from util.path_parameterization import CompositeBezierCurve
+from util.path_parameterization import CompositeBezierCurve, get_bez_segment, get_frame_des_pos
 from util import util
 # Planner
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
@@ -295,37 +295,24 @@ class IKCFreePlanner:
             velocity = solve_ik(self.pink_config, self.tasks, self.dt, solver=self.solver)
             self.pink_config.integrate_inplace(velocity, self.dt)
 
-    @staticmethod
-    def _get_bez_segment(frame_bez_paths: CompositeBezierCurve,
-                        t: float) -> int:
-        seg = 0
-        for s in frame_bez_paths.beziers:
-            if t > s.b:
-                seg += 1
-            else:
-                break
-        return seg
-
-    def get_ee_des_pos(self, frame_name_idx: int, t: float):
-        frame_bez_path = self.planner.path[frame_name_idx]
-        seg = self._get_bez_segment(frame_bez_path, t)
-        if seg >= len(frame_bez_path.beziers):
-            print(f'Segment {seg} was out of bounds for frame {frame_name_idx} at time {t}.')
-            seg = len(frame_bez_path.beziers) - 1
-        bezier_curve = frame_bez_path.beziers[seg]
-        return bezier_curve(t)
-
     def set_plan_to_model_frames(self, plan_to_model_frames: dict[str: str]):
         self.plan_to_model_frames = plan_to_model_frames
 
     def pack_current_targets(self, t):
-        lfoot_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('LF'), t)
-        lknee_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('L_knee'), t)
-        rfoot_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('RF'), t)
-        rknee_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('R_knee'), t)
-        lhand_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('LH'), t)
-        rhand_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('RH'), t)
-        base_t = self.get_ee_des_pos(list(self.plan_to_model_frames.keys()).index('torso'), t)
+        planner_path = self.planner.path
+        idx_LF = list(self.plan_to_model_frames.keys()).index('LF')
+        idx_L_knee = list(self.plan_to_model_frames.keys()).index('L_knee')
+        idx_RF = list(self.plan_to_model_frames.keys()).index('RF')
+        idx_R_knee = list(self.plan_to_model_frames.keys()).index('R_knee')
+        idx_LH = list(self.plan_to_model_frames.keys()).index('LH')
+        idx_RH = list(self.plan_to_model_frames.keys()).index('RH')
+        lfoot_t = get_frame_des_pos(planner_path[idx_LF], t)
+        lknee_t = get_frame_des_pos(planner_path[idx_L_knee], t)
+        rfoot_t = get_frame_des_pos(planner_path[idx_RF], t)
+        rknee_t = get_frame_des_pos(planner_path[idx_R_knee], t)
+        lhand_t = get_frame_des_pos(planner_path[idx_LH], t)
+        rhand_t = get_frame_des_pos(planner_path[idx_RH], t)
+        base_t = get_frame_des_pos(planner_path, list(self.plan_to_model_frames.keys()).index('torso'), t)
         frame_targets_dict = {
             'torso': base_t,
             'LF': lfoot_t,

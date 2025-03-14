@@ -169,3 +169,32 @@ class CompositeBezierCurve:
 
         for bez in self.beziers:
             bez.plot_2dpolygon(**kwargs)
+
+#
+# Helper functions
+#
+def get_bez_segment(frame_bez_paths: CompositeBezierCurve,
+                    t: float) -> int:
+    """
+    Returns the segment of the Bezier curve that contains the time t.
+    """
+    seg = 0
+    for s in frame_bez_paths.beziers:
+        if t > s.b:
+            seg += 1
+        else:
+            break
+    return seg
+
+
+def get_frame_des_pos(frame_bez_path: CompositeBezierCurve,
+                      t: float):
+    """
+    Returns the desired position of a given frame at time t.
+    """
+    seg = get_bez_segment(frame_bez_path, t)
+    if seg >= len(frame_bez_path.beziers):
+        print(f'Bezier segment {seg} was out of bounds at time {t}.')
+        seg = len(frame_bez_path.beziers) - 1
+    bezier_curve = frame_bez_path.beziers[seg]
+    return bezier_curve(t)
