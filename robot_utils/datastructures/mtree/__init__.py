@@ -1,7 +1,7 @@
 from collections import namedtuple
 
-import utils.datastructures.mtree.functions as functions
-from utils.datastructures.mtree.heap_queue import HeapQueue
+import robot_utils.datastructures.mtree.functions as functions
+from robot_utils.datastructures.mtree.heap_queue import HeapQueue
 
 
 _INFINITY = float("inf")

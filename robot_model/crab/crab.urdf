@@ -33,7 +33,7 @@
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
         <!-- <box size="${body_width} ${body_length} ${body_height}" /> -->
-        <mesh filename="package://meshes/base_link/base_link.stl" scale="1 1 1" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/base_link/base_link.stl" scale="1 1 1" />
       </geometry>
       <material name="purple">
         <color rgba="0.5 0.5 0.7 1" />
@@ -43,7 +43,7 @@
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
         <!-- <box size="${body_width} ${body_length} ${body_height}" /> -->
-        <mesh filename="package://meshes/base_link/base_link.stl" scale="1 1 1" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/base_link/base_link.stl" scale="1 1 1" />
       </geometry>
     </collision>
   </link>
@@ -250,7 +250,7 @@
     <child link="front_right__base_link" />
     <origin rpy="0 1.57 0" xyz="1.0 1.0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/776_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/" /> -->
   <link name="front_right__cluster_1_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -288,7 +288,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -297,7 +297,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -318,7 +318,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -327,7 +327,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -348,7 +348,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/end_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -357,7 +357,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/end_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -368,7 +368,7 @@
     <child link="front_right__cluster_1_end_link" />
     <axis xyz="0 0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/665_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/" /> -->
   <link name="front_right__cluster_2_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -406,7 +406,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -415,7 +415,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -436,7 +436,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -445,7 +445,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -466,7 +466,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/end_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -475,7 +475,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/end_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -485,7 +485,7 @@
     <child link="front_right__cluster_2_end_link" />
     <axis xyz="0 0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/5555_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/" /> -->
   <link name="front_right__cluster_3_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -523,7 +523,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -532,7 +532,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -553,7 +553,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -562,7 +562,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -611,7 +611,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/wrist_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/wrist_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -620,7 +620,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/wrist_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/wrist_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -659,7 +659,7 @@
     <child link="front_left__base_link" />
     <origin rpy="3.14 1.57 0" xyz="-1.0 1.0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/776_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/" /> -->
   <link name="front_left__cluster_1_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -697,7 +697,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -706,7 +706,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -727,7 +727,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -736,7 +736,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -757,7 +757,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/end_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -766,7 +766,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/end_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -777,7 +777,7 @@
     <child link="front_left__cluster_1_end_link" />
     <axis xyz="0 0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/665_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/" /> -->
   <link name="front_left__cluster_2_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -815,7 +815,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -824,7 +824,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -845,7 +845,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -854,7 +854,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -875,7 +875,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/end_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -884,7 +884,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/end_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -894,7 +894,7 @@
     <child link="front_left__cluster_2_end_link" />
     <axis xyz="0 0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/5555_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/" /> -->
   <link name="front_left__cluster_3_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -932,7 +932,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -941,7 +941,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -962,7 +962,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -971,7 +971,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1020,7 +1020,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/wrist_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/wrist_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1029,7 +1029,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/wrist_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/wrist_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1068,7 +1068,7 @@
     <child link="back_right__base_link" />
     <origin rpy="0 1.57 0" xyz="1.0 -1.0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/776_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/" /> -->
   <link name="back_right__cluster_1_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -1106,7 +1106,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -1115,7 +1115,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1136,7 +1136,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -1145,7 +1145,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1166,7 +1166,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/end_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -1175,7 +1175,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/end_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1186,7 +1186,7 @@
     <child link="back_right__cluster_1_end_link" />
     <axis xyz="0 0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/665_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/" /> -->
   <link name="back_right__cluster_2_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -1224,7 +1224,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1233,7 +1233,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1254,7 +1254,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1263,7 +1263,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1284,7 +1284,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/end_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1293,7 +1293,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/end_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1303,7 +1303,7 @@
     <child link="back_right__cluster_2_end_link" />
     <axis xyz="0 0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/5555_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/" /> -->
   <link name="back_right__cluster_3_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -1341,7 +1341,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1350,7 +1350,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1371,7 +1371,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1380,7 +1380,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1429,7 +1429,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/wrist_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/wrist_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1438,7 +1438,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/wrist_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/wrist_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1477,7 +1477,7 @@
     <child link="back_left__base_link" />
     <origin rpy="3.14 1.57 0" xyz="-1.0 -1.0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/776_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/" /> -->
   <link name="back_left__cluster_1_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -1515,7 +1515,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -1524,7 +1524,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1545,7 +1545,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -1554,7 +1554,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1575,7 +1575,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/end_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
@@ -1584,7 +1584,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/776_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/776_meshes/end_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1595,7 +1595,7 @@
     <child link="back_left__cluster_1_end_link" />
     <axis xyz="0 0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/665_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/" /> -->
   <link name="back_left__cluster_2_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -1633,7 +1633,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1642,7 +1642,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1663,7 +1663,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1672,7 +1672,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1693,7 +1693,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/end_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1702,7 +1702,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/665_meshes/end_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/665_meshes/end_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1712,7 +1712,7 @@
     <child link="back_left__cluster_2_end_link" />
     <axis xyz="0 0 0" />
   </joint>
-  <!-- <xacro:property name="mesh_path" value="package://meshes/5555_meshes/" /> -->
+  <!-- <xacro:property name="mesh_path" value="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/" /> -->
   <link name="back_left__cluster_3_base_link">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0.25" />
@@ -1750,7 +1750,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/proximal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1759,7 +1759,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/proximal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/proximal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1780,7 +1780,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/distal_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1789,7 +1789,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/distal_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/distal_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -1838,7 +1838,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/wrist_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/wrist_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.89804 0.91765 0.92941 1" />
@@ -1847,7 +1847,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://meshes/5555_meshes/wrist_link.STL" />
+        <mesh filename="/home/june/research/PyPnC/robot_model/crab/meshes/5555_meshes/wrist_link.STL" />
       </geometry>
     </collision>
   </link>

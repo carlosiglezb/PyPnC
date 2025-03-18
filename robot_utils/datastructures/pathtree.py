@@ -1,6 +1,6 @@
 import numpy as np
 import pickle as pkl
-from utils.datastructures.storage import Storage
+from robot_utils.datastructures.storage import Storage
 
 
 class PathTree:

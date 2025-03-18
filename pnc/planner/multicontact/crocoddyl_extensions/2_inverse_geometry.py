@@ -8,10 +8,7 @@
 
 import os 
 import sys 
-
-cwd = os.getcwd()
-sys.path.append(cwd)
-
+sys.path.append( os.getcwd() ) 
 import pdb 
 
 import time 
@@ -26,41 +23,29 @@ from scipy.optimize import fmin_bfgs
 # Kinematic tree in Pinocchio 
 # ---------------------------------- 
 
-# Load robot
-crab_urdf_file = cwd + "/robot_model/crab/crab.urdf"
-package_dir = cwd + "/robot_model/crab/"
-rob_model, col_model, vis_model = pin.buildModelsFromUrdf(crab_urdf_file,
-                                                          package_dir, pin.JointModelFreeFlyer())
-
-# remove gravity
-rob_model.gravity = pin.Motion.Zero()
-
-rob_data, col_data, vis_data = pin.createDatas(rob_model, col_model, vis_model)
-
-## ============================================ ##
-## ============================================ ##
-
-robot = robex.load('crab') 
+# load urdf (from apt paquet robotpkg-example-robot-data 
+# stored in /opt/openrobots/share/example-robot-data) 
+robot = robex.load('ur5') 
 
 # show kinematic tree 
-print(rob_model) 
+print(robot.model) 
 
 # import class RbootWrapper and create an instance in terminal 
 # /opt/openrobots/lib/python2.7/site-packages/pinocchio/robot_wrapper.py 
 # idk where in tutorial they do this 
 
-# # how to get index of a joint 
-# joint_idx = robot.index('wrist_3_joint')
-# # print(f"joint idx = {joint_idx}") 
-# print("joint idx = ", joint_idx)
-# print("joint name = " + rob_model.names[joint_idx]) 
+# how to get index of a joint 
+joint_idx = robot.index('wrist_3_joint')
+# print(f"joint idx = {joint_idx}") 
+print("joint idx = ", joint_idx)
+print("joint name = " + robot.model.names[joint_idx]) 
 
-# rob_model.names is a container for all the joint names 
-for i, n in enumerate(rob_model.names): 
+# robot.model.names is a container for all the joint names 
+for i, n in enumerate(robot.model.names): 
     print(i, n) 
 
-# rob_model.frames is a container for all the frames     
-for f in rob_model.frames: 
+# robot.model.frames is a container for all the frames     
+for f in robot.model.frames: 
     print(f.name, "attached to joint #", f.parent) 
     
 # robot.placement(idx) and robot.framePlacement(idx) returns placement 
@@ -75,8 +60,8 @@ print('b = ', b)
 print('tool_axis = ', tool_axis) 
 
 # dimension of the config space (i.e. the # of joints) is given in: 
-NQ = rob_model.nq     # number of generalized coordinates (DOF) 
-NV = rob_model.nv     # number of generalized velocities 
+NQ = robot.model.nq     # number of generalized coordinates (DOF) 
+NV = robot.model.nv     # number of generalized velocities 
 
 # for this simple robot, NQ = NV = 6 
 print('NQ = ', NQ) 
@@ -87,7 +72,7 @@ print('NV = ', NV)
 # ---------------------------------- 
 
 # load viewer 
-from robot_utils.meshcat_viewer_wrapper import MeshcatVisualizer, colors 
+from utils.meshcat_viewer_wrapper import MeshcatVisualizer, colors 
 
 viz = MeshcatVisualizer(robot) 
 
@@ -273,7 +258,7 @@ viz   = MeshcatVisualizer(robot)
 viz.viewer.jupyter_cell()
 
 viz.display(robot.q0) 
-robot.feetIndexes = [rob_model.getFrameId(frameName) for frameName in ['HR_FOOT', 'HL_FOOT', 'FR_FOOT', 'FL_FOOT']]
+robot.feetIndexes = [robot.model.getFrameId(frameName) for frameName in ['HR_FOOT', 'HL_FOOT', 'FR_FOOT', 'FL_FOOT']]
 
 # --- Add box to represent target
 colors = ['red', 'blue', 'green', 'magenta']
@@ -332,3 +317,4 @@ print("Keep Meshcat server alive")
 
 while True: 
     time.sleep(1)
+

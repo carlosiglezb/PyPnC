@@ -1,6 +1,6 @@
 import random
 
-from utils.datastructures.mtree.heap_queue import HeapQueue
+from robot_utils.datastructures.mtree.heap_queue import HeapQueue
 
 
 def random_promotion(data_objects, distance_function):
