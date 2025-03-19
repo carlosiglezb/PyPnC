@@ -68,43 +68,45 @@ def createSequence(dmodels, DT, N):
 
 
 def get_default_initial_pose():
-    q0 = np.zeros(35,)
-    hip_yaw_angle = 5
-    q0[0] = 0.                          # l_hip_ie
-    q0[1] = np.radians(hip_yaw_angle)   # l_hip_aa
-    q0[2] = -np.pi / 4                  # l_hip_fe
-    q0[3] = np.pi / 4                   # l_knee_fe_jp
-    q0[4] = np.pi / 4                   # l_knee_fe_jd
-    q0[5] = -np.pi / 4                  # l_ankle_fe
-    q0[6] = np.radians(-hip_yaw_angle)  # l_ankle_ie
-    q0[7] = 0.                          # l_shoulder_fe
-    q0[8] = np.pi / 6                   # l_shoulder_aa
-    q0[9] = 0.                          # l_shoulder_ie
-    q0[10] = -np.pi / 2                 # l_elbow_fe
-    q0[11] = 0.                         # l_wrist_ps
-    q0[12] = 0.                         # l_wrist_pitch
-    q0[13] = 0.                         # left_ezgripper_knuckle_palm_L1_1
-    q0[14] = 0.                         # left_ezgripper_knuckle_L1_L2_1
-    q0[15] = 0.                         # left_ezgripper_knuckle_palm_L1_2
-    q0[16] = 0.                         # left_ezgripper_knuckle_L1_L2_2
-    q0[17] = 0.                         # neck pitch
-    q0[18] = 0.                         # r_hip_ie
-    q0[19] = np.radians(-hip_yaw_angle) # r_hip_aa
-    q0[20] = -np.pi / 4                 # r_hip_fe
-    q0[21] = np.pi / 4                  # r_knee_fe_jp
-    q0[22] = np.pi / 4                  # r_knee_fe_jd
-    q0[23] = -np.pi / 4                 # r_ankle_fe
-    q0[24] = np.radians(hip_yaw_angle)  # r_ankle_ie
-    q0[25] = 0.                         # r_shoulder_fe
-    q0[26] = -0.9                       # r_shoulder_aa
-    q0[27] = 0.                         # r_shoulder_ie
-    q0[28] = -np.pi / 2                 # r_elbow_fe
-    q0[29] = 0.                         # r_wrist_ps
-    q0[30] = 0.                         # r_wrist_pitch
-    q0[31] = 0.                         # right_ezgripper_knuckle_palm_L1_1
-    q0[32] = 0.                         # right_ezgripper_knuckle_L1_L2_1
-    q0[33] = 0.                         # right_ezgripper_knuckle_palm_L1_2
-    q0[34] = 0.                         # right_ezgripper_knuckle_L1_L2_2
+
+    q0 = np.zeros(36,)
+
+    q0[0] = 0.                          # universe 
+    q0[1] = 0.                          # root_joint x 
+    q0[2] = 0.                          # root_joint y 
+    q0[3] = 0.                          # root_joint z 
+    q0[4] = 0.                          # root_joint q1
+    q0[5] = 0.                          # root_joint q2
+    q0[6] = 0.                          # root_joint q3
+    q0[7] = 0.                          # root_joint q4 
+    q0[8] = 0.                          # back_left__cluster_1_roll 
+    q0[9] = 0.                          # back_left__cluster_1_pitch 
+    q0[10] = 0.                         # back_left__cluster_2_roll 
+    q0[11] = 0.                          # back_left__cluster_2_pitch 
+    q0[12] = 0.                          # back_left__cluster_3_roll 
+    q0[13] = 0.                          # back_left__cluster_3_pitch 
+    q0[14] = 0.                          # back_left__cluster_3_wrist  
+    q0[15] = 0.                          # back_right__cluster_1_roll 
+    q0[16] = 0.                          # back_right__cluster_1_pitch 
+    q0[17] = 0.                          # back_right__cluster_2_roll 
+    q0[18] = 0.                          # back_right__cluster_2_pitch 
+    q0[19] = 0.                          # back_right__cluster_3_roll 
+    q0[20] = 0.                          # back_right__cluster_3_pitch 
+    q0[21] = 0.                          # back_right__cluster_3_wrist 
+    q0[22] = 0.                          # front_left__cluster_1_roll 
+    q0[23] = 0.                          # front_left__cluster_1_pitch 
+    q0[24] = 0.                          # front_left__cluster_2_roll 
+    q0[25] = 0.                          # front_left__cluster_2_pitch 
+    q0[26] = 0.                          # front_left__cluster_3_roll 
+    q0[27] = 0.                          # front_left__cluster_3_pitch 
+    q0[28] = 0.                          # front_left__cluster_3_wrist 
+    q0[29] = 0.                          # front_right__cluster_1_roll 
+    q0[30] = 0.                          # front_right__cluster_1_pitch 
+    q0[31] = 0.                          # front_right__cluster_2_roll 
+    q0[32] = 0.                          # front_right__cluster_2_pitch 
+    q0[33] = 0.                          # front_right__cluster_3_roll 
+    q0[34] = 0.                          # front_right__cluster_3_pitch 
+    q0[35] = 0.                          # front_right__cluster_3_wrist 
 
     # floating_base = np.array([0., 0., 0., 0., 0., 0., 1.])
     # return np.concatenate((floating_base, q0))
