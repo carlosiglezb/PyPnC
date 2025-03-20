@@ -11,3 +11,6 @@ def pydrake_geom_to_meshcat(mut_polyhedron: HPolyhedron):
     poly_vertices = compute_polytope_vertices(poly_A, poly_b)
     poly_chull = ConvexHull(poly_vertices, qhull_options='QJ')
     return TriangularMeshGeometry(poly_chull.points, poly_chull.simplices)
+
+def scipy_hull_to_meshcat(convex_hull: ConvexHull):
+    return TriangularMeshGeometry(convex_hull.points, convex_hull.simplices)

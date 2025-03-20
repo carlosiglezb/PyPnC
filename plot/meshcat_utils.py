@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import pinocchio as pin
+from meshcat.geometry import TriangularMeshGeometry
 
 # Pinocchio Meshcat
 from pinocchio.visualize import MeshcatVisualizer
@@ -16,6 +17,7 @@ from pinocchio.visualize.meshcat_visualizer import isMesh
 from crocoddyl.libcrocoddyl_pywrap import *  # noqa
 
 from util.util import vec_to_roll_pitch
+from visualizer.meshcat_tools.meshcat_palette import meshcat_iris_obj
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -227,6 +229,11 @@ class MeshcatPinocchioAnimation:
         self.viz.viewer[obj_name]["arrow/head"].set_object(arrow_head, material)
         self.viz.viewer[obj_name]["arrow/head"].set_transform(arrow_offset)
 
+    def add_shape(self, viewer_name, meshcat_shape, obj_material=None):
+        if obj_material is None:
+            obj_material = meshcat_iris_obj()
+        self.viz.viewer[viewer_name].set_object(meshcat_shape, obj_material)
+
     def displayForcesFromCrocoddylSolver(self, fs_ti, frame):
         for contact in range(len(fs_ti)):
             pos = fs_ti[contact]['oMf'].translation
@@ -274,9 +281,18 @@ class MeshcatPinocchioAnimation:
         with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
             self.display_single_collision(frame, collision_target, collision_name)
 
+    def animate_single_shape(self, viewer_name: str,
+                             collision_target: np.ndarray):
+        with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
+            self.display_single_shape(frame, viewer_name, collision_target)
+
     def animate_target(self, end_effector_name, targets, color=None):
         with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
             self.display_targets(end_effector_name, targets, color, animation=True)
+
+    def animate_frame(self, q):
+        with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
+            self.display_visualizer_frames(frame, q)
 
     def animation_step(self):
         self.frame_idx += 1
@@ -344,6 +360,12 @@ class MeshcatPinocchioAnimation:
                 ])
                 frame[viewer_name].set_transform(T)
                 return
+
+    def display_single_shape(self,
+                             frame,
+                             viewer_name,
+                             target_pos):
+        frame[viewer_name].set_transform(target_pos)
 
     def display_targets(self, end_effector_name, targets, color=None, animation=False):
         if color is None:
