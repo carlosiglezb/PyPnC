@@ -69,7 +69,7 @@ def createSequence(dmodels, DT, N):
 
 def get_default_initial_pose():
 
-    q0 = np.zeros(36,)
+    q0 = np.zeros(35,)
 
     q0[0] = 0.                          # universe 
     q0[1] = 0.                          # root_joint x 
@@ -106,7 +106,7 @@ def get_default_initial_pose():
     q0[32] = 0.                          # front_right__cluster_2_pitch 
     q0[33] = 0.                          # front_right__cluster_3_roll 
     q0[34] = 0.                          # front_right__cluster_3_pitch 
-    q0[35] = 0.                          # front_right__cluster_3_wrist 
+    # q0[35] = 0.                          # front_right__cluster_3_wrist 
 
     # floating_base = np.array([0., 0., 0., 0., 0., 0., 1.])
     # return np.concatenate((floating_base, q0))

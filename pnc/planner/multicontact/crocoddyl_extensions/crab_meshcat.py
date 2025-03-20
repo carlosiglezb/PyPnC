@@ -103,7 +103,7 @@ print(pose_ball)
 # and ball, accounting for we want to touch the ball on boundary 
 # in the natural direction (e_z axis of frame) 
 
-frame_tip = robot.framePlacement(q_config, 22)  # SE(3) element frame of tip 
+frame_tip = robot.framePlacement(q_config, )  # SE(3) element frame of tip 
 r_tip     = frame_tip.translation               # position of the tip 
 e_z_axis  = frame_tip.rotation[:, 2]            # direction of the tip  
 offset    = frame_tip.rotation[:, 2] * radius   # direction of the tip 
