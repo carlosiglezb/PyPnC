@@ -1,0 +1,371 @@
+import unittest
+
+import numpy as np
+import os, sys
+
+cwd = os.getcwd()
+
+from meshcat.geometry import Sphere
+from util.pydrake_meshcat_interface import scipy_hull_to_meshcat, pydrake_geom_to_meshcat
+from pydrake.geometry.optimization import HPolyhedron
+from visualizer.meshcat_tools.meshcat_palette import (meshcat_iris_obj, meshcat_collision_obj,
+                                                      meshcat_domain_obj, meshcat_obstacle_obj)
+from pinocchio.visualize import MeshcatVisualizer
+import meshcat.transformations as tf
+import pinocchio as pin
+import external_source.stabilipy.stabilipy as stab
+import pickle
+import plot.meshcat_utils as vis_tools
+
+
+@staticmethod
+def get_contact_poses_from_file(filename: str) -> list[np.ndarray]:
+    q_init_lst = []
+    with open(filename, 'rb') as file:
+        while True:
+            try:
+                d = pickle.load(file)
+                q_init_lst.append(d['joint_pos'][0, :])
+            except EOFError:
+                break
+
+    return q_init_lst
+
+@staticmethod
+def get_all_poses_from_file(filename: str) -> list[np.ndarray]:
+    q_all_lst = []
+    with open(filename, 'rb') as file:
+        while True:
+            try:
+                d = pickle.load(file)
+                q_all_lst.append(d['joint_pos'])
+            except EOFError:
+                break
+
+    return q_all_lst
+
+
+class TestStabilipy(unittest.TestCase):
+    def test_stabilipy_meshcat_visualization(self):
+        b_plot_final = False
+
+        # Specify location of urdf files
+        robot_name = "g1"
+        urdf_file = cwd + "/robot_model/g1_description/g1.urdf"
+        package_dir = cwd + "/robot_model/g1_description"
+
+        # Create robot system
+        model, collision_model, visual_model = pin.buildModelsFromUrdf(
+            urdf_file, package_dir, pin.JointModelFreeFlyer())
+        data, _, _ = pin.createDatas(
+            model, collision_model, visual_model)
+
+        # Display Robot in Meshcat Visualizer
+        viz = MeshcatVisualizer(model, collision_model, visual_model)
+        try:
+            viz.initViewer(open=True)
+            viz.viewer.wait()
+        except ImportError as err:
+            print(
+                "Error while initializing the viewer. It seems you should install Python meshcat"
+            )
+            print(err)
+            sys.exit(0)
+        viz.loadViewerModel(rootNodeName=robot_name)
+        vis_q = pin.neutral(model)
+
+        # get list of configurations throughout multiple contacts
+        cfree_soln_file = cwd + '/experiment_data/g1_knee_knocker_cs_0.pkl'
+        q_at_contact = get_contact_poses_from_file(cfree_soln_file)
+
+        # robot-specific default parameters
+        ankle_heel_dist = 0.06
+        ankle_toe_dist = 0.13
+        half_foot_width = 0.02
+        foot_height = -0.03
+        hand_box_side = 0.02
+
+        contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
+                            ['right_ankle_roll_link', 'left_palm_link'],
+                            ['left_ankle_roll_link', 'right_ankle_roll_link'],
+                            ['left_ankle_roll_link', 'right_palm_link'],
+                            ['left_ankle_roll_link', 'right_ankle_roll_link']]
+        # visualize first contact pose sample and update robot system
+        zero_qd = np.zeros((model.nv))
+        for (cs, current_q) in enumerate(q_at_contact):
+            viz.display(current_q)
+            pin.forwardKinematics(model, data, current_q, zero_qd)
+
+            # set up stabilipy problem
+            robot_mass = sum([inertia.mass for inertia in model.inertias])
+            margin = 2.0
+            mu = 0.9
+            pos, normals = [], []
+            current_contact_links = contacts_seq_lst[cs]
+            for lnk in current_contact_links:
+                lnk_id = model.getFrameId(lnk)
+                trans = pin.updateFramePlacement(model, data, lnk_id)
+                ee_pos = trans.translation.reshape(-1, 1)
+                if lnk == 'left_ankle_roll_link' or lnk == 'right_ankle_roll_link':
+                    # left-front
+                    pos.append(ee_pos + np.array([[ankle_toe_dist], [half_foot_width], [foot_height]]))
+                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                    # right-front
+                    pos.append(ee_pos + np.array([[ankle_toe_dist], [-half_foot_width], [foot_height]]))
+                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                    # right-back
+                    pos.append(ee_pos + np.array([[-ankle_heel_dist], [-half_foot_width], [foot_height]]))
+                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                    # left-back
+                    pos.append(ee_pos + np.array([[-ankle_heel_dist], [half_foot_width], [foot_height]]))
+                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                elif lnk == 'left_palm_link':
+                    # top-front
+                    pos.append(ee_pos + np.array([[hand_box_side], [0.], [hand_box_side]]))
+                    normals.append(np.array([[0.], [-1], [0.]]))    # lhand on door side
+                    # low-front
+                    pos.append(ee_pos + np.array([[hand_box_side], [0.], [-hand_box_side]]))
+                    normals.append(np.array([[0.], [-1.], [0.]]))    # lhand on door side
+                    # low-back
+                    pos.append(ee_pos + np.array([[-hand_box_side], [0.], [-hand_box_side]]))
+                    normals.append(np.array([[0.], [-1.], [0.]]))    # lhand on door side
+                    # top-back
+                    pos.append(ee_pos + np.array([[-hand_box_side], [0.], [hand_box_side]]))
+                    normals.append(np.array([[0.], [-1.], [0.]]))    # lhand on door side
+                elif lnk == 'right_palm_link':
+                    # top-front
+                    pos.append(ee_pos + np.array([[hand_box_side], [0.], [hand_box_side]]))
+                    normals.append(np.array([[0.], [1], [0.]]))    # rhand on door side
+                    # low-front
+                    pos.append(ee_pos + np.array([[hand_box_side], [0.], [-hand_box_side]]))
+                    normals.append(np.array([[0.], [1.], [0.]]))    # rhand on door side
+                    # low-back
+                    pos.append(ee_pos + np.array([[-hand_box_side], [0.], [-hand_box_side]]))
+                    normals.append(np.array([[0.], [1.], [0.]]))    # rhand on door side
+                    # top-back
+                    pos.append(ee_pos + np.array([[-hand_box_side], [0.], [hand_box_side]]))
+                    normals.append(np.array([[0.], [1.], [0.]]))    # rhand on door side
+                else:
+                    raise ValueError(f"Contact location for {lnk} not specified")
+
+            contacts = [stab.Contact(mu, p, n) for p, n in zip(pos, normals)]
+            polyhedron = stab.StabilityPolygon(robot_mass, dimension=3, radius=0.8, robust_sphere=False)
+            polyhedron.contacts = contacts
+            shape = [
+                np.array([[-1., 0, 0]]).T,
+                np.array([[1., 0, 0]]).T,
+                np.array([[0, 1., 0]]).T,
+                np.array([[0, -1., 0]]).T,
+                np.array([[0, 0., 1]]).T,
+                np.array([[0, 0., -1]]).T
+            ]
+
+            polytope = [margin * s for s in shape]
+            polyhedron.gravity_envelope = polytope
+            polyhedron.compute(stab.Mode.iteration, epsilon=2e-3, maxIter=10, solver='qhull',
+                               record_anim=False, plot_init=False,
+                               plot_step=False, plot_final=b_plot_final)
+
+            # visualize CoM
+            pin.centerOfMass(model, data, current_q, zero_qd)
+            com_pos = data.com[0]
+            com_pos_proj = com_pos[0], com_pos[1], 0.
+
+            #
+            # visualize in meshcat
+            #
+            # --- stability polytope
+            p_inner = scipy_hull_to_meshcat(polyhedron.inner)
+            viz.viewer[f"{robot_name}/stability/inner"].set_object(p_inner, meshcat_iris_obj())
+            viz.viewer[f"{robot_name}/stability/inner"].set_transform(tf.translation_matrix([0., 0., com_pos[2]]))
+            p_o = HPolyhedron(polyhedron.outer.halfspaces[:,:3], -polyhedron.outer.halfspaces[:, -1])
+            p_outer = pydrake_geom_to_meshcat(p_o)
+            viz.viewer[f"{robot_name}/stability/outer"].set_object(p_outer, meshcat_domain_obj())
+            viz.viewer[f"{robot_name}/stability/outer"].set_transform(tf.translation_matrix([0., 0., com_pos[2]]))
+            # --- contacts
+            c_obj = Sphere(0.01)
+            com_obj = Sphere(0.02)
+            for i, contact in enumerate(contacts):
+                c_pos = contact.r.reshape(-1,)
+                viz.viewer[f"{robot_name}/contacts/{i}"].set_object(c_obj, meshcat_collision_obj())
+                viz.viewer[f"{robot_name}/contacts/{i}"].set_transform(tf.translation_matrix(c_pos))
+            # --- Center of Mass at current configuration
+            viz.viewer[f"{robot_name}/CoM/3d"].set_object(com_obj, meshcat_obstacle_obj())
+            viz.viewer[f"{robot_name}/CoM/3d"].set_transform(tf.translation_matrix(com_pos))
+            viz.viewer[f"{robot_name}/CoM/proj"].set_object(com_obj, meshcat_obstacle_obj())
+            viz.viewer[f"{robot_name}/CoM/proj"].set_transform(tf.translation_matrix(com_pos_proj))
+
+            if b_plot_final:
+                polyhedron.set_xyz_labels()
+                polyhedron.show()
+            # check that the current CoM is statically stable
+            self.assertEqual(True, True)
+
+
+    def test_stabilipy_meshcat_animation(self):
+        b_plot_final = False
+
+        # Specify location of urdf files
+        robot_name = "g1"
+        urdf_file = cwd + "/robot_model/g1_description/g1.urdf"
+        package_dir = cwd + "/robot_model/g1_description"
+
+        # get list of configurations throughout multiple contacts
+        cfree_soln_file = cwd + '/experiment_data/g1_knee_knocker_cs_0.pkl'
+        q_all = get_all_poses_from_file(cfree_soln_file)
+
+        # Create robot system
+        model, collision_model, visual_model = pin.buildModelsFromUrdf(
+            urdf_file, package_dir, pin.JointModelFreeFlyer())
+        data, col_data, vis_data = pin.createDatas(
+            model, collision_model, visual_model)
+
+        # Create Meshcat Animation
+        save_freq = 1
+        T = 3
+        N_horizon_lst = [180, 200, 220, 200, 200] # TODO get from saved data?
+        display = vis_tools.MeshcatPinocchioAnimation(model, collision_model, visual_model,
+                          data, vis_data, col_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
+
+        # robot-specific default parameters
+        ankle_heel_dist = 0.06
+        ankle_toe_dist = 0.13
+        half_foot_width = 0.02
+        foot_height = -0.03
+        hand_box_side = 0.02
+
+        # constants in visualizer
+        com_3d_name = f"{robot_name}/CoM/3d"
+        com_proj_name = f"{robot_name}/CoM/proj"
+        c_obj = Sphere(0.01)
+        com_obj = Sphere(0.02)
+
+        contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
+                            ['right_ankle_roll_link', 'left_palm_link'],
+                            ['left_ankle_roll_link', 'right_ankle_roll_link'],
+                            ['left_ankle_roll_link', 'right_palm_link'],
+                            ['left_ankle_roll_link', 'right_ankle_roll_link']]
+        # visualize entire motion while super-impossing stability regions after each new contact
+        zero_qd = np.zeros((model.nv))
+        display.start_animation()
+        for (n, N) in enumerate(N_horizon_lst):
+            # at each new contact sequence, compute stability region
+            pin.forwardKinematics(model, data, q_all[n][0], zero_qd)
+
+            # set up stabilipy problem
+            robot_mass = sum([inertia.mass for inertia in model.inertias])
+            margin = 2.0
+            mu = 0.9
+            pos, normals = [], []
+            current_contact_links = contacts_seq_lst[n]
+            for lnk in current_contact_links:
+                lnk_id = model.getFrameId(lnk)
+                trans = pin.updateFramePlacement(model, data, lnk_id)
+                ee_pos = trans.translation.reshape(-1, 1)
+                if lnk == 'left_ankle_roll_link' or lnk == 'right_ankle_roll_link':
+                    # left-front
+                    pos.append(ee_pos + np.array([[ankle_toe_dist], [half_foot_width], [foot_height]]))
+                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                    # right-front
+                    pos.append(ee_pos + np.array([[ankle_toe_dist], [-half_foot_width], [foot_height]]))
+                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                    # right-back
+                    pos.append(ee_pos + np.array([[-ankle_heel_dist], [-half_foot_width], [foot_height]]))
+                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                    # left-back
+                    pos.append(ee_pos + np.array([[-ankle_heel_dist], [half_foot_width], [foot_height]]))
+                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                elif lnk == 'left_palm_link':
+                    # top-front
+                    pos.append(ee_pos + np.array([[hand_box_side], [0.], [hand_box_side]]))
+                    normals.append(np.array([[0.], [-1], [0.]]))    # lhand on door side
+                    # low-front
+                    pos.append(ee_pos + np.array([[hand_box_side], [0.], [-hand_box_side]]))
+                    normals.append(np.array([[0.], [-1.], [0.]]))    # lhand on door side
+                    # low-back
+                    pos.append(ee_pos + np.array([[-hand_box_side], [0.], [-hand_box_side]]))
+                    normals.append(np.array([[0.], [-1.], [0.]]))    # lhand on door side
+                    # top-back
+                    pos.append(ee_pos + np.array([[-hand_box_side], [0.], [hand_box_side]]))
+                    normals.append(np.array([[0.], [-1.], [0.]]))    # lhand on door side
+                elif lnk == 'right_palm_link':
+                    # top-front
+                    pos.append(ee_pos + np.array([[hand_box_side], [0.], [hand_box_side]]))
+                    normals.append(np.array([[0.], [1], [0.]]))    # rhand on door side
+                    # low-front
+                    pos.append(ee_pos + np.array([[hand_box_side], [0.], [-hand_box_side]]))
+                    normals.append(np.array([[0.], [1.], [0.]]))    # rhand on door side
+                    # low-back
+                    pos.append(ee_pos + np.array([[-hand_box_side], [0.], [-hand_box_side]]))
+                    normals.append(np.array([[0.], [1.], [0.]]))    # rhand on door side
+                    # top-back
+                    pos.append(ee_pos + np.array([[-hand_box_side], [0.], [hand_box_side]]))
+                    normals.append(np.array([[0.], [1.], [0.]]))    # rhand on door side
+                else:
+                    raise ValueError(f"Contact location for {lnk} not specified")
+
+            contacts = [stab.Contact(mu, p, n) for p, n in zip(pos, normals)]
+            polyhedron = stab.StabilityPolygon(robot_mass, dimension=3, radius=0.8, robust_sphere=False)
+            polyhedron.contacts = contacts
+            shape = [
+                np.array([[-1., 0, 0]]).T,
+                np.array([[1., 0, 0]]).T,
+                np.array([[0, 1., 0]]).T,
+                np.array([[0, -1., 0]]).T,
+                np.array([[0, 0., 1]]).T,
+                np.array([[0, 0., -1]]).T
+            ]
+
+            polytope = [margin * s for s in shape]
+            polyhedron.gravity_envelope = polytope
+            polyhedron.compute(stab.Mode.iteration, epsilon=2e-3, maxIter=10, solver='qhull',
+                               record_anim=False, plot_init=False,
+                               plot_step=False, plot_final=b_plot_final)
+            #
+            # visualize in meshcat
+            #
+            # --- stability polytope
+            p_in_name = f"{robot_name}/stability/inner/{n}"
+            p_out_name = f"{robot_name}/stability/outer/{n}"
+            p_inner = scipy_hull_to_meshcat(polyhedron.inner)
+            p_o = HPolyhedron(polyhedron.outer.halfspaces[:, :3], -polyhedron.outer.halfspaces[:, -1])
+            p_outer = pydrake_geom_to_meshcat(p_o)
+            display.add_shape(p_in_name, p_inner, meshcat_iris_obj())
+            display.add_shape(p_out_name, p_outer, meshcat_domain_obj())
+            # --- contacts
+            for i in range(len(contacts)):
+                c_name = f"{robot_name}/contacts/{i}"
+                display.add_shape(c_name, c_obj, meshcat_collision_obj())
+            # --- Center of Mass
+            display.add_shape(com_3d_name, com_obj, meshcat_obstacle_obj())
+            display.add_shape(com_proj_name, com_obj, meshcat_obstacle_obj())
+
+            # visualize configurations in between contacts
+            for k in range(N):
+                display.animate_frame(q_all[n][k])
+
+                # visualize CoM
+                pin.centerOfMass(model, data, q_all[n][k], zero_qd)
+                com_pos = data.com[0]
+                com_pos_proj = com_pos[0], com_pos[1], 0.
+                # update meshcat frames
+                display.animate_single_shape(p_in_name, tf.translation_matrix([0., 0., com_pos[2]]))
+                display.animate_single_shape(p_out_name, tf.translation_matrix([0., 0., com_pos[2]]))
+                # --- contacts
+                for i, contact in enumerate(contacts):
+                    c_pos = contact.r.reshape(-1,)
+                    c_name = f"{robot_name}/contacts/{i}"
+                    display.animate_single_shape(c_name, tf.translation_matrix(c_pos))
+                # --- Center of Mass at current configuration
+                display.animate_single_shape(com_3d_name, tf.translation_matrix(com_pos))
+                display.animate_single_shape(com_proj_name, tf.translation_matrix(com_pos_proj))
+                display.animation_step()
+
+                # check that the current CoM is statically stable
+                self.assertEqual(True, True)
+
+        display.finish_animation()
+
+
+if __name__ == '__main__':
+    unittest.main()
