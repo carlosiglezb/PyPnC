@@ -59,7 +59,7 @@ class IKCFreePlanner:
         self._b_record_anim = False
         self.w_rigid_poly = w_rigid_poly
 
-        if q0 is None:
+        if q0 is None and pin_robot_model is not None:
             q0 = np.zeros(pin_robot_model.nq)
 
         if b_use_ik_solver:
@@ -306,13 +306,14 @@ class IKCFreePlanner:
         idx_R_knee = list(self.plan_to_model_frames.keys()).index('R_knee')
         idx_LH = list(self.plan_to_model_frames.keys()).index('LH')
         idx_RH = list(self.plan_to_model_frames.keys()).index('RH')
+        idx_torso = list(self.plan_to_model_frames.keys()).index('torso')
         lfoot_t = get_frame_des_pos(planner_path[idx_LF], t)
         lknee_t = get_frame_des_pos(planner_path[idx_L_knee], t)
         rfoot_t = get_frame_des_pos(planner_path[idx_RF], t)
         rknee_t = get_frame_des_pos(planner_path[idx_R_knee], t)
         lhand_t = get_frame_des_pos(planner_path[idx_LH], t)
         rhand_t = get_frame_des_pos(planner_path[idx_RH], t)
-        base_t = get_frame_des_pos(planner_path, list(self.plan_to_model_frames.keys()).index('torso'), t)
+        base_t = get_frame_des_pos(planner_path[idx_torso], t)
         frame_targets_dict = {
             'torso': base_t,
             'LF': lfoot_t,

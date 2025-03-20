@@ -459,7 +459,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         ik_cfree_planner.plan(p_init, T, alpha, visualizer)
 
         # visualize terminal reachable regions
-        torso_pos_T = ik_cfree_planner.get_ee_des_pos(0, T * len(fixed_frames_seq))
+        torso_pos_T = get_frame_des_pos(ik_cfree_planner.planner.path, 0, T * len(fixed_frames_seq))
         print(f'Final position: {torso_pos_T}')
         for fr_idx, fr in enumerate(frame_names):
             if fr == 'torso':

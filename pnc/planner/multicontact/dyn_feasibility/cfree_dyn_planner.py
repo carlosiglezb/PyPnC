@@ -720,10 +720,6 @@ def main(args):
     robot_name = args.robot_name
     kin_plan_path = args.kin_plan_path
 
-    if B_SAVE_DATA:
-        # Saving data tools
-        data_saver = DataSaver(robot_name + '_knee_knocker.pkl')
-
     #
     # Initialize frames to consider for contact planning
     #
@@ -955,7 +951,7 @@ def main(args):
     # Dynamic solve
     #
     if robot_name == 'g1':
-        N_horizon_lst = [180, 200, 200, 150, 200]
+        N_horizon_lst = [180, 200, 220, 200, 200]
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
         robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
         if contact_seq == 1:    # step on knee knocker
@@ -1047,11 +1043,20 @@ def main(args):
         plot_vector_traj(sim_time, rf_rwrist.T, 'RF RWrist (World)', Fxyz_labels)
         plt.show()
 
+    if B_SAVE_DATA:
+        # Saving data tools
+        data_saver = DataSaver(robot_name + '_knee_knocker_cs_0.pkl')
+        for (i, fp) in enumerate(robot_dyn_plan.fddp):
+            log = fp.getCallbacks()[0]
+            data_saver.add('joint_pos', np.array(log.xs)[:, :rob_model.nq])
+            data_saver.advance()
+        data_saver.close()
+
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sequence", type=int, default=1,
+    parser.add_argument("--sequence", type=int, default=0,
                         help="Contact sequence to solve for")
     parser.add_argument("--robot_name", type=str, default='g1',
                         help="Robot name to use for planning")

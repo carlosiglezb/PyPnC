@@ -548,7 +548,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         ik_cfree_planner.set_planner(frame_planner)
         ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer)
 
-        self.assertEqual(True, True)  # add assertion here
+        self.assertEqual(True, True)
 
     def test_five_stage_plan_one_hand_at_a_time(self, sca_geometry=None):
         frame_names = self.frame_names
@@ -715,7 +715,7 @@ class TestIKCFreePlanner(unittest.TestCase):
 
 
     def test_sca_plan_five_stage_plan_one_hand_at_a_time(self):
-        b_visualize = True
+        b_visualize = False
         b_save_plan = True
 
         plan_to_model_frames = self.plan_to_model_frames
@@ -777,11 +777,18 @@ class TestIKCFreePlanner(unittest.TestCase):
             display.finish_animation()
 
         if b_save_plan:
-            save_filename = self.robot_name + 'sca_five_stage_plan.pkl'
+            # save the solution parameters needed to reconstruct the Bezier curves
+            save_filename = self.robot_name + 'sca_five_stage_plan_box_sphere_clean.pkl'
+            transition_times = []
+            n_frames = len(sca_kin_cfree_planner.planner.path)
             data_saver = DataSaver(save_filename)
-            sca_kin_cfree_planner.planner.safe_boxes = []  # cannot copy/save iris objects
-            sca_kin_cfree_planner.planner.sca_robot_geom = None
-            data_saver.add('ik_cfree_planner', sca_kin_cfree_planner)
+            data_saver.add('bez_points', sca_kin_cfree_planner.planner.points)
+            for i in range(n_frames):
+                transition_times.append(sca_kin_cfree_planner.planner.path[i].transition_times)
+            data_saver.add('bez_points_transition_times', transition_times)
+            data_saver.add('n_frames', n_frames)
+            data_saver.add('n_iris_traversed_per_frame', len(sca_kin_cfree_planner.planner.path[0].beziers))
+            data_saver.add('bez_path', sca_kin_cfree_planner.planner.path)
             data_saver.advance()
             data_saver.close()
 
