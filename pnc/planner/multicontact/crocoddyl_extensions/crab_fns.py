@@ -15,6 +15,8 @@ import example_robot_data as robex
 from scipy.optimize import fmin_bfgs 
 from pinocchio.visualize import MeshcatVisualizer 
 
+import crocoddyl 
+
 # ---------------------------------- 
 # Initial joint angles = 0   
 # ---------------------------------- 
@@ -111,3 +113,4 @@ def get_initial_pose(
     q0[34] = 0.                 # front_right__cluster_3_wrist 
 
     return q0  
+

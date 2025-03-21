@@ -114,7 +114,7 @@ def get_default_initial_pose():
 
 # Load robot
 draco_urdf_file = cwd + "/robot_model/draco3/draco3_gripper_mesh_updated.urdf"
-package_dir = cwd + "/robot_model/draco3"
+package_dir     = cwd + "/robot_model/draco3"
 rob_model, col_model, vis_model = pin.buildModelsFromUrdf(draco_urdf_file,
                                                           package_dir, pin.JointModelFreeFlyer())
 # remove gravity

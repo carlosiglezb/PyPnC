@@ -3,14 +3,21 @@ import sys
 import crocoddyl
 import numpy as np
 import pinocchio as pin
+import matplotlib.pyplot as plt
 
 cwd = os.getcwd()
 sys.path.append(cwd)
 
 import plot.meshcat_utils as vis_tools
 import util.util
+from crab_fns import * 
+
+# ---------------------------------- 
+# Create action model for torso orientation 
+# ---------------------------------- 
 
 def createNoSupportTorsoActionModel(base_target=None):
+    
     # Define the cost sum (cost manager)
     costs = crocoddyl.CostModelSum(state, actuation.nu)
 
@@ -59,6 +66,10 @@ def createNoSupportTorsoActionModel(base_target=None):
     )
     return dmodel
 
+# ---------------------------------- 
+# Create sequence of action models 
+# ---------------------------------- 
+
 def createSequence(dmodels, DT, N):
     return [
         [crocoddyl.IntegratedActionModelEuler(m, DT)] * N
@@ -67,90 +78,73 @@ def createSequence(dmodels, DT, N):
     ]
 
 
-def get_default_initial_pose():
+## ============================================ ##
+## Main simulation 
+## ============================================ ##
 
-    q0 = np.zeros(35,)
-
-    q0[0] = 0.                          # universe 
-    q0[1] = 0.                          # root_joint x 
-    q0[2] = 0.                          # root_joint y 
-    q0[3] = 0.                          # root_joint z 
-    q0[4] = 0.                          # root_joint q1
-    q0[5] = 0.                          # root_joint q2
-    q0[6] = 0.                          # root_joint q3
-    q0[7] = 0.                          # root_joint q4 
-    q0[8] = 0.                          # back_left__cluster_1_roll 
-    q0[9] = 0.                          # back_left__cluster_1_pitch 
-    q0[10] = 0.                         # back_left__cluster_2_roll 
-    q0[11] = 0.                          # back_left__cluster_2_pitch 
-    q0[12] = 0.                          # back_left__cluster_3_roll 
-    q0[13] = 0.                          # back_left__cluster_3_pitch 
-    q0[14] = 0.                          # back_left__cluster_3_wrist  
-    q0[15] = 0.                          # back_right__cluster_1_roll 
-    q0[16] = 0.                          # back_right__cluster_1_pitch 
-    q0[17] = 0.                          # back_right__cluster_2_roll 
-    q0[18] = 0.                          # back_right__cluster_2_pitch 
-    q0[19] = 0.                          # back_right__cluster_3_roll 
-    q0[20] = 0.                          # back_right__cluster_3_pitch 
-    q0[21] = 0.                          # back_right__cluster_3_wrist 
-    q0[22] = 0.                          # front_left__cluster_1_roll 
-    q0[23] = 0.                          # front_left__cluster_1_pitch 
-    q0[24] = 0.                          # front_left__cluster_2_roll 
-    q0[25] = 0.                          # front_left__cluster_2_pitch 
-    q0[26] = 0.                          # front_left__cluster_3_roll 
-    q0[27] = 0.                          # front_left__cluster_3_pitch 
-    q0[28] = 0.                          # front_left__cluster_3_wrist 
-    q0[29] = 0.                          # front_right__cluster_1_roll 
-    q0[30] = 0.                          # front_right__cluster_1_pitch 
-    q0[31] = 0.                          # front_right__cluster_2_roll 
-    q0[32] = 0.                          # front_right__cluster_2_pitch 
-    q0[33] = 0.                          # front_right__cluster_3_roll 
-    q0[34] = 0.                          # front_right__cluster_3_pitch 
-    # q0[35] = 0.                          # front_right__cluster_3_wrist 
-
-    # floating_base = np.array([0., 0., 0., 0., 0., 0., 1.])
-    # return np.concatenate((floating_base, q0))
-    return q0 
-
-
-# Load robot
 crab_urdf_file = cwd + "/robot_model/crab/crab.urdf"
-package_dir = cwd + "/robot_model/crab"
-rob_model, col_model, vis_model = pin.buildModelsFromUrdf(crab_urdf_file,
-                                                          package_dir, pin.JointModelFreeFlyer())
-# remove gravity
-rob_model.gravity = pin.Motion.Zero()
+package_dir    = cwd + "/robot_model/crab"
+rob_model, col_model, vis_model = pin.buildModelsFromUrdf(
+    crab_urdf_file,
+    package_dir, 
+    pin.JointModelFreeFlyer() )
 
-rob_data, col_data, vis_data = pin.createDatas(rob_model, col_model, vis_model)
+# ---------------------------------- 
+# Initial configuration 
+# ---------------------------------- 
 
-q0 = get_default_initial_pose()
+# initial configuration  
+q0 = get_initial_pose()
 v0 = np.zeros(rob_model.nv)
 x0 = np.concatenate([q0, v0])
 
 # Getting the frame ids
 base_id = rob_model.getFrameId("base_link")
 
+# remove gravity
+rob_model.gravity = pin.Motion.Zero()
+
+# create data  
+rob_data, col_data, vis_data = pin.createDatas(rob_model, col_model, vis_model) 
+
+# ---------------------------------- 
+# create target orientation !!!!! 
+# ---------------------------------- 
+
+# base_targets = util.util.euler_to_rot([0., np.pi/2, 0.])
+base_targets = util.util.euler_to_rot([np.pi/2, 0., 0.])
+
 # Define the robot's state and actuation
-state = crocoddyl.StateMultibody(rob_model)
+state     = crocoddyl.StateMultibody(rob_model)
 actuation = crocoddyl.ActuationModelFloatingBase(state)
 
 # Update Pinocchio model
 pin.forwardKinematics(rob_model, rob_data, q0)
 pin.updateFramePlacements(rob_model, rob_data)
 
-# create target orientation
-base_targets = util.util.euler_to_rot([0., np.pi/2, 0.])
+# ---------------------------------- 
+# Solve the problem 
+# ---------------------------------- 
 
-#
-# Solve the problem
-#
+# time step 
 DT = 2e-2
+
+# initialize solver 
 fddp = [None]
 
-N_base_orientation = 100  # knots to re-orient torso
-dmodel = createNoSupportTorsoActionModel(base_target=base_targets)
+# knots to re-orient torso
+N_base_orientation = 300 
+
+# create action model 
+dmodel = createNoSupportTorsoActionModel(base_target = base_targets)
+
+# create sequence of action models 
 model_seqs = createSequence([dmodel], DT, N_base_orientation)
+
+# create problem 
 problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
+
+# set up solver 
 fddp[0] = crocoddyl.SolverFDDP(problem)
 
 # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
@@ -166,11 +160,116 @@ us = fddp[0].problem.quasiStatic([x0] * fddp[0].problem.T)
 print("Problem solved:", fddp[0].solve(xs, us, max_iter))
 print("Number of iterations:", fddp[0].iter)
 
-# Creating display
+# ---------------------------------- 
+# Display results in meschat 
+# ---------------------------------- 
+
 save_freq = 1
 display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
                   rob_data, vis_data, col_data, ctrl_freq=1/DT, save_freq=save_freq)
 display.displayFromCrocoddylSolver(fddp)
 
 print("Done") 
+
+# ---------------------------------- 
+# Plot joint angles 
+# ---------------------------------- 
+
+# Get the solution trajectory
+xs = fddp[0].xs
+
+# Get joint angles over time (excluding the floating base)
+# The first 7 values in q are for the floating base (3 for position, 4 for quaternion)
+n_base_dof = 7  # Floating base DOFs 
+joint_angles = np.array([x[:rob_model.nq][n_base_dof:] for x in xs])
+
+# Create time array
+time_array = np.arange(0, len(xs)) * DT
+
+# Get joint limits from the robot model
+lower_limits = rob_model.lowerPositionLimit[n_base_dof:]
+upper_limits = rob_model.upperPositionLimit[n_base_dof:]
+
+# Create a dictionary mapping joint names to their trajectories
+joint_names = []
+for i in range(1, rob_model.njoints):  # Skip the first joint (universe/root)
+    if i > 1:  # Skip the floating base joint
+        joint_names.append(rob_model.names[i])
+
+joint_trajectories = {}
+joint_lower_limits = {}
+joint_upper_limits = {}
+
+for i, name in enumerate(joint_names):
+    # Make sure we don't go out of bounds
+    if i < joint_angles.shape[1]:
+        joint_trajectories[name] = joint_angles[:, i]
+        joint_lower_limits[name] = lower_limits[i]
+        joint_upper_limits[name] = upper_limits[i]
+
+# Create a 7x4 grid of subplots
+fig, axes = plt.subplots(7, 4, figsize=(16, 20))
+
+# Counter for subplot position
+row, col = 0, 0
+max_rows, max_cols = 7, 4
+
+# Plot each trajectory in its own subplot
+for name, trajectory in joint_trajectories.items():
+    
+    # Plot the trajectory in the current subplot
+    axes[row, col].plot(time_array, trajectory)
+    
+    # Add joint limits as red dashed lines
+    if name in joint_lower_limits and name in joint_upper_limits:
+        lower_limit = joint_lower_limits[name]
+        upper_limit = joint_upper_limits[name]
+        
+        # Only plot limits that are not at infinity
+        # if lower_limit > -1e10:  # Avoid plotting very large negative values
+        axes[row, col].axhline(lower_limit, color='r', linestyle='--', label='Lower limit')
+        
+        # if upper_limit < 1e10:  # Avoid plotting very large positive values
+        axes[row, col].axhline(upper_limit, color='r', linestyle='--', label='Upper limit')
+    
+    axes[row, col].set_title(name, fontsize=10)
+    axes[row, col].grid(True)
+    
+    # Only add x-label to bottom row
+    if row == max_rows - 1:
+        axes[row, col].set_xlabel('Time (s)')
+    
+    # Only add y-label to leftmost column
+    if col == 0:
+        axes[row, col].set_ylabel('Angle (rad)')
+    
+    # Move to the next subplot position
+    row += 1
+    if row >= max_rows:
+        row = 0
+        col += 1
+        if col >= max_cols:
+            # We've filled all subplots
+            break
+
+# Add a single legend for the entire figure
+handles, labels = axes[0, 0].get_legend_handles_labels()
+if handles:  # Only add legend if we have any labelss
+    fig.legend(handles, labels, loc='upper right')
+
+fig.suptitle('Joint Angle Trajectories', fontsize=16)
+
+# Increase spacing between subplots to prevent overlap
+plt.subplots_adjust(hspace=0.5, wspace=0.3, left=0.07, right=0.95, top=0.93, bottom=0.05)
+plt.show()
+
+
+# ==================================================================== 
+# KEEP SCRIPT RUNNING 
+# ==================================================================== 
+
+print("Keep Meshcat server alive") 
+
+while True: 
+    time.sleep(1)
 
