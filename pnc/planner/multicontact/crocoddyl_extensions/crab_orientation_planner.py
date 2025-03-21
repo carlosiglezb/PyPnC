@@ -127,7 +127,7 @@ pin.updateFramePlacements(rob_model, rob_data)
 # ---------------------------------- 
 
 # time step 
-DT = 2e-2
+DT = 2e-2 
 
 # initialize solver 
 fddp = [None]
@@ -263,6 +263,60 @@ fig.suptitle('Joint Angle Trajectories', fontsize=16)
 plt.subplots_adjust(hspace=0.5, wspace=0.3, left=0.07, right=0.95, top=0.93, bottom=0.05)
 plt.show()
 
+# ---------------------------------- 
+# Plot joint torques 
+# ---------------------------------- 
+
+# Get the solution control inputs (torques)
+us = fddp[0].us
+
+# Create a dictionary mapping joint names to their torque trajectories
+joint_torques = {}
+for i, name in enumerate(joint_names):
+    if i < len(us[0]):  # Make sure we don't go out of bounds
+        # Extract torque trajectory for this joint
+        joint_torques[name] = np.array([u[i] for u in us])
+
+# Create a 7x4 grid of subplots for torques
+fig_torque, axes_torque = plt.subplots(7, 4, figsize=(16, 20))
+
+# Counter for subplot position
+row, col = 0, 0
+max_rows, max_cols = 7, 4
+
+# Plot each torque trajectory in its own subplot
+for name, trajectory in joint_torques.items():
+    
+    # Plot the torque trajectory in the current subplot
+    axes_torque[row, col].plot(time_array[:-1], trajectory)  # Note: us is one shorter than xs
+    
+    # We'll skip the effort limits for now to avoid errors
+    
+    axes_torque[row, col].set_title(name, fontsize=10)
+    axes_torque[row, col].grid(True)
+    
+    # Only add x-label to bottom row
+    if row == max_rows - 1:
+        axes_torque[row, col].set_xlabel('Time (s)')
+    
+    # Only add y-label to leftmost column
+    if col == 0:
+        axes_torque[row, col].set_ylabel('Torque (N⋅m)')
+    
+    # Move to the next subplot position
+    row += 1
+    if row >= max_rows:
+        row = 0
+        col += 1
+        if col >= max_cols:
+            # We've filled all subplots
+            break
+
+fig_torque.suptitle('Joint Torques', fontsize=16)
+
+# Increase spacing between subplots to prevent overlap
+plt.subplots_adjust(hspace=0.5, wspace=0.3, left=0.07, right=0.95, top=0.93, bottom=0.05)
+plt.show()
 
 # ==================================================================== 
 # KEEP SCRIPT RUNNING 
