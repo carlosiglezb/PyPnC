@@ -48,8 +48,11 @@ class DoubleSupportStand(StateMachine):
         self._start_time = self._sp.curr_time
 
         # Initialize CoM Trajectory
-        lfoot_iso = self._robot.get_link_iso("l_foot_contact")
-        rfoot_iso = self._robot.get_link_iso("r_foot_contact")
+        # lfoot_iso = self._robot.get_link_iso("l_foot_contact")
+        # rfoot_iso = self._robot.get_link_iso("r_foot_contact")
+        lfoot_iso = self._robot.get_link_iso("front_left__foot_link")
+        rfoot_iso = self._robot.get_link_iso("front_right__foot_link")
+        
         com_pos_des = (lfoot_iso[0:3, 3] + rfoot_iso[0:3, 3]) / 2.0
         com_pos_des[2] = self._com_height_des
         base_quat_slerp = Slerp(

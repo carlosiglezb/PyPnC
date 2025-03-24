@@ -6,8 +6,11 @@ from pnc.wbc.internal_constraint import InternalConstraint
 class CrabRollingJointConstraint(InternalConstraint):
     def __init__(self, robot):
         super(CrabRollingJointConstraint, self).__init__(robot, 2)
+        # l_jp_idx, l_jd_idx, r_jp_idx, r_jd_idx = self._robot.get_q_dot_idx(
+        #     ['l_knee_fe_jp', 'l_knee_fe_jd', 'r_knee_fe_jp', 'r_knee_fe_jd'])
         l_jp_idx, l_jd_idx, r_jp_idx, r_jd_idx = self._robot.get_q_dot_idx(
-            ['l_knee_fe_jp', 'l_knee_fe_jd', 'r_knee_fe_jp', 'r_knee_fe_jd'])
+            ['front_left__cluster_3_pitch', 'front_left__cluster_3_wrist', 
+            'front_right__cluster_3_pitch', 'front_right__cluster_3_wrist']) 
 
         self._jacobian[0, l_jp_idx] = 1.
         self._jacobian[0, l_jd_idx] = -1.

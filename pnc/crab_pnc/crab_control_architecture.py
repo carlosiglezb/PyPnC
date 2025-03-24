@@ -9,7 +9,7 @@ from pnc.wbc.manager.task_hierarchy_manager import TaskHierarchyManager
 from pnc.wbc.manager.floating_base_trajectory_manager import FloatingBaseTrajectoryManager
 from pnc.wbc.manager.foot_trajectory_manager import FootTrajectoryManager
 from pnc.wbc.manager.reaction_force_manager import ReactionForceManager
-from pnc.wbc.manager.upper_body_trajectory_manager import UpperBodyTrajectoryManager
+# from pnc.wbc.manager.upper_body_trajectory_manager import UpperBodyTrajectoryManager
 from pnc.crab_pnc.crab_tci_container import CrabTCIContainer
 from pnc.crab_pnc.crab_controller import CrabController
 from pnc.crab_pnc.crab_state_machine.double_support_stand import DoubleSupportStand
@@ -20,7 +20,7 @@ from pnc.crab_pnc.crab_state_machine.single_support_swing import SingleSupportSw
 from pnc.crab_pnc.crab_state_machine.double_support_swaying import DoubleSupportSwaying
 from pnc.crab_pnc.crab_state_provider import CrabStateProvider
 
-    
+
 class CrabControlArchitecture(ControlArchitecture):
     def __init__(self, robot):
         super(CrabControlArchitecture, self).__init__(robot)
@@ -53,8 +53,8 @@ class CrabControlArchitecture(ControlArchitecture):
             self._tci_container.lfoot_ori_task, robot)
         self._lfoot_tm.swing_height = WalkingConfig.SWING_HEIGHT
 
-        self._upper_body_tm = UpperBodyTrajectoryManager(
-            self._tci_container.upper_body_task, robot)
+        # self._upper_body_tm = UpperBodyTrajectoryManager(
+        #     self._tci_container.upper_body_task, robot)
 
         self._floating_base_tm = FloatingBaseTrajectoryManager(
             self._tci_container.com_task, self._tci_container.torso_ori_task,
@@ -80,7 +80,7 @@ class CrabControlArchitecture(ControlArchitecture):
         self._trajectory_managers = {
             "rfoot": self._rfoot_tm,
             "lfoot": self._lfoot_tm,
-            "upper_body": self._upper_body_tm,
+            # "upper_body": self._upper_body_tm,
             "floating_base": self._floating_base_tm,
             "dcm": self._dcm_tm
         }
@@ -198,8 +198,8 @@ class CrabControlArchitecture(ControlArchitecture):
         # Update State Machine
         self._state_machine[self._state].one_step()
         # Update State Machine Independent Trajectories
-        self._upper_body_tm.use_nominal_upper_body_joint_pos(
-            self._sp.nominal_joint_pos)
+        # self._upper_body_tm.use_nominal_upper_body_joint_pos(
+        #     self._sp.nominal_joint_pos)
         # Get Whole Body Control Commands
         command = self._crab_controller.get_command()
 

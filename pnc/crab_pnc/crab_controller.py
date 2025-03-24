@@ -8,10 +8,14 @@ from pnc.wbc.ihwbc.ihwbc2 import IHWBC2
 from pnc.wbc.ihwbc.joint_integrator import JointIntegrator
 
 
+
 class CrabController(object):
     def __init__(self, tci_container, robot):
         self._tci_container = tci_container
-        self._robot = robot
+        self._robot = robot 
+        
+        # Print to debug
+        print(f"Robot DOFs: n_floating={robot.n_floating}, n_a={robot.n_a}, total={robot.n_q_dot}") 
 
         # Initialize WBC
         # l_jp_idx, l_jd_idx, r_jp_idx, r_jd_idx = self._robot.get_q_dot_idx(
@@ -26,7 +30,9 @@ class CrabController(object):
 
         n_q_dot = len(act_list)
         n_active = np.count_nonzero(np.array(act_list))
-        n_passive = n_q_dot - n_active - 6
+        n_passive = n_q_dot - n_active - 6 
+        
+        print(f"DOF breakdown: n_q_dot={n_q_dot}, n_active={n_active}, n_passive={n_passive}") 
 
         self._sa = np.zeros((n_active, n_q_dot))
         self._sv = np.zeros((n_passive, n_q_dot))

@@ -28,18 +28,18 @@ class CrabTCIContainer(TCIContainer):
         self._torso_ori_task.w_hierarchy = WBCConfig.W_TORSO
 
         # Upperbody joints
-        upperbody_joint = [
-            'neck_pitch', 'l_shoulder_fe', 'l_shoulder_aa', 'l_shoulder_ie',
-            'l_elbow_fe', 'l_wrist_ps', 'l_wrist_pitch', 'r_shoulder_fe',
-            'r_shoulder_aa', 'r_shoulder_ie', 'r_elbow_fe', 'r_wrist_ps',
-            'r_wrist_pitch'
-        ]
-        self._upper_body_task = BasicTask(robot, "SELECTED_JOINT",
-                                          len(upperbody_joint),
-                                          upperbody_joint, PnCConfig.SAVE_DATA)
-        self._upper_body_task.kp = WBCConfig.KP_UPPER_BODY
-        self._upper_body_task.kd = WBCConfig.KD_UPPER_BODY
-        self._upper_body_task.w_hierarchy = WBCConfig.W_UPPER_BODY
+        # upperbody_joint = [
+        #     'neck_pitch', 'l_shoulder_fe', 'l_shoulder_aa', 'l_shoulder_ie',
+        #     'l_elbow_fe', 'l_wrist_ps', 'l_wrist_pitch', 'r_shoulder_fe',
+        #     'r_shoulder_aa', 'r_shoulder_ie', 'r_elbow_fe', 'r_wrist_ps',
+        #     'r_wrist_pitch'
+        # ]
+        # self._upper_body_task = BasicTask(robot, "SELECTED_JOINT",
+        #                                   len(upperbody_joint),
+        #                                   upperbody_joint, PnCConfig.SAVE_DATA)
+        # self._upper_body_task.kp = WBCConfig.KP_UPPER_BODY
+        # self._upper_body_task.kd = WBCConfig.KD_UPPER_BODY
+        # self._upper_body_task.w_hierarchy = WBCConfig.W_UPPER_BODY
 
         # Rfoot Pos Task
         self._rfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3,
@@ -70,7 +70,8 @@ class CrabTCIContainer(TCIContainer):
         self._lfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
 
         self._task_list = [
-            self._com_task, self._torso_ori_task, self._upper_body_task,
+            self._com_task, self._torso_ori_task, 
+            # self._upper_body_task,
             self._rfoot_pos_task, self._lfoot_pos_task, self._rfoot_ori_task,
             self._lfoot_ori_task
         ]
@@ -103,9 +104,9 @@ class CrabTCIContainer(TCIContainer):
     def torso_ori_task(self):
         return self._torso_ori_task
 
-    @property
-    def upper_body_task(self):
-        return self._upper_body_task
+    # @property
+    # def upper_body_task(self):
+    #     return self._upper_body_task
 
     @property
     def rfoot_pos_task(self):

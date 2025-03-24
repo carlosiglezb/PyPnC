@@ -39,8 +39,11 @@ class CrabIHWBC(object):
         # Internal constraint
         self._n_int = 2
         self._jac_int = np.zeros((self._n_int, self._n_q_dot))
+        # l_jp_idx, l_jd_idx, r_jp_idx, r_jd_idx = self._robot.get_q_dot_idx(
+        #     ['l_knee_fe_jp', 'l_knee_fe_jd', 'r_knee_fe_jp', 'r_knee_fe_jd'])
         l_jp_idx, l_jd_idx, r_jp_idx, r_jd_idx = self._robot.get_q_dot_idx(
-            ['l_knee_fe_jp', 'l_knee_fe_jd', 'r_knee_fe_jp', 'r_knee_fe_jd'])
+            ['front_left__cluster_3_pitch', 'front_left__cluster_3_wrist', 
+            'front_right__cluster_3_pitch', 'front_right__cluster_3_wrist'])
         self._jac_int[0, l_jp_idx] = 1.
         self._jac_int[0, l_jd_idx] = -1.
         self._jac_int[1, r_jp_idx] = 1.

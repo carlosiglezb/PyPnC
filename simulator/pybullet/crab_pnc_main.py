@@ -212,19 +212,20 @@ if __name__ == "__main__":
         # Compute Command
         if SimConfig.PRINT_TIME:
             start_time = time.time()
+            
         command = interface.get_command(copy.deepcopy(sensor_data))
 
         if SimConfig.PRINT_TIME:
             end_time = time.time()
             print("ctrl computation time: ", end_time - start_time)
 
-        # Exclude Knee Distal Joints Command
-        del command['joint_pos']['l_knee_fe_jd']
-        del command['joint_pos']['r_knee_fe_jd']
-        del command['joint_vel']['l_knee_fe_jd']
-        del command['joint_vel']['r_knee_fe_jd']
-        del command['joint_trq']['l_knee_fe_jd']
-        del command['joint_trq']['r_knee_fe_jd']
+        # # Exclude Knee Distal Joints Command
+        # del command['joint_pos']['l_knee_fe_jd']
+        # del command['joint_pos']['r_knee_fe_jd']
+        # del command['joint_vel']['l_knee_fe_jd']
+        # del command['joint_vel']['r_knee_fe_jd']
+        # del command['joint_trq']['l_knee_fe_jd']
+        # del command['joint_trq']['r_knee_fe_jd']
 
         # Apply Command
         pybullet_util.set_motor_trq(robot, joint_id, command['joint_trq'])
