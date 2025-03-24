@@ -1,4 +1,5 @@
 import numpy as np
+from enum import Enum
 
 
 class SimConfig(object):
@@ -11,7 +12,7 @@ class SimConfig(object):
     INITIAL_POS_WORLD_TO_BASEJOINT = [0, 0, 1.5 - 0.757]
     INITIAL_QUAT_WORLD_TO_BASEJOINT = [0., 0., 0., 1.]
 
-    PRINT_TIME = False
+    PRINT_TIME = True 
     PRINT_ROBOT_INFO = True
     VIDEO_RECORD = False
     RECORD_FREQ = 5
@@ -103,13 +104,14 @@ class WalkingConfig(object):
     NOMINAL_STRAFE_DISTANCE = 0.05
 
 
-class WalkingState(object):
-    STAND = 0
-    BALANCE = 1
-    RF_CONTACT_TRANS_START = 2
-    RF_CONTACT_TRANS_END = 3
-    RF_SWING = 4
-    LF_CONTACT_TRANS_START = 5
-    LF_CONTACT_TRANS_END = 6
-    LF_SWING = 7
-    SWAYING = 10
+class WalkingState(Enum):
+    NOTHING = 0
+    STAND = 1
+    BALANCE = 2
+    RF_CONTACT_TRANS_START = 3
+    RF_CONTACT_TRANS_END = 4
+    RF_SWING = 5
+    LF_CONTACT_TRANS_START = 6
+    LF_CONTACT_TRANS_END = 7
+    LF_SWING = 8
+    SWAYING = 9

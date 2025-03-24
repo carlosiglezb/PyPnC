@@ -184,30 +184,30 @@ if __name__ == "__main__":
         sensor_data['b_rf_contact'] = True if rf_height <= 0.01 else False
         sensor_data['b_lf_contact'] = True if lf_height <= 0.01 else False
 
-        # Get Keyboard Event
-        keys = p.getKeyboardEvents()
-        if pybullet_util.is_key_triggered(keys, '8'):
-            interface.interrupt_logic.b_interrupt_button_eight = True
-        elif pybullet_util.is_key_triggered(keys, '5'):
-            interface.interrupt_logic.b_interrupt_button_five = True
-        elif pybullet_util.is_key_triggered(keys, '4'):
-            interface.interrupt_logic.b_interrupt_button_four = True
-        elif pybullet_util.is_key_triggered(keys, '2'):
-            interface.interrupt_logic.b_interrupt_button_two = True
-        elif pybullet_util.is_key_triggered(keys, '6'):
-            interface.interrupt_logic.b_interrupt_button_six = True
-        elif pybullet_util.is_key_triggered(keys, '7'):
-            interface.interrupt_logic.b_interrupt_button_seven = True
-        elif pybullet_util.is_key_triggered(keys, '9'):
-            interface.interrupt_logic.b_interrupt_button_nine = True
-        elif pybullet_util.is_key_triggered(keys, '0'):
-            interface.interrupt_logic.b_interrupt_button_zero = True
-        # elif pybullet_util.is_key_triggered(keys, 'c'):
-        #     for k, v in gripper_command.items():
-        #         gripper_command[k] += 1.94 / 3.
-        # elif pybullet_util.is_key_triggered(keys, 'o'):
-        #     for k, v in gripper_command.items():
-        #         gripper_command[k] -= 1.94 / 3.
+        # # Get Keyboard Event
+        # keys = p.getKeyboardEvents()
+        # if pybullet_util.is_key_triggered(keys, '8'):
+        #     interface.interrupt_logic.b_interrupt_button_eight = True
+        # elif pybullet_util.is_key_triggered(keys, '5'):
+        #     interface.interrupt_logic.b_interrupt_button_five = True
+        # elif pybullet_util.is_key_triggered(keys, '4'):
+        #     interface.interrupt_logic.b_interrupt_button_four = True
+        # elif pybullet_util.is_key_triggered(keys, '2'):
+        #     interface.interrupt_logic.b_interrupt_button_two = True
+        # elif pybullet_util.is_key_triggered(keys, '6'):
+        #     interface.interrupt_logic.b_interrupt_button_six = True
+        # elif pybullet_util.is_key_triggered(keys, '7'):
+        #     interface.interrupt_logic.b_interrupt_button_seven = True
+        # elif pybullet_util.is_key_triggered(keys, '9'):
+        #     interface.interrupt_logic.b_interrupt_button_nine = True
+        # elif pybullet_util.is_key_triggered(keys, '0'):
+        #     interface.interrupt_logic.b_interrupt_button_zero = True
+        # # elif pybullet_util.is_key_triggered(keys, 'c'):
+        # #     for k, v in gripper_command.items():
+        # #         gripper_command[k] += 1.94 / 3.
+        # # elif pybullet_util.is_key_triggered(keys, 'o'):
+        # #     for k, v in gripper_command.items():
+        # #         gripper_command[k] -= 1.94 / 3.
 
         # Compute Command
         if SimConfig.PRINT_TIME:

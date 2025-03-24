@@ -1,7 +1,7 @@
 import numpy as np
 
 from config.crab_config import WBCConfig, PnCConfig
-from pnc.crab_pnc.crab_rolling_joint_constraint import CrabRollingJointConstraint
+# from pnc.crab_pnc.crab_rolling_joint_constraint import CrabRollingJointConstraint
 from pnc.wbc.tci_container import TCIContainer
 from pnc.wbc.basic_task import BasicTask
 from pnc.wbc.basic_contact import SurfaceContact
@@ -22,7 +22,7 @@ class CrabTCIContainer(TCIContainer):
 
         # Torso orientation task
         self._torso_ori_task = BasicTask(robot, "LINK_ORI", 3,
-                                         "torso_com_link", PnCConfig.SAVE_DATA)
+                                         "base_link", PnCConfig.SAVE_DATA)
         self._torso_ori_task.kp = WBCConfig.KP_TORSO
         self._torso_ori_task.kd = WBCConfig.KD_TORSO
         self._torso_ori_task.w_hierarchy = WBCConfig.W_TORSO
@@ -43,28 +43,28 @@ class CrabTCIContainer(TCIContainer):
 
         # Rfoot Pos Task
         self._rfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3,
-                                         "r_foot_contact", PnCConfig.SAVE_DATA)
+                                         "front_right__foot_link", PnCConfig.SAVE_DATA)
         self._rfoot_pos_task.kp = WBCConfig.KP_FOOT_POS
         self._rfoot_pos_task.kd = WBCConfig.KD_FOOT_POS
         self._rfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
 
         # Lfoot Pos Task
         self._lfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3,
-                                         "l_foot_contact", PnCConfig.SAVE_DATA)
+                                         "front_left__foot_link", PnCConfig.SAVE_DATA)
         self._lfoot_pos_task.kp = WBCConfig.KP_FOOT_POS
         self._lfoot_pos_task.kd = WBCConfig.KD_FOOT_POS
         self._lfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
 
         # Rfoot Ori Task
         self._rfoot_ori_task = BasicTask(robot, "LINK_ORI", 3,
-                                         "r_foot_contact", PnCConfig.SAVE_DATA)
+                                         "front_right__foot_link", PnCConfig.SAVE_DATA)
         self._rfoot_ori_task.kp = WBCConfig.KP_FOOT_ORI
         self._rfoot_ori_task.kd = WBCConfig.KD_FOOT_ORI
         self._rfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
 
         # Lfoot Ori Task
         self._lfoot_ori_task = BasicTask(robot, "LINK_ORI", 3,
-                                         "l_foot_contact", PnCConfig.SAVE_DATA)
+                                         "front_left__foot_link", PnCConfig.SAVE_DATA)
         self._lfoot_ori_task.kp = WBCConfig.KP_FOOT_ORI
         self._lfoot_ori_task.kd = WBCConfig.KD_FOOT_ORI
         self._lfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT

@@ -12,13 +12,14 @@ from pnc.wbc.manager.reaction_force_manager import ReactionForceManager
 # from pnc.wbc.manager.upper_body_trajectory_manager import UpperBodyTrajectoryManager
 from pnc.crab_pnc.crab_tci_container import CrabTCIContainer
 from pnc.crab_pnc.crab_controller import CrabController
-from pnc.crab_pnc.crab_state_machine.double_support_stand import DoubleSupportStand
-from pnc.crab_pnc.crab_state_machine.double_support_balance import DoubleSupportBalance
-from pnc.crab_pnc.crab_state_machine.contact_transition_start import ContactTransitionStart
-from pnc.crab_pnc.crab_state_machine.contact_transition_end import ContactTransitionEnd
-from pnc.crab_pnc.crab_state_machine.single_support_swing import SingleSupportSwing
-from pnc.crab_pnc.crab_state_machine.double_support_swaying import DoubleSupportSwaying
+# from pnc.crab_pnc.crab_state_machine.double_support_stand import DoubleSupportStand
+# from pnc.crab_pnc.crab_state_machine.double_support_balance import DoubleSupportBalance
+# from pnc.crab_pnc.crab_state_machine.contact_transition_start import ContactTransitionStart
+# from pnc.crab_pnc.crab_state_machine.contact_transition_end import ContactTransitionEnd
+# from pnc.crab_pnc.crab_state_machine.single_support_swing import SingleSupportSwing
+# from pnc.crab_pnc.crab_state_machine.double_support_swaying import DoubleSupportSwaying
 from pnc.crab_pnc.crab_state_provider import CrabStateProvider
+from pnc.crab_pnc.crab_state_machine.nothing import Nothing
 
 
 class CrabControlArchitecture(ControlArchitecture):
@@ -63,8 +64,9 @@ class CrabControlArchitecture(ControlArchitecture):
         self._dcm_tm = DCMTrajectoryManager(self._dcm_planner,
                                             self._tci_container.com_task,
                                             self._tci_container.torso_ori_task,
-                                            self._robot, "l_foot_contact",
-                                            "r_foot_contact")
+                                            self._robot, "front_left__foot_link",
+                                            "front_right__foot_link")
+        
         self._dcm_tm.nominal_com_height = WalkingConfig.COM_HEIGHT
         self._dcm_tm.t_additional_init_transfer = WalkingConfig.T_ADDITIONAL_INI_TRANS
         self._dcm_tm.t_contact_transition = WalkingConfig.T_CONTACT_TRANS
@@ -128,64 +130,69 @@ class CrabControlArchitecture(ControlArchitecture):
         # ======================================================================
         # Initialize State Machines
         # ======================================================================
-        self._state_machine[WalkingState.STAND] = DoubleSupportStand(
-            WalkingState.STAND, self._trajectory_managers,
+        # self._state_machine[WalkingState.STAND] = DoubleSupportStand(
+        #     WalkingState.STAND, self._trajectory_managers,
+        #     self._hierarchy_managers, self._reaction_force_managers, robot)
+        # self._state_machine[
+        #     WalkingState.STAND].end_time = WalkingConfig.INIT_STAND_DUR
+        # self._state_machine[
+        #     WalkingState.STAND].rf_z_max_time = WalkingConfig.RF_Z_MAX_TIME
+        # self._state_machine[
+        #     WalkingState.STAND].com_height_des = WalkingConfig.COM_HEIGHT
+
+        # self._state_machine[WalkingState.BALANCE] = DoubleSupportBalance(
+        #     WalkingState.BALANCE, self._trajectory_managers,
+        #     self._hierarchy_managers, self._reaction_force_managers, robot)
+
+        # self._state_machine[
+        #     WalkingState.LF_CONTACT_TRANS_START] = ContactTransitionStart(
+        #         WalkingState.LF_CONTACT_TRANS_START, self._trajectory_managers,
+        #         self._hierarchy_managers, self._reaction_force_managers,
+        #         Footstep.LEFT_SIDE, self._robot)
+
+        # self._state_machine[
+        #     WalkingState.LF_CONTACT_TRANS_END] = ContactTransitionEnd(
+        #         WalkingState.LF_CONTACT_TRANS_END, self._trajectory_managers,
+        #         self._hierarchy_managers, self._reaction_force_managers,
+        #         Footstep.LEFT_SIDE, self._robot)
+
+        # self._state_machine[WalkingState.LF_SWING] = SingleSupportSwing(
+        #     WalkingState.LF_SWING, self._trajectory_managers,
+        #     Footstep.LEFT_SIDE, self._robot)
+
+        # self._state_machine[
+        #     WalkingState.RF_CONTACT_TRANS_START] = ContactTransitionStart(
+        #         WalkingState.RF_CONTACT_TRANS_START, self._trajectory_managers,
+        #         self._hierarchy_managers, self._reaction_force_managers,
+        #         Footstep.RIGHT_SIDE, self._robot)
+
+        # self._state_machine[
+        #     WalkingState.RF_CONTACT_TRANS_END] = ContactTransitionEnd(
+        #         WalkingState.RF_CONTACT_TRANS_END, self._trajectory_managers,
+        #         self._hierarchy_managers, self._reaction_force_managers,
+        #         Footstep.RIGHT_SIDE, self._robot)
+
+        # self._state_machine[WalkingState.RF_SWING] = SingleSupportSwing(
+        #     WalkingState.RF_SWING, self._trajectory_managers,
+        #     Footstep.RIGHT_SIDE, self._robot)
+
+        # self._state_machine[WalkingState.SWAYING] = DoubleSupportSwaying(
+        #     WalkingState.SWAYING, self._trajectory_managers,
+        #     self._hierarchy_managers, self._reaction_force_managers,
+        #     self._robot)
+        
+        # self._state_machine[
+        #     WalkingState.SWAYING].amp = WalkingConfig.SWAYING_AMP
+        # self._state_machine[
+        #     WalkingState.SWAYING].freq = WalkingConfig.SWAYING_FREQ
+
+        self._state_machine[WalkingState.NOTHING] = Nothing(
+            WalkingState.NOTHING, self._trajectory_managers,
             self._hierarchy_managers, self._reaction_force_managers, robot)
-        self._state_machine[
-            WalkingState.STAND].end_time = WalkingConfig.INIT_STAND_DUR
-        self._state_machine[
-            WalkingState.STAND].rf_z_max_time = WalkingConfig.RF_Z_MAX_TIME
-        self._state_machine[
-            WalkingState.STAND].com_height_des = WalkingConfig.COM_HEIGHT
-
-        self._state_machine[WalkingState.BALANCE] = DoubleSupportBalance(
-            WalkingState.BALANCE, self._trajectory_managers,
-            self._hierarchy_managers, self._reaction_force_managers, robot)
-
-        self._state_machine[
-            WalkingState.LF_CONTACT_TRANS_START] = ContactTransitionStart(
-                WalkingState.LF_CONTACT_TRANS_START, self._trajectory_managers,
-                self._hierarchy_managers, self._reaction_force_managers,
-                Footstep.LEFT_SIDE, self._robot)
-
-        self._state_machine[
-            WalkingState.LF_CONTACT_TRANS_END] = ContactTransitionEnd(
-                WalkingState.LF_CONTACT_TRANS_END, self._trajectory_managers,
-                self._hierarchy_managers, self._reaction_force_managers,
-                Footstep.LEFT_SIDE, self._robot)
-
-        self._state_machine[WalkingState.LF_SWING] = SingleSupportSwing(
-            WalkingState.LF_SWING, self._trajectory_managers,
-            Footstep.LEFT_SIDE, self._robot)
-
-        self._state_machine[
-            WalkingState.RF_CONTACT_TRANS_START] = ContactTransitionStart(
-                WalkingState.RF_CONTACT_TRANS_START, self._trajectory_managers,
-                self._hierarchy_managers, self._reaction_force_managers,
-                Footstep.RIGHT_SIDE, self._robot)
-
-        self._state_machine[
-            WalkingState.RF_CONTACT_TRANS_END] = ContactTransitionEnd(
-                WalkingState.RF_CONTACT_TRANS_END, self._trajectory_managers,
-                self._hierarchy_managers, self._reaction_force_managers,
-                Footstep.RIGHT_SIDE, self._robot)
-
-        self._state_machine[WalkingState.RF_SWING] = SingleSupportSwing(
-            WalkingState.RF_SWING, self._trajectory_managers,
-            Footstep.RIGHT_SIDE, self._robot)
-
-        self._state_machine[WalkingState.SWAYING] = DoubleSupportSwaying(
-            WalkingState.SWAYING, self._trajectory_managers,
-            self._hierarchy_managers, self._reaction_force_managers,
-            self._robot)
-        self._state_machine[
-            WalkingState.SWAYING].amp = WalkingConfig.SWAYING_AMP
-        self._state_machine[
-            WalkingState.SWAYING].freq = WalkingConfig.SWAYING_FREQ
 
         # Set Starting State
-        self._state = WalkingState.STAND
-        self._prev_state = WalkingState.STAND
+        self._state = WalkingState.NOTHING
+        self._prev_state = WalkingState.NOTHING
         self._b_state_first_visit = True
 
         self._sp = CrabStateProvider()
