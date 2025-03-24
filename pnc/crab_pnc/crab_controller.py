@@ -25,8 +25,8 @@ class CrabController(object):
             ['front_left__cluster_3_pitch', 'front_left__cluster_3_wrist', 
             'front_right__cluster_3_pitch', 'front_right__cluster_3_wrist'])
         act_list = [False] * robot.n_floating + [True] * robot.n_a
-        act_list[l_jd_idx] = False
-        act_list[r_jd_idx] = False
+        # act_list[l_jd_idx] = False
+        # act_list[r_jd_idx] = False
 
         n_q_dot = len(act_list)
         n_active = np.count_nonzero(np.array(act_list))

@@ -245,3 +245,4 @@ if __name__ == "__main__":
         time.sleep(dt)
         t += dt
         count += 1
+        print(f"Time: {t:.2f}s, Step: {count}")
