@@ -92,8 +92,8 @@ class CrabTCIContainer(TCIContainer):
         # ======================================================================
         # Initialize Internal Constraint
         # ======================================================================
-        self._rolling_joint_constraint = CrabRollingJointConstraint(robot)
-        self._internal_constraint_list = [self._rolling_joint_constraint]
+        # self._rolling_joint_constraint = CrabRollingJointConstraint(robot)
+        # self._internal_constraint_list = [self._rolling_joint_constraint]
 
     @property
     def com_task(self):

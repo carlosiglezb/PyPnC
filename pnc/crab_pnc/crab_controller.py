@@ -14,8 +14,12 @@ class CrabController(object):
         self._robot = robot
 
         # Initialize WBC
+        # l_jp_idx, l_jd_idx, r_jp_idx, r_jd_idx = self._robot.get_q_dot_idx(
+        #     ['l_knee_fe_jp', 'l_knee_fe_jd', 'r_knee_fe_jp', 'r_knee_fe_jd'])
+        # These are the wrist joints which might need special handling as passive joints
         l_jp_idx, l_jd_idx, r_jp_idx, r_jd_idx = self._robot.get_q_dot_idx(
-            ['l_knee_fe_jp', 'l_knee_fe_jd', 'r_knee_fe_jp', 'r_knee_fe_jd'])
+            ['front_left__cluster_3_pitch', 'front_left__cluster_3_wrist', 
+            'front_right__cluster_3_pitch', 'front_right__cluster_3_wrist'])
         act_list = [False] * robot.n_floating + [True] * robot.n_a
         act_list[l_jd_idx] = False
         act_list[r_jd_idx] = False
