@@ -251,13 +251,14 @@ class CrabControlArchitecture(ControlArchitecture):
         # ---------------------------------- 
         # Get Whole Body Control Commands
         # ----------------------------------    
+
+        # Update State Machine
+        self._state_machine[self._state].one_step()
+        
         # display task name 
         print(f"Task: {self._tci_container.task_list[1]._target_id}")
         print(f"Task type: {self._tci_container.task_list[1]._task_type}")
         print(f"Task pos des: {self._tci_container.task_list[1]._pos_des}")
-
-        # Update State Machine
-        self._state_machine[self._state].one_step()
         
         command = self._crab_controller.get_command()
 

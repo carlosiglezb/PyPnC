@@ -72,28 +72,28 @@ class CrabTCIContainer(TCIContainer):
 
         # Rfoot Pos Task
         self._rfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3,
-                                       "r_foot_contact", PnCConfig.SAVE_DATA)
+                                       "front_right__foot_link", PnCConfig.SAVE_DATA)
         self._rfoot_pos_task.kp = WBCConfig.KP_FOOT_POS
         self._rfoot_pos_task.kd = WBCConfig.KD_FOOT_POS
         self._rfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
 
         # Lfoot Pos Task
         self._lfoot_pos_task = BasicTask(robot, "LINK_XYZ", 3,
-                                       "l_foot_contact", PnCConfig.SAVE_DATA)
+                                       "front_left__foot_link", PnCConfig.SAVE_DATA)
         self._lfoot_pos_task.kp = WBCConfig.KP_FOOT_POS
         self._lfoot_pos_task.kd = WBCConfig.KD_FOOT_POS
         self._lfoot_pos_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
 
         # Rfoot Ori Task
         self._rfoot_ori_task = BasicTask(robot, "LINK_ORI", 3,
-                                       "r_foot_contact", PnCConfig.SAVE_DATA)
+                                        "front_right__foot_link", PnCConfig.SAVE_DATA)
         self._rfoot_ori_task.kp = WBCConfig.KP_FOOT_ORI
         self._rfoot_ori_task.kd = WBCConfig.KD_FOOT_ORI
         self._rfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
 
         # Lfoot Ori Task
         self._lfoot_ori_task = BasicTask(robot, "LINK_ORI", 3,
-                                       "l_foot_contact", PnCConfig.SAVE_DATA)
+                                       "front_left__foot_link", PnCConfig.SAVE_DATA)
         self._lfoot_ori_task.kp = WBCConfig.KP_FOOT_ORI
         self._lfoot_ori_task.kd = WBCConfig.KD_FOOT_ORI
         self._lfoot_ori_task.w_hierarchy = WBCConfig.W_CONTACT_FOOT
@@ -104,13 +104,13 @@ class CrabTCIContainer(TCIContainer):
             
         # Right Foot Contact
         # Defines contact constraints and friction cone for right foot
-        self._rfoot_contact = SurfaceContact(robot, "r_foot_contact", 0.115,
+        self._rfoot_contact = SurfaceContact(robot, "font_right__foot_link", 0.115,
                                            0.065, 0.3, PnCConfig.SAVE_DATA)
         self._rfoot_contact.rf_z_max = 1e-3  # Maximum normal force
 
         # Left Foot Contact
         # Defines contact constraints and friction cone for left foot
-        self._lfoot_contact = SurfaceContact(robot, "l_foot_contact", 0.115,
+        self._lfoot_contact = SurfaceContact(robot, "font_left__foot_link", 0.115,
                                            0.065, 0.3, PnCConfig.SAVE_DATA)
         self._lfoot_contact.rf_z_max = 1e-3  # Maximum normal force
 

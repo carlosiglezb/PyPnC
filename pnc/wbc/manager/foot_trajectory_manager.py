@@ -40,7 +40,9 @@ class FootTrajectoryManager(object):
 
     def use_current(self):
         foot_iso = self._robot.get_link_iso(self._target_id)
+        print(f"foot_iso: {foot_iso}")
         foot_vel = self._robot.get_link_vel(self._target_id)
+        print(f"foot_vel: {foot_vel}")
 
         foot_pos_des = foot_iso[0:3, 3]
         foot_lin_vel_des = foot_vel[3:6]
