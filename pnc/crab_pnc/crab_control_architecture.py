@@ -21,29 +21,52 @@ from pnc.crab_pnc.crab_controller import CrabController
 from pnc.crab_pnc.crab_state_provider import CrabStateProvider
 from pnc.crab_pnc.crab_state_machine.nothing import Nothing
 
+# ====================================================================== 
+# class CrabControlArchitecture 
+# ====================================================================== 
 
 class CrabControlArchitecture(ControlArchitecture):
+    """
+    Main control architecture for the Crab robot. Coordinates state machine,
+    trajectory managers, and task-level controllers.
+
+    The control flow is:
+    1. State machine determines high-level behavior
+    2. Trajectory managers generate desired trajectories
+    3. Task controllers compute required joint commands
+    """
+
+    # ====================================================================== 
+    # __init__ 
+    # ====================================================================== 
+
     def __init__(self, robot):
+        """
+        Initialize the control architecture.
+
+        Args:
+            robot: Robot instance containing model and state information
+        """
         super(CrabControlArchitecture, self).__init__(robot)
 
-        # ======================================================================
+        # ---------------------------------- 
         # Initialize TCIContainer
-        # ======================================================================
+        # ---------------------------------- 
         self._tci_container = CrabTCIContainer(robot)
 
-        # ======================================================================
+        # ---------------------------------- 
         # Initialize Controller
-        # ======================================================================
+        # ---------------------------------- 
         self._crab_controller = CrabController(self._tci_container, robot)
 
-        # ======================================================================
+        # ---------------------------------- 
         # Initialize Planner
-        # ======================================================================
+        # ---------------------------------- 
         self._dcm_planner = DCMPlanner()
 
-        # ======================================================================
+        # ---------------------------------- 
         # Initialize Task Manager
-        # ======================================================================
+        # ---------------------------------- 
         self._rfoot_tm = FootTrajectoryManager(
             self._tci_container.rfoot_pos_task,
             self._tci_container.rfoot_ori_task, robot)
@@ -67,17 +90,17 @@ class CrabControlArchitecture(ControlArchitecture):
                                             self._robot, "front_left__foot_link",
                                             "front_right__foot_link")
         
-        self._dcm_tm.nominal_com_height = WalkingConfig.COM_HEIGHT
+        self._dcm_tm.nominal_com_height         = WalkingConfig.COM_HEIGHT
         self._dcm_tm.t_additional_init_transfer = WalkingConfig.T_ADDITIONAL_INI_TRANS
-        self._dcm_tm.t_contact_transition = WalkingConfig.T_CONTACT_TRANS
-        self._dcm_tm.t_swing = WalkingConfig.T_SWING
-        self._dcm_tm.percentage_settle = WalkingConfig.PERCENTAGE_SETTLE
-        self._dcm_tm.alpha_ds = WalkingConfig.ALPHA_DS
-        self._dcm_tm.nominal_footwidth = WalkingConfig.NOMINAL_FOOTWIDTH
-        self._dcm_tm.nominal_forward_step = WalkingConfig.NOMINAL_FORWARD_STEP
-        self._dcm_tm.nominal_backward_step = WalkingConfig.NOMINAL_BACKWARD_STEP
-        self._dcm_tm.nominal_turn_radians = WalkingConfig.NOMINAL_TURN_RADIANS
-        self._dcm_tm.nominal_strafe_distance = WalkingConfig.NOMINAL_STRAFE_DISTANCE
+        self._dcm_tm.t_contact_transition       = WalkingConfig.T_CONTACT_TRANS
+        self._dcm_tm.t_swing                    = WalkingConfig.T_SWING
+        self._dcm_tm.percentage_settle          = WalkingConfig.PERCENTAGE_SETTLE
+        self._dcm_tm.alpha_ds                   = WalkingConfig.ALPHA_DS
+        self._dcm_tm.nominal_footwidth          = WalkingConfig.NOMINAL_FOOTWIDTH
+        self._dcm_tm.nominal_forward_step       = WalkingConfig.NOMINAL_FORWARD_STEP
+        self._dcm_tm.nominal_backward_step      = WalkingConfig.NOMINAL_BACKWARD_STEP
+        self._dcm_tm.nominal_turn_radians       = WalkingConfig.NOMINAL_TURN_RADIANS
+        self._dcm_tm.nominal_strafe_distance    = WalkingConfig.NOMINAL_STRAFE_DISTANCE
 
         self._trajectory_managers = {
             "rfoot": self._rfoot_tm,
@@ -87,9 +110,9 @@ class CrabControlArchitecture(ControlArchitecture):
             "dcm": self._dcm_tm
         }
 
-        # ======================================================================
+        # ---------------------------------- 
         # Initialize Hierarchy Manager
-        # ======================================================================
+        # ---------------------------------- 
         self._rfoot_pos_hm = TaskHierarchyManager(
             self._tci_container.rfoot_pos_task, WBCConfig.W_CONTACT_FOOT,
             WBCConfig.W_SWING_FOOT)
@@ -113,9 +136,9 @@ class CrabControlArchitecture(ControlArchitecture):
             "lfoot_ori": self._lfoot_ori_hm
         }
 
-        # ======================================================================
+        # ---------------------------------- 
         # Initialize Reaction Force Manager
-        # ======================================================================
+        # ---------------------------------- 
         self._rfoot_fm = ReactionForceManager(
             self._tci_container.rfoot_contact, WBCConfig.RF_Z_MAX)
 
@@ -127,9 +150,9 @@ class CrabControlArchitecture(ControlArchitecture):
             "lfoot": self._lfoot_fm
         }
 
-        # ======================================================================
+        # ---------------------------------- 
         # Initialize State Machines
-        # ======================================================================
+        # ---------------------------------- 
         # self._state_machine[WalkingState.STAND] = DoubleSupportStand(
         #     WalkingState.STAND, self._trajectory_managers,
         #     self._hierarchy_managers, self._reaction_force_managers, robot)
@@ -190,26 +213,57 @@ class CrabControlArchitecture(ControlArchitecture):
             WalkingState.NOTHING, self._trajectory_managers,
             self._hierarchy_managers, self._reaction_force_managers, robot)
 
+        # ---------------------------------- 
         # Set Starting State
-        self._state = WalkingState.NOTHING
-        self._prev_state = WalkingState.NOTHING
+        # ---------------------------------- 
+        self._state               = WalkingState.NOTHING
+        self._prev_state          = WalkingState.NOTHING
         self._b_state_first_visit = True
 
         self._sp = CrabStateProvider()
 
+    # ====================================================================== 
+    # get_command 
+    # ====================================================================== 
+
     def get_command(self):
+        """
+        Generate control commands based on current state and trajectories.
+        
+        Process:
+        1. Update state machine
+        2. Generate task-space trajectories
+        3. Compute joint-space commands using whole-body controller
+        """
+        # ---------------------------------- 
+        # First Visit 
+        # ---------------------------------- 
         if self._b_state_first_visit:
             self._state_machine[self._state].first_visit()
             self._b_state_first_visit = False
 
-        # Update State Machine
-        self._state_machine[self._state].one_step()
+        # ---------------------------------- 
         # Update State Machine Independent Trajectories
+        # ---------------------------------- 
         # self._upper_body_tm.use_nominal_upper_body_joint_pos(
         #     self._sp.nominal_joint_pos)
+
+        # ---------------------------------- 
         # Get Whole Body Control Commands
+        # ----------------------------------    
+        # display task name 
+        print(f"Task: {self._tci_container.task_list[1]._target_id}")
+        print(f"Task type: {self._tci_container.task_list[1]._task_type}")
+        print(f"Task pos des: {self._tci_container.task_list[1]._pos_des}")
+
+        # Update State Machine
+        self._state_machine[self._state].one_step()
+        
         command = self._crab_controller.get_command()
 
+        # ---------------------------------- 
+        # Update State Machine
+        # ---------------------------------- 
         if self._state_machine[self._state].end_of_state():
             self._state_machine[self._state].last_visit()
             self._prev_state = self._state
@@ -217,6 +271,10 @@ class CrabControlArchitecture(ControlArchitecture):
             self._b_state_first_visit = True
 
         return command
+    
+    # ====================================================================== 
+    # Property Getters
+    # ====================================================================== 
 
     @property
     def dcm_tm(self):
@@ -225,3 +283,60 @@ class CrabControlArchitecture(ControlArchitecture):
     @property
     def state_machine(self):
         return self._state_machine
+
+    # ====================================================================== 
+    # initialize 
+    # ====================================================================== 
+
+    def initialize(self):
+        """
+        Initialize the control architecture.
+        
+        This:
+        1. Sets up initial state
+        2. Initializes trajectory managers
+        3. Prepares state machine for execution
+        """
+        # Initialize first state
+        self._state_machine[self._state].first_visit()
+
+    # ====================================================================== 
+    # save_trajectory 
+    # ====================================================================== 
+
+    def save_trajectory(self):
+        """
+        Save trajectory data for analysis or debugging.
+        Delegates to trajectory managers to save their data.
+        """
+        for tm in self._trajectory_managers.values():
+            tm.save_trajectory()
+            
+    # ====================================================================== 
+    # Property Getters
+    # ====================================================================== 
+
+    @property
+    def state(self):
+        """Current state of the state machine"""
+        return self._state
+
+    @property
+    def joint_trq_cmd(self):
+        """Latest computed joint torque commands"""
+        return self._joint_trq_cmd
+
+    @property
+    def joint_acc_cmd(self):
+        """Latest computed joint acceleration commands"""
+        return self._joint_acc_cmd
+
+    @property
+    def joint_vel_cmd(self):
+        """Latest computed joint velocity commands"""
+        return self._joint_vel_cmd
+
+    @property
+    def joint_pos_cmd(self):
+        """Latest computed joint position commands"""
+        return self._joint_pos_cmd

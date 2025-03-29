@@ -8,6 +8,8 @@ from qpsolvers import solve_qp
 from util import util
 from pnc.data_saver import DataSaver
 
+# ====================================================================== 
+# ====================================================================== 
 
 class IHWBC(object):
     """
@@ -25,8 +27,8 @@ class IHWBC(object):
         self._sf = sf
         self._snf = np.concatenate((np.zeros(
             (self._n_active + self._n_passive, 6)),
-                                    np.eye(self._n_active + self._n_passive)),
-                                   axis=1)
+            np.eye(self._n_active + self._n_passive)),
+            axis=1)
         self._sa = sa
         self._sv = sv
 

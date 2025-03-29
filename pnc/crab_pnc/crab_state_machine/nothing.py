@@ -9,8 +9,14 @@ from pnc.crab_pnc.crab_state_provider import CrabStateProvider
 
 from util import util
 
+# ====================================================================== 
+# class Nothing 
+# ====================================================================== 
 
 class Nothing(StateMachine):
+    """
+    State machine for the Crab robot when it is doing absolutely nothing.
+    """
     def __init__(self, id, tm, hm, fm, robot):
         super(Nothing, self).__init__(id, robot)
         self._trajectory_managers = tm
@@ -20,6 +26,10 @@ class Nothing(StateMachine):
         self._sp = CrabStateProvider()
         self._start_time = 0.
         self._duration = 3.0  # Duration in seconds before transitioning
+
+    # ====================================================================== 
+    # first_visit 
+    # ====================================================================== 
 
     def first_visit(self):
         print("[WalkingState] NOTHING - Doing absolutely nothing")
@@ -38,6 +48,10 @@ class Nothing(StateMachine):
                 self._sp.curr_time, self._sp.curr_time + self._duration, 
                 com_pos_des, base_quat_des)
 
+    # ====================================================================== 
+    # one_step 
+    # ====================================================================== 
+
     def one_step(self):
         # Just track time, do absolutely nothing else
         self._state_machine_time = self._sp.curr_time - self._start_time
@@ -54,9 +68,17 @@ class Nothing(StateMachine):
         # self._trajectory_managers["dcm"].update_floating_base_task_desired(
         #     self._sp.curr_time)
                 
+    # ====================================================================== 
+    # last_visit 
+    # ====================================================================== 
+
     def last_visit(self):
         print("[WalkingState] NOTHING - Finished doing nothing")
         pass
+
+    # ====================================================================== 
+    # end_of_state 
+    # ====================================================================== 
 
     def end_of_state(self):
         # End the state after duration seconds
@@ -65,6 +87,11 @@ class Nothing(StateMachine):
         else:
             return False
 
+    # ====================================================================== 
+    # get_next_state 
+    # ====================================================================== 
+
     def get_next_state(self):
         # Transition to STAND state after doing nothing
-        return WalkingState.STAND
+        # return WalkingState.STAND
+        return WalkingState.NOTHING 
