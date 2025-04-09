@@ -1,5 +1,5 @@
 import time
-from typing import List, OrderedDict
+from typing import List
 
 import meshcat
 from pinocchio.visualize import MeshcatVisualizer
@@ -10,7 +10,7 @@ import numpy as np
 from util.path_parameterization import CompositeBezierCurve, get_bez_segment, get_frame_des_pos
 from util import util
 # Planner
-from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
+from .locomanipulation_frame_planner import LocomanipulationFramePlanner
 
 b_use_ik_solver = False
 
@@ -18,7 +18,7 @@ if b_use_ik_solver:
     import qpsolvers
     import pink
     from pink import solve_ik
-    from pink.tasks import FrameTask, JointCouplingTask, PostureTask
+    from pink.tasks import FrameTask, PostureTask
 
 def display_visualizer_frames(meshcat_visualizer, frame):
     for visual in meshcat_visualizer.visual_model.geometryObjects:

@@ -2,7 +2,7 @@ import unittest
 
 import os, sys
 
-from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
+from pnc.planner.multicontact.kin_feasibility.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -20,7 +20,7 @@ from vision.iris.iris_geom_interface import *
 from vision.iris.iris_regions_manager import IrisRegionsManager
 # IRIS sequence planner
 from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.multiframe_fpp import plan_multistage_iris_seq
-from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
+from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
 
 b_visualize = True
 b_static_html = False

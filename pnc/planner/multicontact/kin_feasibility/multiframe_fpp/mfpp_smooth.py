@@ -8,16 +8,16 @@ from casadi import nlpsol
 from scipy.special import binom
 from scipy.optimize import minimize
 
-from pnc.planner.multicontact.kin_feasibility.casadi_ocp_constraints.casadi_ocp_functions import \
+from ..casadi_ocp_constraints.casadi_ocp_functions import \
     IndexedPolytopeEllipsoidConstraint, IndexedPolytopePolytopeConstraint
-from pnc.planner.multicontact.kin_feasibility.constraint_parsers import parse_mat_leq_constr, parse_repvec_eq_constr, \
+from ..constraint_parsers import parse_mat_leq_constr, parse_repvec_eq_constr, \
     parse_vec_eq_constr, parse_mat_eq_constr
-from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import get_aux_frame_idx, \
-    create_bezier_cvx_norm_eq_relaxation, add_vel_acc_constr, add_vel_acc_constr_casadi
-from pnc.planner.multicontact.kin_feasibility.scipy_ocp_constraints.scipy_ocp_functions import \
+from ..cvx_mfpp_tools import get_aux_frame_idx, \
+    create_bezier_cvx_norm_eq_relaxation
+from ..scipy_ocp_constraints.scipy_ocp_functions import \
     LinearBezierIneqConstraint, LinearBezierEqConstraint
-from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 from util.path_parameterization import BezierCurve, CompositeBezierCurve
+from ..self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
 
@@ -585,7 +585,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
-            sca_bez_points = range(0, num_iris_tot * n_points, 1)
+            sca_bez_points = range(0, num_iris_tot * n_points, n_points)
 
             # populate col_pair_geom_data with respective primitive shape pair type information
             ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])

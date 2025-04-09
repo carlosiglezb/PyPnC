@@ -16,7 +16,7 @@ from pydrake.geometry.optimization import HPolyhedron
 
 # Kinematic feasibility
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
-from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
+from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
 from pnc.planner.multicontact.kin_feasibility.ik_cfree_planner import *
 # Tools for dynamic feasibility
 from humanoid_action_models import *

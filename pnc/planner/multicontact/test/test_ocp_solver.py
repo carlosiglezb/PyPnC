@@ -12,7 +12,7 @@ from pnc.planner.multicontact.kin_feasibility.fastpathplanning.smooth import opt
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
 from pnc.planner.multicontact.kin_feasibility.fastpathplanning.polygonal import solve_min_reach_distance
-from pnc.planner.multicontact.planner_surface_contact import PlannerSurfaceContact
+from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import PlannerSurfaceContact
 from util import util
 
 cwd = os.getcwd()

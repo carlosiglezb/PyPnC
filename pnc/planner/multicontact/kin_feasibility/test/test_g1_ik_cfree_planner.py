@@ -3,9 +3,9 @@ import unittest
 import os
 import sys
 from collections import OrderedDict
-import copy
 
-from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
+from pnc.data_saver import DataSaver
+from ..self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -16,16 +16,15 @@ from pinocchio.visualize import MeshcatVisualizer
 
 from pydrake.geometry.optimization import HPolyhedron
 
-from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
-from pnc.planner.multicontact.kin_feasibility.ik_cfree_planner import IKCFreePlanner
-from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
-from pnc.planner.multicontact.planner_surface_contact import MotionFrameSequencer, PlannerSurfaceContact
+from ..frame_traversable_region import FrameTraversableRegion
+from ..ik_cfree_planner import IKCFreePlanner
+from ..locomanipulation_frame_planner import LocomanipulationFramePlanner
+from ..planner_surface_contact import MotionFrameSequencer, PlannerSurfaceContact
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 from util import util
 from vision.iris.iris_geom_interface import IrisGeomInterface
 from vision.iris.iris_regions_manager import IrisRegionsManager
 import plot.meshcat_utils as vis_tools
-from pnc.data_saver import DataSaver
 
 b_visualize = True
 b_use_knees = True

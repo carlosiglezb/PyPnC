@@ -2,14 +2,12 @@ import copy
 
 import numpy as np
 
-from pnc.planner.multicontact.kin_feasibility.fastpathplanning.fastpathplanning import distribute_box_seq, distribute_free_frames
-from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_polygonal import solve_min_reach_iris_distance
-from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.mfpp_smooth import optimize_multiple_bezier_iris, \
+from .mfpp_polygonal import solve_min_reach_iris_distance
+from .mfpp_smooth import optimize_multiple_bezier_iris, \
     optimize_multiple_bezier_iris_casadi, pack_points_for_single_vector
-from pnc.planner.multicontact.kin_feasibility.fpp_sequencer_tools import get_last_defined_point
-from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 from vision.iris.iris_regions_manager import IrisRegionsManager
-from pnc.planner.multicontact.self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
+from ..fpp_sequencer_tools import get_last_defined_point, distribute_box_seq, distribute_free_frames
+from ..self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 
 
 def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],

@@ -4,7 +4,7 @@ from typing import List
 import cvxpy as cp
 import numpy as np
 
-from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import get_aux_frame_idx, create_cvx_norm_eq_relaxation
+from ..cvx_mfpp_tools import get_aux_frame_idx, create_cvx_norm_eq_relaxation
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
 b_debug = False
