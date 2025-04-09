@@ -4,6 +4,7 @@ import numpy as np
 import meshcat
 from pydrake.geometry.optimization import HPolyhedron
 
+from util.environment_creator import TiltedBox
 from vision.iris.iris_geom_interface import *
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
@@ -131,22 +132,24 @@ class IrisGeomInterfaceTest(unittest.TestCase):
 
         # left box
         box_h1_left = 0.25
-        box_h2_left = 0.4
-        a_lbox_normal = np.array([0., -(box_h2_left - box_h1_left), box_width])
+        box_h2_left = 0.5
+        lbox_angle = np.arctan((box_h2_left - box_h1_left) / box_width)
         b_lbox_origin = [0., box_width/2, (box_h1_left + box_h2_left)/2]
-        d_lbox = a_lbox_normal @ b_lbox_origin
+        tilted_left_box = TiltedBox(box_width, box_depth, box_h1_left, lbox_angle, b_lbox_origin)
+        tilted_left_step = tilted_left_box.get_polytope()
 
         # right box
         box_h1_right = 0.55
-        box_h2_right = 0.75
-        a_rbox_normal = np.array([0., (box_h2_right - box_h1_right), box_width])
+        box_h2_right = 0.8
+        rbox_angle = -np.arctan((box_h2_right - box_h1_right) / box_width)
         b_rbox_origin = [box_depth, -box_width/2, (box_h1_right + box_h2_right)/2]
-        d_rbox = a_rbox_normal @ b_rbox_origin
+        tilted_right_box = TiltedBox(box_width, box_depth, box_h1_right, rbox_angle, b_rbox_origin)
+        tilted_right_step = tilted_right_box.get_polytope()
 
         # center box
         box_center_origin = np.array([2.5*box_depth, 0., 0.])
         cbox_lbounds = [box_depth, box_depth, 0.]
-        cbox_ubounds = [box_depth, box_depth, 0.9]
+        cbox_ubounds = [box_depth, box_depth, 1.0]
         center_box = mut.HPolyhedron.MakeBox(
             np.array(box_center_origin - cbox_lbounds),
             np.array(box_center_origin + cbox_ubounds),
@@ -163,33 +166,6 @@ class IrisGeomInterfaceTest(unittest.TestCase):
             np.array([2, -(box_width/2 + b_lbox_origin[1]), 2.5]))
 
         # create tilted stairs environment
-        tilted_lbox_A = np.array([[1, 0., 0.],
-                                 [0, 1., 0.],
-                                 a_lbox_normal,
-                                 [-1, 0., 0.],
-                                 [0, -1., 0.],
-                                 [0, 0., -1.]])
-        tilted_lbox_b = np.array([[box_depth/2 + b_lbox_origin[0]] ,
-                                 [box_width/2 + b_lbox_origin[1]],
-                                 [d_lbox],
-                                 [box_depth/2 - b_lbox_origin[0]],
-                                 [box_width/2 - b_lbox_origin[1]],
-                                 [0]])
-        tilted_rbox_A = np.array([[1, 0., 0.],
-                                 [0, 1., 0.],
-                                 a_rbox_normal,
-                                 [-1, 0., 0.],
-                                 [0, -1., 0.],
-                                 [0, 0., -1.]])
-        tilted_rbox_b = np.array([[box_depth/2 + b_rbox_origin[0]],
-                                 [box_width/2 + b_rbox_origin[1]],
-                                 [d_rbox],
-                                 [box_depth/2 - b_rbox_origin[0]],
-                                 [box_width/2 - b_rbox_origin[1]],
-                                 [0]])
-
-        tilted_left_step = HPolyhedron(tilted_lbox_A, tilted_lbox_b)
-        tilted_right_step = HPolyhedron(tilted_rbox_A, tilted_rbox_b)
         obstacles = [floor,
                      lwall,
                      rwall,
