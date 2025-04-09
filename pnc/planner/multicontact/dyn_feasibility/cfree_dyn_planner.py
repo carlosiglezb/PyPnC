@@ -35,6 +35,7 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 from plot.data_saver import *
 
 B_SHOW_JOINT_PLOTS = True
+B_SHOW_COST_PLOTS = True
 B_SHOW_GRF_PLOTS = True
 B_VISUALIZE = True
 B_SAVE_DATA = False
@@ -905,14 +906,15 @@ def main(args):
             while True:
                 try:
                     d = pickle.load(file)
-                    ik_cfree_planner = d['ik_cfree_planner']
+                    ik_cfree_planner = d['bez_path']
+                    fixed_frames = d['fixed_frames']
                 except EOFError:
                     break
         # get parameters needed for reconstruction in croccodyl
-        contact_seqs = get_contact_seq_from_fixed_frames_seq(ik_cfree_planner.planner.fixed_frames)
+        contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames)
         contact_seqs[-1].remove('LH')
         contact_seqs[-1].remove('RH')
-        T = ik_cfree_planner.planner.path[0].beziers[0].b
+        T = ik_cfree_planner[0].beziers[0].b
 
         # load knee knocker visualization and collision models
         door_model, door_collision_model, door_visual_model = load_navy_door_models()
@@ -1056,7 +1058,7 @@ def main(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sequence", type=int, default=0,
+    parser.add_argument("--sequence", type=int, default=1,
                         help="Contact sequence to solve for")
     parser.add_argument("--robot_name", type=str, default='g1',
                         help="Robot name to use for planning")

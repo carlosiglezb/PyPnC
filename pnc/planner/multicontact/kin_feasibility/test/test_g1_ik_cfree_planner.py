@@ -715,7 +715,7 @@ class TestIKCFreePlanner(unittest.TestCase):
 
 
     def test_sca_plan_five_stage_plan_one_hand_at_a_time(self):
-        b_visualize = False
+        b_visualize = True
         b_save_plan = True
 
         plan_to_model_frames = self.plan_to_model_frames
@@ -778,7 +778,7 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         if b_save_plan:
             # save the solution parameters needed to reconstruct the Bezier curves
-            save_filename = self.robot_name + 'sca_five_stage_plan_box_sphere_clean.pkl'
+            save_filename = self.robot_name + '_sca_five_stage_plan_box_sphere_clean.pkl'
             transition_times = []
             n_frames = len(sca_kin_cfree_planner.planner.path)
             data_saver = DataSaver(save_filename)
@@ -789,6 +789,7 @@ class TestIKCFreePlanner(unittest.TestCase):
             data_saver.add('n_frames', n_frames)
             data_saver.add('n_iris_traversed_per_frame', len(sca_kin_cfree_planner.planner.path[0].beziers))
             data_saver.add('bez_path', sca_kin_cfree_planner.planner.path)
+            data_saver.add('fixed_frames', sca_kin_cfree_planner.planner.fixed_frames)
             data_saver.advance()
             data_saver.close()
 
