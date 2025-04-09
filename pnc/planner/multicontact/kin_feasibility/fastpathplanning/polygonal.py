@@ -3,7 +3,7 @@ import copy
 import numpy as np
 import cvxpy as cp
 
-from pnc.planner.multicontact.kin_feasibility.cvx_mfpp_tools import create_cvx_norm_eq_relaxation, get_aux_frame_idx
+from ..cvx_mfpp_tools import create_cvx_norm_eq_relaxation, get_aux_frame_idx
 
 b_debug = False
 

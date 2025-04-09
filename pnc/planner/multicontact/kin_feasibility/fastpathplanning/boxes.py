@@ -2,7 +2,7 @@ import numpy as np
 from copy import copy
 from itertools import product
 from bisect import bisect_left, bisect_right
-from pnc.planner.multicontact.kin_feasibility.fastpathplanning.graph import LineGraph
+from .graph import LineGraph
 
 class Box:
 

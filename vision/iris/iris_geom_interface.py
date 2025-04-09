@@ -37,6 +37,7 @@ class IrisGeomInterface:
         self.iris_region = mut.Iris(
             obstacles=self.obstacles_mut, sample=self.seed_pos,
             domain=self.domain_mut, options=self.options)
+        self.iris_region = self.iris_region.ReduceInequalities()
         self.iris_mcat = pydrake_geom_to_meshcat(self.iris_region)
 
     def isPointSafe(self, point):

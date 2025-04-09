@@ -2,11 +2,10 @@ from typing import List
 
 from pydrake.geometry.optimization import HPolyhedron
 
-import pnc.planner.multicontact.kin_feasibility.fastpathplanning.fastpathplanning as fpp
 from collections import OrderedDict
 
-from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.multiframe_fpp import plan_multiple_iris
-from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import convert_rgba_to_meshcat_obj
+from .multiframe_fpp.multiframe_fpp import plan_multiple_iris
+from .frame_traversable_region import convert_rgba_to_meshcat_obj
 from util.polytope_math import extract_plane_eqn_from_coeffs
 
 import meshcat.geometry as g
@@ -16,7 +15,7 @@ from ruamel.yaml import YAML
 
 from util.pydrake_meshcat_interface import pydrake_geom_to_meshcat
 from visualizer.meshcat_tools.meshcat_palette import meshcat_reach_obj, meshcat_safe_obj
-
+from .fastpathplanning import fastpathplanning as fpp
 
 class LocomanipulationFramePlanner:
     def __init__(self, traversable_regions_list,

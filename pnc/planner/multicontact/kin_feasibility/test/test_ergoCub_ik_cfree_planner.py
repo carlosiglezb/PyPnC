@@ -13,7 +13,7 @@ from pydrake.geometry.optimization import HPolyhedron
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
 from pnc.planner.multicontact.kin_feasibility.ik_cfree_planner import IKCFreePlanner
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
-from pnc.planner.multicontact.planner_surface_contact import MotionFrameSequencer, PlannerSurfaceContact
+from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import MotionFrameSequencer, PlannerSurfaceContact
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 from util import util
 from vision.iris.iris_geom_interface import IrisGeomInterface

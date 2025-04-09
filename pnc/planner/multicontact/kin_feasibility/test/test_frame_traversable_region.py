@@ -11,7 +11,7 @@ import numpy as np
 from pinocchio.visualize import MeshcatVisualizer
 import pinocchio as pin
 
-from pnc.planner.multicontact.planner_surface_contact import (
+from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import (
         PlannerSurfaceContact, MotionFrameSequencer)
 
 cwd = os.getcwd()
