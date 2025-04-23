@@ -52,7 +52,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     # lengths in paths for each leg
     x = cp.Variable(d * n_f * (num_iris_tot + 1))
 
-    constr = []
+    contact_constr = []
     x_init_idx = 0
     # re-write multi-stage goal points (locations) in terms of optimization variables
     for f_name in iris_regions.keys():  # go in order (hence, refer to an OrderedDict)
@@ -60,10 +60,10 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
         for sp_lst in safe_points_list:
             # process initial positions when in new frame
             if seg_idx == 0:
-                constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
+                contact_constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
             else:
                 if f_name in sp_lst:
-                    constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
+                    contact_constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
                 if seg_idx == len(iris_seq):  # we have reached the end position
                     x_init_idx += d
                     continue
@@ -72,6 +72,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
             seg_idx += 1
 
     # organize lower and upper state limits (include initial and final state bounds)
+    iris_constr = []
     x_init_idx = d       # initial point is assumed to be feasible
     for frame, ee_iris in iris_regions.items():
         for seg_idx in range(len(iris_seq)):
@@ -88,7 +89,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
                 else:       # last region, use as is
                     A = ee_iris.iris_list[ir_seq_idx].iris_region.A()
                     b = ee_iris.iris_list[ir_seq_idx].iris_region.b()
-                constr.append(A @ x[x_init_idx:x_init_idx+d] <= b)
+                iris_constr.append(A @ x[x_init_idx:x_init_idx+d] <= b)
                 x_init_idx += d
         x_init_idx += d     # initial point is assumed to be feasible
 
@@ -166,12 +167,12 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
         cost += cp.sum(cp.norm(p_fr_t[:, 1:] - p_fr_t[:, :-1], axis=1))
 
     # solve
-    prob = cp.Problem(cp.Minimize(cost + cost_log_abs), constr + soc_constraint)
+    prob = cp.Problem(cp.Minimize(cost + cost_log_abs), contact_constr + iris_constr + soc_constraint)
     prob.solve(solver='SCS')
 
     if prob.status == 'infeasible':
         print('Polygonal problem was infeasible. Retrying with relaxed tolerances.')
-        prob.solve(solver='SCS', eps_rel=0.05, eps_abs=0.01)
+        prob.solve(solver='SCS', eps_rel=0.05, eps_abs=0.05)
 
     length = prob.value
     traj = x.value
