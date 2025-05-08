@@ -26,7 +26,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         super().__init__(robot_model, contact_seqs, time_per_phase, ik_cfree_planner)
 
         self.gains = {
-            'torso': np.array([6.5, 6.5, 2.5] + [0.5, 0.5, 0.001]),  # (lin, ang)
+            'torso': np.array([1.5, 1.5, 1.0] + [0.5, 0.5, 0.001]),  # (lin, ang)
             'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
             'L_knee': np.array([8.] * 3 + [0.00001] * 3),
             'R_knee': np.array([8.] * 3 + [0.00001] * 3),
@@ -64,8 +64,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             # TODO change for upper call to update_contact_params() or so
             if i == 1:
                 ee_rpy['LH'] = get_rpy_normal_left_wall()
-            # elif i == 3:
-            #     ee_rpy['RH'] = get_rpy_normal_right_wall()
+            elif i == 3:
+                ee_rpy['RH'] = get_rpy_normal_right_wall()
             elif i > (self.contact_phases - 1):
                 raise NotImplementedError(f"Frames for contact sequence {i} not specified.")
             N_current = self.horizon_lst[i]
