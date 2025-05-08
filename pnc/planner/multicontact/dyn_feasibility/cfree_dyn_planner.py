@@ -1047,10 +1047,18 @@ def main(args):
 
     if B_SAVE_DATA:
         # Saving data tools
-        data_saver = DataSaver(robot_name + '_knee_knocker_cs_0.pkl')
+        data_saver = DataSaver(robot_name + '_knee_knocker_sca_on.pkl')
         for (i, fp) in enumerate(robot_dyn_plan.fddp):
+            if i == len(robot_dyn_plan.fddp)-1:      # variables that need to be logged only once
+                data_saver.add('grf_lfoot', rf_lfoot.tolist())
+                data_saver.add('grf_rfoot', rf_rfoot.tolist())
+                data_saver.add('grf_lhand', rf_lwrist.tolist())
+                data_saver.add('grf_rhand', rf_rwrist.tolist())
+                data_saver.add('time', sim_time.tolist())
             log = fp.getCallbacks()[0]
-            data_saver.add('joint_pos', np.array(log.xs)[:, :rob_model.nq])
+            data_saver.add('joint_pos', (np.array(log.xs)[:, :rob_model.nq]).tolist())
+            data_saver.add('joint_vel', (np.array(log.xs)[:, rob_model.nq:]).tolist())
+            data_saver.add('joint_torque', (np.array(log.us)[:, :]).tolist())
             data_saver.advance()
         data_saver.close()
 
