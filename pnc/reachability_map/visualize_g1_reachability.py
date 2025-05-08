@@ -16,7 +16,7 @@ from ruamel.yaml import YAML
 # Display Robot in Meshcat Visualizer
 robot_name = "g1"
 model, collision_model, visual_model = pin.buildModelsFromUrdf(
-    cwd + "/robot_model/g1_description/g1.urdf",
+    cwd + "/robot_model/g1_description/g1_29dof_lock_waist_modified.urdf",
     cwd + "/robot_model/g1_description", pin.JointModelFreeFlyer())
 viz = MeshcatVisualizer(model, collision_model, visual_model)
 try:

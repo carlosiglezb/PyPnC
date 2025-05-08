@@ -48,7 +48,7 @@ def generate_t_pose_joint_dict(joint_id):
 
 # Load Draco3 robot model
 robot = PinocchioRobotSystem(
-                cwd + "/robot_model/g1_description/g1.urdf",
+                cwd + "/robot_model/g1_description/g1_29dof_lock_waist_modified.urdf",
                 cwd + "/robot_model/g1_description", b_fixed_base=True)
 
 joint_id = robot.joint_id
@@ -69,8 +69,8 @@ end_effector_names = ['left_ankle_roll_link',
                       'right_ankle_roll_link',
                       'left_knee_link',
                       'right_knee_link',
-                      'left_palm_link',
-                      'right_palm_link']
+                      'left_rubber_hand',
+                      'right_rubber_hand']
 connected_frames_list.append(
                     {'parent_frame': 'left_knee_link',
                      'child_frame': 'left_ankle_roll_link',
