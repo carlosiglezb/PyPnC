@@ -35,6 +35,7 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 from plot.data_saver import *
 
 B_SHOW_JOINT_PLOTS = True
+B_SHOW_COST_PLOTS = True
 B_SHOW_GRF_PLOTS = True
 B_SHOW_COST_PLOTS = False
 B_VISUALIZE = True
@@ -906,14 +907,15 @@ def main(args):
             while True:
                 try:
                     d = pickle.load(file)
-                    ik_cfree_planner = d['ik_cfree_planner']
+                    ik_cfree_planner = d['bez_path']
+                    fixed_frames = d['fixed_frames']
                 except EOFError:
                     break
         # get parameters needed for reconstruction in croccodyl
-        contact_seqs = get_contact_seq_from_fixed_frames_seq(ik_cfree_planner.planner.fixed_frames)
+        contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames)
         contact_seqs[-1].remove('LH')
         contact_seqs[-1].remove('RH')
-        T = ik_cfree_planner.planner.path[0].beziers[0].b
+        T = ik_cfree_planner[0].beziers[0].b
 
         # load knee knocker visualization and collision models
         door_model, door_collision_model, door_visual_model = load_navy_door_models()
@@ -1046,10 +1048,18 @@ def main(args):
 
     if B_SAVE_DATA:
         # Saving data tools
-        data_saver = DataSaver(robot_name + '_knee_knocker_cs_0.pkl')
+        data_saver = DataSaver(robot_name + '_knee_knocker_sca_on.pkl')
         for (i, fp) in enumerate(robot_dyn_plan.fddp):
+            if i == len(robot_dyn_plan.fddp)-1:      # variables that need to be logged only once
+                data_saver.add('grf_lfoot', rf_lfoot.tolist())
+                data_saver.add('grf_rfoot', rf_rfoot.tolist())
+                data_saver.add('grf_lhand', rf_lwrist.tolist())
+                data_saver.add('grf_rhand', rf_rwrist.tolist())
+                data_saver.add('time', sim_time.tolist())
             log = fp.getCallbacks()[0]
-            data_saver.add('joint_pos', np.array(log.xs)[:, :rob_model.nq])
+            data_saver.add('joint_pos', (np.array(log.xs)[:, :rob_model.nq]).tolist())
+            data_saver.add('joint_vel', (np.array(log.xs)[:, rob_model.nq:]).tolist())
+            data_saver.add('joint_torque', (np.array(log.us)[:, :]).tolist())
             data_saver.advance()
         data_saver.close()
 
@@ -1057,7 +1067,7 @@ def main(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sequence", type=int, default=0,
+    parser.add_argument("--sequence", type=int, default=1,
                         help="Contact sequence to solve for")
     parser.add_argument("--robot_name", type=str, default='g1',
                         help="Robot name to use for planning")

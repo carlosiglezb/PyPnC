@@ -209,7 +209,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     if prob.status == 'infeasible':
         print('***** Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
-        prob.solve(solver='SCS', eps_rel=1e-1, eps_abs=1e-1)
+        prob.solve(solver='SCS', eps_rel=5e-1, eps_abs=5e-1)
 
     # check link constraints values
     if bool(aux_frames):     # check if empy dictionary

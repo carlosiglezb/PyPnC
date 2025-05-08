@@ -1,6 +1,7 @@
 import numpy as np
 import crocoddyl
 
+from util.path_parameterization import get_frame_des_pos
 
 class ContactSequence:
     def __init__(self, contact_phases, phases_knots, time_per_phase):
@@ -13,7 +14,7 @@ class HumanoidMulticontactPlanner:
                  contact_seqs: ContactSequence,
                  time_per_phase: float,
                  ik_cfree_planner):
-        self.frame_names_lst = ['torso', 'LH', 'RH', 'LF', 'RF', 'L_knee', 'R_knee']
+        self.frame_names_lst = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
         self.contact_seqs = contact_seqs.contact_phases
         self.horizon_lst = contact_seqs.phases_knots
         tot_num_knots = sum(contact_seqs.phases_knots)
@@ -71,6 +72,32 @@ class HumanoidMulticontactPlanner:
 
     def set_plan_to_model_params(self, plan_to_model_ids):
         self.plan_to_model_ids = plan_to_model_ids
+
+    def pack_current_targets(self, t):
+        idx_LF = self.frame_names_lst.index('LF')
+        idx_L_knee = self.frame_names_lst.index('L_knee')
+        idx_RF = self.frame_names_lst.index('RF')
+        idx_R_knee = self.frame_names_lst.index('R_knee')
+        idx_LH = self.frame_names_lst.index('LH')
+        idx_RH = self.frame_names_lst.index('RH')
+        idx_torso = self.frame_names_lst.index('torso')
+        lfoot_t = get_frame_des_pos(self.ik_cfree_planner[idx_LF], t)
+        lknee_t = get_frame_des_pos(self.ik_cfree_planner[idx_L_knee], t)
+        rfoot_t = get_frame_des_pos(self.ik_cfree_planner[idx_RF], t)
+        rknee_t = get_frame_des_pos(self.ik_cfree_planner[idx_R_knee], t)
+        lhand_t = get_frame_des_pos(self.ik_cfree_planner[idx_LH], t)
+        rhand_t = get_frame_des_pos(self.ik_cfree_planner[idx_RH], t)
+        base_t = get_frame_des_pos(self.ik_cfree_planner[idx_torso], t)
+        frame_targets_dict = {
+            'torso': base_t,
+            'LF': lfoot_t,
+            'RF': rfoot_t,
+            'L_knee': lknee_t,
+            'R_knee': rknee_t,
+            'LH': lhand_t,
+            'RH': rhand_t
+        }
+        return frame_targets_dict
 
     def update_costs_from_solver(self):
         for fddp_idx, fddp in enumerate(self.fddp):

@@ -45,7 +45,7 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
             if fm in f_frames:
                 pm_init = get_last_defined_point(safe_points_lst, fm)
                 safe_points_lst[k_transition][fm] = pm_next
-                if len(box_seq_lst) > 1:
+                if len(box_seq_lst) > 1 and (box_seq_lst[-1][fm][-1] is not np.nan):
                     box_seq_dict[fm] = iris_regions[fm].findShortestPath(pm_init, pm_next, box_seq_lst[-1][fm][-1])
                 else:
                     box_seq_dict[fm] = iris_regions[fm].findShortestPath(pm_init, pm_next)
@@ -139,6 +139,13 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
             if any(np.isnan(bs)):
                 raise Exception(f"{fname} frame has un-assigned safe regions or goal")
 
+    # last check that all dimensions are the same
+    for bs in box_seq_lst:
+        b_max = np.max([len(bval) for bval in bs.values()])
+        for v in bs.values():
+            if len(v) < b_max:
+                distribute_box_seq(bs, b_max)
+
     # save iris sequence to IrisRegionsManager
     for fname, ir in iris_regions.items():
         ir.iris_idx_seq.clear()
@@ -153,7 +160,7 @@ def pack_box_seq_from_point(b_max, box_seq_dict, box_seq_lst, ff, iris_regions, 
     if len(box_pf_prev) > 1:
         # check that one of the previous feasible regions is the same as the last from previous contact phase
         for bpp in box_pf_prev:
-            if bpp == box_seq_lst[-1][ff][-1]:
+            if (len(box_seq_lst) == 0) or (bpp == box_seq_lst[-1][ff][-1]):
                 box_seq_dict[ff] = [bpp] * b_max
                 break
     else:

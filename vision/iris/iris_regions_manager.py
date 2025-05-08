@@ -10,13 +10,15 @@ from pydrake.common import RandomGenerator
 class IrisRegionsManager:
     def __init__(self,
                  iris_start: IrisGeomInterface,
-                 iris_goal: IrisGeomInterface):
+                 iris_goal: IrisGeomInterface = None):
         self.iris_list = []
         self.iris_list.append(iris_start)
-        self.iris_list.append(iris_goal)
-
         self.iris_start_seed = iris_start.seed_pos
-        self.iris_goal_seed = iris_goal.seed_pos
+
+        if iris_goal is not None:
+            self.iris_list.append(iris_goal)
+            self.iris_goal_seed = iris_goal.seed_pos
+
         self.iris_graph = None      # this is computed after connecting IRIS seeds
         self.iris_idx_seq = []    # this is computed after finding the shortest path
         self.global_iris = []     # index of IRIS region containing start & goal seeds
@@ -28,6 +30,27 @@ class IrisRegionsManager:
     def computeIris(self):
         for ir in self.iris_list:
             ir.computeIris()
+
+    def areIrisListSeedsContained(self):
+        # check containment
+        for ir_num, ir in enumerate(self.iris_list):
+            if ir_num < len(self.iris_list) - 1:
+                curr_pos = self.iris_list[ir_num].seed_pos
+                next_pos = self.iris_list[ir_num+1].seed_pos
+                b_goal_pos_in_prev_iris = self.iris_list[ir_num].isPointSafe(next_pos)
+                b_goal_pos_in_next_iris = self.iris_list[ir_num+1].isPointSafe(curr_pos)
+
+                # store index of IRIS region(s) containing both start and goal seeds
+                if b_goal_pos_in_prev_iris:
+                    self.global_iris.append([ir_num])
+                if b_goal_pos_in_next_iris:
+                    self.global_iris.append([ir_num+1])
+
+        # return whether a global IRIS region exists
+        if len(self.global_iris) > 0:
+            return True
+        else:
+            return False
 
     def areIrisSeedsContained(self):
         start_pos = self.iris_start_seed
@@ -59,6 +82,87 @@ class IrisRegionsManager:
             if obs.PointInSet(point):
                 return True
         return False
+
+    def connectIrisListSeeds(self, choose_iris_by: str = None):
+        """
+        Connect the list of IRIS regions.
+        This approach is based on checking if the IRIS region in the iris_list are connected.
+        If they are not connected, a new sample is obtained by sampling in between centroids.
+        An alternative approach would be to do an RRT-based expansion.
+        :return: [None] Stores the new IRIS regions in the iris_list and graph in iris_graph
+        """
+        if choose_iris_by is None:
+            choose_iris_by = "centroid"
+
+        # If IRIS regions span from start to goal seeds, heuristically initialize graph and iris_seq
+        b_single_iris = self.areIrisListSeedsContained()
+        if b_single_iris:
+            self.iris_graph = None
+
+            # Prioritize IRIS region already containing both start/goal seeds
+            if len(self.global_iris) == 1:
+                self.iris_idx_seq = [self.global_iris[0]]
+            elif choose_iris_by == "volume":
+                max_vol, max_idx = 0, 0
+                for ir_num, ir in enumerate(self.iris_list):
+                    curr_vol = ir.iris_region.MaximumVolumeInscribedEllipsoid().CalcVolume()
+                    if curr_vol > max_vol:
+                        max_vol = curr_vol
+                        max_idx = ir_num
+                self.iris_idx_seq = [max_idx]
+            else:
+                # choose the one w/centroid closest to goal seed (alternative to choosing largest volume)
+                c_ellipse_start_iris = self.iris_list[0].iris_region.MaximumVolumeInscribedEllipsoid().center()
+                c_ellipse_goal_iris = self.iris_list[1].iris_region.MaximumVolumeInscribedEllipsoid().center()
+                c_frame_traj = (self.iris_start_seed + self.iris_goal_seed) / 2.0
+                dist_start_trajc = np.linalg.norm(c_ellipse_start_iris - c_frame_traj)
+                dist_goal_trajc = np.linalg.norm(c_ellipse_goal_iris - c_frame_traj)
+                self.iris_idx_seq = [0] if dist_start_trajc < dist_goal_trajc else [1]
+            return
+
+        # sample from within staring IRIS region, compute new IRIS region and check
+        # if it intersects with ending IRIS region
+        obstacles = self.iris_list[0].obstacles_mut
+        domain = self.iris_list[0].domain_mut
+
+        # sample random seed between start and goal IRIS regions
+        extended_iris_list = []
+        for ir_num, ir in enumerate(self.iris_list):
+            if ir_num >= len(self.iris_list) - 1:
+                break
+            start_centroid = self.iris_list[ir_num].seed_pos
+            goal_centroid = self.iris_list[ir_num+1].seed_pos
+            # start_centroid = self.iris_list[ir_num].iris_region.ChebyshevCenter()
+            # goal_centroid = self.iris_list[ir_num+1].iris_region.ChebyshevCenter()
+            new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.1, 0.01, 0.1])
+
+            # check that new seed is not in collision before creating new IRIS region
+            b_resample = self.pointInCollision(new_seed)
+            while b_resample:
+                new_seed = np.random.normal(loc=(start_centroid + goal_centroid) / 2, scale=[0.05, 0.05, 0.15])
+                b_resample = self.pointInCollision(new_seed)
+
+            # create IRIS region using collision-free seed
+            new_iris = IrisGeomInterface(obstacles, domain, new_seed)
+
+            # append new IRIS processor and compute IRIS region
+            new_iris.computeIris()
+            extended_iris_list.append(new_iris)
+
+            # create IRIS regions until the seeds connect
+            b_done = False
+            while not b_done:
+                if (new_iris.iris_region.IntersectsWith(self.iris_list[ir_num].iris_region)
+                        and new_iris.iris_region.IntersectsWith(self.iris_list[ir_num+1].iris_region)):
+                    b_done = True
+                else:
+                    # update seed and create new IRIS region
+                    new_seed = self.iris_list[-1].iris_region.UniformSample(RandomGenerator(), new_seed)
+                    new_iris = IrisGeomInterface(obstacles, domain, new_seed)
+                    self.iris_list.append(new_iris)
+                    self.iris_list[-1].computeIris()
+        self.addIris(extended_iris_list)
+        self.iris_graph = IrisGraph(self.iris_list)
 
     def connectIrisSeeds(self):
         """
@@ -192,6 +296,8 @@ class IrisRegionsManager:
             # point must be contained in either the start/goal IRIS region
             if self.iris_list[self.iris_idx_seq[0]].isPointSafe(point):
                 return [self.iris_idx_seq[0]]
+            # if self.iris_list[self.iris_idx_seq].isPointSafe(point):
+            #     return [self.iris_idx_seq]
             elif len(self.global_iris) > 1:
                 # as fallback, loop through IRIS regions in the global IRIS list
                 for gi in self.global_iris:

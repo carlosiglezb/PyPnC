@@ -85,7 +85,7 @@ class TiltedStairs:
         )
 
         floor = HPolyhedron.MakeBox(
-                                np.array([-2, -0.9, -0.05]),
+                                np.array([-2, -0.9, -0.5]),
                                 np.array([2, 0.9, -0.001]))
         lwall = HPolyhedron.MakeBox(
             np.array([-2, box_width/2 + b_lbox_origin[1], -0.05]),
