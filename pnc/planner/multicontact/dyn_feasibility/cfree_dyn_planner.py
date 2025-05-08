@@ -92,7 +92,7 @@ def get_g1_default_initial_pose(n_joints):
     q0[10] = -np.pi / 6  # right_ankle_pitch_joint
     # q0[11] = 0.  # right_ankle_roll_joint
 
-    floating_base = np.array([0., 0., 0.62, 0., 0., 0., 1.])
+    floating_base = np.array([0., 0., 0.71, 0., 0., 0., 1.])
     return np.concatenate((floating_base, q0))
 
 
@@ -314,7 +314,7 @@ def load_robot_model(robot_name):
         robot_urdf_file = package_dir + "/draco3_ft_wrist_mesh_updated.urdf"
     elif robot_name == 'g1':
         package_dir = cwd + "/robot_model/g1_description"
-        robot_urdf_file = package_dir + "/g1_simple_collisions.urdf"
+        robot_urdf_file = package_dir + "/g1_29dof_lock_waist_modified.urdf"
     elif robot_name == 'valkyrie':
         package_dir = cwd + "/robot_model/" + robot_name
         robot_urdf_file = package_dir + "/valkyrie_hands.urdf"
@@ -479,8 +479,8 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     # door_r_outer_location = np.array([0.45, -0.35, 1.2])
     if robot_name == 'g1':
         # G1 settings
-        door_l_inner_location = np.array([0.3, 0.35, 0.9])
-        door_r_inner_location = np.array([0.34, -0.35, 0.9])
+        door_l_inner_location = np.array([0.3, 0.38, 0.9])
+        door_r_inner_location = np.array([0.34, -0.38, 0.9])
     else:
         # ergoCub settings
         door_l_inner_location = np.array([0.3, 0.35, 1.0])
@@ -739,12 +739,12 @@ def main(args):
         plan_to_model_frames['RF'] = 'right_ankle_roll_link'
         plan_to_model_frames['L_knee'] = 'left_knee_link'
         plan_to_model_frames['R_knee'] = 'right_knee_link'
-        plan_to_model_frames['LH'] = 'left_palm_link'
-        plan_to_model_frames['RH'] = 'right_palm_link'
+        plan_to_model_frames['LH'] = 'left_rubber_hand'
+        plan_to_model_frames['RH'] = 'right_rubber_hand'
         force_joint_frames['LF'] = "left_ankle_roll_joint"
         force_joint_frames['RF'] = "right_ankle_roll_joint"
-        force_joint_frames['LH'] = "left_elbow_roll_joint"
-        force_joint_frames['RH'] = "right_elbow_roll_joint"
+        force_joint_frames['LH'] = "left_hand_palm_joint"
+        force_joint_frames['RH'] = "right_hand_palm_joint"
     elif robot_name == 'valkyrie':
         plan_to_model_frames['torso'] = 'torso'
         plan_to_model_frames['LF'] = 'leftFoot'
@@ -804,8 +804,8 @@ def main(args):
         q0 = get_g1_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.28, 0., 0.])
         step_length = 0.42
-        # weights_rigid_link = np.array([10., 0., 3.])    # step over door in single step
-        weights_rigid_link = np.array([10., 0., 0.])  # step on knee knocker
+        weights_rigid_link = np.array([10., 0., 3.])    # step over door in single step
+        # weights_rigid_link = np.array([10., 0., 0.])  # step on knee knocker
     elif robot_name == 'valkyrie':
         q0 = get_val_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.34, 0., 0.])

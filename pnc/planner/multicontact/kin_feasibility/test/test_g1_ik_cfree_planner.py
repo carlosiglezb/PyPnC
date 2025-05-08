@@ -60,7 +60,7 @@ def get_g1_default_initial_pose(n_joints):
     # q0[24] = np.pi/3.   # r_wrist_ps
     # q0[25] = 0.  # r_wrist_pitch
 
-    floating_base = np.array([0., 0., 0.62, 0., 0., 0., 1.])
+    floating_base = np.array([0., 0., 0.71, 0., 0., 0., 1.])
     return np.concatenate((floating_base, q0))
 
 
@@ -114,14 +114,15 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         # load robot
         mesh_dir = cwd + "/robot_model/" + robot_name + "_description"
+        robot_urdf = mesh_dir + "/g1_29dof_lock_waist_modified.urdf"
         self.robot = pin.RobotWrapper.BuildFromURDF(
-            mesh_dir + "/" + robot_name + ".urdf",
+            robot_urdf,
             mesh_dir,
             root_joint=pin.JointModelFreeFlyer())
 
         # set-up easy access to fwd kinematics for IRIS seeds
         self.robot_fwdk = PinocchioRobotSystem(
-            mesh_dir + "/" + robot_name + ".urdf",
+            robot_urdf,
             mesh_dir, False, False)
 
         # load default standing pos configuration
@@ -135,7 +136,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         # load robot model and corresponding robot data for self-collision avoidance
         self.package_dir = cwd + "/robot_model/g1_description"
         # self.robot_urdf_file = self.package_dir + "/g1_cube_collisions.urdf"
-        self.robot_urdf_file = self.package_dir + "/g1_cube_sphere_collisions.urdf"
+        self.robot_urdf_file = robot_urdf
 
     # needed for self-collision checks
     @staticmethod
@@ -156,8 +157,8 @@ class TestIKCFreePlanner(unittest.TestCase):
                 'RF': 'right_ankle_roll_link',
                 'L_knee': 'left_knee_link',
                 'R_knee': 'right_knee_link',
-                'LH': 'left_palm_link',
-                'RH': 'right_palm_link'
+                'LH': 'left_rubber_hand',
+                'RH': 'right_rubber_hand'
             }
         else:
             frame_names = ['torso', 'LF', 'RF', 'LH', 'RH']
@@ -165,8 +166,8 @@ class TestIKCFreePlanner(unittest.TestCase):
                 'torso': 'torso_link',
                 'LF': 'left_ankle_roll_link',
                 'RF': 'right_ankle_roll_link',
-                'LH': 'left_palm_link',
-                'RH': 'right_palm_link'
+                'LH': 'left_rubber_hand',
+                'RH': 'right_rubber_hand'
             }
         return frame_names, plan_to_model_frames
 
@@ -334,7 +335,7 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         # ---- Step 1: L hand to frame
         fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'RH'])   # frames that must not move
-        motion_frames_seq.add_motion_frame({'LH': starting_lh_pos + np.array([0.08, 0.07, 0.15])})
+        motion_frames_seq.add_motion_frame({'LH': starting_lh_pos + np.array([0.0, 0.2, 0.15])})
         lh_contact_front = PlannerSurfaceContact('LH', np.array([-1, 0, 0]))
         lh_contact_front.set_contact_breaking_velocity(np.array([-1, 0., 0.]))
         motion_frames_seq.add_contact_surface(lh_contact_front)
@@ -364,7 +365,7 @@ class TestIKCFreePlanner(unittest.TestCase):
                             'torso': final_torso_pos,
                             'R_knee': final_rkn_pos,
                             'RH': final_rh_pos,
-                            'LH': starting_lh_pos + np.array([0.55, 0.0, 0.0])})
+                            'LH': starting_lh_pos + np.array([0.35, 0.0, 0.0])})
         rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
         motion_frames_seq.add_contact_surface(rf_contact_over)
 
@@ -514,7 +515,7 @@ class TestIKCFreePlanner(unittest.TestCase):
             p_init[fr] = safe_regions_mgr_dict[fr].iris_list[0].seed_pos  # starting_pos
 
         # hand-chosen five-stage sequence of contacts
-        fixed_frames_seq, motion_frames_seq = self.get_five_stage_contact_sequence(safe_regions_mgr_dict)
+        fixed_frames_seq, motion_frames_seq = self.get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict)
 
         # planner parameters
         T = 3
