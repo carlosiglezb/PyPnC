@@ -45,6 +45,7 @@ class PinocchioRobotSystem(RobotSystem):
         self._data, self._collision_data, self._visual_data = pin.createDatas(
             self._model, self._collision_model, self._visual_model)
 
+        self._name = self._model.name
         self._n_q = self._model.nq
         self._n_q_dot = self._model.nv
         self._n_a = self._n_q_dot - self._n_floating

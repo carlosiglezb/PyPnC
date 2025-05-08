@@ -24,6 +24,7 @@ class RobotSystem(abc.ABC):
         """
         self._b_fixed_base = b_fixed_base
 
+        self._name = None
         self._n_floating = 0
         self._n_q = 0
         self._n_q_dot = 0
@@ -59,6 +60,11 @@ class RobotSystem(abc.ABC):
         self._Ig = np.zeros((6, 6))
         self._Ag = np.zeros((6, self._n_q_dot))
         self._hg = np.zeros(6)
+
+
+    @property
+    def name(self):
+        return self._name
 
     @property
     def n_floating(self):
