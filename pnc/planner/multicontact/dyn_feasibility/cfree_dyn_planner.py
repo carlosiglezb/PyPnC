@@ -36,6 +36,7 @@ from plot.data_saver import *
 
 B_SHOW_JOINT_PLOTS = True
 B_SHOW_GRF_PLOTS = True
+B_SHOW_COST_PLOTS = False
 B_VISUALIZE = True
 B_SAVE_DATA = False
 B_VERBOSE = True
