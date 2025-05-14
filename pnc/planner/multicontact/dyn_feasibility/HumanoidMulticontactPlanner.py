@@ -37,6 +37,8 @@ class HumanoidMulticontactPlanner:
         self.plan_to_model_ids = None
         self.lleg_jnames = None
         self.rleg_jnames = None
+        self.larm_jnames = None
+        self.rarm_jnames = None
         self.ik_cfree_planner = ik_cfree_planner
 
         # Crocoddyl variables / parameters

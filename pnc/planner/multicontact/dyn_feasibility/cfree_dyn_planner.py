@@ -745,8 +745,8 @@ def main(args):
         plan_to_model_frames['RH'] = 'right_rubber_hand'
         force_joint_frames['LF'] = "left_ankle_roll_joint"
         force_joint_frames['RF'] = "right_ankle_roll_joint"
-        force_joint_frames['LH'] = "left_hand_palm_joint"
-        force_joint_frames['RH'] = "right_hand_palm_joint"
+        force_joint_frames['LH'] = "left_wrist_yaw_joint"
+        force_joint_frames['RH'] = "right_wrist_yaw_joint"
     elif robot_name == 'valkyrie':
         plan_to_model_frames['torso'] = 'torso'
         plan_to_model_frames['LF'] = 'leftFoot'
