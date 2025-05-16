@@ -45,7 +45,7 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
             if fm in f_frames:
                 pm_init = get_last_defined_point(safe_points_lst, fm)
                 safe_points_lst[k_transition][fm] = pm_next
-                if len(box_seq_lst) > 1 and (box_seq_lst[-1][fm][-1] is not np.nan):
+                if len(box_seq_lst) >= 1 and (box_seq_lst[-1][fm][-1] is not np.nan):
                     box_seq_dict[fm] = iris_regions[fm].findShortestPath(pm_init, pm_next, box_seq_lst[-1][fm][-1])
                 else:
                     box_seq_dict[fm] = iris_regions[fm].findShortestPath(pm_init, pm_next)
@@ -71,7 +71,14 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
                 is_old_seg_unassigned = np.isnan(box_seq_lst[-1][fname][0])
                 is_current_seg_assigned = not np.isnan(box_seq_dict[fname][0])
                 if is_old_seg_unassigned and is_current_seg_assigned:
-                    distribute_free_frames(box_seq_dict, box_seq_lst, fname)
+                    # if last known IRIS region remained unchanged, simply copy accordingly
+                    prev_prev_iris = box_seq_lst[-2][fname][0]
+                    current_iris = box_seq_dict[fname][0]
+                    if not np.isnan(prev_prev_iris) and prev_prev_iris == current_iris:
+                        b_max_prev = np.max([len(bs) for bs in box_seq_lst[-1].values()])
+                        box_seq_lst[-1][fname] = [current_iris] * b_max_prev
+                    else:
+                        distribute_free_frames(box_seq_dict, box_seq_lst, fname)
 
         box_seq_lst.append(copy.deepcopy(box_seq_dict))
         box_seq_dict.clear()

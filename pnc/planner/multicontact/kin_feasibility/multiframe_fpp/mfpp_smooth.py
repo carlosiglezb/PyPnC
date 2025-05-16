@@ -13,7 +13,7 @@ from ..casadi_ocp_constraints.casadi_ocp_functions import \
 from ..constraint_parsers import parse_mat_leq_constr, parse_repvec_eq_constr, \
     parse_vec_eq_constr, parse_mat_eq_constr
 from ..cvx_mfpp_tools import get_aux_frame_idx, \
-    create_bezier_cvx_norm_eq_relaxation
+    create_bezier_cvx_norm_eq_relaxation, add_vel_acc_constr
 from ..scipy_ocp_constraints.scipy_ocp_functions import \
     LinearBezierIneqConstraint, LinearBezierEqConstraint
 from util.path_parameterization import BezierCurve, CompositeBezierCurve
@@ -70,6 +70,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
         continuity[k] = {}
 
         # Update frame name and number of boxes within segment/interval
+        # TODO check if IRIS regions match safe_point_list
         f_name = frame_list[frame_idx]
         sequenced_idx = iris_regions[f_name].iris_idx_seq[seg_idx][fr_seg_k_box]
         A = iris_regions[f_name].iris_list[sequenced_idx].iris_region.A()
@@ -176,6 +177,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
         cost_log_abs_sum = -(cp.sum(cost_log_abs))
 
     # Reachability constraints
+    reach_constr = []
     if reach_region is not None:
         k_fr_iris = 0
         for fr_idx, frame_name in enumerate(frame_list):
@@ -197,18 +199,19 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                     H = coeffs['H']
                     d_vec = np.reshape(coeffs['d'], (len(H), 1))
                     d_mat = np.repeat(d_vec, n_points, axis=1)
-                    if frame_name == 'torso' or frame_name == 'LF' or frame_name == 'RF':
-                        constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+                    if frame_name == 'LF' or frame_name == 'RF' or frame_name == 'LH' or frame_name == 'RH':
+                        reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
 
                 fr_iris_counter += num_iris_current
                 k_fr_iris += num_iris_current
 
     # Solve problem.
-    prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-    prob.solve(solver='SCS')
+    prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + reach_constr + soc_constraint)
+    # prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
+    prob.solve(solver='SCS', eps_rel=0.1, eps_abs=0.1)
 
     if prob.status == 'infeasible':
-        print('***** Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
+        print('***** Smooth Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
         prob.solve(solver='SCS', eps_rel=5e-1, eps_abs=5e-1)
 
     # check link constraints values
@@ -513,7 +516,8 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                     constraints.append(ca.norm_2(link_proximal_point - link_distal_point))
                     lbg.append(link_length - link_threshold/2)
                     ubg.append(link_length + link_threshold/2)
-                    initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.array([0.])))
+                    if initial_guess is not None:
+                        initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.array([0.])))
 
         # cost_log_abs_sum = -(cp.sum(cost_log_abs))
 
@@ -538,7 +542,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                     # reachable constraint
                     H = coeffs['H']
                     d_vec = np.reshape(coeffs['d'], (len(H), 1))
-                    if frame_name == 'torso' or frame_name == 'LF' or frame_name == 'RF':
+                    if frame_name == 'LF' or frame_name == 'RF'or frame_name == 'LH' or frame_name == 'RH':
                         parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
                         # constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
                 fr_iris_counter += num_iris_current
@@ -550,7 +554,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     opts = {
         "ipopt": {
             "hessian_approximation": "exact",   # limited-memory
-            "max_iter": 50,
+            "max_iter": 200,
             "mu_init": 1e-4,
             "tol": 1e-1,
             # "derivative_test": "first-order",

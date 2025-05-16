@@ -44,7 +44,7 @@ class IrisGeomInterface:
         return self.iris_region.PointInSet(point)
 
     def irisIntersects(self, other: mut.ConvexSet):
-        return self.iris_region.Intersect(other)
+        return self.iris_region.IntersectsWith(other)
 
     def visualize(self, meshcat_viewer, iris_name=0):
         if self.iris_region is None:

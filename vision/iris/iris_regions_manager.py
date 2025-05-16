@@ -252,7 +252,21 @@ class IrisRegionsManager:
                          hint_iris: int = None) -> List[int]:
         # if single IRIS region, return the index of corresponding global IRIS region
         if self.iris_graph is None:
-            return [self.iris_idx_seq[0]]
+            if len(self.global_iris) == 1:
+                return [self.iris_idx_seq[0]]
+            elif len(self.global_iris) == 2:
+                b_last_global_contains_start = self.iris_list[self.global_iris[1][0]].isPointSafe(start)
+                b_last_global_contains_goal = self.iris_list[self.global_iris[1][0]].isPointSafe(goal)
+                if b_last_global_contains_start and b_last_global_contains_goal:
+                    # if the start/goal point is contained in 2nd global IRIS, favor it
+                    return self.global_iris[1]
+                else:
+                    # don't rely on global IRIS regions
+                    self.iris_graph = IrisGraph(self.iris_list)
+            else:
+                # for some reason we didn't need the graph before
+                print(f"Creating Graph connecting points: {self.iris_list}")
+                self.iris_graph = IrisGraph(self.iris_list)
 
         planner, runtime = self.iris_graph.computeShortestPath(goal)
 
@@ -276,12 +290,26 @@ class IrisRegionsManager:
                 break
             ir_goal_idx += 1
 
+        regions_containing_goal = self.iris_graph.regionsContainingPoint(goal)
         iris_seq_tmp, length, runtime = planner(start)
         if iris_p_init == iris_p_goal:
             iris_seq = [iris_p_init]
-        elif len(self.iris_graph.regionsContainingPoint(goal)) == 1 and (len(iris_seq_tmp) == 2):
+        elif len(regions_containing_goal) == 1 and (len(iris_seq_tmp) == 2):
             iris_seq = [iris_p_init, iris_p_goal]
-        else:
+        elif len(regions_containing_goal) >= 1 and (len(iris_seq_tmp) >= 2):
+            # if goal is contained in > 1 IRIS region, check if init and goal IRIS regions intersect
+            if (self.iris_list[iris_p_init].irisIntersects(self.iris_list[iris_p_goal].iris_region)):
+                if len(iris_seq_tmp) == 2:
+                    iris_seq = [iris_p_init, iris_p_goal]
+                elif len(iris_seq_tmp) == 3:
+                    iris_seq = [iris_p_init, iris_p_init, iris_p_goal]
+                else:
+                    raise NotImplementedError
+            else:
+                print(f"[Iris Region Manager] Check IRIS sequence from {start} to {goal}")
+                iris_seq = iris_seq_tmp
+        else:   # need to traverse more than 2 IRIS regions?
+            print(f"[Iris Region Manager] Check if goal is contained in IRIS sequence from {start} to {goal}.")
             iris_seq = iris_seq_tmp
         return iris_seq
 
@@ -294,7 +322,7 @@ class IrisRegionsManager:
         # We reserve None for single IRIS regions containing from start to goal seeds
         if self.iris_graph is None:
             # point must be contained in either the start/goal IRIS region
-            if self.iris_list[self.iris_idx_seq[0]].isPointSafe(point):
+            if len(self.global_iris) == 1 and self.iris_list[self.iris_idx_seq[0]].isPointSafe(point):
                 return [self.iris_idx_seq[0]]
             # if self.iris_list[self.iris_idx_seq].isPointSafe(point):
             #     return [self.iris_idx_seq]
