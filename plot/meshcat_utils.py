@@ -1,5 +1,7 @@
 import os
 import sys
+from typing import List
+
 import numpy as np
 import pinocchio as pin
 from meshcat.geometry import TriangularMeshGeometry
@@ -15,9 +17,11 @@ from pinocchio.visualize.meshcat_visualizer import isMesh
 
 # Crocoddyl tools
 from crocoddyl.libcrocoddyl_pywrap import *  # noqa
+from pydrake.geometry.optimization import HPolyhedron
 
+from util.pydrake_meshcat_interface import pydrake_geom_to_meshcat
 from util.util import vec_to_roll_pitch
-from visualizer.meshcat_tools.meshcat_palette import meshcat_iris_obj
+from visualizer.meshcat_tools.meshcat_palette import meshcat_iris_obj, meshcat_obstacle_obj
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -229,6 +233,12 @@ class MeshcatPinocchioAnimation:
         self.viz.viewer[obj_name]["arrow/head"].set_object(arrow_head, material)
         self.viz.viewer[obj_name]["arrow/head"].set_transform(arrow_offset)
 
+    def add_shapes_from(self, shapes_lst: List[HPolyhedron]):
+        for i, shape in enumerate(shapes_lst):
+            name = 'env/' + str(i)
+            meshcat_geom = pydrake_geom_to_meshcat(shape)
+            self.add_shape(name, meshcat_geom, meshcat_obstacle_obj())
+
     def add_shape(self, viewer_name, meshcat_shape, obj_material=None):
         if obj_material is None:
             obj_material = meshcat_iris_obj()
@@ -389,9 +399,9 @@ class MeshcatPinocchioAnimation:
             else:
                 self.viz.viewer[end_effector_name+"/" + str(i)].set_transform(Href)
 
-    def hide_visuals(self, viz_list):
+    def hide_visuals(self, viz_list, b_visualize=False):
         for viz in viz_list:
-            self.viz.viewer[viz].set_property("visible", False)
+            self.viz.viewer[viz].set_property("visible", b_visualize)
 
     def save_html(self, path, filename):
         viewer_html = self.viz.viewer.static_html()
