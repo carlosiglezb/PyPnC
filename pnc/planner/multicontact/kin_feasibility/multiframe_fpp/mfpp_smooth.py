@@ -442,6 +442,11 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     # number of frames
     n_frames = len(safe_points_lst[0].keys())
 
+    # point segment order
+    point_seg_order = []
+    for dseg_dict in durations:
+        point_seg_order.append(dseg_dict['torso'])
+
     # Problem size. Assume for now same number of boxes for all frames
     first_fr_iris = next(iter(iris_regions.values()))
     d = first_fr_iris.iris_list[0].iris_region.ambient_dimension()
@@ -497,6 +502,10 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                     # TODO add vel constraint
                     # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
         elif (k + 1) % num_iris_tot == 0:  # final position for each frame
+            safe_pnt = has_safe_point_at(point_seg_order, num_iris_tot, safe_points_lst, k, f_name)
+            if any(safe_pnt):
+                # constraints.append(points[k][0][0] == safe_pnt) # pos
+                parse_repvec_eq_constr(np.array([safe_pnt]), points[k][0][0,:], constraints, lbg, ubg)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
             else:
@@ -504,16 +513,20 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 # TODO add vel constraint
                 # add_vel_acc_constr(f_name, surface_normals_lst[-1], points[k], constraints)
         else:       # safe and fixed positions at other times
+            safe_pnt = has_safe_point_at(point_seg_order, num_iris_tot, safe_points_lst, k, f_name)
+            if any(safe_pnt):
+                # constraints.append(points[k][0][0] == safe_pnt) # pos
+                parse_repvec_eq_constr(np.array([safe_pnt]), points[k][0][0,:], constraints, lbg, ubg)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
             # Check if safe_point is available for the current frame
-            elif f_name in safe_points_lst[seg_idx+1].keys():
-                # Enforce (pre-computed) safe points at the end of each desired motion
-                # note: the initial point within a segment is defined by the continuity constraint below
-                if fr_seg_k_box == (num_iris_current-1):
-                    parse_vec_eq_constr(safe_points_lst[seg_idx+1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
-                    # TODO add vel contraint
-                    # add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx], points[k], constraints, lbg, ubg)
+            # elif f_name in safe_points_lst[seg_idx+1].keys():
+            #     # Enforce (pre-computed) safe points at the end of each desired motion
+            #     # note: the initial point within a segment is defined by the continuity constraint below
+            #     if fr_seg_k_box == (num_iris_current-1):
+            #         parse_vec_eq_constr(safe_points_lst[seg_idx+1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
+            #         # TODO add vel contraint
+            #         # add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx], points[k], constraints, lbg, ubg)
 
         # Bezier dynamics.
         for i in range(D):
@@ -548,7 +561,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             seg_idx = 0
             fr_seg_k_box = 0
         else:           # move to next segment if this is the last box
-            if fr_seg_k_box == (num_iris_current - 1):   # or (k % num_iris_current == 0)
+            if num_iris_current == 2 or fr_seg_k_box == (num_iris_current - 1):   # or (k % num_iris_current == 0)
                 fr_seg_k_box = 0        # reset the box count
                 seg_idx += 1            # increase segment
             else:
@@ -558,7 +571,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     # soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
     if bool(aux_frames):     # check if empty dictionary
-        link_threshold = 0.05
+        link_threshold = 0.02
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
             prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
@@ -582,30 +595,23 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     # Reachability constraints
     if reach_region is not None:
-        k_fr_iris = 0
         for fr_idx, frame_name in enumerate(frame_list):
-            fr_iris_counter = 0
-            for seg in range(len(durations)):
+            if frame_name == 'torso':
+                continue
 
-                num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg])
-                for si in range(num_iris_current):
-                    z_t = points[0 * num_iris_tot + fr_iris_counter + si][0]
+            coeffs = reach_region[frame_name]
+            H = coeffs['H']
+            d_vec = np.reshape(coeffs['d'], (len(H), 1))
+            for ti in range(num_iris_tot):
+                # torso index
+                z_t = points[0 * num_iris_tot + ti][0]
 
-                    if frame_name == 'torso':
-                        continue
+                # current frame index
+                z_ee_seg = points[fr_idx * num_iris_tot + ti][0]
 
-                    else:
-                        coeffs = reach_region[frame_name]
-                        z_ee_seg = points[fr_idx * num_iris_tot + fr_iris_counter + si][0]
-
-                    # reachable constraint
-                    H = coeffs['H']
-                    d_vec = np.reshape(coeffs['d'], (len(H), 1))
-                    if frame_name == 'LF' or frame_name == 'RF'or frame_name == 'LH' or frame_name == 'RH':
-                        parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
-                        # constraints.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
-                fr_iris_counter += num_iris_current
-                k_fr_iris += num_iris_current
+                # reachable constraint
+                if frame_name == 'LF' or frame_name == 'RF' or frame_name == 'LH' or frame_name == 'RH':
+                    parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
 
     # Collect points into a single vector
     points_all = pack_points_for_single_vector(points, 'casadi')
@@ -648,7 +654,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
-            sca_bez_points = range(0, num_iris_tot * n_points, n_points)
+            sca_bez_points = range(0, num_iris_tot * n_points, 4)
 
             # populate col_pair_geom_data with respective primitive shape pair type information
             ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])
@@ -732,22 +738,29 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     fr_seg_k_box, frame_idx, seg_idx = 0, 0, 0
     frame_name = frame_list[frame_idx]
     for k in range(num_iris_tot * n_frames):
-        num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
-        # move on to next segment after the current number of safe boxes
-        if (fr_seg_k_box != 0) and fr_seg_k_box % num_iris_current == 0 and seg_idx != (num_iris_tot-1):
-            seg_idx += 1
-            fr_seg_k_box = 0
-
-        # move on to next frame after all boxes processed for each frame
-        if k != 0 and (k % num_iris_tot) == 0:
-            frame_idx += 1
-            frame_name = frame_list[frame_idx]
-            fr_seg_k_box = 0
-
         b = a + durations[seg_idx][frame_name][fr_seg_k_box]
         beziers.append(BezierCurve(sol_points[k][0], a, b))
         a = b
-        fr_seg_k_box += 1
+
+        # figure out next indices
+        num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
+
+        # if single IRIS region (i.e., 2 points in current segment), move to next segment
+        if num_iris_current == 2:
+            seg_idx += 1
+            fr_seg_k_box = 0
+        elif (fr_seg_k_box != 0) and (fr_seg_k_box+1) % num_iris_current == 0 and seg_idx != (num_iris_tot-1):
+            # move on to next segment after the current number of safe boxes
+            seg_idx += 1
+            fr_seg_k_box = 0
+        elif k != 0 and (k % num_iris_tot) == 0:
+            # move on to next frame after all boxes processed for each frame
+            frame_idx += 1
+            frame_name = frame_list[frame_idx]
+            fr_seg_k_box = 0
+        else:
+            fr_seg_k_box += 1
+
         # skip the final positions, those are assigned later
         if (k + 1) % num_iris_tot == 0:
             fr_seg_k_box = 0  # might be redundant
