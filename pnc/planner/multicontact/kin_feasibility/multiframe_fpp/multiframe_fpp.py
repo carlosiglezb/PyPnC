@@ -267,4 +267,4 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                              initial_guess=initial_guess,
                                                              verbose=verbose)
 
-    return paths, iris_seq, points
+    return paths, iris_seq, points, safe_pnt_lst

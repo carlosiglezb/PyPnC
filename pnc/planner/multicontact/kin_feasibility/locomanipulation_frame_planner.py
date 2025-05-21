@@ -32,6 +32,7 @@ class LocomanipulationFramePlanner:
         self.reachability_planes = OrderedDict()
         self.path = []
         self.points = None      # control points (from Bezier trajectory solution)
+        self.safe_points = None   # safe points obtained from rollout of motion sequence
         self.box_seq = []
         self.frame_names = []
         self.starting_stance_foot = starting_stance_foot
@@ -121,13 +122,13 @@ class LocomanipulationFramePlanner:
         fixed_frames = self.fixed_frames
         motion_frames_seq = self.motion_frames_seq
         sca_robot_geom = self.sca_robot_geom
-        self.path, self.box_seq, self.points = plan_multiple_iris(S, R, p_init, T,
-                                                                  alpha, verbose,
-                                                                  A, fixed_frames,
-                                                                  motion_frames_seq,
-                                                                  sca_robot_geom,
-                                                                  w_rigid,
-                                                                  w_rigid_poly)
+        self.path, self.box_seq, self.points, self.safe_points = plan_multiple_iris(S, R, p_init, T,
+                                                                                    alpha, verbose,
+                                                                                    A, fixed_frames,
+                                                                                    motion_frames_seq,
+                                                                                    sca_robot_geom,
+                                                                                    w_rigid,
+                                                                                    w_rigid_poly)
 
     def plot(self, visualizer, static_html=False):
         i = 0
@@ -137,6 +138,13 @@ class LocomanipulationFramePlanner:
                 fr_name = self.frame_names[i]
                 self.visualize_bezier_points(visualizer.viewer, fr_name, bezier_curve, seg)
             i += 1
+
+        # visualize safe points
+        for seq, sp_dict in enumerate(self.safe_points):
+            for k, v in sp_dict.items():
+                v = v.reshape(1,3)
+                self.visualize_simple_points(visualizer.viewer["traversable_regions"]["inputs"],
+                                             k + "/" + str(seq), v, color=[0.1, 0.1, 0.1, 0.5])
 
         visualizer.viewer["traversable_regions"].set_property("visible", False)
         if static_html:
