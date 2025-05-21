@@ -51,7 +51,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     # x = [p_torso^{(i)}, p_lfoot^{(i)}, p_rfoot^{(i)}, p_lknee^{(i)}, p_rknee^{(i)}, ... , t^{(i)}]
     # containing all "i" curve points + auxiliary variables t^(i) that assimilate constant shin
     # lengths in paths for each leg
-    x = cp.Variable(d * n_f * (num_iris_tot + 1))
+    x = cp.Variable(d * n_f * (num_iris_tot))
 
     contact_constr = []
     x_init_idx = 0
@@ -59,27 +59,34 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     for f_name in iris_regions.keys():  # go in order (hence, refer to an OrderedDict)
         seg_idx = 0
         for sp_lst in safe_points_list:
+            x_curr_idx = x_init_idx
             # process initial positions when in new frame
-            if seg_idx == 0:
-                contact_constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
-            else:
-                if f_name in sp_lst:
-                    contact_constr.append(x[x_init_idx:x_init_idx + d] == sp_lst[f_name])
+            if seg_idx != 0:
+                # for remaining segments, we assign desired locations to be achieved at end of sequence
+                x_curr_idx = x_init_idx - d
                 if seg_idx == len(iris_seq):  # we have reached the end position
-                    x_init_idx += d
+                    contact_constr.append(x[x_curr_idx:x_curr_idx + d] == sp_lst[f_name])
                     continue
+            if f_name in sp_lst:
+                contact_constr.append(x[x_curr_idx:x_curr_idx + d] == sp_lst[f_name])
             num_boxes_current = len(next(iter(iris_seq[seg_idx].values())))
             x_init_idx += num_boxes_current * d
             seg_idx += 1
 
     # organize lower and upper state limits (include initial and final state bounds)
-    iris_constr = []
-    x_init_idx = d       # initial point is assumed to be feasible
+    iris_constr_torso = []
+    iris_constr_lf = []
+    iris_constr_rf = []
+    iris_constr_lk = []
+    iris_constr_rk = []
+    iris_constr_lh = []
+    iris_constr_rh = []
+    x_init_idx = 0      # reset index counter
     for frame, ee_iris in iris_regions.items():
         for seg_idx in range(len(iris_seq)):
             for ir_seg_count in range(len(iris_seq[seg_idx][frame])):
                 ir_seq_idx = iris_seq[seg_idx][frame][ir_seg_count]
-                # look for intersections when more than 3 IRIS regions per sequence
+                # look for intersections when more than 2 IRIS regions per sequence
                 if ir_seg_count != (len(iris_seq[seg_idx][frame]) - 1):
                     ir_next_seq_idx = iris_seq[seg_idx][frame][ir_seg_count+1]
                     iris_current = ee_iris.iris_list[ir_seq_idx].iris_region
@@ -88,67 +95,78 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
                     if len(iris_seq[seg_idx][frame]) == 2:
                         iris_intersect = iris_current
                     else:   # if more than 2 IRIS regions in this contact sequence
-                        if ir_seg_count == 0:
-                            # the first IRIS region must contain the current contact point
-                            iris_intersect = iris_current
-                        else:
-                            # any other in-between points should lie in the intersecting regions
-                            iris_intersect = iris_current.Intersection(iris_next, check_for_redundancy=True)
+                        # any other in-between points should lie in the intersecting regions
+                        iris_intersect = iris_current.Intersection(iris_next, check_for_redundancy=True)
                     A = iris_intersect.A()
                     b = iris_intersect.b()
                 else:       # last region, use as is
                     A = ee_iris.iris_list[ir_seq_idx].iris_region.A()
                     b = ee_iris.iris_list[ir_seq_idx].iris_region.b()
-                iris_constr.append(A @ x[x_init_idx:x_init_idx+d] <= b)
+                # debug
+                if frame == 'torso':
+                    iris_constr_torso.append(A @ x[x_init_idx:x_init_idx+d] <= b)
+                elif frame == 'LF':
+                    iris_constr_lf.append(A @ x[x_init_idx:x_init_idx+d] <= b)
+                elif frame == 'RF':
+                    iris_constr_rf.append(A @ x[x_init_idx:x_init_idx+d] <= b)
+                elif frame == 'L_knee':
+                    iris_constr_lk.append(A @ x[x_init_idx:x_init_idx+d] <= b)
+                elif frame == 'R_knee':
+                    iris_constr_rk.append(A @ x[x_init_idx:x_init_idx+d] <= b)
+                elif frame == 'LH':
+                    iris_constr_lh.append(A @ x[x_init_idx:x_init_idx+d] <= b)
+                elif frame == 'RH':
+                    iris_constr_rh.append(A @ x[x_init_idx:x_init_idx+d] <= b)
                 x_init_idx += d
-        x_init_idx += d     # initial point is assumed to be feasible
+        # x_init_idx += d     # last point is assumed to be feasible
 
     # Construct end-effector reachability constraints (initial & final points specified)
     l_arm_reach_constr = []
     r_arm_reach_constr = []
     l_leg_reach_constr = []
     r_leg_reach_constr = []
+    l_knee_reach_constr = []
+    r_knee_reach_constr = []
+    x_curr_idx = 0      # reset index counter
     if reach is not None:
-        for sp_idx, sp_lst in enumerate(safe_points_list):
-            # assume ee are reachable at the beginning and end
-            if sp_idx == 0 or sp_idx == len(safe_points_list) - 1:
-                continue
+        for frame_idx, frame in enumerate(iris_regions.keys()):
+            for ti in range(num_iris_tot):
+                # torso reachability is redundant
+                if frame == 'torso':
+                    x_curr_idx += 3
+                    continue
 
-            # get corresponding indices of torso optimization variable
-            t_curr_idx = 0 * num_iris_tot * d + d * sp_idx
-            t_next_idx = t_curr_idx + 3
-            z_t = x[t_curr_idx: t_next_idx]
-
-            for frame_name in sp_lst.keys():
-                # get corresponding frame index
-                frame_idx = list(iris_regions.keys()).index(frame_name)
+                # get corresponding torso indices
+                t_curr_idx = 0 * num_iris_tot * d + d * ti
+                t_next_idx = t_curr_idx + 3
+                z_t = x[t_curr_idx: t_next_idx]
 
                 # torso must be reachable from contact foot
                 # Note: not including knee reachability eases infeasibility
-                if frame_name == 'torso' or frame_name == 'L_knee' or frame_name == 'R_knee':
+                if frame == 'NaN' or frame == 'MaM':
+                    x_curr_idx += 3
                     continue
                 else:
-                    ee_curr_idx = frame_idx * num_iris_tot * d + d * sp_idx
+                    ee_curr_idx = frame_idx * num_iris_tot * d + d * ti
                     ee_next_idx = ee_curr_idx + 3
                 z_ee = x[ee_curr_idx: ee_next_idx]
-                coeffs = reach[frame_name]
+                coeffs = reach[frame]
 
                 H = coeffs['H']
                 d_vec = np.reshape(coeffs['d'], (len(H), ))
-                if frame_name == 'LH':
+                if frame == 'LH':
                     l_arm_reach_constr.append(H @ (z_ee - z_t) <= -d_vec)
-                    # l_arm_reach_constr.append( cp.norm(z_ee - z_t) <= 1.0)
-                elif frame_name == 'RH':
+                elif frame == 'RH':
                     r_arm_reach_constr.append(H @ (z_ee - z_t) <= -d_vec)
-                    # r_arm_reach_constr.append(cp.norm(z_ee - z_t) <= 1.0)
-                elif frame_name == 'LF':
+                elif frame == 'LF':
                     l_leg_reach_constr.append(H @ (z_ee - z_t) <= -d_vec)
-                    # l_leg_reach_constr.append(cp.norm(z_ee - z_t) <= 1.2)
-                elif frame_name == 'RF':
+                elif frame == 'RF':
                     r_leg_reach_constr.append(H @ (z_ee - z_t) <= -d_vec)
-                    # r_leg_reach_constr.append(cp.norm(z_ee - z_t) <= 1.2)
-
-    # add feasibility of end curve point? Perhaps since it depends on torso
+                elif frame == 'L_knee':
+                    l_knee_reach_constr.append(H @ (z_ee - z_t) <= -d_vec)
+                elif frame == 'R_knee':
+                    r_knee_reach_constr.append(H @ (z_ee - z_t) <= -d_vec)
+                x_curr_idx += 3
 
     frame_list = list(safe_points_list[0].keys())
     # add rigid link constraint
@@ -162,13 +180,13 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
         for aux_fr in aux_frames:
             # get corresponding indices of optimization variable
             prox_idx, dist_idx, link_length = get_aux_frame_idx(
-                aux_fr, frame_list, num_iris_tot + 1)
+                aux_fr, frame_list, num_iris_tot)
 
             if not np.isnan(prox_idx):
                 link_length += link_threshold  # threshold for relaxation
                 # add convex relaxation of norm constraint
                 A_soc_aux, d_soc_aux = create_cvx_norm_eq_relaxation(
-                    prox_idx, dist_idx, link_length, d, num_iris_tot + 1, x)
+                    prox_idx, dist_idx, link_length, d, num_iris_tot, x)
 
                 # concatenate A inequality matrices for debugging
                 A_soc_debug += copy.deepcopy(A_soc_aux)
@@ -185,24 +203,55 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     # minimum distance cost (add distance between points of corresponding frame)
     cost = 0
     for fr in range(n_f):
-        start_idx = fr * d * (num_iris_tot + 1)
-        end_idx = start_idx + d * (num_iris_tot + 1)
+        start_idx = fr * d * (num_iris_tot)
+        end_idx = start_idx + d * (num_iris_tot)
         x_fr = x[start_idx: end_idx]
-        p_fr_t = cp.reshape(x_fr, [d, num_iris_tot + 1])
+        p_fr_t = cp.reshape(x_fr, [d, num_iris_tot])
         cost += cp.sum(cp.norm(p_fr_t[:, 1:] - p_fr_t[:, :-1], axis=1))
 
     # solve
-    # prob = cp.Problem(cp.Minimize(cost + cost_log_abs),
-    #                   l_arm_reach_constr + l_leg_reach_constr +
-    #                   contact_constr + iris_constr + soc_constraint)
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs),
                       l_arm_reach_constr + r_arm_reach_constr + l_leg_reach_constr + r_leg_reach_constr +
-                      contact_constr + iris_constr + soc_constraint)
+                      contact_constr +
+                      iris_constr_torso + iris_constr_lf + iris_constr_rf + iris_constr_lk + iris_constr_rk + iris_constr_lh + iris_constr_rh +
+                      soc_constraint)
     prob.solve(solver='SCS')
 
     if prob.status == 'infeasible':
         print('Polygonal problem was infeasible. Retrying with relaxed tolerances.')
         prob.solve(solver='SCS', eps_rel=0.05, eps_abs=0.05)
+
+        # debug info returning which constraints are violated with this relaxed threshold
+        # IRIS region containment check
+        ic_t, ic_lf, ic_rf, ic_lh, ic_rh, ic_lk, ic_rk = [], [], [], [], [], [], []
+        for ic in iris_constr_torso:
+            ic_t.append(scipy.linalg.norm(ic.residual))
+        for ic in iris_constr_lf:
+            ic_lf.append(scipy.linalg.norm(ic.residual))
+        for ic in iris_constr_rf:
+            ic_rf.append(scipy.linalg.norm(ic.residual))
+        for ic in iris_constr_lk:
+            ic_lk.append(scipy.linalg.norm(ic.residual))
+        for ic in iris_constr_rk:
+            ic_rk.append(scipy.linalg.norm(ic.residual))
+        for ic in iris_constr_lh:
+            ic_lh.append(scipy.linalg.norm(ic.residual))
+        for ic in iris_constr_rh:
+            ic_rh.append(scipy.linalg.norm(ic.residual))
+        # reachability check
+        rc_lf, rc_rf, rc_lk, rc_rk, rc_lh, rc_rh = [], [], [], [], [], []
+        for rc in l_arm_reach_constr:
+            rc_lh.append(scipy.linalg.norm(rc.residual))
+        for rc in r_arm_reach_constr:
+            rc_rh.append(scipy.linalg.norm(rc.residual))
+        for rc in l_leg_reach_constr:
+            rc_lf.append(scipy.linalg.norm(rc.residual))
+        for rc in r_leg_reach_constr:
+            rc_rf.append(scipy.linalg.norm(rc.residual))
+        for rc in l_knee_reach_constr:
+            rc_lk.append(scipy.linalg.norm(rc.residual))
+        for rc in r_knee_reach_constr:
+            rc_rk.append(scipy.linalg.norm(rc.residual))
 
     length = prob.value
     traj = x.value

@@ -1,4 +1,5 @@
 import copy
+from typing import List
 
 import numpy as np
 
@@ -218,19 +219,33 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
             # Initialize transition times.
             num_iris = len(ir)
             frame_idx = list(p_init.keys()).index(frame)
-            # get indices of current frame for all curve points
-            for b in range(num_iris+1):
-                first_idx = n_poly_points * frame_idx + (b + ir_i) * d
-                last_idx = first_idx + d - 1
-                if b == 0:
-                   ee_traj_idx = np.linspace(first_idx, last_idx, d).astype(int)
-                else:
-                    ee_traj_idx = np.vstack((ee_traj_idx, (np.linspace(first_idx, last_idx, d)).astype(int)))
+            if num_iris <= 2:
+                # get indices of current frame for all curve points
+                for b in range(num_iris):
+                    first_idx = n_poly_points * frame_idx + (b + ir_i) * d
+                    last_idx = first_idx + d - 1
+                    if b == 0:
+                       ee_traj_idx = np.linspace(first_idx, last_idx, d).astype(int)
+                    else:
+                        ee_traj_idx = np.vstack((ee_traj_idx, (np.linspace(first_idx, last_idx, d)).astype(int)))
+            else:
+                # we used intersection so we should take additional point into account
+                for b in range(num_iris + 1):
+                    first_idx = n_poly_points * frame_idx + (b + ir_i) * d - d
+                    last_idx = first_idx + d - 1
+                    if b == 0:
+                       ee_traj_idx = np.linspace(first_idx, last_idx, d).astype(int)
+                    else:
+                        ee_traj_idx = np.vstack((ee_traj_idx, (np.linspace(first_idx, last_idx, d)).astype(int)))
 
-            ee_traj_change = traj[ee_traj_idx[1:]]-traj[ee_traj_idx[:-1]]
-            durations[seg_idx][frame] = np.linalg.norm(ee_traj_change, axis=1)
-            #TODO deal with case where any of durations[frame] == 0
-            durations[seg_idx][frame] *= T / sum(durations[seg_idx][frame])
+            if seg_idx == len(iris_seq) - 1:
+                # assumes the last sequence is a fixed frame to stabilize last motion
+                durations[seg_idx][frame] = [float(T)]
+            else:
+                ee_traj_change = traj[ee_traj_idx[1:]]-traj[ee_traj_idx[:-1]]
+                durations[seg_idx][frame] = np.linalg.norm(ee_traj_change, axis=1)
+                #TODO deal with case where any of durations[frame] == 0
+                durations[seg_idx][frame] *= T / sum(durations[seg_idx][frame])
         ir_i += num_iris
         seg_idx += 1
 

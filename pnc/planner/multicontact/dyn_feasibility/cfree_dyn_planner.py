@@ -37,7 +37,6 @@ from plot.data_saver import *
 B_SHOW_JOINT_PLOTS = True
 B_SHOW_COST_PLOTS = True
 B_SHOW_GRF_PLOTS = True
-B_SHOW_COST_PLOTS = False
 B_VISUALIZE = True
 B_SAVE_DATA = False
 B_VERBOSE = True
@@ -81,20 +80,20 @@ def get_draco3_shaft_wrist_default_initial_pose():
 
 def get_g1_default_initial_pose(n_joints):
     q0 = np.zeros(n_joints, )
-    q0[0] = -np.pi / 6  # left_hip_pitch_joint
+    q0[0] = -0.697  # left_hip_pitch_joint
     # q0[1] = np.radians(hip_yaw_angle)  # left_hip_roll_joint
     # q0[2] = np.radians(hip_yaw_angle)  # left_hip_yaw_joint
-    q0[3] = np.pi / 3  # left_knee_joint
-    q0[4] = -np.pi / 6  # left_ankle_pitch_joint
+    q0[3] = 1.23  # left_knee_joint
+    q0[4] = -0.53  # left_ankle_pitch_joint
     # q0[5] = np.radians(-hip_yaw_angle)  # left_ankle_roll_joint
-    q0[6] = -np.pi / 6  # right_hip_pitch_joint
+    q0[6] = -0.697  # right_hip_pitch_joint
     # q0[7] = np.pi / 6  # right_hip_roll_joint
     # q0[8] = 0.  # right_hip_yaw_joint
-    q0[9] = np.pi / 3  # right_knee_joint
-    q0[10] = -np.pi / 6  # right_ankle_pitch_joint
+    q0[9] = 1.23  # right_knee_joint
+    q0[10] = -0.53  # right_ankle_pitch_joint
     # q0[11] = 0.  # right_ankle_roll_joint
 
-    floating_base = np.array([0., 0., 0.71, 0., 0., 0., 1.])
+    floating_base = np.array([0., 0., 0.68, 0., 0., 0., 1.])
     return np.concatenate((floating_base, q0))
 
 
@@ -481,8 +480,8 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     # door_r_outer_location = np.array([0.45, -0.35, 1.2])
     if robot_name == 'g1':
         # G1 settings
-        door_l_inner_location = np.array([0.3, 0.38, 0.9])
-        door_r_inner_location = np.array([0.34, -0.38, 0.9])
+        door_l_inner_location = np.array([0.34, 0.37, 0.9])
+        door_r_inner_location = np.array([0.34, -0.37, 0.9])
     else:
         # ergoCub settings
         door_l_inner_location = np.array([0.3, 0.35, 1.0])
@@ -507,7 +506,7 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     if robot_name == 'g1':
         motion_frames_seq.add_motion_frame({
                                             'LH': door_l_inner_location,
-                                            'torso': starting_torso_pos + np.array([0.07, -0.07, 0.02])
+                                            # 'torso': starting_torso_pos + np.array([0.07, -0.07, 0.02])
                                             })
     elif robot_name == 'ergoCub':
         motion_frames_seq.add_motion_frame({
@@ -532,7 +531,7 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     motion_frames_seq.add_motion_frame({
                         # 'LH': starting_lh_pos + np.array([0.3, 0., 0.0]),   # <-- G1
                         # 'LH': starting_lh_pos + np.array([0.35, 0.1, 0.0]),   # <-- other
-                        'torso': final_torso_pos + np.array([-0.15, 0.05, 0.05]),     # good testing
+                        # 'torso': final_torso_pos + np.array([-0.15, 0.05, 0.05]),     # good testing
                         'RH': door_r_inner_location})
     rh_contact_inside = PlannerSurfaceContact('RH', np.array([1, 0, 0]))
     motion_frames_seq.add_contact_surface(rh_contact_inside)
@@ -804,10 +803,10 @@ def main(args):
         q0 = get_draco3_shaft_wrist_default_initial_pose()
     elif robot_name == 'g1':
         q0 = get_g1_default_initial_pose(rob_model.nq - 7)
-        door_pos = np.array([0.28, 0., 0.])
-        step_length = 0.42
-        weights_rigid_link = np.array([10., 0., 3.])    # step over door in single step
-        # weights_rigid_link = np.array([10., 0., 0.])  # step on knee knocker
+        door_pos = np.array([0.32, 0., 0.])
+        step_length = 0.46
+        # weights_rigid_link = np.array([10., 0., 3.])    # step over door in single step
+        weights_rigid_link = np.array([1000., 0., 0.])  # step on knee knocker
     elif robot_name == 'valkyrie':
         q0 = get_val_default_initial_pose(rob_model.nq - 7)
         door_pos = np.array([0.34, 0., 0.])
@@ -926,30 +925,6 @@ def main(args):
     state = crocoddyl.StateMultibody(rob_model)
     actuation = crocoddyl.ActuationModelFloatingBase(state)
 
-    ee_rpy = {'LH': [0., 0., 0.], 'RH': [0., 0., 0.]}
-    if robot_name == 'draco3':
-        n_q = len(q0)
-        l_constr_ids, r_constr_ids = [9 + n_q, 10 + n_q], [23 + n_q, 24 + n_q]  # qdot
-        l_constr_ids_u, r_constr_ids_u = [3, 4], [17, 18]  # u
-
-        constr_mgr = crocoddyl.ConstraintModelManager(state, actuation.nu)
-        # -------- Existent constraint --------
-        # res_model = crocoddyl.ResidualModelState(state, x0, actuation.nu)
-        # constr_model_res = crocoddyl.ConstraintModelResidual(state, res_model)
-        # constr_mgr.addConstraint("residual_model", constr_model_res)
-        # -------- New constraint --------
-        l_res_model = ResidualModelStateError(state, 1, nu=actuation.nu, q_dependent=False)
-        l_res_model.constr_ids = l_constr_ids
-        # l_res_model.constr_ids_u = l_constr_ids_u
-        l_rcj_constr = ConstraintModelRCJ(state, residual=l_res_model, ng=0, nh=1)
-        constr_mgr.addConstraint("l_rcj_constr", l_rcj_constr)
-        r_res_model = ResidualModelStateError(state, 1, nu=actuation.nu, q_dependent=False)
-        r_res_model.constr_ids = r_constr_ids
-        # r_res_model.constr_ids_u = r_constr_ids_u
-        r_rcj_constr = ConstraintModelRCJ(state, residual=r_res_model, ng=0, nh=1)
-        constr_mgr.addConstraint("r_rcj_constr", r_rcj_constr)
-        ee_rpy = {'LH': [0., -np.pi/2, 0.], 'RH': [0., -np.pi/2, 0.]}
-
     #
     # Dynamic solve
     #
@@ -958,7 +933,7 @@ def main(args):
         contact_seqs = ContactSequence(contact_seqs, N_horizon_lst, T)
         robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_seqs, T, ik_cfree_planner)
         if contact_seq == 1:    # step on knee knocker
-            robot_dyn_plan.reset_default_gains('torso', np.array([2.5, 3.5, 0.5] + [0.5, 0.5, 0.001]))
+            robot_dyn_plan.reset_default_gains('torso', np.array([2.5, 3.5, 1.5] + [0.5, 0.5, 0.001]))
             robot_dyn_plan.set_zero_configuration(q0)
     elif robot_name == 'ergoCub':
         N_horizon_lst = [100, 220, 100, 180, 80]
@@ -1048,7 +1023,7 @@ def main(args):
 
     if B_SAVE_DATA:
         # Saving data tools
-        data_saver = DataSaver(robot_name + '_knee_knocker_sca_on.pkl')
+        data_saver = DataSaver(robot_name + '_29dof_knee_knocker_full_step_over.pkl')
         for (i, fp) in enumerate(robot_dyn_plan.fddp):
             if i == len(robot_dyn_plan.fddp)-1:      # variables that need to be logged only once
                 data_saver.add('grf_lfoot', rf_lfoot.tolist())

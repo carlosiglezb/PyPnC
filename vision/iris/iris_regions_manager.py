@@ -210,8 +210,8 @@ class IrisRegionsManager:
         # start_centroid = self.iris_start_seed + np.array([0., 0., 0.35])
         # goal_centroid = self.iris_goal_seed + np.array([0.0, 0., 0.35])
         # ----------- settings for all
-        start_centroid = np.array([0.3, 0, 0.5])
-        goal_centroid = np.array([0.3, 0, 0.5])
+        start_centroid = np.array([0.35, 0, 0.5])
+        goal_centroid = np.array([0.35, 0, 0.5])
         new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.001, 0.01, 0.01])
 
         # check that new seed is not in collision before creating new IRIS region
@@ -252,17 +252,17 @@ class IrisRegionsManager:
                          hint_iris: int = None) -> List[int]:
         # if single IRIS region, return the index of corresponding global IRIS region
         if self.iris_graph is None:
-            if len(self.global_iris) == 1:
+            if len(self.iris_list) == 1 and len(self.global_iris) == 1:
                 return [self.iris_idx_seq[0]]
-            elif len(self.global_iris) == 2:
+            elif len(self.iris_list) == 2 and len(self.global_iris) == 2:
                 b_last_global_contains_start = self.iris_list[self.global_iris[1][0]].isPointSafe(start)
                 b_last_global_contains_goal = self.iris_list[self.global_iris[1][0]].isPointSafe(goal)
                 if b_last_global_contains_start and b_last_global_contains_goal:
                     # if the start/goal point is contained in 2nd global IRIS, favor it
                     return self.global_iris[1]
                 else:
-                    # don't rely on global IRIS regions
-                    self.iris_graph = IrisGraph(self.iris_list)
+                    # by construction, these should be true
+                    return [self.global_iris[0][0], self.global_iris[1][0]]
             else:
                 # for some reason we didn't need the graph before
                 print(f"Creating Graph connecting points: {self.iris_list}")
@@ -302,7 +302,8 @@ class IrisRegionsManager:
                 if len(iris_seq_tmp) == 2:
                     iris_seq = [iris_p_init, iris_p_goal]
                 elif len(iris_seq_tmp) == 3:
-                    iris_seq = [iris_p_init, iris_p_init, iris_p_goal]
+                    # iris_seq = [iris_p_init, iris_p_init, iris_p_goal]
+                    iris_seq = iris_seq_tmp
                 else:
                     raise NotImplementedError
             else:
@@ -321,8 +322,11 @@ class IrisRegionsManager:
         """
         # We reserve None for single IRIS regions containing from start to goal seeds
         if self.iris_graph is None:
+            # if we already agreed we can stay in the initial IRIS region, proceed with that
+            if len(self.iris_idx_seq) == 1:
+                return self.iris_idx_seq
             # point must be contained in either the start/goal IRIS region
-            if len(self.global_iris) == 1 and self.iris_list[self.iris_idx_seq[0]].isPointSafe(point):
+            elif len(self.global_iris) == 1 and self.iris_list[self.iris_idx_seq[0]].isPointSafe(point):
                 return [self.iris_idx_seq[0]]
             # if self.iris_list[self.iris_idx_seq].isPointSafe(point):
             #     return [self.iris_idx_seq]
