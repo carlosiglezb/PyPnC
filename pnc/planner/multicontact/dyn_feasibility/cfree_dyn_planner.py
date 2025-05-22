@@ -12,7 +12,6 @@ sys.path.append(cwd)
 import crocoddyl
 import numpy as np
 
-from pnc.planner.multicontact.crocoddyl_extensions.ConstraintModelRCJ import ConstraintModelRCJ
 # Collision free description
 from pydrake.geometry.optimization import HPolyhedron
 
@@ -540,7 +539,7 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surface(rf_contact_over)
 
-    # ---- Step 5: balance / square up
+    # ---- Step 5: square up
     # fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
     fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee'])
     motion_frames_seq.add_motion_frame({
@@ -575,7 +574,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
     final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
     final_rh_pos = safe_regions_mgr_dict['RH'].iris_list[1].seed_pos
     final_lh_pos = safe_regions_mgr_dict['LH'].iris_list[1].seed_pos
-    intermediate_rf_pos = np.array([0.3, final_rf_pos[1], 0.44])
+    intermediate_rf_pos = np.array([0.35, final_rf_pos[1], 0.44])
 
     # initialize fixed and motion frame sets
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
@@ -586,7 +585,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
         motion_frames_seq.add_motion_frame({
                                             'LH': door_l_inner_location,
                                             'RH': door_r_inner_location,
-                                            'torso': starting_torso_pos + np.array([0.0, 0.06, 0])
+                                            # 'torso': starting_torso_pos + np.array([0.0, 0.06, 0])
                                             })
     elif robot_name == 'ergoCub':
         motion_frames_seq.add_motion_frame({
@@ -605,7 +604,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surface(rf_contact_over)
 
-    # ---- Step 3: step through door with right foot
+    # ---- Step 3: step through door with left foot
     fixed_frames.append(['RF', 'R_knee', 'LH', 'RH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                         # 'LH': starting_lh_pos + np.array([0.3, 0., 0.0]),   # <-- G1

@@ -257,12 +257,17 @@ class IrisRegionsManager:
             elif len(self.iris_list) == 2 and len(self.global_iris) == 2:
                 b_last_global_contains_start = self.iris_list[self.global_iris[1][0]].isPointSafe(start)
                 b_last_global_contains_goal = self.iris_list[self.global_iris[1][0]].isPointSafe(goal)
+                b_first_global_contains_goal = self.iris_list[self.global_iris[0][0]].isPointSafe(goal)
+                b_first_global_contains_start = self.iris_list[self.global_iris[0][0]].isPointSafe(start)
                 if b_last_global_contains_start and b_last_global_contains_goal:
                     # if the start/goal point is contained in 2nd global IRIS, favor it
                     return self.global_iris[1]
-                else:
+                elif not b_last_global_contains_goal and b_first_global_contains_goal and b_first_global_contains_start:
                     # by construction, these should be true
-                    return [self.global_iris[0][0], self.global_iris[1][0]]
+                    return self.global_iris[0]
+                elif b_first_global_contains_start and b_first_global_contains_goal:
+                    # by construction, these should be true
+                    return self.global_iris[0]
             else:
                 # for some reason we didn't need the graph before
                 print(f"Creating Graph connecting points: {self.iris_list}")
@@ -282,7 +287,7 @@ class IrisRegionsManager:
                     break
                 ir_start_idx += 1
 
-        # find which IRIS region contains the goal point
+        # find first IRIS region contains the goal point
         ir_goal_idx = 0
         for ir in self.iris_list:
             if ir.isPointSafe(goal):
@@ -291,6 +296,15 @@ class IrisRegionsManager:
             ir_goal_idx += 1
 
         regions_containing_goal = self.iris_graph.regionsContainingPoint(goal)
+        # if several regions contain the goal, check which one overlaps the most
+        if len(regions_containing_goal) > 1:
+            intersect_vol = []
+            init_iris_region = self.iris_list[iris_p_init].iris_region
+            for r in regions_containing_goal:
+                test_iris_region = self.iris_list[r].iris_region
+                intersect_vol.append(init_iris_region.Intersection(test_iris_region).MaximumVolumeInscribedEllipsoid().CalcVolume())
+            iris_p_goal = regions_containing_goal[np.argmax(intersect_vol)]
+
         iris_seq_tmp, length, runtime = planner(start)
         if iris_p_init == iris_p_goal:
             iris_seq = [iris_p_init]

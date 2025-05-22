@@ -205,7 +205,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
             seg_idx = 0
             fr_seg_k_box = 0
         else:           # move to next segment if this is the last box
-            if num_iris_current == 2 or fr_seg_k_box == (num_iris_current - 1):   # or (k % num_iris_current == 0)
+            if fr_seg_k_box == (num_iris_current - 1):   # or (k % num_iris_current == 0)
                 fr_seg_k_box = 0        # reset the box count
                 seg_idx += 1            # increase segment
             else:
@@ -287,30 +287,22 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     fr_seg_k_box, frame_idx, seg_idx = 0, 0, 0
     frame_name = frame_list[frame_idx]
     for k in range(num_iris_tot * n_frames):
+        num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
+        # move on to next segment after the current number of safe boxes
+        if (fr_seg_k_box != 0) and fr_seg_k_box % num_iris_current == 0 and seg_idx != (num_iris_tot-1):
+            seg_idx += 1
+            fr_seg_k_box = 0
+
+        # move on to next frame after all boxes processed for each frame
+        if k != 0 and (k % num_iris_tot) == 0:
+            frame_idx += 1
+            frame_name = frame_list[frame_idx]
+            fr_seg_k_box = 0
 
         b = a + durations[seg_idx][frame_name][fr_seg_k_box]
         beziers.append(BezierCurve(points[k][0].value, a, b))
         a = b
-
-        # figure out next indices
-        num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
-
-        # if single IRIS region (i.e., 2 points in current segment), move to next segment
-        if num_iris_current == 2:
-            seg_idx += 1
-            fr_seg_k_box = 0
-        elif (fr_seg_k_box != 0) and (fr_seg_k_box+1) % num_iris_current == 0 and seg_idx != (num_iris_tot-1):
-            # move on to next segment after the current number of safe boxes
-            seg_idx += 1
-            fr_seg_k_box = 0
-        elif k != 0 and (k % num_iris_tot) == 0:
-            # move on to next frame after all boxes processed for each frame
-            frame_idx += 1
-            frame_name = frame_list[frame_idx]
-            fr_seg_k_box = 0
-        else:
-            fr_seg_k_box += 1
-
+        fr_seg_k_box += 1
         # skip the final positions, those are assigned later
         if (k + 1) % num_iris_tot == 0:
             fr_seg_k_box = 0  # might be redundant
@@ -561,7 +553,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             seg_idx = 0
             fr_seg_k_box = 0
         else:           # move to next segment if this is the last box
-            if num_iris_current == 2 or fr_seg_k_box == (num_iris_current - 1):   # or (k % num_iris_current == 0)
+            if fr_seg_k_box == (num_iris_current - 1):   # or (k % num_iris_current == 0)
                 fr_seg_k_box = 0        # reset the box count
                 seg_idx += 1            # increase segment
             else:
@@ -654,7 +646,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
-            sca_bez_points = range(0, num_iris_tot * n_points, 4)
+            sca_bez_points = range(0, num_iris_tot * n_points, n_points)
 
             # populate col_pair_geom_data with respective primitive shape pair type information
             ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])
@@ -738,29 +730,22 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     fr_seg_k_box, frame_idx, seg_idx = 0, 0, 0
     frame_name = frame_list[frame_idx]
     for k in range(num_iris_tot * n_frames):
-        b = a + durations[seg_idx][frame_name][fr_seg_k_box]
-        beziers.append(BezierCurve(sol_points[k][0], a, b))
-        a = b
-
-        # figure out next indices
         num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
+        # move on to next segment after the current number of safe boxes
+        if (fr_seg_k_box != 0) and fr_seg_k_box % num_iris_current == 0 and seg_idx != (num_iris_tot-1):
+            seg_idx += 1
+            fr_seg_k_box = 0
 
-        # if single IRIS region (i.e., 2 points in current segment), move to next segment
-        if num_iris_current == 2:
-            seg_idx += 1
-            fr_seg_k_box = 0
-        elif (fr_seg_k_box != 0) and (fr_seg_k_box+1) % num_iris_current == 0 and seg_idx != (num_iris_tot-1):
-            # move on to next segment after the current number of safe boxes
-            seg_idx += 1
-            fr_seg_k_box = 0
-        elif k != 0 and (k % num_iris_tot) == 0:
-            # move on to next frame after all boxes processed for each frame
+        # move on to next frame after all boxes processed for each frame
+        if k != 0 and (k % num_iris_tot) == 0:
             frame_idx += 1
             frame_name = frame_list[frame_idx]
             fr_seg_k_box = 0
-        else:
-            fr_seg_k_box += 1
 
+        b = a + durations[seg_idx][frame_name][fr_seg_k_box]
+        beziers.append(BezierCurve(sol_points[k][0], a, b))
+        a = b
+        fr_seg_k_box += 1
         # skip the final positions, those are assigned later
         if (k + 1) % num_iris_tot == 0:
             fr_seg_k_box = 0  # might be redundant

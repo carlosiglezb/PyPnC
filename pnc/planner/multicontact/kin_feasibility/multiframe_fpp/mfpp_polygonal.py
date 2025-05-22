@@ -51,57 +51,71 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     # x = [p_torso^{(i)}, p_lfoot^{(i)}, p_rfoot^{(i)}, p_lknee^{(i)}, p_rknee^{(i)}, ... , t^{(i)}]
     # containing all "i" curve points + auxiliary variables t^(i) that assimilate constant shin
     # lengths in paths for each leg
-    x = cp.Variable(d * n_f * (num_iris_tot))
+    x = cp.Variable(d * n_f * (num_iris_tot + 1 ))
 
     contact_constr = []
     x_init_idx = 0
     # re-write multi-stage goal points (locations) in terms of optimization variables
     for f_name in iris_regions.keys():  # go in order (hence, refer to an OrderedDict)
-        seg_idx = 0
-        for sp_lst in safe_points_list:
-            x_curr_idx = x_init_idx
-            # process initial positions when in new frame
-            if seg_idx != 0:
-                # for remaining segments, we assign desired locations to be achieved at end of sequence
-                x_curr_idx = x_init_idx - d
-                if seg_idx == len(iris_seq):  # we have reached the end position
-                    contact_constr.append(x[x_curr_idx:x_curr_idx + d] == sp_lst[f_name])
-                    continue
-            if f_name in sp_lst:
-                contact_constr.append(x[x_curr_idx:x_curr_idx + d] == sp_lst[f_name])
-            num_boxes_current = len(next(iter(iris_seq[seg_idx].values())))
-            x_init_idx += num_boxes_current * d
-            seg_idx += 1
+        for seg_idx in range(len(safe_points_list)):
+            # for the other segments, assign next desired location to end of respective segment
+            if f_name in safe_points_list[seg_idx].keys():
+                contact_constr.append(x[x_init_idx:x_init_idx + d] == safe_points_list[seg_idx][f_name])
+            if seg_idx != (len(safe_points_list) - 1):
+                next_seg_len = len(iris_seq[seg_idx][f_name])
+            else:
+                next_seg_len = 1
+            x_init_idx += d * next_seg_len
 
     # organize lower and upper state limits (include initial and final state bounds)
-    iris_constr_torso = []
-    iris_constr_lf = []
-    iris_constr_rf = []
-    iris_constr_lk = []
-    iris_constr_rk = []
-    iris_constr_lh = []
-    iris_constr_rh = []
+    iris_constr_torso, iris_constr_lf, iris_constr_rf, iris_constr_lk, iris_constr_rk, iris_constr_lh, iris_constr_rh = [], [], [], [], [], [], []
     x_init_idx = 0      # reset index counter
     for frame, ee_iris in iris_regions.items():
+        # initial condition is given
+        ir_seq_idx = iris_seq[0][frame][0]
+        iris_current = ee_iris.iris_list[ir_seq_idx].iris_region
+        A = iris_current.A()
+        b = iris_current.b()
+        # debug
+        if frame == 'torso':
+            iris_constr_torso.append(A @ x[x_init_idx:x_init_idx + d] <= b)
+        elif frame == 'LF':
+            iris_constr_lf.append(A @ x[x_init_idx:x_init_idx + d] <= b)
+        elif frame == 'RF':
+            iris_constr_rf.append(A @ x[x_init_idx:x_init_idx + d] <= b)
+        elif frame == 'L_knee':
+            iris_constr_lk.append(A @ x[x_init_idx:x_init_idx + d] <= b)
+        elif frame == 'R_knee':
+            iris_constr_rk.append(A @ x[x_init_idx:x_init_idx + d] <= b)
+        elif frame == 'LH':
+            iris_constr_lh.append(A @ x[x_init_idx:x_init_idx + d] <= b)
+        elif frame == 'RH':
+            iris_constr_rh.append(A @ x[x_init_idx:x_init_idx + d] <= b)
+        x_init_idx += d
         for seg_idx in range(len(iris_seq)):
-            for ir_seg_count in range(len(iris_seq[seg_idx][frame])):
+            curr_seg_len = len(iris_seq[seg_idx][frame])
+            for ir_seg_count in range(curr_seg_len):
                 ir_seq_idx = iris_seq[seg_idx][frame][ir_seg_count]
-                # look for intersections when more than 2 IRIS regions per sequence
-                if ir_seg_count != (len(iris_seq[seg_idx][frame]) - 1):
-                    ir_next_seq_idx = iris_seq[seg_idx][frame][ir_seg_count+1]
-                    iris_current = ee_iris.iris_list[ir_seq_idx].iris_region
-                    iris_next = ee_iris.iris_list[ir_next_seq_idx].iris_region
-
-                    if len(iris_seq[seg_idx][frame]) == 2:
-                        iris_intersect = iris_current
-                    else:   # if more than 2 IRIS regions in this contact sequence
-                        # any other in-between points should lie in the intersecting regions
-                        iris_intersect = iris_current.Intersection(iris_next, check_for_redundancy=True)
-                    A = iris_intersect.A()
-                    b = iris_intersect.b()
-                else:       # last region, use as is
-                    A = ee_iris.iris_list[ir_seq_idx].iris_region.A()
-                    b = ee_iris.iris_list[ir_seq_idx].iris_region.b()
+                iris_current = ee_iris.iris_list[ir_seq_idx].iris_region
+                if curr_seg_len == 1:
+                    A = iris_current.A()
+                    b = iris_current.b()
+                else:
+                    # if there's another IRIS region in this contact sequence, intersect with it
+                    if ir_seg_count != (curr_seg_len - 1):
+                        ir_next_seq_idx = iris_seq[seg_idx][frame][ir_seg_count + 1]
+                        iris_next = ee_iris.iris_list[ir_next_seq_idx].iris_region
+                        # check if the two IRIS regions intersect
+                        if iris_current.IntersectsWith(iris_next):
+                            iris_intersect = iris_current.Intersection(iris_next, check_for_redundancy=True)
+                        else:
+                            raise ValueError(f"IRIS regions of {frame} in segment {seg_idx} do not intersect.")
+                        A = iris_intersect.A()
+                        b = iris_intersect.b()
+                    else:
+                        # last IRIS region in the sequence
+                        A = iris_current.A()
+                        b = iris_current.b()
                 # debug
                 if frame == 'torso':
                     iris_constr_torso.append(A @ x[x_init_idx:x_init_idx+d] <= b)
@@ -118,26 +132,20 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
                 elif frame == 'RH':
                     iris_constr_rh.append(A @ x[x_init_idx:x_init_idx+d] <= b)
                 x_init_idx += d
-        # x_init_idx += d     # last point is assumed to be feasible
 
     # Construct end-effector reachability constraints (initial & final points specified)
-    l_arm_reach_constr = []
-    r_arm_reach_constr = []
-    l_leg_reach_constr = []
-    r_leg_reach_constr = []
-    l_knee_reach_constr = []
-    r_knee_reach_constr = []
+    l_arm_reach_constr, r_arm_reach_constr, l_leg_reach_constr, r_leg_reach_constr, l_knee_reach_constr, r_knee_reach_constr = [], [], [], [], [], []
     x_curr_idx = 0      # reset index counter
     if reach is not None:
         for frame_idx, frame in enumerate(iris_regions.keys()):
-            for ti in range(num_iris_tot):
+            for ti in range(num_iris_tot + 1):
                 # torso reachability is redundant
                 if frame == 'torso':
                     x_curr_idx += 3
                     continue
 
                 # get corresponding torso indices
-                t_curr_idx = 0 * num_iris_tot * d + d * ti
+                t_curr_idx = 0 * (num_iris_tot + 1) * d + d * ti
                 t_next_idx = t_curr_idx + 3
                 z_t = x[t_curr_idx: t_next_idx]
 
@@ -147,7 +155,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
                     x_curr_idx += 3
                     continue
                 else:
-                    ee_curr_idx = frame_idx * num_iris_tot * d + d * ti
+                    ee_curr_idx = frame_idx * (num_iris_tot + 1) * d + d * ti
                     ee_next_idx = ee_curr_idx + 3
                 z_ee = x[ee_curr_idx: ee_next_idx]
                 coeffs = reach[frame]
@@ -180,13 +188,13 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
         for aux_fr in aux_frames:
             # get corresponding indices of optimization variable
             prox_idx, dist_idx, link_length = get_aux_frame_idx(
-                aux_fr, frame_list, num_iris_tot)
+                aux_fr, frame_list, num_iris_tot+1)
 
             if not np.isnan(prox_idx):
                 link_length += link_threshold  # threshold for relaxation
                 # add convex relaxation of norm constraint
                 A_soc_aux, d_soc_aux = create_cvx_norm_eq_relaxation(
-                    prox_idx, dist_idx, link_length, d, num_iris_tot, x)
+                    prox_idx, dist_idx, link_length, d, num_iris_tot+1, x)
 
                 # concatenate A inequality matrices for debugging
                 A_soc_debug += copy.deepcopy(A_soc_aux)
@@ -203,10 +211,10 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
     # minimum distance cost (add distance between points of corresponding frame)
     cost = 0
     for fr in range(n_f):
-        start_idx = fr * d * (num_iris_tot)
-        end_idx = start_idx + d * (num_iris_tot)
+        start_idx = fr * d * (num_iris_tot + 1)
+        end_idx = start_idx + d * (num_iris_tot + 1)
         x_fr = x[start_idx: end_idx]
-        p_fr_t = cp.reshape(x_fr, [d, num_iris_tot])
+        p_fr_t = cp.reshape(x_fr, [d, num_iris_tot + 1], order='F')
         cost += cp.sum(cp.norm(p_fr_t[:, 1:] - p_fr_t[:, :-1], axis=1))
 
     # solve
