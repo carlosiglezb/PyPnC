@@ -79,7 +79,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 if t == (i + 1) * T:
                     b_terminal_step = False
                     gains['feet'] = get_terminal_feet_gains()
-                frame_targets_dict = self.pack_current_targets(t)
+                # frame_targets_dict = self.pack_current_targets(t)   # used for data reload
+                frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
                 if t < (i + 1) * T:
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
