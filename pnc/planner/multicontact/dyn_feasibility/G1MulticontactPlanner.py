@@ -26,8 +26,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         super().__init__(robot_model, contact_seqs, time_per_phase, ik_cfree_planner)
 
         self.gains = {
-            'torso': np.array([1.5, 1.5, 1.0] + [0.5, 0.5, 0.001]),  # (lin, ang)
-            'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
+            'torso': np.array([2.5, 1.5, 1.0] + [0.5, 0.5, 0.01]),  # (lin, ang)
+            'feet': np.array([12.] * 3 + [0.00001] * 3),  # (lin, ang)
             'L_knee': np.array([8.] * 3 + [0.00001] * 3),
             'R_knee': np.array([8.] * 3 + [0.00001] * 3),
             'hands': np.array([2.] * 3 + [0.00001] * 3)

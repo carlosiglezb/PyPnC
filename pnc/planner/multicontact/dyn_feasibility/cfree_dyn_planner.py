@@ -36,10 +36,11 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 from plot.data_saver import *
 
 B_SHOW_JOINT_PLOTS = False
-B_SHOW_COST_PLOTS = True
+B_SHOW_COST_PLOTS = False
 B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = True
-B_SAVE_DATA = False
+B_SAVE_KIN_DATA = False
+B_SAVE_DYN_DATA = True
 B_VERBOSE = True
 B_SAVE_HTML = False
 B_USE_SELF_COLLISION_AVOIDANCE = False
@@ -901,7 +902,7 @@ def main(args):
         ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
         ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer, B_VERBOSE)
 
-        if B_SAVE_DATA:
+        if B_SAVE_KIN_DATA:
             # save the solution parameters needed to reconstruct the Bezier curves
             if B_USE_SELF_COLLISION_AVOIDANCE:
                 save_filename = robot_name + '_sca_step_over_knee_knocker_kin.pkl'
@@ -1039,7 +1040,7 @@ def main(args):
             plan_plotter.plot_costs()
         plt.show()
 
-    if B_SHOW_GRF_PLOTS or B_SAVE_DATA:
+    if B_SHOW_GRF_PLOTS or B_SAVE_DYN_DATA:
         # Note: contact_links are l_ankle_ie, r_ankle_ie, l_wrist_pitch, r_wrist_pitch
         sim_steps_list = [len(robot_dyn_plan.fddp[i].us) for i in range(len(robot_dyn_plan.fddp))]
         sim_steps = np.sum(sim_steps_list)
@@ -1077,9 +1078,10 @@ def main(args):
             plot_vector_traj(sim_time, rf_rwrist.T, 'RF RWrist (World)', Fxyz_labels)
             plt.show()
 
-    if B_SAVE_DATA:
+    if B_SAVE_DYN_DATA:
         # Saving data tools
-        dyn_data_saver = DataSaver(robot_name + '_step_over_knee_knocker_dyn.pkl')
+        dyn_data_saver = DataSaver(robot_name + '_step_over_knee_knocker.pkl')
+        dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
         for (i, fp) in enumerate(robot_dyn_plan.fddp):
             com_lst = []
             torso_pos, lf_pos, rf_pos, lkn_pos, rkn_pos, lh_pos, rh_pos = [], [], [], [], [], [], []
