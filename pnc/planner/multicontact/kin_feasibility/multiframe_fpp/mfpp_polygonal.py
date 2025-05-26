@@ -141,22 +141,22 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
             for ti in range(num_iris_tot + 1):
                 # torso reachability is redundant
                 if frame == 'torso':
-                    x_curr_idx += 3
+                    x_curr_idx += d
                     continue
 
                 # get corresponding torso indices
                 t_curr_idx = 0 * (num_iris_tot + 1) * d + d * ti
-                t_next_idx = t_curr_idx + 3
+                t_next_idx = t_curr_idx + d
                 z_t = x[t_curr_idx: t_next_idx]
 
                 # torso must be reachable from contact foot
                 # Note: not including knee reachability eases infeasibility
                 if frame == 'NaN' or frame == 'MaM':
-                    x_curr_idx += 3
+                    x_curr_idx += d
                     continue
                 else:
                     ee_curr_idx = frame_idx * (num_iris_tot + 1) * d + d * ti
-                    ee_next_idx = ee_curr_idx + 3
+                    ee_next_idx = ee_curr_idx + d
                 z_ee = x[ee_curr_idx: ee_next_idx]
                 coeffs = reach[frame]
 
@@ -174,7 +174,7 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
                     l_knee_reach_constr.append(H @ (z_ee - z_t) <= -d_vec)
                 elif frame == 'R_knee':
                     r_knee_reach_constr.append(H @ (z_ee - z_t) <= -d_vec)
-                x_curr_idx += 3
+                x_curr_idx += d
 
     frame_list = list(safe_points_list[0].keys())
     # add rigid link constraint

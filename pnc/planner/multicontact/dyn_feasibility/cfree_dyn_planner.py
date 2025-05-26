@@ -40,7 +40,7 @@ B_SHOW_COST_PLOTS = False
 B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = True
 B_SAVE_KIN_DATA = False
-B_SAVE_DYN_DATA = True
+B_SAVE_DYN_DATA = False
 B_VERBOSE = True
 B_SAVE_HTML = False
 B_USE_SELF_COLLISION_AVOIDANCE = False
@@ -879,7 +879,7 @@ def main(args):
 
         # planner parameters
         T = 3
-        alpha = [1, 0.1, 0.01]
+        alpha = [0, 0, 1.0]
         # use self-collision avoidance
         sca_geometry = None
         if B_USE_SELF_COLLISION_AVOIDANCE:

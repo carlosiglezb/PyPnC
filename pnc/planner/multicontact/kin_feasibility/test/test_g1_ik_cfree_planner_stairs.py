@@ -262,18 +262,17 @@ class TestIKCFreePlanner(unittest.TestCase):
         return safe_regions_mgr_dict
 
     def get_opposing_limbs_contact_sequence(self, plan_to_model_frames):
-        # TODO grab from environment geometry?
-        box_width = 0.35
-        box_depth = 0.2
-        box_h1_left = 0.25
-        box_h2_left = 0.5
-        box_h1_right = 0.55
-        box_h2_right = 0.8
-        ankle_height = 0.05
-        delta_h = (box_h2_left - box_h1_left) / 2
-        left_step_normal = np.array([0, delta_h, -box_width])
-        right_step_normal = np.array([0, delta_h, box_width])
-        robot_height = 0.7
+        box_width = self.stairs.box_width
+        box_depth = self.stairs.box_depth
+        box_h1_left = self.stairs.box_h1_left
+        box_h2_left = self.stairs.box_h2_left
+        box_h1_right = self.stairs.box_h1_right
+        box_h2_right = self.stairs.box_h2_right
+        ankle_height = 0.08
+        delta_h_left = (box_h2_left - box_h1_left) / 2
+        delta_h_right = (box_h2_right - box_h1_right) / 2
+        left_step_normal = np.array([0, delta_h_left, -box_width])
+        right_step_normal = np.array([0, delta_h_right, box_width])
 
         # get end effector positions via fwd kin
         starting_torso_pos = self.robot_fwdk.get_link_iso(plan_to_model_frames['torso'])[:3, 3]
@@ -286,8 +285,8 @@ class TestIKCFreePlanner(unittest.TestCase):
             starting_rkn_pos = self.robot_fwdk.get_link_iso(plan_to_model_frames['R_knee'])[:3, 3]
 
         # G1 settings
-        final_lf_pos = np.array([0.4 + 2.5 * box_depth , 0.1, 1.05])
-        final_rf_pos = np.array([0.4 + 2.5 * box_depth , -0.1, 1.05])
+        final_lf_pos = np.array([0.2 + 2.5 * box_depth , 0.1, 1.05])
+        final_rf_pos = np.array([0.2 + 2.5 * box_depth , -0.1, 1.05])
         final_torso_pos = (final_lf_pos + final_rf_pos) / 2 + np.array([0., 0., starting_torso_pos[2]])
         final_rh_pos = final_torso_pos + np.array([0.3, -0.2, 0.08])
         final_lh_pos = final_torso_pos + np.array([0.3, 0.2, 0.08])
@@ -301,9 +300,9 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         # intermediate locations
         rh1_wall = np.array([0.34, -0.32, 1.0])
-        lf_step1 = np.array([0.4, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height])
+        lf_step1 = np.array([0.35, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height])
         lh_wall_step_12 = np.array([0.2 + box_depth, box_width - 0.03, 1.4])
-        rf_step2 = np.array([0.4 + box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + 0.03])
+        rf_step2 = np.array([0.32+ box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height])
 
         # initialize fixed and motion frame sets
         fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
@@ -315,15 +314,14 @@ class TestIKCFreePlanner(unittest.TestCase):
             fixed_frames.append(['LF', 'RF'])  # frames that must not move
         motion_frames_seq.add_motion_frame({
             'RH': rh1_wall,
-            # 'torso': starting_torso_pos + np.array([0.07, -0.07, 0])
         })
-        rh_wall1_contact = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
-        rh_wall1_contact.set_contact_breaking_velocity(np.array([0, -1, 0.]))
+        rh_wall1_contact = PlannerSurfaceContact('LH', np.array([0, 1, 0]))
+        rh_wall1_contact.set_contact_breaking_velocity(np.array([0, 1, 0.]))
         motion_frames_seq.add_contact_surface(rh_wall1_contact)
 
         # ---- Step 2: step on left tilted step (and RH wall)
         if self.b_use_knees:
-            rough_knee_pos = np.array([0.05, 0., 0.3])
+            rough_knee_pos = np.array([0.08, 0., 0.25])
             scaled_knee_pos = lf_step1 + rough_knee_pos * 0.3139 / np.linalg.norm(rough_knee_pos)
             fixed_frames.append(['RF', 'R_knee', 'RH'])  # frames that must not move
             motion_frames_seq.add_motion_frame({
@@ -339,7 +337,7 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         # ---- Step 3: move to second step with RF
         if self.b_use_knees:
-            rough_knee_pos = np.array([0.05, 0., 0.25])
+            rough_knee_pos = np.array([0.08, 0., 0.25])
             scaled_knee_pos = rf_step2 + rough_knee_pos * 0.3139 / np.linalg.norm(rough_knee_pos)
             fixed_frames.append(['LF', 'L_knee', 'RH'])  # frames that must not move
             motion_frames_seq.add_motion_frame({
@@ -358,14 +356,12 @@ class TestIKCFreePlanner(unittest.TestCase):
         if self.b_use_knees:
             fixed_frames.append(['RF', 'R_knee', 'LH'])
             motion_frames_seq.add_motion_frame({
-                # 'torso': final_torso_pos,
                 'LF': final_lf_pos,
                 'L_knee': final_lkn_pos,        # + np.array([-0.05, 0., 0.035])
             })
         else:
             fixed_frames.append(['RF', 'LH'])
             motion_frames_seq.add_motion_frame({
-                # 'torso': final_torso_pos,
                 'LF': final_lf_pos,
             })
         lf_step3_contact = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
@@ -465,8 +461,6 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         # initial and desired final positions for each frame
         p_init = {}
-        # for fr in frame_names:
-        #     p_init[fr] = safe_regions_mgr_dict[fr].iris_list[0].seed_pos  # starting_pos
         p_init['torso'] = self.starting_torso_pos
         p_init['LF'] = self.starting_lf_pos
         p_init['RF'] = self.starting_rf_pos
@@ -478,7 +472,7 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         # planner parameters
         T = 3
-        alpha = [0, 0, 1]
+        alpha = [1, 0.1, 0.01]
         if self.b_use_knees:
             traversable_regions = [traversable_regions_dict['torso'],
                                    traversable_regions_dict['LF'],
@@ -505,8 +499,6 @@ class TestIKCFreePlanner(unittest.TestCase):
         ik_cfree_planner.set_planner(frame_planner)
         ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
         ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer)
-
-        # TODO plot safe_points_list
 
         self.assertEqual(True, True)
         return ik_cfree_planner
@@ -554,8 +546,8 @@ class TestIKCFreePlanner(unittest.TestCase):
             display.start_animation()
             for i in range(N_knots):
                 display.animate_single_collision(ik_cfree_planner.plan_to_model_frames['torso'] + '_0', base_targets[i])
-                display.animate_single_collision(ik_cfree_planner.plan_to_model_frames['L_knee'] + '_0', lkn_targets[i])
-                display.animate_single_collision(ik_cfree_planner.plan_to_model_frames['R_knee'] + '_0', rkn_targets[i])
+                # display.animate_single_collision(ik_cfree_planner.plan_to_model_frames['L_knee'] + '_0', lkn_targets[i])
+                # display.animate_single_collision(ik_cfree_planner.plan_to_model_frames['R_knee'] + '_0', rkn_targets[i])
                 display.animate_target("lfoot_target", [lf_targets[i]], [1, 1, 0])
                 display.animate_target("lknee_target", [lkn_targets[i]], [0, 0, 1])
                 display.animate_target("rfoot_target", [rf_targets[i]], [1, 1, 0])

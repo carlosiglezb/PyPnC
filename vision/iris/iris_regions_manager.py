@@ -1,6 +1,7 @@
 from typing import List
 
 import numpy as np
+import scipy as sp
 
 from .iris_seq_planner import IrisGraph
 from .iris_geom_interface import IrisGeomInterface
@@ -250,10 +251,96 @@ class IrisRegionsManager:
     def findShortestPath(self, start: np.array,
                          goal: np.array,
                          hint_iris: int = None) -> List[int]:
+        """
+        First, try to use logic to find the right sequence of IRIS regions.
+        If too convoluted, use the graph.
+        """
+
+        # If total number of IRIS regions is 1 or 2, we can use logic to find the right sequence
+        if len(self.iris_list) == 1 and len(self.global_iris) == 1:
+            return [0]
+        elif len(self.iris_list) == 2 and len(self.global_iris) == 1:
+            return self.global_iris[0]
+        elif len(self.iris_list) == 2 and len(self.global_iris) == 2:
+            b_last_global_contains_start = self.iris_list[self.global_iris[1][0]].isPointSafe(start)
+            b_last_global_contains_goal = self.iris_list[self.global_iris[1][0]].isPointSafe(goal)
+            b_first_global_contains_goal = self.iris_list[self.global_iris[0][0]].isPointSafe(goal)
+            b_first_global_contains_start = self.iris_list[self.global_iris[0][0]].isPointSafe(start)
+            if b_last_global_contains_start and b_last_global_contains_goal:
+                # if the start/goal point is contained in 2nd global IRIS, favor it
+                return self.global_iris[1]
+            elif not b_last_global_contains_goal and b_first_global_contains_goal and b_first_global_contains_start:
+                # by construction, these should be true
+                return self.global_iris[0]
+            elif b_first_global_contains_start and b_first_global_contains_goal:
+                # by construction, these should be true
+                return self.global_iris[0]
+        else:
+            if self.iris_graph is None:
+                self.iris_graph = IrisGraph(self.iris_list)
+
+            # look at regions that contain the start and goal points
+            regions_containing_goal = self.iris_graph.regionsContainingPoint(goal)
+            regions_containing_start = self.iris_graph.regionsContainingPoint(start)
+
+            if len(regions_containing_goal) >= 2 or len(regions_containing_start) >= 2:
+                # check if there is a path between any two of these regions
+                max_pair = None
+                max_vol = -np.inf
+                for idx1 in range(len(regions_containing_start)):
+                    for idx2 in range(len(regions_containing_goal)):
+                        i1 = regions_containing_start[idx1]
+                        i2 = regions_containing_goal[idx2]
+                        vol = self.iris_list[i1].iris_region.Intersection(
+                            self.iris_list[i2].iris_region
+                        ).MaximumVolumeInscribedEllipsoid().CalcVolume()
+                        if vol > max_vol:
+                            max_vol = vol
+                            max_pair = (i1, i2)
+                if max_pair is not None:
+                    if max_pair[0] == max_pair[1]:
+                        # if both indices are the same, return that IRIS region
+                        return [max_pair[0]]
+                    else:
+                        return list(max_pair)
+
+            # Reaching here means we cannot reasonably go from start to goal with a single IRIS region pair.
+            # Resorting to Dijkstra's algorithm to find the shortest path using IRIS centroids
+            print(f"Creating Graph for (start, goal): ({start}, {goal})")
+            self.iris_graph = IrisGraph(self.iris_list)
+
+        # compute shortest path from start to goal
+        planner, runtime = self.iris_graph.computeShortestPath(goal)
+        iris_seq_tmp, _, __ = planner(start)
+
+        # If <= 2 IRIS regions in shortest path, check that the start/goal are not contained in one IRIS
+        if len(iris_seq_tmp) <= 2:
+            if hint_iris is not None:
+                start_is_in_hint = self.iris_list[hint_iris].isPointSafe(start)
+                goal_is_in_hint = self.iris_list[hint_iris].isPointSafe(goal)
+                if hint_iris in iris_seq_tmp and start_is_in_hint and goal_is_in_hint:
+                    return [hint_iris]
+                else:
+                    return iris_seq_tmp
+            else:
+                # choose the one whose centroid is closest to the goal seed
+                centroid_dist = []
+                for ir in iris_seq_tmp:
+                    centroid_dist.append(sp.linalg.norm(self.iris_list[ir].iris_region.ChebyshevCenter() - goal))
+                return [iris_seq_tmp[np.argmin(centroid_dist)]]
+
+        # If we reach this point, there are > 2 IRIS regions in shortest path
+        return iris_seq_tmp
+
+    def findShortestPathOld(self, start: np.array,
+                         goal: np.array,
+                         hint_iris: int = None) -> List[int]:
         # if single IRIS region, return the index of corresponding global IRIS region
         if self.iris_graph is None:
             if len(self.iris_list) == 1 and len(self.global_iris) == 1:
                 return [self.iris_idx_seq[0]]
+            elif len(self.iris_list) == 2 and len(self.global_iris) == 1:
+                return self.global_iris[0]
             elif len(self.iris_list) == 2 and len(self.global_iris) == 2:
                 b_last_global_contains_start = self.iris_list[self.global_iris[1][0]].isPointSafe(start)
                 b_last_global_contains_goal = self.iris_list[self.global_iris[1][0]].isPointSafe(goal)
@@ -270,7 +357,7 @@ class IrisRegionsManager:
                     return self.global_iris[0]
             else:
                 # for some reason we didn't need the graph before
-                print(f"Creating Graph connecting points: {self.iris_list}")
+                print(f"Creating Graph for seed: {self.iris_start_seed}")
                 self.iris_graph = IrisGraph(self.iris_list)
 
         planner, runtime = self.iris_graph.computeShortestPath(goal)
@@ -279,6 +366,8 @@ class IrisRegionsManager:
         if hint_iris is not None:
             if self.iris_list[hint_iris].isPointSafe(start):
                 iris_p_init = hint_iris
+            else:
+                iris_p_init = self.iris_graph.regionsContainingPoint(start)[0]
         else:
             ir_start_idx = 0
             for ir in self.iris_list:
@@ -304,6 +393,7 @@ class IrisRegionsManager:
                 test_iris_region = self.iris_list[r].iris_region
                 intersect_vol.append(init_iris_region.Intersection(test_iris_region).MaximumVolumeInscribedEllipsoid().CalcVolume())
             iris_p_goal = regions_containing_goal[np.argmax(intersect_vol)]
+            return [iris_p_goal]
 
         iris_seq_tmp, length, runtime = planner(start)
         if iris_p_init == iris_p_goal:
@@ -338,7 +428,8 @@ class IrisRegionsManager:
         if self.iris_graph is None:
             # if we already agreed we can stay in the initial IRIS region, proceed with that
             if len(self.iris_idx_seq) == 1:
-                return self.iris_idx_seq
+                # there are some type inconsistency issues. Fix later
+                return [self.iris_idx_seq[0]] if isinstance(self.iris_idx_seq[0], int) else self.iris_idx_seq[0]
             # point must be contained in either the start/goal IRIS region
             elif len(self.global_iris) == 1 and self.iris_list[self.iris_idx_seq[0]].isPointSafe(point):
                 return [self.iris_idx_seq[0]]
