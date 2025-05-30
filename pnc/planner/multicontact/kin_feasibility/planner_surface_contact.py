@@ -38,9 +38,8 @@ class PlannerSurfaceContact:
 
 class MotionFrameSequencer:
     def __init__(self):
-        self.motion_frame_lst = []
-        self.contact_frame_lst = []
-
+        self.motion_frame_lst: list[dict[str: np.ndarray]] = []
+        self.contact_frame_lst: list[PlannerSurfaceContact] = []
         self.b_initial_vel = False
         self.b_initial_acc = False
         self.b_final_vel = False

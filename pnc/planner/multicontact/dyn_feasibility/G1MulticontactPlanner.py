@@ -67,12 +67,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             model_seqs = []
             frames_in_contact = self.contact_seqs[i]
             # TODO change for upper call to update_contact_params() or so
-            if i == 1:
+            if 'LH' in frames_in_contact:
                 ee_rpy['LH'] = get_rpy_normal_left_wall()
-            elif i == 3:
+            elif 'RH' in frames_in_contact:
                 ee_rpy['RH'] = get_rpy_normal_right_wall()
             elif i > (self.contact_phases - 1):
-                raise NotImplementedError(f"Frames for contact sequence {i} not specified.")
+                raise NotImplementedError(f"{'*' * 10} Frames for contact sequence {i} not specified.")
             N_current = self.horizon_lst[i]
             DT = T / (N_current - 1)
             for t in np.linspace(i * T, (i + 1) * T, N_current):
@@ -180,17 +180,6 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print("Time to solve:", dyn_seg_solve_time)
             print("===============")
             dyn_solve_time += dyn_seg_solve_time
-
-            # save data
-            # if B_SAVE_DATA:
-            #     for ti in range(len(fddp[i].us)):
-            #         data_saver.add('time', float(i*T + ti*T/(len(fddp[i].xs)-1)))
-            #         data_saver.add('q_base', list(fddp[i].xs[ti][:7]))
-            #         data_saver.add('q_joints', list(fddp[i].xs[ti][7:state.nq]))
-            #         data_saver.add('qd_base', list(fddp[i].xs[ti][state.nq:state.nq+6]))
-            #         data_saver.add('qd_joints', list(fddp[i].xs[ti][state.nq+6:]))
-            #         data_saver.add('tau_joints', list(fddp[i].us[ti]))
-            #         data_saver.advance()
 
             # Set final state as initial state of next phase
             x0 = fddp[i].xs[-1]

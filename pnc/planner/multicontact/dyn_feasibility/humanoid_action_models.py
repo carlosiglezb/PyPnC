@@ -371,7 +371,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
                                 terminal_step: bool = False):
-    mu = 0.9
+    mu = 0.7
 
     # Define the cost sum (cost manager)
     costs = crocoddyl.CostModelSum(state, actuation.nu)
@@ -503,7 +503,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
                                 terminal_step: bool = False):
-    mu = 0.9
+    mu = 0.7
 
     # Define the cost sum (cost manager)
     costs = crocoddyl.CostModelSum(state, actuation.nu)
