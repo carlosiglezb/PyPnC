@@ -92,11 +92,6 @@ class LocomanipulationFramePlanner:
         d_prime = d_vec + H @ (init_standing_pos + torso_p_contact_offset)  # grab all the 'd' coefficients
         return H, d_prime
 
-    # def add_reachable_frame_constraint(self, frame_name, associated_traversable_region):
-    #     new_frame_constr = {'name': frame_name,
-    #                         'constrained_to': associated_traversable_region}
-    #     self.aux_frames.append(new_frame_constr)
-
     def plan(self, p_init: dict[str, np.array],
              p_term: np.array,
              T: np.float64,

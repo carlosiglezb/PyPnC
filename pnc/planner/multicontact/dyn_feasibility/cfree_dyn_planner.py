@@ -7,6 +7,7 @@ from collections import OrderedDict
 from pnc.planner.multicontact.kin_feasibility import SCARobotGeometry
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 from util.environment_creator import TiltedStairs
+import pnc.planner.multicontact.contact_sequence_plans.tilted_stairs_plans as stairs_plan
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -19,7 +20,8 @@ from pydrake.geometry.optimization import HPolyhedron
 
 # Kinematic feasibility
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
-from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
+from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import PlannerSurfaceContact, \
+    MotionFrameSequencer, get_contact_seq_from_fixed_frames_seq, get_contact_planes_from_motion_frames_seq
 from pnc.planner.multicontact.kin_feasibility.ik_cfree_planner import *
 # Tools for dynamic feasibility
 from humanoid_action_models import *
@@ -305,194 +307,6 @@ def load_navy_door_models():
     return pin.buildModelsFromUrdf(
         cwd + "/robot_model/ground/navy_door.urdf",
         cwd + "/robot_model/ground", pin.JointModelFreeFlyer())
-
-
-def get_opposing_limbs_contact_sequence(stairs: TiltedStairs, starting_pose: dict[str: np.ndarray]):
-    box_width = stairs.box_width
-    box_depth = stairs.box_depth
-    box_h1_left = stairs.box_h1_left
-    box_h2_left = stairs.box_h2_left
-    box_h1_right = stairs.box_h1_right
-    box_h2_right = stairs.box_h2_right
-    ankle_height = 0.08
-    delta_h_left = (box_h2_left - box_h1_left)
-    delta_h_right = (box_h2_right - box_h1_right)
-    left_step_normal = np.array([0, -delta_h_left, box_width])
-    right_step_normal = np.array([0, delta_h_right, box_width])
-
-    # get end effector positions via fwd kin
-    starting_torso_pos = starting_pose['torso']
-    starting_lf_pos = starting_pose['LF']
-    starting_lh_pos = starting_pose['LH']
-    starting_rf_pos = starting_pose['RF']
-    starting_rh_pos = starting_pose['RH']
-    if B_USE_KNEES:
-        starting_lkn_pos = starting_pose['L_knee']
-        starting_rkn_pos = starting_pose['R_knee']
-
-    # G1 settings
-    final_lf_pos = np.array([0.2 + 2.5 * box_depth , 0.1, 1.05])
-    final_rf_pos = np.array([0.2 + 2.5 * box_depth , -0.1, 1.05])
-    final_torso_pos = (final_lf_pos + final_rf_pos) / 2 + np.array([0., 0., starting_torso_pos[2]])
-    final_rh_pos = final_torso_pos + np.array([0.3, -0.2, 0.08])
-    final_lh_pos = final_torso_pos + np.array([0.3, 0.2, 0.08])
-    if B_USE_KNEES:
-        rough_knee_pos = (starting_lkn_pos - starting_lf_pos)
-        scaled_knee_pos = final_lf_pos + rough_knee_pos * 0.3139 / np.linalg.norm(rough_knee_pos)
-        final_lkn_pos = scaled_knee_pos
-        rough_knee_pos = (starting_rkn_pos - starting_rf_pos)
-        scaled_knee_pos = final_rf_pos + rough_knee_pos * 0.3139 / np.linalg.norm(rough_knee_pos)
-        final_rkn_pos = scaled_knee_pos
-
-    # intermediate locations
-    rh1_wall = np.array([0.34, -0.32, 1.0])
-    lf_step1 = np.array([0.35, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height])
-    lh_wall_step_12 = np.array([0.2 + box_depth, box_width - 0.03, 1.4])
-    rf_step2 = np.array([0.32+ box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height])
-
-    # initialize fixed and motion frame sets
-    fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
-
-    # ---- Step 1: R hand to frame
-    if B_USE_KNEES:
-        fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])  # frames that must not move
-    else:
-        fixed_frames.append(['LF', 'RF'])  # frames that must not move
-    motion_frames_seq.add_motion_frame({
-        'RH': rh1_wall,
-    })
-    rh_wall1_contact = PlannerSurfaceContact('RH', np.array([0, 1, 0]))
-    rh_wall1_contact.set_contact_breaking_velocity(np.array([0, 1, 0.]))
-    motion_frames_seq.add_contact_surface(rh_wall1_contact)
-
-    # ---- Step 2: step on left tilted step (and RH wall)
-    if B_USE_KNEES:
-        rough_knee_pos = np.array([0.08, 0., 0.25])
-        scaled_knee_pos = lf_step1 + rough_knee_pos * 0.3139 / np.linalg.norm(rough_knee_pos)
-        fixed_frames.append(['RF', 'R_knee', 'RH'])  # frames that must not move
-        motion_frames_seq.add_motion_frame({
-            'LF': lf_step1,
-            'L_knee': scaled_knee_pos})
-    else:
-        fixed_frames.append(['RF', 'RH'])  # frames that must not move
-        motion_frames_seq.add_motion_frame({
-            'LF': lf_step1})
-    lf_step1_contact = PlannerSurfaceContact('LF', left_step_normal)
-    lf_step1_contact.set_contact_breaking_velocity(left_step_normal)
-    motion_frames_seq.add_contact_surface(lf_step1_contact)
-
-    # ---- Step 3: move to second step with RF
-    if B_USE_KNEES:
-        rough_knee_pos = np.array([0.08, 0., 0.25])
-        scaled_knee_pos = rf_step2 + rough_knee_pos * 0.3139 / np.linalg.norm(rough_knee_pos)
-        fixed_frames.append(['LF', 'L_knee', 'RH'])  # frames that must not move
-        motion_frames_seq.add_motion_frame({
-            'LH': lh_wall_step_12,
-            'R_knee': scaled_knee_pos,
-            'RF': rf_step2})
-    else:
-        fixed_frames.append(['LF', 'RH'])  # frames that must not move
-        motion_frames_seq.add_motion_frame({
-            'LH': lh_wall_step_12,
-            'RF': rf_step2})
-    rf_step2_contact = PlannerSurfaceContact('RF', right_step_normal)
-    motion_frames_seq.add_contact_surface(rf_step2_contact)
-
-    # ---- Step 4: step on middle box with LF
-    if B_USE_KNEES:
-        fixed_frames.append(['RF', 'R_knee', 'LH'])
-        motion_frames_seq.add_motion_frame({
-            'LF': final_lf_pos,
-            'L_knee': final_lkn_pos,        # + np.array([-0.05, 0., 0.035])
-        })
-    else:
-        fixed_frames.append(['RF', 'LH'])
-        motion_frames_seq.add_motion_frame({
-            'LF': final_lf_pos,
-        })
-    lf_step3_contact = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(lf_step3_contact)
-
-    # ---- Step 5: step on middle box with RF
-    if B_USE_KNEES:
-        fixed_frames.append(['LF', 'L_knee'])
-        motion_frames_seq.add_motion_frame({
-            'torso': final_torso_pos,
-            'RF': final_rf_pos,
-            'R_knee': final_rkn_pos,
-            'LH': final_lh_pos,
-            'RH': final_rh_pos,
-        })
-    else:
-        fixed_frames.append(['LF'])
-        motion_frames_seq.add_motion_frame({
-            'torso': final_torso_pos,
-            'RF': final_rf_pos,
-            'LH': final_lh_pos,
-            'RH': final_rh_pos,
-        })
-    rf_step4_contact = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(rf_step4_contact)
-
-    # ---- Step 6: balance
-    if B_USE_KNEES:
-        fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
-    else:
-        fixed_frames.append(['torso', 'LF', 'RF', 'LH', 'RH'])
-    motion_frames_seq.add_motion_frame({})
-
-    return fixed_frames, motion_frames_seq
-
-def compute_stairs_iris_regions_mgr(stairs: TiltedStairs,
-                                    starting_pose: dict[str, np.ndarray],
-                                    motion_frames_seq: MotionFrameSequencer):
-    # load obstacle, domain, and start / end seed for IRIS
-    obstacles = stairs.obstacles
-    domain = stairs.domain
-    # shift (feet) iris seed to get nicer IRIS region
-    iris_lf_shift = np.array([0.0, 0., 0.])
-    iris_rf_shift = np.array([0.0, 0., 0.])
-    iris_kn_shift = np.array([0.0, 0., 0.0])
-
-    starting_torso_pos = starting_pose['torso']
-    starting_lf_pos = starting_pose['LF']
-    starting_lh_pos = starting_pose['LH']
-    starting_rf_pos = starting_pose['RF']
-    starting_rh_pos = starting_pose['RH']
-    if B_USE_KNEES:
-        starting_lkn_pos = starting_pose['L_knee']
-        starting_rkn_pos = starting_pose['R_knee']
-
-    # create dictionary of safe regions
-    safe_torso_start_region = IrisGeomInterface(obstacles, domain, starting_torso_pos)
-    safe_lf_start_region = IrisGeomInterface(obstacles, domain, starting_lf_pos + iris_lf_shift)
-    safe_lh_start_region = IrisGeomInterface(obstacles, domain, starting_lh_pos)
-    safe_rf_start_region = IrisGeomInterface(obstacles, domain, starting_rf_pos + iris_rf_shift)
-    safe_rh_start_region = IrisGeomInterface(obstacles, domain, starting_rh_pos)
-    safe_regions_mgr_dict = {'torso': IrisRegionsManager(safe_torso_start_region),
-                             'LF': IrisRegionsManager(safe_lf_start_region),
-                             'LH': IrisRegionsManager(safe_lh_start_region),
-                             'RF': IrisRegionsManager(safe_rf_start_region),
-                             'RH': IrisRegionsManager(safe_rh_start_region)}
-    if B_USE_KNEES:
-        safe_lk_start_region = IrisGeomInterface(obstacles, domain, starting_lkn_pos + np.array([0.02, 0., -0.05]))
-        safe_rk_start_region = IrisGeomInterface(obstacles, domain, starting_rkn_pos)
-
-        safe_regions_mgr_dict['L_knee'] = IrisRegionsManager(safe_lk_start_region)
-        safe_regions_mgr_dict['R_knee'] = IrisRegionsManager(safe_rk_start_region)
-
-    # loop through each of the planned steps to make sure we have an IRIS regions for each
-    for fr_dict in motion_frames_seq.motion_frame_lst:
-        for fr_name, pos in fr_dict.items():
-            next_ir = IrisGeomInterface(obstacles, domain, pos)
-            safe_regions_mgr_dict[fr_name].addIris([next_ir])
-
-    # compute and connect IRIS from start to goal
-    for _, irm in safe_regions_mgr_dict.items():
-        irm.computeIris()
-        irm.connectIrisListSeeds("volume")
-
-    return safe_regions_mgr_dict
 
 def compute_iris_regions_mgr(obstacles,
                              domain_ubody,
@@ -834,70 +648,6 @@ def visualize_env(rob_model, rob_collision_model, rob_visual_model, q0, door_pos
 
     return visualizer, door_model, door_collision_model, door_visual_model
 
-
-def get_contact_seq_from_fixed_frames_seq(fixed_frames_seq):
-    contact_frames = ['LF', 'RF', 'LH', 'RH']
-    contact_frames_seq = []
-    for seq in fixed_frames_seq:
-        cf = []
-        for ff in seq:
-            # check for frames that can be in contact:
-            if ff in contact_frames:
-               cf.append(ff)
-
-        # throw error if no contact frames were detected
-        if len(cf) == 0:
-            print(f"No contact frames found in fixed frames")
-            return
-
-        # append contact frames found in current sequence
-        contact_frames_seq.append(cf)
-
-    # move contact-making to the end
-    for cs_i, cs in enumerate(contact_frames_seq):
-        if cs_i == 0:   # ignore first contact sequence
-            continue
-
-        b_phase_done = False
-        # find new contact to place them at the end for impulse model
-        for ccon in cs:
-            if (not b_phase_done) and (ccon not in contact_frames_seq[cs_i - 1]):
-                contact_frames_seq[cs_i].remove(ccon)
-                contact_frames_seq[cs_i].append(ccon)
-                b_phase_done = True
-
-    # remove hands from last sequence when added for smoothing
-    if contact_frames_seq[-1] == contact_frames:
-        contact_frames_seq.pop(-1)
-        contact_frames_seq.pop(-1)
-
-    return contact_frames_seq
-
-def get_contact_planes_from_motion_frames_seq(contact_seq: list[str],
-                                              motion_frames_seq: MotionFrameSequencer):
-    contact_planes: dict[str: np.ndarray] = []
-    for i, seq_contact in enumerate(contact_seq):
-        seq_contact_planes = {}
-        if i == 0 or i == len(motion_frames_seq.motion_frame_lst) - 1:
-            # currently, we are assuming we start/end on a flat surface
-            seq_contact_planes['LF'] = np.array([0, 0, 1])
-            seq_contact_planes['RF'] = np.array([0, 0, 1])
-        else:
-            for fr_name in seq_contact:
-                # search for latest assigned contact plane
-                for j in range(i, -1, -1):
-                    if fr_name == motion_frames_seq.contact_frame_lst[j].contact_frame_name:
-                        seq_contact_planes[fr_name] = motion_frames_seq.contact_frame_lst[j].surface_normal
-                        break
-                    if j == 0:
-                        # if no contact plane was found, check the initial contacts
-                        if fr_name in contact_planes[0]:
-                            seq_contact_planes[fr_name] = contact_planes[0][fr_name]
-        contact_planes.append(seq_contact_planes)
-
-    return contact_planes
-
-
 def main(args):
     env = args.env
     contact_seq = args.sequence
@@ -1042,11 +792,11 @@ def main(args):
             starting_pose = {}
             for fr in plan_to_model_frames.keys():
                 starting_pose[fr] = robot_fwdk.get_link_iso(plan_to_model_frames[fr])[:3, 3]
-            fixed_frames_seq, motion_frames_seq = get_opposing_limbs_contact_sequence(stairs, starting_pose)
+            fixed_frames_seq, motion_frames_seq = stairs_plan.get_opposing_limbs_contact_sequence(stairs, starting_pose, B_USE_KNEES)
 
             # process vision and create IRIS regions
             standing_pos = q0[:3]
-            safe_regions_mgr_dict = compute_stairs_iris_regions_mgr(stairs, starting_pose, motion_frames_seq)
+            safe_regions_mgr_dict = stairs_plan.compute_stairs_iris_regions_mgr(stairs, starting_pose, motion_frames_seq)
             p_init = {}
             p_init['torso'] = starting_pose['torso']
             p_init['LF'] = starting_pose['LF']
