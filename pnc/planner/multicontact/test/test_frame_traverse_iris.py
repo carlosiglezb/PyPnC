@@ -106,7 +106,7 @@ class TestFrameTraverseIris(unittest.TestCase):
         motion_frames_seq.add_motion_frame({
                             'RF': starting_pos + np.array([step_length, 0., 0.])})
         rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(rf_contact_over)
+        motion_frames_seq.add_contact_surfaces([rf_contact_over])
 
         # plan iris region sequence
         fixed_frames = [None]
@@ -175,14 +175,14 @@ class TestFrameTraverseIris(unittest.TestCase):
         motion_frames_seq.add_motion_frame({
                             rf_name: rf_starting_pos + np.array([step_length, 0., 0.])})
         rf_contact_over = PlannerSurfaceContact(rf_name, np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(rf_contact_over)
+        motion_frames_seq.add_contact_surfaces([rf_contact_over])
 
         # Second sequence: RH
         fixed_frames.append([rf_name])
         motion_frames_seq.add_motion_frame({
                             rh_name: rh_starting_pos + np.array([step_length, 0., 0.])})
         rh_contact_over = PlannerSurfaceContact(rh_name, np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(rh_contact_over)
+        motion_frames_seq.add_contact_surfaces([rh_contact_over])
 
         # plan iris region sequence
         motion_frames_lst = motion_frames_seq.get_motion_frames()
@@ -273,14 +273,14 @@ class TestFrameTraverseIris(unittest.TestCase):
         motion_frames_seq.add_motion_frame({
                             rf_name: rf_starting_pos + np.array([step_length, 0., 0.])})
         rf_contact_over = PlannerSurfaceContact(rf_name, np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(rf_contact_over)
+        motion_frames_seq.add_contact_surfaces([rf_contact_over])
 
         # Second sequence: torso
         fixed_frames.append([rf_name])
         motion_frames_seq.add_motion_frame({
                             torso_name: torso_ending_pos})
         torso_contact_over = PlannerSurfaceContact(rf_name, None)
-        motion_frames_seq.add_contact_surface(torso_contact_over)
+        motion_frames_seq.add_contact_surfaces([torso_contact_over])
 
         # plan iris region sequence
         motion_frames_lst = motion_frames_seq.get_motion_frames()
@@ -365,7 +365,7 @@ class TestFrameTraverseIris(unittest.TestCase):
                             rf_name: rf_ending_pos,
                             rk_name: rk_ending_pos})
         rf_contact_over = PlannerSurfaceContact(rf_name, np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(rf_contact_over)
+        motion_frames_seq.add_contact_surfaces([rf_contact_over])
 
         # plan iris region sequence
         motion_frames_lst = motion_frames_seq.get_motion_frames()

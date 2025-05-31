@@ -279,7 +279,7 @@ class TestIKCFreePlanner(unittest.TestCase):
                 'RH': starting_rh_pos + np.array([0.2, 0., 0.])})  # testing
 
         lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(lf_contact_over)
+        motion_frames_seq.add_contact_surfaces([lf_contact_over])
 
         # ---- Step 3: re-position L/R hands for more stability
         # fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
@@ -304,7 +304,7 @@ class TestIKCFreePlanner(unittest.TestCase):
                                 'RF': final_rf_pos,
                                 'torso': final_torso_pos})
         rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(rf_contact_over)
+        motion_frames_seq.add_contact_surfaces([rf_contact_over])
 
         # ---- Step 5: square up
         if b_use_knees:
@@ -339,7 +339,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         motion_frames_seq.add_motion_frame({'LH': door_l_inner_location})
         lh_contact_front = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
         lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
-        motion_frames_seq.add_contact_surface(lh_contact_front)
+        motion_frames_seq.add_contact_surfaces([lh_contact_front])
 
         # ---- Step 2: step through door with left foot
         fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
@@ -347,7 +347,7 @@ class TestIKCFreePlanner(unittest.TestCase):
                             'LF': final_lf_pos,
                             'L_knee': final_lkn_pos + np.array([-0.05, 0., 0.07])})
         lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(lf_contact_over)
+        motion_frames_seq.add_contact_surfaces([lf_contact_over])
 
         # ---- Step 3: re-position L/R hands for more stability
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
@@ -357,7 +357,7 @@ class TestIKCFreePlanner(unittest.TestCase):
                             'RH': door_r_inner_location})
         rh_contact_inside = PlannerSurfaceContact('RH', np.array([1, 0, 0]))
         # rh_contact_inside.set_contact_breaking_velocity(np.array([1, 0., 0.]))
-        motion_frames_seq.add_contact_surface(rh_contact_inside)
+        motion_frames_seq.add_contact_surfaces([rh_contact_inside])
 
         # ---- Step 4: step through door with right foot
         fixed_frames.append(['LF', 'L_knee', 'RH'])   # frames that must not move
@@ -368,7 +368,7 @@ class TestIKCFreePlanner(unittest.TestCase):
                             # 'RH': final_rh_pos,
                             # 'LH': starting_lh_pos + np.array([0.35, 0.0, 0.0])})
         rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(rf_contact_over)
+        motion_frames_seq.add_contact_surfaces([rf_contact_over])
 
         # ---- Step 5: square up
         # fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])

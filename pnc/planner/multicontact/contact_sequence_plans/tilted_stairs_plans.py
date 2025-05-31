@@ -22,6 +22,9 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
     delta_h_right = (box_h2_right - box_h1_right)
     left_step_normal = np.array([0, -delta_h_left, box_width])
     right_step_normal = np.array([0, delta_h_right, box_width])
+    lh_wall_normal = np.array([0, -1, 0])
+    rh_wall_normal = np.array([0, 1, 0])
+    foot_final_step_normal = np.array([0, 0, 1])
 
     # get end effector positions via fwd kin
     starting_torso_pos = starting_pose['torso']
@@ -64,9 +67,9 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
     motion_frames_seq.add_motion_frame({
         'RH': rh1_wall,
     })
-    rh_wall1_contact = PlannerSurfaceContact('RH', np.array([0, 1, 0]))
-    rh_wall1_contact.set_contact_breaking_velocity(np.array([0, 1, 0.]))
-    motion_frames_seq.add_contact_surface(rh_wall1_contact)
+    rh_wall1_contact = PlannerSurfaceContact('RH', rh_wall_normal)
+    # rh_wall1_contact.set_contact_breaking_velocity(rh_wall_normal)
+    motion_frames_seq.add_contact_surfaces([rh_wall1_contact])
 
     # ---- Step 2: step on left tilted step (and RH wall)
     if b_use_knees:
@@ -81,8 +84,8 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
         motion_frames_seq.add_motion_frame({
             'LF': lf_step1})
     lf_step1_contact = PlannerSurfaceContact('LF', left_step_normal)
-    lf_step1_contact.set_contact_breaking_velocity(left_step_normal)
-    motion_frames_seq.add_contact_surface(lf_step1_contact)
+    # lf_step1_contact.set_contact_breaking_velocity(foot_final_step_normal)
+    motion_frames_seq.add_contact_surfaces([lf_step1_contact])
 
     # ---- Step 3: move to second step with RF
     if b_use_knees:
@@ -99,23 +102,23 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
             'LH': lh_wall_step_12,
             'RF': rf_step2})
     rf_step2_contact = PlannerSurfaceContact('RF', right_step_normal)
-    motion_frames_seq.add_contact_surface(rf_step2_contact)
-    # TODO add LH wall plane contact surface
+    lh_step2_contact = PlannerSurfaceContact('LH', lh_wall_normal)
+    motion_frames_seq.add_contact_surfaces([rf_step2_contact, lh_step2_contact])
 
     # ---- Step 4: step on middle box with LF
     if b_use_knees:
         fixed_frames.append(['RF', 'R_knee', 'LH'])
         motion_frames_seq.add_motion_frame({
             'LF': final_lf_pos,
-            'L_knee': final_lkn_pos,        # + np.array([-0.05, 0., 0.035])
+            'L_knee': final_lkn_pos,
         })
     else:
         fixed_frames.append(['RF', 'LH'])
         motion_frames_seq.add_motion_frame({
             'LF': final_lf_pos,
         })
-    lf_step3_contact = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(lf_step3_contact)
+    lf_step3_contact = PlannerSurfaceContact('LF', foot_final_step_normal)
+    motion_frames_seq.add_contact_surfaces([lf_step3_contact])
 
     # ---- Step 5: step on middle box with RF
     if b_use_knees:
@@ -135,8 +138,8 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
             'LH': final_lh_pos,
             'RH': final_rh_pos,
         })
-    rf_step4_contact = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(rf_step4_contact)
+    rf_step4_contact = PlannerSurfaceContact('RF', foot_final_step_normal)
+    motion_frames_seq.add_contact_surfaces([rf_step4_contact])
 
     # ---- Step 6: balance
     if b_use_knees:

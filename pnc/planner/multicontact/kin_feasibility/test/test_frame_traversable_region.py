@@ -692,7 +692,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
         motion_frames_seq.add_motion_frame({'LH': p_init['LH'] + np.array([0.08, 0.07, 0.15])})
         lh_contact_front = PlannerSurfaceContact('LH', np.array([-1, 0, 0]))
-        motion_frames_seq.add_contact_surface(lh_contact_front)
+        motion_frames_seq.add_contact_surfaces([lh_contact_front])
 
         # ---- Step 2: step through door with left foot
         fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
@@ -700,7 +700,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
                             'LF': p_init['LF'] + np.array([step_length, 0., 0.]),
                             'L_knee': p_init['L_knee'] + np.array([step_length, 0., 0.])})
         lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(lf_contact_over)
+        motion_frames_seq.add_contact_surfaces([lf_contact_over])
 
         # ---- Step 3: re-position L/R hands for more stability
         fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
@@ -709,7 +709,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
                             'RH': p_init['RH'] + np.array([0.09, -0.06, 0.18])})
         lh_contact_inside = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
         rh_contact_inside = PlannerSurfaceContact('RH', np.array([0, 1, 0]))
-        motion_frames_seq.add_contact_surface([lh_contact_inside, rh_contact_inside])
+        motion_frames_seq.add_contact_surfaces([lh_contact_inside, rh_contact_inside])
 
         # ---- Step 4: step through door with right foot
         fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
@@ -718,7 +718,7 @@ class TestFrameTraversableRegion(unittest.TestCase):
                             'R_knee': p_init['R_knee'] + np.array([step_length, 0., 0.]),
                             'torso': p_init['torso'] + np.array([step_length, 0., 0.])})
         rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-        motion_frames_seq.add_contact_surface(rf_contact_over)
+        motion_frames_seq.add_contact_surfaces([rf_contact_over])
 
         # ---- Step 5: square up
         fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])

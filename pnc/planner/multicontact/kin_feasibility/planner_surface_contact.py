@@ -39,7 +39,7 @@ class PlannerSurfaceContact:
 class MotionFrameSequencer:
     def __init__(self):
         self.motion_frame_lst: list[dict[str: np.ndarray]] = []
-        self.contact_frame_lst: list[PlannerSurfaceContact] = []
+        self.contact_frame_lst: list[list[PlannerSurfaceContact]] = []
         self.b_initial_vel = False
         self.b_initial_acc = False
         self.b_final_vel = False
@@ -50,8 +50,8 @@ class MotionFrameSequencer:
     def add_motion_frame(self, frame_goal_dict: dict[str, np.ndarray]):
         self.motion_frame_lst.append(frame_goal_dict)
 
-    def add_contact_surface(self, contact_surface: PlannerSurfaceContact):
-        self.contact_frame_lst.append(contact_surface)
+    def add_contact_surfaces(self, contact_surfaces: list[PlannerSurfaceContact]):
+        self.contact_frame_lst.append(contact_surfaces)
 
     def get_motion_frames(self):
         return self.motion_frame_lst
@@ -110,9 +110,11 @@ def get_contact_planes_from_motion_frames_seq(contact_seq: list[str],
             for fr_name in seq_contact:
                 # search for latest assigned contact plane
                 for j in range(i, -1, -1):
-                    if fr_name == motion_frames_seq.contact_frame_lst[j].contact_frame_name:
-                        seq_contact_planes[fr_name] = motion_frames_seq.contact_frame_lst[j].surface_normal
-                        break
+                    for k, fr_contact in enumerate(motion_frames_seq.contact_frame_lst[j]):
+                        # check if the contact frame name matches
+                        if fr_name == fr_contact.contact_frame_name:
+                            seq_contact_planes[fr_name] = motion_frames_seq.contact_frame_lst[j][k].surface_normal
+                            break
                     if j == 0:
                         # if no contact plane was found, check the initial contacts
                         if fr_name in contact_planes[0]:

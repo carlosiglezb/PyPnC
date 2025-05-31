@@ -413,7 +413,7 @@ def get_two_stage_contact_sequence(safe_regions_mgr_dict):
         'LH': starting_lh_pos + np.array([0.2, -0.1, 0.2]),  # testing
         'RH': starting_rh_pos + np.array([0.2, 0.1, 0.2])})  # testing
     lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(lf_contact_over)
+    motion_frames_seq.add_contact_surfaces(lf_contact_over)
 
     # ---- Step 3: re-position L/R hands for more stability
     # fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
@@ -435,7 +435,7 @@ def get_two_stage_contact_sequence(safe_regions_mgr_dict):
                         'RH': starting_rh_pos + np.array([0.4, 0., 0.])
     })
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(rf_contact_over)
+    motion_frames_seq.add_contact_surfaces(rf_contact_over)
 
     # ---- Step 5: square up
     fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
@@ -485,7 +485,7 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
                                             })
     lh_contact_front = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
     lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
-    motion_frames_seq.add_contact_surface(lh_contact_front)
+    motion_frames_seq.add_contact_surfaces(lh_contact_front)
 
     # ---- Step 2: step through door with left foot
     fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
@@ -494,7 +494,7 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
                         'L_knee': final_lf_pos + np.array([0.15, 0., 0.28])})
                         # 'L_knee': final_lkn_pos + np.array([-0.05, 0., 0.07])})
     lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(lf_contact_over)
+    motion_frames_seq.add_contact_surfaces(lf_contact_over)
 
     # ---- Step 3: re-position L/R hands for more stability
     fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
@@ -504,7 +504,7 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
                         # 'torso': final_torso_pos + np.array([-0.15, 0.05, 0.05]),     # good testing
                         'RH': door_r_inner_location})
     rh_contact_inside = PlannerSurfaceContact('RH', np.array([1, 0, 0]))
-    motion_frames_seq.add_contact_surface(rh_contact_inside)
+    motion_frames_seq.add_contact_surfaces(rh_contact_inside)
 
     # ---- Step 4: step through door with right foot
     # G1 settings
@@ -519,7 +519,7 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
                         # 'LH': starting_lh_pos + np.array([0.35, 0.0, 0.0])
     })
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(rf_contact_over)
+    motion_frames_seq.add_contact_surfaces(rf_contact_over)
 
     # ---- Step 5: square up
     # fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
@@ -576,7 +576,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
                                             })
     lh_contact_front = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
     lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
-    motion_frames_seq.add_contact_surface(lh_contact_front)
+    motion_frames_seq.add_contact_surfaces(lh_contact_front)
 
     # ---- Step 2: step on knee-knocker with right foot
     fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
@@ -584,7 +584,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
                         'RF': intermediate_rf_pos,
                         'R_knee': intermediate_rf_pos + np.array([0.15, 0., 0.28])})    # + np.array([-0.05, 0., 0.035])
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(rf_contact_over)
+    motion_frames_seq.add_contact_surfaces(rf_contact_over)
 
     # ---- Step 3: step through door with left foot
     fixed_frames.append(['RF', 'R_knee', 'LH', 'RH'])   # frames that must not move
@@ -596,7 +596,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
                         'L_knee': final_lf_pos + np.array([0.15, 0., 0.28]),
                         'LF': final_lf_pos})
     lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(lf_contact_over)
+    motion_frames_seq.add_contact_surfaces(lf_contact_over)
 
     # ---- Step 4: balance / square up
     # fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
@@ -610,7 +610,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name, safe_regions_mgr_dict
         'LH': final_lh_pos
     })
     rf_square_up = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-    motion_frames_seq.add_contact_surface(rf_square_up)
+    motion_frames_seq.add_contact_surfaces(rf_square_up)
 
     # ---- Step 5: balance
     fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
@@ -864,7 +864,7 @@ def main(args):
         if env == 'door':
             alpha = [0, 0, 1]
         elif env == 'stairs':
-            alpha = [0.5, 0.1, 0.01]
+            alpha = [1, 0.1, 0.01]
         # use self-collision avoidance
         sca_geometry = None
         if B_USE_SELF_COLLISION_AVOIDANCE:

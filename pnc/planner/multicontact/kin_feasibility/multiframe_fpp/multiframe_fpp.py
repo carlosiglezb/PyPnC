@@ -8,6 +8,7 @@ from .mfpp_smooth import optimize_multiple_bezier_iris, \
     optimize_multiple_bezier_iris_casadi, pack_points_for_single_vector
 from vision.iris.iris_regions_manager import IrisRegionsManager
 from ..fpp_sequencer_tools import get_last_defined_point, distribute_box_seq, distribute_free_frames
+from ..planner_surface_contact import get_contact_seq_from_fixed_frames_seq
 from ..self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 
 
@@ -184,17 +185,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     motion_frames_lst = motion_frames_seq.get_motion_frames()
     iris_seq, safe_pnt_lst = plan_multistage_iris_seq(S, fixed_frames, motion_frames_lst, p_init)
 
-    contact_seq_polygonal = []
-    for cont_seq_idx, ir_seq in enumerate(iris_seq):
-        num_segs = len(next(iter(ir_seq.values())))
-        current_ff_lst = fixed_frames[cont_seq_idx]
-        for j in range(num_segs):
-            if current_ff_lst[0] != 'torso':
-                contact_seq_polygonal.append([current_ff_lst[0]])
-            else:
-                contact_seq_polygonal.append([current_ff_lst[1]])
     traj, length, solver_time = solve_min_reach_iris_distance(R, S, iris_seq, safe_pnt_lst,
-                                                              contact_seq=contact_seq_polygonal,
                                                               aux_frames=A,
                                                               weights_rigid=w_rigid_poly)
 
@@ -236,14 +227,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
         seg_idx += 1
 
     # distribute contact sequence according to partitioned iris regions segments
-    parsed_contact_seq = []
-    for cont_seq_idx, ir_seq in enumerate(iris_seq):
-        num_segs = len(next(iter(ir_seq.values())))
-        current_ff_lst = fixed_frames[cont_seq_idx]
-        if current_ff_lst[0] != 'torso':
-            parsed_contact_seq.append([current_ff_lst[0]] * num_segs)
-        else:
-            parsed_contact_seq.append([current_ff_lst[1]] * num_segs)
+    parsed_contact_seq = get_contact_seq_from_fixed_frames_seq(fixed_frames)
 
     surface_normals_lst = motion_frames_seq.get_contact_surfaces()
     paths, sol_stats, points, dvars = optimize_multiple_bezier_iris(R, A, S, durations, alpha, safe_pnt_lst,
@@ -255,17 +239,17 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     if verbose:
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
 
-    initial_guess = {}
-    initial_guess['x0'] = pack_points_for_single_vector(points, 'cvxpy')
-    initial_guess['lam_g0'] = pack_points_for_single_vector(dvars['lam_g0'], 'cvxpy')
-    initial_guess['lam_x0'] = dvars['lam_x0']
-    paths, sol_stats, points, _ = optimize_multiple_bezier_iris_casadi(R, A, S, durations, alpha, safe_pnt_lst,
-                                                             sca_robot_geometry,
-                                                             fixed_frames=fixed_frames,
-                                                             contact_sequence=parsed_contact_seq,
-                                                             surface_normals_lst=surface_normals_lst,
-                                                             weights_rigid_link=w_rigid,
-                                                             initial_guess=initial_guess,
-                                                             verbose=verbose)
+    # initial_guess = {}
+    # initial_guess['x0'] = pack_points_for_single_vector(points, 'cvxpy')
+    # initial_guess['lam_g0'] = pack_points_for_single_vector(dvars['lam_g0'], 'cvxpy')
+    # initial_guess['lam_x0'] = dvars['lam_x0']
+    # paths, sol_stats, points, _ = optimize_multiple_bezier_iris_casadi(R, A, S, durations, alpha, safe_pnt_lst,
+    #                                                          sca_robot_geometry,
+    #                                                          fixed_frames=fixed_frames,
+    #                                                          contact_sequence=parsed_contact_seq,
+    #                                                          surface_normals_lst=surface_normals_lst,
+    #                                                          weights_rigid_link=w_rigid,
+    #                                                          initial_guess=initial_guess,
+    #                                                          verbose=verbose)
 
     return paths, iris_seq, points, safe_pnt_lst

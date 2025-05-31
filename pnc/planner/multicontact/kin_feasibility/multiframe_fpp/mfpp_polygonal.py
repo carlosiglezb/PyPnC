@@ -22,7 +22,6 @@ def solve_min_reach_iris_distance(reach: dict[str: np.array, str: np.array],
                                   iris_regions: dict[str: IrisRegionsManager],
                                   iris_seq: List[dict[str: int]],
                                   safe_points_list: List[dict[str: np.array]],
-                                  contact_seq=None,
                                   aux_frames=None,
                                   weights_rigid: np.array = None) -> [np.array, np.float64, np.float64]:
     if weights_rigid is None:

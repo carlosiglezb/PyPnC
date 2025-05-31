@@ -139,7 +139,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 if fr_seg_k_box == (num_iris_current-1) and f_name in safe_points_lst[seg_idx+1].keys():
                     constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])
                     # TODO uncomment below after fixing casadi version
-                    # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
+                    # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints, False)
         elif (k + 1) % num_iris_tot == 0:  # final position for each frame
             safe_pnt = has_safe_point_at(point_seg_order, num_iris_tot, safe_points_lst, k, f_name)
             if any(safe_pnt):
@@ -149,27 +149,19 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
             else:
                 constraints.append(points[k][0][-1] == safe_points_lst[-1][f_name])
-                # TODO uncomment below after fixing casadi version
-                # add_vel_acc_constr(f_name, surface_normals_lst[-1], points[k], constraints)
+            # TODO check if below is needed since the last motion is taken into account below
+            # add_vel_acc_constr(f_name, surface_normals_lst[-1], points[k], constraints)
         else:       # safe and fixed positions at other times
             safe_pnt = has_safe_point_at(point_seg_order, num_iris_tot, safe_points_lst, k, f_name)
             if any(safe_pnt):
                 constraints.append(points[k][0][0] == safe_pnt) # pos
+                # TODO fix casadi version
+                # ignore if at initial stance
+                if (k-1) % num_iris_tot != 0:
+                    add_vel_acc_constr(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
                 constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
-            # Check if motion frame specified at in single IRIS region
-            # elif f_name in safe_points_lst[seg_idx].keys() and num_iris_prev == 2 and fr_seg_k_box == 0:
-            #     constraints.append(points[k][0][-1] == safe_points_lst[seg_idx][f_name])  # pos
-            #     # TODO uncomment below after fixing casadi version
-            #     # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
-            # elif f_name in safe_points_lst[seg_idx+1].keys():
-            #     # Enforce (pre-computed) safe points at the end of each desired motion
-            #     # note: the initial point within a segment is defined by the continuity constraint below
-            #     if fr_seg_k_box == (num_iris_current-1):
-            #         constraints.append(points[k][0][-1] == safe_points_lst[seg_idx+1][f_name])  # pos
-            #         # TODO uncomment below after fixing casadi version
-            #         # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
 
 
         # Bezier dynamics.
@@ -258,15 +250,18 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + reach_constr + soc_constraint)
-    # prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
     prob.solve(solver='SCS')
 
     if prob.status == 'infeasible':
-        print('***** Smooth Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
-        prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
+        print('***** Smooth Problem was infeasible. Retrying without reachability constraints.')
+        prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
+        prob.solve(solver='CLARABEL')
         if prob.status == 'infeasible':
-            print('***** Smooth (2nd Attempt) Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
-            prob.solve(solver='SCS', eps_rel=5e-1, eps_abs=5e-1)
+            print('***** Smooth Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
+            prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
+            if prob.status == 'infeasible':
+                print('***** Smooth (2nd Attempt) Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
+                prob.solve(solver='SCS', eps_rel=5e-1, eps_abs=5e-1)
 
 
     # check link constraints values
