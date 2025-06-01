@@ -58,7 +58,7 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
         fddp = self.fddp
         for i in range(self.contact_phases):
             model_seqs = []
-            frames_in_contact = self.contact_seqs[i]
+            frames_in_contact = self.contact_planes_seq[i]
             # TODO change for upper call to update_contact_params() or so
             if i == 1:
                 ee_rpy['LH'] = get_rpy_normal_left_wall()
@@ -114,12 +114,12 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
                 imp_model = createMultiFrameFinalImpulseModel(state,
                                                               x0,
                                                               plan_to_model_ids,
-                                                              [self.contact_seqs[i+1][1]],
+                                                              [self.contact_planes_seq[i + 1][1]],
                                                               ee_rpy,
                                                               frame_targets_dict,
                                                               gains=gains)
                 model_seqs = [*model_seqs, [imp_model]]
-                print(f"Applied impulse model at {i} on frame {[self.contact_seqs[i + 1][1]]}")
+                print(f"Applied impulse model at {i} on frame {[self.contact_planes_seq[i + 1][1]]}")
             else:
                 dmodel = createMultiFrameFinalActionModel(state,
                                                           actuation,

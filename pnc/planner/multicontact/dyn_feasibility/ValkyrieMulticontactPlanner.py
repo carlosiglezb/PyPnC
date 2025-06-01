@@ -52,7 +52,7 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
         fddp = self.fddp
         for i in range(self.contact_phases):
             model_seqs = []
-            frames_in_contact = self.contact_seqs[i]
+            frames_in_contact = self.contact_planes_seq[i]
             if i > (self.contact_phases - 1):
                 raise NotImplementedError(f"Frames for contact sequence {i} not specified.")
             N_current = self.horizon_lst[i]
@@ -103,12 +103,12 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
                 imp_model = createMultiFrameFinalImpulseModel(state,
                                                               x0,
                                                               plan_to_model_ids,
-                                                              [self.contact_seqs[i+1][0]],
+                                                              [self.contact_planes_seq[i + 1][0]],
                                                               ee_rpy,
                                                               frame_targets_dict,
                                                               gains=gains)
                 model_seqs = [*model_seqs, [imp_model]]
-                print(f"Applied impulse model at {i} on frame {[self.contact_seqs[i + 1][0]]}")
+                print(f"Applied impulse model at {i} on frame {[self.contact_planes_seq[i + 1][0]]}")
             else:
                 dmodel = createMultiFrameFinalActionModel(state,
                                                           actuation,

@@ -5,6 +5,10 @@ import util.util
 from pnc.planner.multicontact.crocoddyl_extensions.ResidualModelStateError import ResidualModelStateError
 from crocoddyl.utils.biped import SimpleBipedGaitProblem
 
+from util.util import so3_from_vec_to_vec
+
+Z_UP =  np.array([0., 0., 1])
+
 def createDoubleSupportActionModel(state: crocoddyl.StateMultibody,
                                    actuation: crocoddyl.ActuationModelFloatingBase,
                                    x0: np.array,
@@ -363,10 +367,9 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 actuation: crocoddyl.ActuationModelFloatingBase,
                                 x0: np.array,
                                 plan_to_model_ids: dict[str, int],
-                                frames_in_contact: list[str],
-                                ee_rpy: dict[str, list[float]],
+                                frames_in_contact: dict[str: np.array],
+                                next_frames_in_contact: dict[str: np.array],
                                 frame_targets_dict: dict[str, np.array],
-                                rcj_constraints: crocoddyl.ConstraintModelManager,
                                 gains: dict[str, np.array] = None,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
@@ -380,13 +383,12 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     contacts = crocoddyl.ContactModelMultiple(state, actuation.nu)
 
     # create contact models for each frame in contact
-    for fr_name in frames_in_contact:
+    for fr_name, fr_plane in frames_in_contact.items():
         fr_id = plan_to_model_ids[fr_name]
 
-        # for hand contact frames, set the corresponding rotation
+        # set the corresponding rotation for all frames in contact
         SE3_ee = pin.SE3.Identity()
-        if fr_name in ee_rpy.keys():
-            SE3_ee.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
+        SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
 
         fr_contact = crocoddyl.ContactModel6D(
             state,
@@ -399,13 +401,8 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         contacts.addContact(fr_name, fr_contact)
 
         # Add friction cone penalization according to foot or hand contact
-        if 'RH' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([-np.pi/2, 0., 0.])), mu, 4, True)
-        elif 'LH' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([np.pi/2, 0., 0.])), mu, 4, True)
-        else:
-            floor_rotation = np.eye(3)
-            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+        floor_rotation = SE3_ee.rotation
+        surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
@@ -436,10 +433,10 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         else:
             raise ValueError(f"Weights to track frame {fr_name} were not set")
 
-        # set the desired frame pose
+        # set the desired frame position (and orientation fo upcoming feet contact planes)
         fr_Mref = pin.SE3.Identity()
-        if fr_name in ee_rpy.keys():
-            fr_Mref.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
+        if fr_name in next_frames_in_contact.keys() and 'H' not in fr_name:
+            fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, next_frames_in_contact[fr_name])
         fr_Mref.translation = frame_targets_dict[fr_name]
 
         # add as cost
@@ -486,7 +483,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
 
     # Creating the action model
     dmodel = crocoddyl.DifferentialActionModelContactFwdDynamics(
-        state, actuation, contacts, costs #, rcj_constraints
+        state, actuation, contacts, costs
     )
     return dmodel
 
@@ -495,10 +492,9 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                                 actuation: crocoddyl.ActuationModelFloatingBase,
                                 x0: np.array,
                                 plan_to_model_ids: dict[str, int],
-                                frames_in_contact: list[str],
-                                ee_rpy: dict[str, list[float]],
+                                frames_in_contact: dict[str: np.array],
+                                next_frames_in_contact: dict[str: np.array],
                                 frame_targets_dict: dict[str, np.array],
-                                rcj_constraints: crocoddyl.ConstraintModelManager,
                                 gains: dict[str, np.array] = None,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
@@ -512,13 +508,12 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
     contacts = crocoddyl.ContactModelMultiple(state, actuation.nu)
 
     # create contact models for each frame in contact
-    for fr_name in frames_in_contact:
+    for fr_name, fr_plane in frames_in_contact.items():
         fr_id = plan_to_model_ids[fr_name]
 
         # for hand contact frames, set the corresponding rotation
         SE3_ee = pin.SE3.Identity()
-        if fr_name in ee_rpy.keys():
-            SE3_ee.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
+        SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
 
         fr_contact = crocoddyl.ContactModel6D(
             state,
@@ -531,13 +526,8 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
         contacts.addContact(fr_name + "_contact", fr_contact)
 
         # Add friction cone penalization according to foot or hand contact
-        if 'RH' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([-np.pi/2,  0., 0.])), mu, 4, True)
-        elif 'LH' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(util.util.euler_to_rot(np.array([np.pi/2, 0., 0.])), mu, 4, True)
-        else:
-            floor_rotation = np.eye(3)
-            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+        floor_rotation = SE3_ee.rotation
+        surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
@@ -568,10 +558,10 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
         else:
             raise ValueError(f"Weights to track frame {fr_name} were not set")
 
-        # set the desired frame pose
+        # set the desired frame pose for feet using upcoming contact surface normal
         fr_Mref = pin.SE3.Identity()
-        if fr_name in ee_rpy.keys():
-            fr_Mref.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
+        if fr_name in next_frames_in_contact.keys() and 'H' not in fr_name:
+            fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, next_frames_in_contact[fr_name])
         fr_Mref.translation = frame_targets_dict[fr_name]
 
         activation_fr = crocoddyl.ActivationModelWeightedQuad(w_fr ** 2)
@@ -629,8 +619,8 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
                                       x0: np.array,
                                       plan_to_model_ids: dict[str, int],
-                                      frames_in_contact: list[str],
-                                      ee_rpy: dict[str, list[float]],
+                                      frames_in_contact: dict[str: np.array],
+                                      next_frames_in_contact: dict[str: np.array],
                                       frame_targets_dict: dict[str, np.array],
                                       gains: dict[str, np.array] = None,
                                       zero_config: np.array = None,
@@ -638,14 +628,20 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
     # Creating a 6D multi-contact model, and then including the supporting foot
     impulseModel = crocoddyl.ImpulseModelMultiple(state)
 
-    for fr_name in frames_in_contact:
-        fr_id = plan_to_model_ids[fr_name]
-        supportContactModel = crocoddyl.ImpulseModel6D(
-            state, fr_id, pin.LOCAL_WORLD_ALIGNED
-        )
-        impulseModel.addImpulse(
-            fr_name + "_impulse", supportContactModel
-        )
+    for fr_name, fr_plane in next_frames_in_contact.items():
+        # apply impulse only to the new (upcoming) contacts
+        if fr_name not in frames_in_contact.keys():
+            fr_id = plan_to_model_ids[fr_name]
+
+            SE3_ee = pin.SE3.Identity()
+            SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
+
+            supportContactModel = crocoddyl.ImpulseModel6D(
+                state, fr_id, pin.LOCAL_WORLD_ALIGNED
+            )
+            impulseModel.addImpulse(
+                fr_name + "_impulse", supportContactModel
+            )
 
     # Creating the cost model for a contact phase
     costs = crocoddyl.CostModelSum(state, 0)
@@ -670,8 +666,8 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
 
         # set the desired frame pose
         fr_Mref = pin.SE3.Identity()
-        if fr_name in ee_rpy.keys():
-            fr_Mref.rotation = util.util.euler_to_rot(ee_rpy[fr_name])
+        if fr_name in next_frames_in_contact.keys() and 'H' not in fr_name:
+            fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, next_frames_in_contact[fr_name])
         fr_Mref.translation = frame_targets_dict[fr_name]
 
         activation_fr = crocoddyl.ActivationModelWeightedQuad(w_fr ** 2)

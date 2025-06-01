@@ -11,14 +11,8 @@ from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (cre
                                                                              createFinalSequence)
 
 
-def get_rpy_normal_left_wall():
-    return [np.pi / 2, 0., 0.]
-
-def get_rpy_normal_right_wall():
-    return [-np.pi / 2, 0., 0.]
-
 def get_terminal_feet_gains():
-    return np.array([10.] * 3 + [2.5] * 3)
+    return np.array([12.] * 3 + [4.5] * 3)
 
 
 class G1MulticontactPlanner(HumanoidMulticontactPlanner):
@@ -57,7 +51,6 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         actuation = self.actuation
         x0 = self.x0
         T = self.T
-        ee_rpy = self.ee_rpy
         plan_to_model_ids = self.plan_to_model_ids
         gains = self.gains
         zero_config = self._zero_config
@@ -65,14 +58,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         fddp = self.fddp
         for i in range(self.contact_phases):
             model_seqs = []
-            frames_in_contact = self.contact_seqs[i]
-            # TODO change for upper call to update_contact_params() or so
-            if 'LH' in frames_in_contact:
-                ee_rpy['LH'] = get_rpy_normal_left_wall()
-            elif 'RH' in frames_in_contact:
-                ee_rpy['RH'] = get_rpy_normal_right_wall()
-            elif i > (self.contact_phases - 1):
-                raise NotImplementedError(f"{'*' * 10} Frames for contact sequence {i} not specified.")
+            frames_in_contact = self.contact_planes_seq[i]
             N_current = self.horizon_lst[i]
             DT = T / (N_current - 1)
             for t in np.linspace(i * T, (i + 1) * T, N_current):
@@ -87,9 +73,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                          x0,
                                                          plan_to_model_ids,
                                                          frames_in_contact,
-                                                         ee_rpy,
+                                                         self.contact_planes_seq[i + 1],
                                                          frame_targets_dict,
-                                                         None,
                                                          gains=gains,
                                                          terminal_step=b_terminal_step)
                     model_seqs += createSequence([dmodel], DT, 1)
@@ -101,9 +86,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                                   x0,
                                                                   plan_to_model_ids,
                                                                   frames_in_contact,
-                                                                  ee_rpy,
+                                                                  self.contact_planes_seq[i + 1],
                                                                   frame_targets_dict,
-                                                                  None,
                                                                   gains=gains,
                                                                   terminal_step=b_terminal_step)
                         model_seqs += createFinalSequence([dmodel])
@@ -137,23 +121,23 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 imp_model = createMultiFrameFinalImpulseModel(state,
                                                               x0,
                                                               plan_to_model_ids,
-                                                              [self.contact_seqs[i+1][-1]],
-                                                              ee_rpy,
+                                                              frames_in_contact,
+                                                              self.contact_planes_seq[i + 1],
                                                               frame_targets_dict,
                                                               gains=gains)
                 model_seqs = [*model_seqs, [imp_model]]
-                print(f"Applied impulse model at {i} on frame {[self.contact_seqs[i + 1][-1]]}")
+                new_contact_fr = [fr for fr in self.contact_planes_seq[i + 1].keys() if fr not in frames_in_contact.keys()]
+                print(f"Applied impulse model at {i} on frame {new_contact_fr}")
             else:
                 dmodel = createMultiFrameFinalActionModel(state,
                                                           actuation,
                                                           x0,
                                                           plan_to_model_ids,
                                                           frames_in_contact,
-                                                          ee_rpy,
+                                                          frames_in_contact,
                                                           frame_targets_dict,
-                                                          None,
-                                                          zero_config=zero_config,
                                                           gains=gains,
+                                                          zero_config=zero_config,
                                                           terminal_step=False)
                 model_seqs += createFinalSequence([dmodel])
                 print(f"Applying Final Sequence model at {i}")
@@ -185,7 +169,6 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             x0 = fddp[i].xs[-1]
 
             # Reset desired EE rpy and gains for next contact phase
-            ee_rpy = copy(self.ee_rpy)
             gains = copy(self._default_gains)
 
         super().update_costs_from_solver()
@@ -194,5 +177,5 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
     def reset_default_gains(self, frame_name: str, updated_gains: np.array):
         self._default_gains[frame_name] = updated_gains
 
-    def set_zero_configuration(self, joint_configuartion):
-        self._zero_config = joint_configuartion
+    def set_zero_configuration(self, joint_configuration):
+        self._zero_config = joint_configuration

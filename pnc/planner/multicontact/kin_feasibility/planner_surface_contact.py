@@ -98,7 +98,7 @@ def get_contact_seq_from_fixed_frames_seq(fixed_frames_seq: list[list[str]]):
     return contact_frames_seq
 
 def get_contact_planes_from_motion_frames_seq(contact_seq: list[str],
-                                              motion_frames_seq: MotionFrameSequencer):
+                                              motion_frames_seq: MotionFrameSequencer) -> list[dict[str: np.ndarray]]:
     contact_planes: dict[str: np.ndarray] = []
     for i, seq_contact in enumerate(contact_seq):
         seq_contact_planes = {}
@@ -108,17 +108,21 @@ def get_contact_planes_from_motion_frames_seq(contact_seq: list[str],
             seq_contact_planes['RF'] = np.array([0, 0, 1])
         else:
             for fr_name in seq_contact:
+                b_found_frame = False
                 # search for latest assigned contact plane
                 for j in range(i, -1, -1):
                     for k, fr_contact in enumerate(motion_frames_seq.contact_frame_lst[j]):
+                        if b_found_frame:
+                            break
                         # check if the contact frame name matches
                         if fr_name == fr_contact.contact_frame_name:
                             seq_contact_planes[fr_name] = motion_frames_seq.contact_frame_lst[j][k].surface_normal
+                            b_found_frame = True
                             break
-                    if j == 0:
-                        # if no contact plane was found, check the initial contacts
-                        if fr_name in contact_planes[0]:
-                            seq_contact_planes[fr_name] = contact_planes[0][fr_name]
+                        if j == 0:
+                            # if no contact plane was found, check the initial contacts
+                            if fr_name in contact_planes[0]:
+                                seq_contact_planes[fr_name] = contact_planes[0][fr_name]
         contact_planes.append(seq_contact_planes)
 
     return contact_planes

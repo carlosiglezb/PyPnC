@@ -857,7 +857,7 @@ def main(args):
                         NotImplementedError(f"Contact sequence {contact_seq} not implemented")
 
         contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames_seq)
-        contact_planes = get_contact_planes_from_motion_frames_seq(contact_seqs, motion_frames_seq)
+        contact_seq_planes = get_contact_planes_from_motion_frames_seq(contact_seqs, motion_frames_seq)
 
         # planner parameters
         T = 3
@@ -915,6 +915,7 @@ def main(args):
                     d = pickle.load(file)
                     ik_cfree_planner = d['bez_path']
                     fixed_frames = d['fixed_frames']
+                    contact_seq_planes = d['contact_seq_planes']
                 except EOFError:
                     break
         # get parameters needed for reconstruction in crocoddyl
@@ -932,16 +933,17 @@ def main(args):
     if robot_name == 'g1':
         if env == 'door':
             N_horizon_lst = [180, 200, 220, 200, 200]
-            contact_sequence = ContactSequence(contact_seqs, N_horizon_lst, T)
+            contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
             robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, T, ik_cfree_planner)
             if contact_seq == 1:    # step on knee knocker
                 robot_dyn_plan.reset_default_gains('torso', np.array([2.5, 3.5, 1.5] + [0.5, 0.5, 0.001]))
                 robot_dyn_plan.set_zero_configuration(q0)
         elif env == 'stairs':
             N_horizon_lst = [180, 250, 250, 250, 280]
-            contact_sequence = ContactSequence(contact_seqs, N_horizon_lst, T)
+            contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
             robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, T, ik_cfree_planner)
             robot_dyn_plan.reset_default_gains('torso', np.array([2.0, 1.5, 1.0] + [0.5, 0.5, 0.1]))
+            robot_dyn_plan.reset_default_gains('feet', np.array([12.0] * 3 + [0.05, 0.00001, 0.00001]))
             robot_dyn_plan.reset_default_gains('L_knee', np.array([2.0, 2.5, 3.0] + [0.0001] * 3))
             robot_dyn_plan.reset_default_gains('R_knee', np.array([2.0, 2.5, 3.0] + [0.0001] * 3))
             robot_dyn_plan.reset_default_gains('hands', np.array([4.0, 4.0, 4.0] + [0.0001] * 3))

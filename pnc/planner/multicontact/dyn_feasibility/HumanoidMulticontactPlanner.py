@@ -4,8 +4,10 @@ import crocoddyl
 from util.path_parameterization import get_frame_des_pos
 
 class ContactSequence:
-    def __init__(self, contact_phases, phases_knots, time_per_phase):
-        self.contact_phases = contact_phases
+    def __init__(self, contact_planes_seq: list[dict[str: np.ndarray]],
+                 phases_knots: list[int],
+                 time_per_phase: float):
+        self.contact_planes_seq = contact_planes_seq
         self.phases_knots = phases_knots
         self.phases_durations = time_per_phase
 
@@ -15,7 +17,7 @@ class HumanoidMulticontactPlanner:
                  time_per_phase: float,
                  ik_cfree_planner):
         self.frame_names_lst = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
-        self.contact_seqs = contact_seqs.contact_phases
+        self.contact_planes_seq = contact_seqs.contact_planes_seq
         self.horizon_lst = contact_seqs.phases_knots
         tot_num_knots = sum(contact_seqs.phases_knots)
         self.lh_targets = np.zeros((tot_num_knots, 3))
