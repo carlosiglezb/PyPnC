@@ -253,15 +253,18 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     prob.solve(solver='SCS')
 
     if prob.status == 'infeasible':
-        print('***** Smooth Problem was infeasible. Retrying without reachability constraints.')
-        prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
-        prob.solve(solver='CLARABEL')
+        print(f'{"*" * 5} Smooth Problem was infeasible. Retrying with relaxed tolerances.')
+        prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
         if prob.status == 'infeasible':
-            print('***** Smooth Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
-            prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
+            print(f'{"*" * 5} Smooth Problem was infeasible. Retrying without reachability constraints.')
+            prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
+            prob.solve(solver='CLARABEL')
             if prob.status == 'infeasible':
-                print('***** Smooth (2nd Attempt) Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
-                prob.solve(solver='SCS', eps_rel=5e-1, eps_abs=5e-1)
+                print('***** Smooth Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
+                prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
+                if prob.status == 'infeasible':
+                    print('***** Smooth (2nd Attempt) Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
+                    prob.solve(solver='SCS', eps_rel=5e-1, eps_abs=5e-1)
 
 
     # check link constraints values
