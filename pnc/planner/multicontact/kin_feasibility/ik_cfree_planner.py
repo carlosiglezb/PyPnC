@@ -162,7 +162,8 @@ class IKCFreePlanner:
              alpha: np.array,
              w_rigid: np.array,
              visualizer: MeshcatVisualizer = None,
-             verbose: bool = False):
+             verbose: bool = False,
+             save_html:bool = False):
         if self.planner is None:
             raise ValueError("Planner not set")
 
@@ -171,7 +172,7 @@ class IKCFreePlanner:
         self.planner.plan_iris(p_init, T, alpha, w_rigid, self.w_rigid_poly, verbose)
         print("[Compute Time] Total IK solve time: ", time.time() - ik_all_start_time)
         if visualizer is not None:
-            self.planner.plot(visualizer)
+            self.planner.plot(visualizer, save_html)
 
         # get some information from planner
         frame_names = self.planner.frame_names      # in the order matching path solution

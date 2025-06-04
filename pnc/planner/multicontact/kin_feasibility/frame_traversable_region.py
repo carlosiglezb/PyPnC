@@ -27,7 +27,8 @@ class FrameTraversableRegion:
                  convex_hull_halfspace_path=None,
                  visualizer=None,
                  b_visualize_reach=False,
-                 b_visualize_safe=False):
+                 b_visualize_safe=False,
+                 root_to_torso_pos=None):
         r"""Creates a convex polyhedron composed of :
         (1) the reachable space of a frame w.r.t. root, and
         (2) the safe, collision-free region specified for the frame
@@ -50,6 +51,11 @@ class FrameTraversableRegion:
         """
         if visualizer is not None:
             b_visualize_reach = True
+
+        if root_to_torso_pos is None:
+            self.root_to_torso_pos = np.array([0., 0., 0.])
+        else:
+            self.root_to_torso_pos = root_to_torso_pos
 
         self.frame_name = frame_name
         self._b_visualize_reach = b_visualize_reach

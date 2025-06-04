@@ -239,17 +239,18 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     if verbose:
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
 
-    # initial_guess = {}
-    # initial_guess['x0'] = pack_points_for_single_vector(points, 'cvxpy')
-    # initial_guess['lam_g0'] = pack_points_for_single_vector(dvars['lam_g0'], 'cvxpy')
-    # initial_guess['lam_x0'] = dvars['lam_x0']
-    # paths, sol_stats, points, _ = optimize_multiple_bezier_iris_casadi(R, A, S, durations, alpha, safe_pnt_lst,
-    #                                                          sca_robot_geometry,
-    #                                                          fixed_frames=fixed_frames,
-    #                                                          contact_sequence=parsed_contact_seq,
-    #                                                          surface_normals_lst=surface_normals_lst,
-    #                                                          weights_rigid_link=w_rigid,
-    #                                                          initial_guess=initial_guess,
-    #                                                          verbose=verbose)
+    if sca_robot_geometry is not None:
+        initial_guess = {}
+        initial_guess['x0'] = pack_points_for_single_vector(points, 'cvxpy')
+        initial_guess['lam_g0'] = pack_points_for_single_vector(dvars['lam_g0'], 'cvxpy')
+        initial_guess['lam_x0'] = dvars['lam_x0']
+        paths, sol_stats, points, _ = optimize_multiple_bezier_iris_casadi(R, A, S, durations, alpha, safe_pnt_lst,
+                                                                 sca_robot_geometry,
+                                                                 fixed_frames=fixed_frames,
+                                                                 contact_sequence=parsed_contact_seq,
+                                                                 surface_normals_lst=surface_normals_lst,
+                                                                 weights_rigid_link=w_rigid,
+                                                                 initial_guess=initial_guess,
+                                                                 verbose=verbose)
 
     return paths, iris_seq, points, safe_pnt_lst

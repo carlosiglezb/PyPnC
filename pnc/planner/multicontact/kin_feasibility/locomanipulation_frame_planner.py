@@ -1,3 +1,4 @@
+import os
 from typing import List
 
 from pydrake.geometry.optimization import HPolyhedron
@@ -44,8 +45,7 @@ class LocomanipulationFramePlanner:
             # do the torso at the very end to get reachability from contact frames
             if region.frame_name != 'torso':
                 H, d_prime = extract_plane_eqn_from_coeffs(region._plane_coeffs)
-                # d_prime = self.update_plane_offset_from_root(region._origin_pos,
-                #                                                 H, d_prime)
+                d_prime = self.update_plane_offset_from_root(region.root_to_torso_pos, H, d_prime)
                 self.reachability_planes[region.frame_name] = {'H': H, 'd': d_prime}
 
             if region.frame_name == starting_stance_foot:
@@ -145,6 +145,8 @@ class LocomanipulationFramePlanner:
         if static_html:
             # create and save locally in static html form
             res = visualizer.viewer.static_html()
+            path = os.getcwd() + '/data'
+            os.makedirs(os.path.dirname(path), exist_ok=True)
             save_file = './data/multi-contact-plan.html'
             with open(save_file, "w") as f:
                 f.write(res)
@@ -266,7 +268,7 @@ class LocomanipulationFramePlanner:
 
     @staticmethod
     def update_plane_offset_from_root(_origin_pos, H, d):
-        return d - H @ _origin_pos
+        return d + H @ _origin_pos
 
     def debug_sample_points(self, visualizer, frame_name):
         # sample random points in 3D within [-1, 1] on all axes

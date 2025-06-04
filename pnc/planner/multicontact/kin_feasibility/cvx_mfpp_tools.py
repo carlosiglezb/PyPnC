@@ -171,51 +171,40 @@ def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_
 
 def add_vel_acc_constr_casadi(f_name, seg_surface_normal, point, constraints, lbg, ubg, b_constr_accel=True):
 
-    # check if we have multiple contacts occurring in the same segment
-    if type(seg_surface_normal) is list:
-        # figure out which normal we are currently using based on its frame name
-        for i, sn in enumerate(seg_surface_normal):
-            if f_name == sn.contact_frame_name:
-                seg_surface_normal = sn
-                break
-
-            # if we reach this point, the current frame does not have an assigned contact surface at this segment
-            if i == len(seg_surface_normal) - 1:
-                print(f'{f_name} motion frame not found in surface contact {seg_surface_normal.contact_frame_name}')
-                return
-
     # if surface normal does not correspond to current frame, skip adding constraints
-    if f_name != seg_surface_normal.contact_frame_name:
+    cur_seg_surface_normal = None
+    for ssn in seg_surface_normal:
+        if f_name == ssn.contact_frame_name:
+            cur_seg_surface_normal = ssn
+            break
+        # if we reach this point, the current frame does not have an assigned contact surface at this segment
         return
+    surf_normal = cur_seg_surface_normal.surface_normal
+    surf_normal = surf_normal / scipy.linalg.norm(surf_normal)      # normalize
 
-    surf_normal = seg_surface_normal.surface_normal
-    if seg_surface_normal is not None:
-        # check that a normal vector has been specified for this frame and segment
-        if f_name not in seg_surface_normal.contact_frame_name:
-            surf_contact_name = seg_surface_normal.contact_frame_name
-            print(f'{f_name} motion frame not found in {surf_contact_name} surface contact.'
-                  f'No velocity/acceleration constraints added for this point.')
-            return
+    # apply epsilon motion constraint along specified direction
+    # TODO change constraint below to casadi format
+    if cur_seg_surface_normal.b_initial_vel:
+        frame_vel_ini = cur_seg_surface_normal.get_contact_breaking_velocity()
+        constraints.append(frame_vel_ini @ point[BezierParam.VEL.value][0,:] >= 0)
+        raise NotImplementedError("Initial velocity constraint not implemented in casadi format")
 
-        # apply epsilon motion constraint along specified direction
-        if seg_surface_normal.b_initial_vel:
-            frame_vel_ini = seg_surface_normal.get_contact_breaking_velocity()
-            constraints.append(frame_vel_ini @ point[BezierParam.VEL.value][0,:] >= 0)
+    # final velocity parallel to normal surface
+    normal_mat = np.array([[0, -surf_normal[2], surf_normal[1]],
+                           [surf_normal[2], 0, -surf_normal[0]],
+                           [-surf_normal[1], surf_normal[0], 0]])
+    parse_vec_eq_constr(np.zeros(3), normal_mat @ point[BezierParam.VEL.value][-2,:].T, constraints, lbg, ubg)
+    # constraints.append(normal_mat @ point[BezierParam.VEL.value][-1,:].T == 0)
 
-        # final velocity parallel to normal surface
-        normal_mat = np.array([[0, -surf_normal[2], surf_normal[1]],
-                               [surf_normal[2], 0, -surf_normal[0]],
-                               [-surf_normal[1], surf_normal[0], 0]])
-        parse_vec_eq_constr(np.zeros(3), normal_mat @ point[BezierParam.VEL.value][-1,:].T, constraints, lbg, ubg)
-        # constraints.append(normal_mat @ point[BezierParam.VEL.value][-1,:].T == 0)
+    # final velocity magnitude
+    # TODO uncomment back in
+    normal_tilde = -eps_vel_constr * surf_normal
+    parse_vec_eq_constr(normal_tilde, point[BezierParam.VEL.value][-2,:].T, constraints, lbg, ubg)
+    # constraints.append(-normal_tilde.reshape(-1, 1).T @ point[BezierParam.VEL.value][-1, :].T)
+    # lbg.append(0.)
+    # ubg.append(casadi.inf)
+    # constraints.append(point[BezierParam.VEL.value][-1] == - eps_vel_constr * np.sign(surf_normal))
 
-        # final velocity magnitude
-        # TODO uncomment back in
-        # normal_tilde = (1. / eps_vel_constr) * surf_normal
-        # constraints.append(-normal_tilde.reshape(-1, 1).T @ point[BezierParam.VEL.value][-1, :].T)
-        # lbg.append(0.)
-        # ubg.append(casadi.inf)
-        # constraints.append(point[BezierParam.VEL.value][-1] == - eps_vel_constr * np.sign(surf_normal))
     if b_constr_accel:
         # apply only strictly positive and negative accelerations
         if surf_normal[Axis.X.value] > 0:

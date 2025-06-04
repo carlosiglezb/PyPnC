@@ -1,5 +1,5 @@
 """
-Constructs the reachable space of the end effectors of Valkyrie
+Constructs the reachable space of the end effectors of ergoCub
 assuming the base is fixed. The reachable space is randomly sampled,
 then a convex hull is created using these points, and finally
 the polytopes are simplified using a decimation process.
@@ -7,6 +7,8 @@ the polytopes are simplified using a decimation process.
 This follows more or less the approach from
 Tonneau, Steve, et al. "An efficient acyclic contact planner for
 multiped robots." IEEE Transactions on Robotics 34.3 (2018): 586-601.
+
+Note: in ergoCub, the (floating) base is attached to root_link
 """
 import os
 import sys

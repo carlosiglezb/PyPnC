@@ -13,7 +13,7 @@ from ..casadi_ocp_constraints.casadi_ocp_functions import \
 from ..constraint_parsers import parse_mat_leq_constr, parse_repvec_eq_constr, \
     parse_vec_eq_constr, parse_mat_eq_constr
 from ..cvx_mfpp_tools import get_aux_frame_idx, \
-    create_bezier_cvx_norm_eq_relaxation, add_vel_acc_constr
+    create_bezier_cvx_norm_eq_relaxation, add_vel_acc_constr, add_vel_acc_constr_casadi
 from ..scipy_ocp_constraints.scipy_ocp_functions import \
     LinearBezierIneqConstraint, LinearBezierEqConstraint
 from util.path_parameterization import BezierCurve, CompositeBezierCurve
@@ -155,14 +155,12 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
             safe_pnt = has_safe_point_at(point_seg_order, num_iris_tot, safe_points_lst, k, f_name)
             if any(safe_pnt):
                 constraints.append(points[k][0][0] == safe_pnt) # pos
-                # TODO fix casadi version
                 # ignore if at initial stance
-                if (k-1) % num_iris_tot != 0:
-                    add_vel_acc_constr(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, False)
+                # if (k-1) % num_iris_tot != 0:
+                #     add_vel_acc_constr(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
                 constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
-
 
         # Bezier dynamics.
         for i in range(D):
@@ -250,7 +248,8 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + reach_constr + soc_constraint)
-    prob.solve(solver='SCS')
+    prob.solve(solver='CLARABEL')
+    # prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
 
     if prob.status == 'infeasible':
         print(f'{"*" * 5} Smooth Problem was infeasible. Retrying with relaxed tolerances.')
@@ -511,16 +510,11 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             if any(safe_pnt):
                 # constraints.append(points[k][0][0] == safe_pnt) # pos
                 parse_repvec_eq_constr(np.array([safe_pnt]), points[k][0][0,:], constraints, lbg, ubg)
+                # ignore if at initial stance
+                # if (k-1) % num_iris_tot != 0:
+                #     add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, lbg, ubg,False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
-            # Check if safe_point is available for the current frame
-            # elif f_name in safe_points_lst[seg_idx+1].keys():
-            #     # Enforce (pre-computed) safe points at the end of each desired motion
-            #     # note: the initial point within a segment is defined by the continuity constraint below
-            #     if fr_seg_k_box == (num_iris_current-1):
-            #         parse_vec_eq_constr(safe_points_lst[seg_idx+1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
-            #         # TODO add vel contraint
-            #         # add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx], points[k], constraints, lbg, ubg)
 
         # Bezier dynamics.
         for i in range(D):
@@ -648,7 +642,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
-            sca_bez_points = range(0, num_iris_tot * n_points, n_points)
+            sca_bez_points = range(0, num_iris_tot * n_points, 4)
 
             # populate col_pair_geom_data with respective primitive shape pair type information
             ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])

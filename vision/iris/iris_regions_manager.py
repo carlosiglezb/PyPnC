@@ -282,8 +282,9 @@ class IrisRegionsManager:
             # look at regions that contain the start and goal points
             regions_containing_goal = self.iris_graph.regionsContainingPoint(goal)
             regions_containing_start = self.iris_graph.regionsContainingPoint(start)
+            b_overlapping_regions = set(regions_containing_goal).intersection(set(regions_containing_start))
 
-            if len(regions_containing_goal) >= 2 or len(regions_containing_start) >= 2:
+            if (len(regions_containing_goal) >= 2 or len(regions_containing_start) >= 2) and b_overlapping_regions:
                 # check if there is a path between any two of these regions
                 max_pair = None
                 max_vol = -np.inf
