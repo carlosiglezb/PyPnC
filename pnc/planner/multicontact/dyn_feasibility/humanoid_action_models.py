@@ -420,8 +420,10 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         # set higher tracking cost on feet
         if 'F' in fr_name:
             w_fr = gains['feet']
-        elif 'H' in fr_name:
-            w_fr = gains['hands']
+        elif 'RH' in fr_name:
+            w_fr = gains['RH']
+        elif 'LH' in fr_name:
+            w_fr = gains['LH']
         elif 'R_knee' in fr_name:
             w_fr = gains['R_knee']
         elif 'L_knee' in fr_name:
@@ -545,8 +547,10 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
         # set higher tracking cost on feet
         if 'F' in fr_name:
             w_fr = gains['feet']
-        elif 'H' in fr_name:
-            w_fr = gains['hands']
+        elif 'LH' in fr_name:
+            w_fr = gains['LH']
+        elif 'RH' in fr_name:
+            w_fr = gains['RH']
         elif 'R_knee' in fr_name:
             w_fr = gains['R_knee']
         elif 'L_knee' in fr_name:
@@ -570,10 +574,10 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
             activation_fr,
             crocoddyl.ResidualModelFramePlacement(state, fr_id, fr_Mref, actuation.nu),
         )
-        costs.addCost(fr_name + "_goal", fr_cost, 5e2)
+        costs.addCost(fr_name + "_goal", fr_cost, 5e4)
 
     # Adding state and control regularization terms
-    x_reg_weight = 5e-2
+    x_reg_weight = 5000
     u_reg_weight = 1e-4
     w_x = np.array([0.1] * 3 + [10.0] * 3 + [2.] * (state.nv - 6) + [4.] * state.nv)
     if zero_config is not None and terminal_step:
@@ -651,8 +655,10 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
         # set higher tracking cost on feet
         if 'F' in fr_name:
             w_fr = gains['feet']
-        elif 'H' in fr_name:
-            w_fr = gains['hands']
+        elif 'LH' in fr_name:
+            w_fr = gains['LH']
+        elif 'RH' in fr_name:
+            w_fr = gains['RH']
         elif 'R_knee' in fr_name:
             w_fr = gains['R_knee']
         elif 'L_knee' in fr_name:

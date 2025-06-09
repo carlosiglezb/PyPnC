@@ -245,6 +245,8 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 # reachable constraint
                 if frame_name == 'LF' or frame_name == 'RF' or frame_name == 'LH' or frame_name == 'RH':
                     reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+                elif frame_name == 'L_knee' or frame_name == 'R_knee':
+                    reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + reach_constr + soc_constraint)
@@ -559,7 +561,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     # soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
     if bool(aux_frames):     # check if empty dictionary
-        link_threshold = 0.02
+        link_threshold = 0.001
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
             prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
@@ -600,6 +602,8 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 # reachable constraint
                 if frame_name == 'LF' or frame_name == 'RF' or frame_name == 'LH' or frame_name == 'RH':
                     parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
+                elif frame_name == 'L_knee' or frame_name == 'R_knee':
+                    parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
 
     # Collect points into a single vector
     points_all = pack_points_for_single_vector(points, 'casadi')
@@ -607,8 +611,8 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     opts = {
         "ipopt": {
             "hessian_approximation": "exact",   # limited-memory
-            "max_iter": 200,
-            "mu_init": 1e-4,
+            "max_iter": 100,
+            "mu_init": 1e-6,
             "tol": 1e-1,
             # "derivative_test": "first-order",
             # "derivative_test_print_all": "no",
@@ -619,6 +623,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     sca_constraints = []
     if robot_geom_data is not None:
+    # if False:
         print(f'{"*" * 10} Solving with Primitive Self Collision Avoidance! {"*" * 10}')
         f_dist = {}
         Q = np.eye(3)
@@ -642,7 +647,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
-            sca_bez_points = range(0, num_iris_tot * n_points, 4)
+            sca_bez_points = range(0, num_iris_tot * n_points, n_points)
 
             # populate col_pair_geom_data with respective primitive shape pair type information
             ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])
@@ -675,13 +680,13 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
             initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points),1))))
 
-        opts["ipopt"]["max_iter"] = 100
+        opts["ipopt"]["max_iter"] = 50
         opts["ipopt"]["warm_start_init_point"] = "yes"
-        opts["ipopt"]["warm_start_mult_bound_push"] = 1e-4
-        opts["ipopt"]["warm_start_slack_bound_push"] = 1e-4
-        opts["ipopt"]["warm_start_bound_push"] = 1e-4
+        opts["ipopt"]["warm_start_mult_bound_push"] = 1e-8
+        opts["ipopt"]["warm_start_slack_bound_push"] = 1e-8
+        opts["ipopt"]["warm_start_bound_push"] = 1e-8
 
-        # Solve problem
+    # Solve problem
     nlp = {'x': points_all,
            'f': cost + cost_log_abs_sum,
            'g': ca.vertcat(*constraints, *sca_constraints)

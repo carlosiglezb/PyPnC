@@ -405,7 +405,7 @@ class TestIKCFreePlanner(unittest.TestCase):
             # 'torso': starting_torso_pos + np.array([0.07, -0.07, 0])
         })
         lh_contact_front = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
-        lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
+        # lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
         motion_frames_seq.add_contact_surfaces([lh_contact_front])
 
         # ---- Step 2: step on knee-knocker with right foot
@@ -414,7 +414,7 @@ class TestIKCFreePlanner(unittest.TestCase):
             'RF': intermediate_rf_pos,
             'R_knee': intermediate_rf_pos + (final_rkn_pos - final_rf_pos) + np.array([-0.05, 0., 0.035])})
         rf_contact_knocker = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
-        rf_contact_knocker.set_contact_breaking_velocity(np.array([0, 0, 1]))
+        # rf_contact_knocker.set_contact_breaking_velocity(np.array([0, 0, 1]))
         motion_frames_seq.add_contact_surfaces([rf_contact_knocker])
 
         # ---- Step 3: step through door with left foot

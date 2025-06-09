@@ -15,7 +15,8 @@ from pnc.planner.multicontact.kin_feasibility import SCARobotGeometry
 from pnc.planner.multicontact.kin_feasibility.frame_traversable_region import FrameTraversableRegion
 from pnc.planner.multicontact.kin_feasibility.ik_cfree_planner import IKCFreePlanner
 from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner import LocomanipulationFramePlanner
-from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import MotionFrameSequencer, PlannerSurfaceContact
+from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import MotionFrameSequencer, \
+    PlannerSurfaceContact, get_contact_seq_from_fixed_frames_seq, get_contact_planes_from_motion_frames_seq
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 from util import util
 from vision.iris.iris_geom_interface import IrisGeomInterface
@@ -72,7 +73,8 @@ def get_ergoCub_default_initial_pose(n_joints):
     # q0[38] = -np.pi / 2                           # "r_shoulder_pitch",
     # q0[39] = 0.                           # "r_shoulder_roll",
     # q0[40] = 0.                           # "r_shoulder_yaw",
-    q0[41] = np.pi / 2                           # "r_elbow",
+    q0[29] = np.pi / 2                           # "r_elbow",
+    # q0[41] = np.pi / 2                           # "r_elbow",
     # q0[32] = 0.                           # "r_wrist_yaw",
     # q0[32] = 0.                           # "r_wrist_roll",
     # q0[32] = 0.                           # "r_wrist_pitch",
@@ -463,7 +465,8 @@ class TestIKCFreePlanner(unittest.TestCase):
         final_rh_pos = safe_regions_mgr_dict['RH'].iris_list[1].seed_pos
         final_lh_pos = safe_regions_mgr_dict['LH'].iris_list[1].seed_pos
         # final_rh_pos = starting_rh_pos + np.array([0.3, 0.0, 0.0])
-        intermediate_rf_pos = np.array([0.3, final_rf_pos[1], 0.44])
+        intermediate_rf_pos = np.array([0.3, final_rf_pos[1], 0.48])
+        intermediate_rh_pos = np.array([0.4, -0.15, 1.0])
 
         # initialize fixed and motion frame sets
         fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
@@ -480,6 +483,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         # ---- Step 2: step on knee-knocker with right foot
         fixed_frames.append(['LF', 'L_knee', 'LH'])  # frames that must not move
         motion_frames_seq.add_motion_frame({
+            # 'RH': intermediate_rh_pos,
             'RF': intermediate_rf_pos,
             'R_knee': intermediate_rf_pos + np.array([0.2, 0., 0.3])})
         rf_contact_knocker = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
@@ -683,7 +687,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         # planner parameters
         T = 3
         # alpha = [1, 0, 0]
-        alpha = [1, 0.1, 0.01]
+        alpha = [0.2, 0.1, 0.1]
         if self.b_use_knees:
             traversable_regions = [traversable_regions_dict['torso'],
                                    traversable_regions_dict['LF'],
@@ -849,8 +853,11 @@ class TestIKCFreePlanner(unittest.TestCase):
                 display.save_html(cwd + '/data/ONR/', self.robot_name + '-SCA-IK-step-on-knee-knocker-anim.html')
 
         if self.b_save_plan:
+            contact_seqs = get_contact_seq_from_fixed_frames_seq(sca_kin_cfree_planner.planner.fixed_frames)
+            contact_seq_planes = get_contact_planes_from_motion_frames_seq(contact_seqs, sca_kin_cfree_planner.planner.motion_frames_seq)
+
             # save the solution parameters needed to reconstruct the Bezier curves
-            save_filename = self.robot_name + '_sca_five_stage_plan_box_sphere.pkl'
+            save_filename = self.robot_name + '_sca_on_box_sphere_plan.pkl'
             transition_times = []
             n_frames = len(sca_kin_cfree_planner.planner.path)
             data_saver = DataSaver(save_filename)
@@ -862,6 +869,7 @@ class TestIKCFreePlanner(unittest.TestCase):
             data_saver.add('n_iris_traversed_per_frame', len(sca_kin_cfree_planner.planner.path[0].beziers))
             data_saver.add('bez_path', sca_kin_cfree_planner.planner.path)
             data_saver.add('fixed_frames', sca_kin_cfree_planner.planner.fixed_frames)
+            data_saver.add('contact_seq_planes', contact_seq_planes)
             data_saver.advance()
             data_saver.close()
 
