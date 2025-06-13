@@ -12,7 +12,7 @@ from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (cre
 
 
 def get_terminal_feet_gains():
-    return np.array([12.] * 3 + [4.0, 2.5, 1.0])
+    return np.array([12.] * 3 + [10.0, 10.0, 10.0])
 
 
 class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
@@ -20,12 +20,12 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
         super().__init__(robot_model, contact_seqs, time_per_phase, ik_cfree_planner)
 
         self.gains = {
-            'torso': np.array([1.5, 3.5, 1.0] + [0.5, 1.0, 0.01]),  # (lin, ang)
-            'feet': np.array([12.] * 3 + [0.01] * 3),  # (lin, ang)
-            'L_knee': np.array([4.] * 3 + [0.00001] * 3),
-            'R_knee': np.array([4.] * 3 + [0.00001] * 3),
+            'torso': np.array([2.5, 3.5, 1.5] + [1.0, 3.0, 0.001]),  # (lin, ang)
+            'feet': np.array([10.] * 3 + [0.01, 1.0, 0.01]),  # (lin, ang)
+            'L_knee': np.array([8.] * 3 + [0.00001] * 3),
+            'R_knee': np.array([6.] * 3 + [0.00001] * 3),
             'LH': np.array([2.] * 3 + [0.00001] * 3),
-            'RH': np.array([0.5] * 3 + [0.00001] * 3)
+            'RH': np.array([2] * 3 + [0.00001] * 3)
         }
         self._default_gains = copy(self.gains)
         self._zero_config = None
@@ -52,7 +52,7 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
         ik_cfree_planner = self.ik_cfree_planner
         gains = self.gains
         zero_config = self._zero_config
-        speed_up = 2.5
+        speed_up = 1.0
 
         fddp = self.fddp
         for i in range(self.contact_phases):
@@ -101,14 +101,15 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
                         model_seqs += createFinalSequence([dmodel])
                         print(f"Applying (last) Final Sequence model at {i}")
 
-                # ------ speed up last step before balance
-                if i == (self.contact_phases - 2) and t < (i + 1) * T:
-                    t += speed_up * DT
-                    # if it goes past this contact phase, set it to the end of the phase
-                    if t > (i + 1) * T - (speed_up * DT + 0.001):
-                        gains['feet'] = get_terminal_feet_gains()
-                # ------ last step speed up (end)
-                elif t > (i + 1) * T - (DT + 0.001):
+                # # ------ speed up last step before balance
+                # if i == (self.contact_phases - 2) and t < (i + 1) * T:
+                #     t += speed_up * DT
+                #     # if it goes past this contact phase, set it to the end of the phase
+                #     if t > (i + 1) * T - (speed_up * DT + 0.001):
+                #         gains['feet'] = get_terminal_feet_gains()
+                # # ------ last step speed up (end)
+                # elif t > (i + 1) * T - (DT + 0.001):
+                if t > (i + 1) * T - (DT + 0.001):
                     b_terminal_step = True
                     gains['feet'] = get_terminal_feet_gains()
                     t += DT
@@ -136,19 +137,19 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
                 model_seqs = [*model_seqs, [imp_model]]
                 new_contact_fr = [fr for fr in self.contact_planes_seq[i + 1].keys() if fr not in frames_in_contact.keys()]
                 print(f"Applied impulse model at {i} on frame {new_contact_fr}")
-            else:
-                dmodel = createMultiFrameFinalActionModel(state,
-                                                          actuation,
-                                                          x0,
-                                                          plan_to_model_ids,
-                                                          frames_in_contact,
-                                                          frames_in_contact,
-                                                          frame_targets_dict,
-                                                          gains=gains,
-                                                          zero_config=zero_config,
-                                                          terminal_step=True)
-                model_seqs += createFinalSequence([dmodel])
-                print(f"Applying Final Sequence instead of impulse at last sequence: {i}")
+            # else:
+            #     dmodel = createMultiFrameFinalActionModel(state,
+            #                                               actuation,
+            #                                               x0,
+            #                                               plan_to_model_ids,
+            #                                               frames_in_contact,
+            #                                               frames_in_contact,
+            #                                               frame_targets_dict,
+            #                                               gains=gains,
+            #                                               zero_config=zero_config,
+            #                                               terminal_step=True)
+            #     model_seqs += createFinalSequence([dmodel])
+            #     print(f"Applying Final Sequence instead of impulse at last sequence: {i}")
 
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
             fddp[i] = crocoddyl.SolverFDDP(problem)

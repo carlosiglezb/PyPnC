@@ -246,12 +246,12 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 if frame_name == 'LF' or frame_name == 'RF' or frame_name == 'LH' or frame_name == 'RH':
                     reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
                 elif frame_name == 'L_knee' or frame_name == 'R_knee':
+                    # in some cases, scaling the reach polytope for knees helps the solver
                     reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + reach_constr + soc_constraint)
     prob.solve(solver='CLARABEL')
-    # prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
 
     if prob.status == 'infeasible':
         print(f'{"*" * 5} Smooth Problem was infeasible. Retrying with relaxed tolerances.')

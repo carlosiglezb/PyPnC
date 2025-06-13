@@ -211,8 +211,8 @@ class IrisRegionsManager:
         # start_centroid = self.iris_start_seed + np.array([0., 0., 0.35])
         # goal_centroid = self.iris_goal_seed + np.array([0.0, 0., 0.35])
         # ----------- settings for all
-        start_centroid = np.array([0.35, 0, 0.5])
-        goal_centroid = np.array([0.35, 0, 0.5])
+        start_centroid = np.array([0.35, 0, 0.55])
+        goal_centroid = np.array([0.35, 0, 0.55])
         new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.001, 0.01, 0.01])
 
         # check that new seed is not in collision before creating new IRIS region
