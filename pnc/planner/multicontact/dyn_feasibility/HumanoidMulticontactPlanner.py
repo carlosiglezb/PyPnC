@@ -110,12 +110,5 @@ class HumanoidMulticontactPlanner:
                 len_datas -= 1
             for model_idx in range(len_datas):
                 costs_vec = list(fddp.problem.runningDatas)[model_idx].differential.costs.costs
-                self.costs['uReg'][fddp_idx][model_idx] = costs_vec['uReg'].cost
-                self.costs['xReg'][fddp_idx][model_idx] = costs_vec['xReg'].cost
-                self.costs['xBounds'][fddp_idx][model_idx] = costs_vec['xBounds'].cost
-
-                for fr in self.frame_names_lst:
-                    if fr + '_friction' in costs_vec:
-                        self.costs[fr + '_friction'][fddp_idx][model_idx] = costs_vec[fr + '_friction'].cost
-                    if fr + '_goal' in costs_vec:
-                        self.costs[fr + '_goal'][fddp_idx][model_idx] = costs_vec[fr + '_goal'].cost
+                for cv in costs_vec:
+                    self.costs[cv.key()][fddp_idx][model_idx] = costs_vec[cv.key()].cost

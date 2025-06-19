@@ -396,12 +396,12 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             SE3_ee,
             pin.LOCAL_WORLD_ALIGNED,
             actuation.nu,
-            np.array([0, 50]),
+            np.array([0, 1e-6]),
         )
-        contacts.addContact(fr_name, fr_contact)
+        contacts.addContact(fr_name + "_contact", fr_contact)
 
         # Add friction cone penalization according to foot or hand contact
-        floor_rotation = SE3_ee.rotation
+        floor_rotation = np.eye(3)
         surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
 
         # friction cone activation function
@@ -523,12 +523,12 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
             SE3_ee,
             pin.LOCAL_WORLD_ALIGNED,
             actuation.nu,
-            np.array([0, 50.]),
+            np.array([0, 1e-6]),
         )
         contacts.addContact(fr_name + "_contact", fr_contact)
 
         # Add friction cone penalization according to foot or hand contact
-        floor_rotation = SE3_ee.rotation
+        floor_rotation = np.eye(3)
         surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
 
         # friction cone activation function
@@ -577,17 +577,11 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
         costs.addCost(fr_name + "_goal", fr_cost, 5e6)
 
     # Adding state and control regularization terms
-    x_reg_weight = 5e-2
+    x_reg_weight = 5e-5
     u_reg_weight = 1e-4
-    w_x = np.array([0.01] * 3 + [0.01] * 3 + [2.] * (state.nv - 6) + [4.] * state.nv)
+    w_x = np.array([0.1] * 3 + [10.0] * 3 + [2.] * (state.nv - 6) + [4.] * state.nv)
     if zero_config is not None and terminal_step:
-        # x0[6:state.nv] = zero_config[7:]    # use (x,y,z)-position from references
-        # x0[state.nq-1] = 0
-        # x0[6:state.nq] = np.zeros(state.nq - 6)
-        x0[5+19:5+31] = zero_config[6+19:6+31]  # set upper body to zero config
-        # w_x[:7+11] = 1e-3               # don't track lower body
-        # w_x[3:7] = 10                   # track orientation
-        # w_x[-state.nv:] = 100.0          # penalize high velocities returning to zero configuration
+        x0[3:state.nq] = zero_config[3:]
     if v_ref is not None:
         x0[-state.nv:] = v_ref
     else:
@@ -600,8 +594,10 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
         )
         costs.addCost("xReg", x_reg_cost, x_reg_weight)
 
+    w_u = np.array([0.5] * actuation.nu)
+    activation_ureg = crocoddyl.ActivationModelWeightedQuad(w_u ** 2)
     u_reg_cost = crocoddyl.CostModelResidual(
-        state, crocoddyl.ResidualModelControl(state, actuation.nu)
+        state, activation_ureg, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
     costs.addCost("uReg", u_reg_cost, u_reg_weight)
 
