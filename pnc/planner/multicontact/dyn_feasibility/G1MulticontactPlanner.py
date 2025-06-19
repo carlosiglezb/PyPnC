@@ -24,7 +24,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             'feet': np.array([12.] * 3 + [0.00001] * 3),  # (lin, ang)
             'L_knee': np.array([8.] * 3 + [0.00001] * 3),
             'R_knee': np.array([8.] * 3 + [0.00001] * 3),
-            'hands': np.array([2.] * 3 + [0.00001] * 3)
+            'LH': np.array([2.] * 3 + [0.00001] * 3),
+            'RH': np.array([2.] * 3 + [0.00001] * 3)
         }
         self._default_gains = copy(self.gains)
         self._zero_config = None
@@ -68,15 +69,27 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 # frame_targets_dict = self.pack_current_targets(t)   # used for data reload
                 frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
                 if t < (i + 1) * T:
-                    dmodel = createMultiFrameActionModel(state,
-                                                         actuation,
-                                                         x0,
-                                                         plan_to_model_ids,
-                                                         frames_in_contact,
-                                                         self.contact_planes_seq[i + 1],
-                                                         frame_targets_dict,
-                                                         gains=gains,
-                                                         terminal_step=b_terminal_step)
+                    if i != (self.contact_phases - 1):
+                        dmodel = createMultiFrameActionModel(state,
+                                                             actuation,
+                                                             x0,
+                                                             plan_to_model_ids,
+                                                             frames_in_contact,
+                                                             self.contact_planes_seq[i + 1],
+                                                             frame_targets_dict,
+                                                             gains=gains,
+                                                             terminal_step=True)
+                    else:
+                        dmodel = createMultiFrameActionModel(state,
+                                                             actuation,
+                                                             x0,
+                                                             plan_to_model_ids,
+                                                             frames_in_contact,
+                                                             frames_in_contact,
+                                                             frame_targets_dict,
+                                                             gains=gains,
+                                                             terminal_step=b_terminal_step)
+                        # print(f"Applying Final Sequence model at {i}")
                     model_seqs += createSequence([dmodel], DT, 1)
                 else:   # last time knot in current contact phase
                     if i != (self.contact_phases - 1):
@@ -91,7 +104,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                                   gains=gains,
                                                                   terminal_step=b_terminal_step)
                         model_seqs += createFinalSequence([dmodel])
-                        print(f"Applying Final Sequence model at {i}")
+                        print(f"Last time in mode {i}. Applying Final Sequence")
 
                     # if in final contact phase, add extra knot to match dimensions of other phases
                     # else:
@@ -138,7 +151,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                           frame_targets_dict,
                                                           gains=gains,
                                                           zero_config=zero_config,
-                                                          terminal_step=False)
+                                                          terminal_step=True)
                 model_seqs += createFinalSequence([dmodel])
                 print(f"Applying Final Sequence model at {i}")
 
