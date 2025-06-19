@@ -546,6 +546,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name: str,
     final_lh_pos = safe_regions_mgr_dict['LH'].iris_list[1].seed_pos
     if robot_name == 'g1':
         intermediate_rf_pos = np.array([0.35, final_rf_pos[1], 0.44])
+        # intermediate_rh_pos = np.array([0.45, -0.2, 1.0])
     elif robot_name == 'ergoCub':
         intermediate_rf_pos = np.array([0.30, final_rf_pos[1]-0.02, 0.49])
         intermediate_rh_pos = np.array([0.40, -0.15, 1.0])
@@ -558,7 +559,6 @@ def get_five_stage_on_knocker_contact_sequence(robot_name: str,
     if robot_name == 'g1':
         motion_frames_seq.add_motion_frame({
                                             'LH': door_l_inner_location,
-                                            'RH': door_r_inner_location,
                                             })
     elif robot_name == 'ergoCub':
         motion_frames_seq.add_motion_frame({
@@ -570,7 +570,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name: str,
 
     # ---- Step 2: step on knee-knocker with right foot
     if robot_name == 'g1':
-        fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
+        fixed_frames.append(['LF', 'L_knee', 'LH'])   # frames that must not move
     elif robot_name == 'ergoCub':
         fixed_frames.append(['LF', 'L_knee', 'LH'])
     motion_frames_seq.add_motion_frame({
@@ -582,7 +582,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name: str,
 
     # ---- Step 3: step through door with left foot
     if robot_name == 'g1':
-        fixed_frames.append(['RF', 'R_knee', 'LH', 'RH'])   # frames that must not move
+        fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
     elif robot_name == 'ergoCub':
         fixed_frames.append(['RF', 'R_knee', 'LH'])  # frames that must not move
     motion_frames_seq.add_motion_frame({
@@ -872,10 +872,13 @@ def main(args):
         if robot_name == 'g1':
             q0 = get_g1_default_initial_pose(rob_model.nq - 7, env)
             weights_rigid_link = np.array([1., 0., 10.])
-            v0 = np.zeros(rob_model.nv)
-            x0 = np.concatenate([q0, v0])
+        elif robot_name == 'ergoCub':
+            q0 = get_ergoCub_default_initial_pose(rob_model.nq - 7) # TODO add stairs env config
+            weights_rigid_link = np.array([1., 0., 10.])
         else:
             raise NotImplementedError('Robot default configuration not specified for stairs')
+        v0 = np.zeros(rob_model.nv)
+        x0 = np.concatenate([q0, v0])
     else:
         raise NotImplementedError('Specified environment cannot be loaded')
 
@@ -907,7 +910,7 @@ def main(args):
             starting_pose = {}
             for fr in plan_to_model_frames.keys():
                 starting_pose[fr] = robot_fwdk.get_link_iso(plan_to_model_frames[fr])[:3, 3]
-            fixed_frames_seq, motion_frames_seq = stairs_plan.get_opposing_limbs_contact_sequence(stairs, starting_pose, B_USE_KNEES)
+            fixed_frames_seq, motion_frames_seq = stairs_plan.get_opposing_limbs_contact_sequence(stairs, starting_pose, robot_name, b_use_knees=B_USE_KNEES)
 
             # process vision and create IRIS regions
             standing_pos = q0[:3]
@@ -980,10 +983,10 @@ def main(args):
         # planner parameters
         T = 3
         if env == 'door':
-            # alpha = [0.5, 0.1, 0.01]  # g1
-            alpha = [0.2, 0.2, 1.0]  # ergoCub
+            alpha = [0.5, 0.1, 0.01]  # g1
+            # alpha = [0.2, 0.2, 1.0]  # ergoCub
         elif env == 'stairs':
-            alpha = [1, 0.1, 0.01]
+            alpha = [0.1, 0.2, 0.8]
         # use self-collision avoidance
         sca_geometry = None
         sca_str = '_'
@@ -1058,7 +1061,7 @@ def main(args):
                 robot_dyn_plan.reset_default_gains('torso', np.array([2.5, 3.5, 1.5] + [0.5, 0.5, 0.001]))
                 robot_dyn_plan.set_zero_configuration(q0)
         elif env == 'stairs':
-            N_horizon_lst = [180, 250, 250, 250, 280]   # TODO add time knots for last (balance) step
+            N_horizon_lst = [180, 250, 250, 250, 280, 250]
             contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
             robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, T, ik_cfree_planner)
             robot_dyn_plan.reset_default_gains('torso', np.array([2.0, 1.5, 1.0] + [0.5, 0.5, 0.1]))
@@ -1072,6 +1075,8 @@ def main(args):
                 N_horizon_lst = [100, 250, 250, 200, 150]
             elif contact_seq in [2]:
                 N_horizon_lst = [100, 250, 250, 200, 200]
+        elif env == 'stairs':
+            N_horizon_lst = [100, 250, 250, 250, 280, 250]
         contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
         robot_dyn_plan = ErgoCubMulticontactPlanner(rob_model, contact_sequence, T, ik_cfree_planner)
         robot_dyn_plan.set_zero_configuration(q0)

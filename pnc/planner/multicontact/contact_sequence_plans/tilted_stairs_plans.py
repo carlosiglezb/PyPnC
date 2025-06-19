@@ -10,6 +10,7 @@ from vision.iris import IrisGeomInterface, IrisRegionsManager
 # ---------------------------
 def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
                                         starting_pose: dict[str: np.ndarray],
+                                        robot_name: str = 'g1',
                                         b_use_knees: bool = True):
     box_width = stairs.box_width
     box_depth = stairs.box_depth
@@ -17,7 +18,22 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
     box_h2_left = stairs.box_h2_left
     box_h1_right = stairs.box_h1_right
     box_h2_right = stairs.box_h2_right
-    ankle_height = 0.08
+    if robot_name == 'g1':
+        # G1 settings
+        ankle_height = 0.08
+        torso_hand_height = 0.08
+        rh1_height = 1.0
+        lh2_height = 1.4
+        rh3_height = 1.7
+    elif robot_name == 'ergoCub':
+        # ErgoCub settings
+        ankle_height = 0.1
+        torso_hand_height = -0.05
+        rh1_height = 1.1
+        lh2_height = 1.6
+        rh3_height = 1.9
+    else:
+        raise ValueError(f"Unknown tilted stair settings for robot: {robot_name}")
     delta_h_left = (box_h2_left - box_h1_left)
     delta_h_right = (box_h2_right - box_h1_right)
     left_step_normal = np.array([0, -delta_h_left, box_width])
@@ -36,12 +52,11 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
         starting_lkn_pos = starting_pose['L_knee']
         starting_rkn_pos = starting_pose['R_knee']
 
-    # G1 settings
-    final_lf_pos = np.array([0.2 + 2.5 * box_depth , 0.1, 1.05])
-    final_rf_pos = np.array([0.2 + 2.5 * box_depth , -0.1, 1.05])
+    final_lf_pos = np.array([0.2 + 2.5 * box_depth , 0.1, 1. + ankle_height])
+    final_rf_pos = np.array([0.2 + 2.5 * box_depth , -0.1, 1. + ankle_height])
     final_torso_pos = (final_lf_pos + final_rf_pos) / 2 + np.array([0., 0., starting_torso_pos[2]])
-    final_rh_pos = final_torso_pos + np.array([0.3, -0.2, 0.08])
-    final_lh_pos = final_torso_pos + np.array([0.3, 0.2, 0.08])
+    final_rh_pos = final_torso_pos + np.array([0.3, -0.2, torso_hand_height])
+    final_lh_pos = final_torso_pos + np.array([0.3, 0.2, torso_hand_height])
     if b_use_knees:
         rough_knee_pos = (starting_lkn_pos - starting_lf_pos)
         scaled_knee_pos = final_lf_pos + rough_knee_pos * 0.3139 / np.linalg.norm(rough_knee_pos)
@@ -51,9 +66,10 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
         final_rkn_pos = scaled_knee_pos
 
     # intermediate locations
-    rh1_wall = np.array([0.34, -0.32, 1.0])
+    rh1_wall = np.array([0.34, -0.32, rh1_height])
     lf_step1 = np.array([0.35, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height])
-    lh_wall_step_12 = np.array([0.2 + box_depth, box_width - 0.03, 1.4])
+    lh_wall_step_12 = np.array([0.2 + box_depth, box_width - 0.03, lh2_height])
+    rh_wall_final_step = np.array([0.25 + box_depth, -(box_width - 0.03), rh3_height])
     rf_step2 = np.array([0.32+ box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height])
 
     # initialize fixed and motion frame sets
@@ -111,6 +127,7 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
         motion_frames_seq.add_motion_frame({
             'LF': final_lf_pos,
             'L_knee': final_lkn_pos,
+            'RH': rh_wall_final_step,
         })
     else:
         fixed_frames.append(['RF', 'LH'])
@@ -118,35 +135,34 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
             'LF': final_lf_pos,
         })
     lf_step3_contact = PlannerSurfaceContact('LF', foot_final_step_normal)
-    motion_frames_seq.add_contact_surfaces([lf_step3_contact])
+    rh_step3_contact = PlannerSurfaceContact('RH', rh_wall_normal)
+    motion_frames_seq.add_contact_surfaces([lf_step3_contact, rh_step3_contact])
 
     # ---- Step 5: step on middle box with RF
     if b_use_knees:
-        fixed_frames.append(['LF', 'L_knee'])
+        fixed_frames.append(['LF', 'L_knee', 'RH'])
         motion_frames_seq.add_motion_frame({
             'torso': final_torso_pos,
             'RF': final_rf_pos,
             'R_knee': final_rkn_pos,
             'LH': final_lh_pos,
-            'RH': final_rh_pos,
         })
     else:
-        fixed_frames.append(['LF'])
+        fixed_frames.append(['LF', 'RH'])
         motion_frames_seq.add_motion_frame({
             'torso': final_torso_pos,
             'RF': final_rf_pos,
             'LH': final_lh_pos,
-            'RH': final_rh_pos,
         })
     rf_step4_contact = PlannerSurfaceContact('RF', foot_final_step_normal)
     motion_frames_seq.add_contact_surfaces([rf_step4_contact])
 
     # ---- Step 6: balance
     if b_use_knees:
-        fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
+        fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH'])
     else:
-        fixed_frames.append(['torso', 'LF', 'RF', 'LH', 'RH'])
-    motion_frames_seq.add_motion_frame({})
+        fixed_frames.append(['torso', 'LF', 'RF', 'LH'])
+    motion_frames_seq.add_motion_frame({'RH': final_rh_pos,})
 
     return fixed_frames, motion_frames_seq
 

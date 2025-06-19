@@ -228,7 +228,7 @@ class TestIKCFreePlanner(unittest.TestCase):
             ee_halfspace_params[fr] = cwd + '/pnc/reachability_map/output/g1/g1_' + fr + '.yaml'
 
         # hand-chosen five-stage sequence of contacts
-        fixed_frames_seq, motion_frames_seq = stairs_plan.get_opposing_limbs_contact_sequence(self.stairs, self.starting_pose, self.b_use_knees)
+        fixed_frames_seq, motion_frames_seq = stairs_plan.get_opposing_limbs_contact_sequence(self.stairs, self.starting_pose, robot_name=self.robot_name,b_use_knees=self.b_use_knees)
 
         # process vision and create IRIS regions
         standing_pos = self.q0[:3]

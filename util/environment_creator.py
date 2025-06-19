@@ -53,7 +53,7 @@ class TiltedBox:
 class TiltedStairs:
     def __init__(self):
         dom_lb = np.array([-1.6, -0.8, -0.])
-        dom_ub = np.array([1.6, 0.8, 2.1])
+        dom_ub = np.array([1.6, 0.8, 2.4])
 
         # stairs parameters
         box_width = 0.35
