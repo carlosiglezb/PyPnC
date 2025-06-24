@@ -24,7 +24,8 @@ class LocomanipulationFramePlanner:
                  aux_frames_path=None,
                  fixed_frames=None,
                  motion_frames_seq=None,
-                 sca_robot_geom=None):
+                 sca_robot_geom=None,
+                 b_use_knees_in_smooth_plan=False,):
 
         # fixed, motion, and free frames filled out in the creation of hyperplanes
         self.fixed_frames, self.motion_frames_seq, self.free_frames = [], [], []
@@ -32,6 +33,7 @@ class LocomanipulationFramePlanner:
         self.safe_boxes = OrderedDict()
         self.reachability_planes = OrderedDict()
         self.path = []
+        self.b_use_knees_in_smooth_plan = b_use_knees_in_smooth_plan
         self.points = None      # control points (from Bezier trajectory solution)
         self.safe_points = None   # safe points obtained from rollout of motion sequence
         self.box_seq = []
@@ -117,13 +119,16 @@ class LocomanipulationFramePlanner:
         fixed_frames = self.fixed_frames
         motion_frames_seq = self.motion_frames_seq
         sca_robot_geom = self.sca_robot_geom
+        b_use_knees_in_smooth_plan = self.b_use_knees_in_smooth_plan
         self.path, self.box_seq, self.points, self.safe_points = plan_multiple_iris(S, R, p_init, T,
                                                                                     alpha, verbose,
                                                                                     A, fixed_frames,
                                                                                     motion_frames_seq,
                                                                                     sca_robot_geom,
                                                                                     w_rigid,
-                                                                                    w_rigid_poly)
+                                                                                    w_rigid_poly,
+                                                                                    b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan,
+                                                                                    )
 
     def plot(self, visualizer, static_html=False):
         i = 0

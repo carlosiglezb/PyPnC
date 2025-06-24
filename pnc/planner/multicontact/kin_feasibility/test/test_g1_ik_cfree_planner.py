@@ -551,6 +551,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         self.assertEqual(True, True)
 
     def test_five_stage_plan_one_hand_at_a_time(self, sca_geometry=None):
+        b_save_plan = True
         frame_names = self.frame_names
         plan_to_model_frames = self.plan_to_model_frames
 
@@ -613,8 +614,6 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         # initial and desired final positions for each frame
         p_init = {}
-        # for fr in frame_names:
-        #     p_init[fr] = safe_regions_mgr_dict[fr].iris_list[0].seed_pos  # starting_pos
         p_init['torso'] = self.starting_torso_pos
         p_init['LF'] = self.starting_lf_pos
         p_init['RF'] = self.starting_rf_pos
@@ -625,12 +624,12 @@ class TestIKCFreePlanner(unittest.TestCase):
         p_init['RH'] = self.starting_rh_pos
 
         # hand-chosen five-stage sequence of contacts
-        # fixed_frames_seq, motion_frames_seq = self.get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict)
-        fixed_frames_seq, motion_frames_seq = self.get_five_stage_on_knocker_contact_sequence(safe_regions_mgr_dict)
+        fixed_frames_seq, motion_frames_seq = self.get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict)
+        # fixed_frames_seq, motion_frames_seq = self.get_five_stage_on_knocker_contact_sequence(safe_regions_mgr_dict)
 
         # planner parameters
         T = 3
-        alpha = [0, 0, 1]
+        alpha = [0, 0, 0.1]
         traversable_regions = [traversable_regions_dict['torso'],
                                traversable_regions_dict['LF'],
                                traversable_regions_dict['RF'],
@@ -642,14 +641,31 @@ class TestIKCFreePlanner(unittest.TestCase):
                                                      aux_frames_path=self.aux_frames_path,
                                                      fixed_frames=fixed_frames_seq,
                                                      motion_frames_seq=motion_frames_seq,
-                                                     sca_robot_geom=sca_geometry)
+                                                     sca_robot_geom=sca_geometry,
+                                                     b_use_knees_in_smooth_plan=False)
 
         # set planner
-        weights_rigid_link = np.array([10, 0., 0.])
+        weights_rigid_link = np.array([5., 0., 0.])
         ik_cfree_planner.set_planner(frame_planner)
         ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
         ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer)
 
+        if b_save_plan:
+            # save the solution parameters needed to reconstruct the Bezier curves
+            save_filename = self.robot_name + '_five_stage_plan.pkl'
+            transition_times = []
+            n_frames = len(ik_cfree_planner.planner.path)
+            data_saver = DataSaver(save_filename)
+            data_saver.add('bez_points', ik_cfree_planner.planner.points)
+            for i in range(n_frames):
+                transition_times.append(ik_cfree_planner.planner.path[i].transition_times)
+            data_saver.add('bez_points_transition_times', transition_times)
+            data_saver.add('n_frames', n_frames)
+            data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
+            data_saver.add('bez_path', ik_cfree_planner.planner.path)
+            data_saver.add('fixed_frames', ik_cfree_planner.planner.fixed_frames)
+            data_saver.advance()
+            data_saver.close()
         self.assertEqual(True, True)
         return ik_cfree_planner
 

@@ -74,6 +74,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                                   contact_sequence=None,
                                   surface_normals_lst=None,
                                   weights_rigid_link=None,
+                                  b_use_knees_in_smooth_plan=True,
                                   n_points=None, **kwargs):
     if weights_rigid_link is None:
         weights_rigid_link = np.array([3500., 0.5, 10.])     # default for g1
@@ -245,9 +246,10 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 # reachable constraint
                 if frame_name == 'LF' or frame_name == 'RF' or frame_name == 'LH' or frame_name == 'RH':
                     reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
-                elif frame_name == 'L_knee' or frame_name == 'R_knee':
-                    # in some cases, scaling the reach polytope for knees helps the solver
-                    reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+                if b_use_knees_in_smooth_plan:
+                    if frame_name == 'L_knee' or frame_name == 'R_knee':
+                        # note: in some cases, scaling the reach polytope for knees helps the solver
+                        reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + reach_constr + soc_constraint)
@@ -430,6 +432,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                   surface_normals_lst=None,
                                   initial_guess=None,
                                   weights_rigid_link=None,
+                                  b_use_knees_in_smooth_plan=True,
                                   n_points=None, **kwargs):
     if weights_rigid_link is None:
         weights_rigid_link = np.array([3500., 0.5, 10.])     # default for g1
@@ -602,8 +605,9 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 # reachable constraint
                 if frame_name == 'LF' or frame_name == 'RF' or frame_name == 'LH' or frame_name == 'RH':
                     parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
-                elif frame_name == 'L_knee' or frame_name == 'R_knee':
-                    parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
+                if b_use_knees_in_smooth_plan:
+                    if frame_name == 'L_knee' or frame_name == 'R_knee':
+                        parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
 
     # Collect points into a single vector
     points_all = pack_points_for_single_vector(points, 'casadi')
