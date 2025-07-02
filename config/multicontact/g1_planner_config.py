@@ -1,6 +1,8 @@
 import numpy as np
 from config.multicontact.planner_config import PlannerConfig
 
+N_V = 33  # dimension of generalized velocities
+N_U = 27  # dimension of control inputs
 
 class MultiContactDoorConfig(PlannerConfig):
     W_RIGID_LINK = [5., 0., 0.]
@@ -20,6 +22,10 @@ class MultiContactDoorConfig(PlannerConfig):
             'LH': np.array([2.] * 3 + [0.00001] * 3),
             'RH': np.array([2.] * 3 + [0.00001] * 3)
         }
+    WBC_WEIGHTED_COSTS = {
+        'xReg': np.array([0.1] * 3 + [10.0] * 3 + [2.] * (N_V - 6) + [4.] * N_V),
+        'uReg': np.array([0.5] * N_U),
+    }
 
 class MultiContactTiltedStairsConfig(PlannerConfig):
     W_RIGID_LINK = [1., 0., 10.]
@@ -34,3 +40,7 @@ class MultiContactTiltedStairsConfig(PlannerConfig):
             'LH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
             'RH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
         }
+    WBC_WEIGHTED_COSTS = {
+        'xReg': np.array([0.1] * 3 + [10.0] * 3 + [2.] * (N_V - 6) + [4.] * N_V),
+        'uReg': np.array([0.5] * N_U),
+    }

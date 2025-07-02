@@ -46,6 +46,7 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
         plan_to_model_ids = self.plan_to_model_ids
         ik_cfree_planner = self.ik_cfree_planner
         gains = self.gains
+        planner_params = self.planner_params
 
         fddp = self.fddp
         for i in range(self.contact_phases):
@@ -66,10 +67,9 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
                                                          x0,
                                                          plan_to_model_ids,
                                                          frames_in_contact,
-                                                         ee_rpy,
+                                                         self.contact_planes_seq[i+1],
                                                          frame_targets_dict,
-                                                         None,
-                                                         gains=gains,
+                                                         planner_weights=planner_params,
                                                          terminal_step=b_terminal_step)
                     model_seqs += createSequence([dmodel], DT, 1)
                 else:
@@ -81,8 +81,7 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
                                                                   frames_in_contact,
                                                                   ee_rpy,
                                                                   frame_targets_dict,
-                                                                  None,
-                                                                  gains=gains,
+                                                                  planner_weights=planner_params,
                                                                   terminal_step=b_terminal_step)
                         model_seqs += createFinalSequence([dmodel])
                         print(f"Applying Impulse model at {i}")
@@ -104,7 +103,7 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
                                                               [self.contact_planes_seq[i + 1][0]],
                                                               ee_rpy,
                                                               frame_targets_dict,
-                                                              gains=gains)
+                                                              planner_weights=planner_params)
                 model_seqs = [*model_seqs, [imp_model]]
                 print(f"Applied impulse model at {i} on frame {[self.contact_planes_seq[i + 1][0]]}")
             else:
@@ -113,10 +112,9 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
                                                           x0,
                                                           plan_to_model_ids,
                                                           frames_in_contact,
-                                                          ee_rpy,
+                                                          frames_in_contact,
                                                           frame_targets_dict,
-                                                          None,
-                                                          gains=gains,
+                                                          planner_weights=planner_params,
                                                           terminal_step=b_terminal_step)
                 model_seqs += createFinalSequence([dmodel])
                 print(f"Applying Final Sequence model at {i}")

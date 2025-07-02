@@ -43,6 +43,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         T = self.T
         plan_to_model_ids = self.plan_to_model_ids
         gains = self.gains
+        planner_params = self.planner_params
         zero_config = self._zero_config
 
         fddp = self.fddp
@@ -66,7 +67,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                              frames_in_contact,
                                                              self.contact_planes_seq[i + 1],
                                                              frame_targets_dict,
-                                                             gains=gains,
+                                                             planner_weights=planner_params,
                                                              terminal_step=True)
                     else:
                         dmodel = createMultiFrameActionModel(state,
@@ -76,7 +77,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                              frames_in_contact,
                                                              frames_in_contact,
                                                              frame_targets_dict,
-                                                             gains=gains,
+                                                             planner_weights=planner_params,
                                                              terminal_step=b_terminal_step)
                         # print(f"Applying Final Sequence model at {i}")
                     model_seqs += createSequence([dmodel], DT, 1)
@@ -90,7 +91,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                                   frames_in_contact,
                                                                   self.contact_planes_seq[i + 1],
                                                                   frame_targets_dict,
-                                                                  gains=gains,
+                                                                  planner_weights=planner_params,
                                                                   terminal_step=b_terminal_step)
                         model_seqs += createFinalSequence([dmodel])
                         print(f"Last time in mode {i}. Applying Final Sequence")
@@ -126,7 +127,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                               frames_in_contact,
                                                               self.contact_planes_seq[i + 1],
                                                               frame_targets_dict,
-                                                              gains=gains)
+                                                              planner_weights=planner_params)
                 model_seqs = [*model_seqs, [imp_model]]
                 new_contact_fr = [fr for fr in self.contact_planes_seq[i + 1].keys() if fr not in frames_in_contact.keys()]
                 print(f"Applied impulse model at {i} on frame {new_contact_fr}")
@@ -138,7 +139,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                           frames_in_contact,
                                                           frames_in_contact,
                                                           frame_targets_dict,
-                                                          gains=gains,
+                                                          planner_weights=planner_params,
                                                           zero_config=zero_config,
                                                           terminal_step=True)
                 model_seqs += createFinalSequence([dmodel])
@@ -177,7 +178,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         print("[Compute Time] Dynamic feasibility check: ", dyn_solve_time)
 
     def reset_default_gains(self, frame_name: str, updated_gains: np.array):
-        self._default_gains[frame_name] = updated_gains
+        self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains
+        # self._default_gains[frame_name] = updated_gains
 
     def set_zero_configuration(self, joint_configuration):
         self._zero_config = joint_configuration

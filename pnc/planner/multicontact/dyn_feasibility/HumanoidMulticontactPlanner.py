@@ -35,7 +35,7 @@ class HumanoidMulticontactPlanner:
         self.fddp = [crocoddyl.SolverFDDP] * num_contact_phases
         self.T = contact_seqs.phases_durations  # time_per_phase
 
-        self.gains = planner_params.WBC_FRAME_TRACKING_GAINS
+        self.planner_params = planner_params
         # TODO set some default values
         self.x0 = None
         self.plan_to_model_ids = None
@@ -44,7 +44,8 @@ class HumanoidMulticontactPlanner:
         self.larm_jnames = None
         self.rarm_jnames = None
         self.ik_cfree_planner = ik_cfree_planner
-        self._default_gains = copy(self.gains)
+        self.gains = planner_params.WBC_FRAME_TRACKING_GAINS    # TODO remove?
+        self._default_gains = copy(self.gains)                  # TODO remove?
         self._zero_config = None
 
 
