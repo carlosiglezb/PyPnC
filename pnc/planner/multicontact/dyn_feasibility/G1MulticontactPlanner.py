@@ -16,19 +16,8 @@ def get_terminal_feet_gains():
 
 
 class G1MulticontactPlanner(HumanoidMulticontactPlanner):
-    def __init__(self, robot_model, contact_seqs, time_per_phase, ik_cfree_planner):
-        super().__init__(robot_model, contact_seqs, time_per_phase, ik_cfree_planner)
-
-        self.gains = {
-            'torso': np.array([2.5, 1.5, 1.0] + [0.5, 0.5, 0.01]),  # (lin, ang)
-            'feet': np.array([12.] * 3 + [0.00001] * 3),  # (lin, ang)
-            'L_knee': np.array([8.] * 3 + [0.00001] * 3),
-            'R_knee': np.array([8.] * 3 + [0.00001] * 3),
-            'LH': np.array([2.] * 3 + [0.00001] * 3),
-            'RH': np.array([2.] * 3 + [0.00001] * 3)
-        }
-        self._default_gains = copy(self.gains)
-        self._zero_config = None
+    def __init__(self, robot_model, contact_seqs, ik_cfree_planner, planner_params):
+        super().__init__(robot_model, contact_seqs, ik_cfree_planner, planner_params)
 
         # names of joints used in reduced states (for plotting only)
         self.lleg_jnames = ['left_hip_roll_joint', 'left_hip_pitch_joint', 'left_hip_yaw_joint',

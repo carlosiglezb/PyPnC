@@ -1,9 +1,11 @@
 import os
 import pickle
 import sys
-import time
 from collections import OrderedDict
 
+import config.multicontact.g1_planner_config as g1_params
+import config.multicontact.ergoCub_planner_config as ergoCub_params
+import config.multicontact.valkyrie_planner_config as valkyrie_params
 from pnc.planner.multicontact.kin_feasibility import SCARobotGeometry
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 from util.environment_creator import TiltedStairs
@@ -40,12 +42,12 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 from plot.data_saver import *
 
 B_SHOW_JOINT_PLOTS = False
-B_SHOW_COST_PLOTS = False
+B_SHOW_COST_PLOTS = True
 B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = True
 B_SAVE_KIN_DATA = False
 B_SAVE_DYN_DATA = False
-B_VERBOSE = True
+B_VERBOSE = False
 B_SAVE_HTML = False
 B_USE_SELF_COLLISION_AVOIDANCE = False
 B_USE_KNEES = True
@@ -848,18 +850,17 @@ def main(args):
             q0 = get_g1_default_initial_pose(rob_model.nq - 7)
             door_pos = np.array([0.32, 0., 0.])
             step_length = 0.46
-            weights_rigid_link = np.array([5., 0., 0.])    # step over door in single step
-            # weights_rigid_link = np.array([1000., 0., 0.])  # step on knee knocker
+            planner_params = g1_params.MultiContactDoorConfig()
         elif robot_name == 'valkyrie':
             q0 = get_val_default_initial_pose(rob_model.nq - 7)
             door_pos = np.array([0.34, 0., 0.])
             step_length = 0.55
-            weights_rigid_link = np.array([500., 0., 50.])
+            planner_params = valkyrie_params.MultiContactDoorConfig()
         elif robot_name == 'ergoCub':
             q0 = get_ergoCub_default_initial_pose(rob_model.nq - 7)
             door_pos = np.array([0.30, 0., 0.])
             step_length = 0.47
-            weights_rigid_link = np.array([1.2, 0., 4.0])   # step on knee knocker
+            planner_params = ergoCub_params.MultiContactDoorConfig()
         else:
             raise NotImplementedError('Robot default configuration not specified')
         v0 = np.zeros(rob_model.nv)
@@ -871,10 +872,10 @@ def main(args):
 
         if robot_name == 'g1':
             q0 = get_g1_default_initial_pose(rob_model.nq - 7, env)
-            weights_rigid_link = np.array([1., 0., 10.])
+            planner_params = g1_params.MultiContactTiltedStairsConfig()
         elif robot_name == 'ergoCub':
             q0 = get_ergoCub_default_initial_pose(rob_model.nq - 7) # TODO add stairs env config
-            weights_rigid_link = np.array([1., 0., 10.])
+            planner_params = ergoCub_params.MultiContactTiltedStairsConfig()
         else:
             raise NotImplementedError('Robot default configuration not specified for stairs')
         v0 = np.zeros(rob_model.nv)
@@ -938,11 +939,7 @@ def main(args):
         #
         # Initialize IK Frame Planner
         #
-        if robot_name == 'valkyrie':
-            w_rigid_poly = np.array([0.1621, 0.0, 0.])
-        else:
-            w_rigid_poly = weights_rigid_link
-        ik_cfree_planner = IKCFreePlanner(rob_model, rob_data, plan_to_model_frames, q0, w_rigid_poly=w_rigid_poly)
+        ik_cfree_planner = IKCFreePlanner(rob_model, rob_data, plan_to_model_frames, q0, planner_params)
 
         # generate all frame traversable regions
         traversable_regions_dict = OrderedDict()
@@ -982,11 +979,7 @@ def main(args):
 
         # planner parameters
         T = 3
-        if env == 'door':
-            alpha = [0.5, 0.1, 0.01]  # g1
-            # alpha = [0.2, 0.2, 1.0]  # ergoCub
-        elif env == 'stairs':
-            alpha = [0.1, 0.2, 0.8]
+
         # use self-collision avoidance
         sca_geometry = None
         sca_str = '_'
@@ -1009,7 +1002,7 @@ def main(args):
         # compute paths and create targets
         ik_cfree_planner.set_planner(frame_planner)
         ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
-        ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer, B_VERBOSE)
+        ik_cfree_planner.plan(p_init, T, planner_params, visualizer, B_VERBOSE)
 
         if B_SAVE_KIN_DATA:
             # save the solution parameters needed to reconstruct the Bezier curves
@@ -1052,38 +1045,19 @@ def main(args):
     #
     # Start Dynamic Feasibility Check
     #
+    N_horizon_lst = planner_params.N_HORIZON_LST
+    contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
     if robot_name == 'g1':
+        robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params)
         if env == 'door':
-            N_horizon_lst = [180, 200, 220, 200, 200]
-            contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
-            robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, T, ik_cfree_planner)
             if contact_seq == 1:    # step on knee knocker
                 robot_dyn_plan.reset_default_gains('torso', np.array([2.5, 3.5, 1.5] + [0.5, 0.5, 0.001]))
                 robot_dyn_plan.set_zero_configuration(q0)
-        elif env == 'stairs':
-            N_horizon_lst = [180, 250, 250, 250, 280, 250]
-            contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
-            robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, T, ik_cfree_planner)
-            robot_dyn_plan.reset_default_gains('torso', np.array([2.0, 1.5, 1.0] + [0.5, 0.5, 0.1]))
-            robot_dyn_plan.reset_default_gains('feet', np.array([12.0] * 3 + [0.05, 0.00001, 0.00001]))
-            robot_dyn_plan.reset_default_gains('L_knee', np.array([2.0, 2.5, 3.0] + [0.0001] * 3))
-            robot_dyn_plan.reset_default_gains('R_knee', np.array([2.0, 2.5, 3.0] + [0.0001] * 3))
-            robot_dyn_plan.reset_default_gains('hands', np.array([4.0, 4.0, 4.0] + [0.0001] * 3))
     elif robot_name == 'ergoCub':
-        if env == 'door':
-            if contact_seq in [0, 1]:
-                N_horizon_lst = [100, 250, 250, 200, 150]
-            elif contact_seq in [2]:
-                N_horizon_lst = [100, 250, 250, 200, 200]
-        elif env == 'stairs':
-            N_horizon_lst = [100, 250, 250, 250, 280, 250]
-        contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
-        robot_dyn_plan = ErgoCubMulticontactPlanner(rob_model, contact_sequence, T, ik_cfree_planner)
+        robot_dyn_plan = ErgoCubMulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params)
         robot_dyn_plan.set_zero_configuration(q0)
     elif robot_name == 'valkyrie':
-        N_horizon_lst = [150, 150, 100]
-        contact_sequence = ContactSequence(contact_seqs, N_horizon_lst, T)
-        robot_dyn_plan = ValkyrieMulticontactPlanner(rob_model, contact_sequence, T, ik_cfree_planner)
+        robot_dyn_plan = ValkyrieMulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params)
     else:
         raise NotImplementedError(f"Matching multicontact planner for {robot_name} not found")
 
@@ -1288,7 +1262,7 @@ def get_root_to_torso_offset(package_dir, rob_model, robot_urdf_file):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", type=str, default='door',
+    parser.add_argument("--env", type=str, default='stairs',
                         choices=['door', 'stairs'],
                         help="Environment to load for planning")
     parser.add_argument("--sequence", type=int, default=1,

@@ -1,3 +1,5 @@
+from copy import copy
+
 import numpy as np
 import crocoddyl
 
@@ -14,8 +16,8 @@ class ContactSequence:
 class HumanoidMulticontactPlanner:
     def __init__(self, robot_model,
                  contact_seqs: ContactSequence,
-                 time_per_phase: float,
-                 ik_cfree_planner):
+                 ik_cfree_planner,
+                 planner_params):
         self.frame_names_lst = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
         self.contact_planes_seq = contact_seqs.contact_planes_seq
         self.horizon_lst = contact_seqs.phases_knots
@@ -31,10 +33,10 @@ class HumanoidMulticontactPlanner:
 
         self.contact_phases = num_contact_phases = len(contact_seqs.phases_knots)
         self.fddp = [crocoddyl.SolverFDDP] * num_contact_phases
-        self.T = time_per_phase
+        self.T = contact_seqs.phases_durations  # time_per_phase
 
+        self.gains = planner_params.WBC_FRAME_TRACKING_GAINS
         # TODO set some default values
-        self.gains = None
         self.x0 = None
         self.plan_to_model_ids = None
         self.lleg_jnames = None
@@ -42,6 +44,9 @@ class HumanoidMulticontactPlanner:
         self.larm_jnames = None
         self.rarm_jnames = None
         self.ik_cfree_planner = ik_cfree_planner
+        self._default_gains = copy(self.gains)
+        self._zero_config = None
+
 
         # Crocoddyl variables / parameters
         self.state = crocoddyl.StateMultibody(robot_model)

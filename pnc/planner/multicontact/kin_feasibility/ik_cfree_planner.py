@@ -7,6 +7,7 @@ from pinocchio.visualize import MeshcatVisualizer
 import pinocchio as pin
 import numpy as np
 
+from config.multicontact.planner_config import PlannerConfig
 from util.path_parameterization import CompositeBezierCurve, get_bez_segment, get_frame_des_pos
 from util import util
 # Planner
@@ -50,14 +51,14 @@ class IKCFreePlanner:
                  pin_robot_data: pin.Data,
                  plan_frames_to_model_map: dict[str: str],
                  q0: np.array = None,
-                 dt: float = 0.02,
-                 w_rigid_poly=None):
+                 gains: PlannerConfig = None,
+                 dt: float = 0.02):
         self.dt = dt
         self.task_dict = {}             # filled out in PInk tasks (setup_tasks)
         self.planner = None
         self.plan_to_model_frames = None
         self._b_record_anim = False
-        self.w_rigid_poly = w_rigid_poly
+        self.w_rigid_poly = np.array(gains.W_RIGID_LINK)
 
         if q0 is None and pin_robot_model is not None:
             q0 = np.zeros(pin_robot_model.nq)
@@ -159,8 +160,7 @@ class IKCFreePlanner:
 
     def plan(self, p_init: np.array,
              T: float,
-             alpha: np.array,
-             w_rigid: np.array,
+             planner_params: PlannerConfig,
              visualizer: MeshcatVisualizer = None,
              verbose: bool = False,
              save_html:bool = False):
@@ -168,6 +168,8 @@ class IKCFreePlanner:
             raise ValueError("Planner not set")
 
         # compute plan
+        alpha = planner_params.ALPHA
+        w_rigid = np.array(planner_params.W_RIGID_LINK)
         ik_all_start_time = time.time()
         self.planner.plan_iris(p_init, T, alpha, w_rigid, self.w_rigid_poly, verbose)
         print("[Compute Time] Total IK solve time: ", time.time() - ik_all_start_time)

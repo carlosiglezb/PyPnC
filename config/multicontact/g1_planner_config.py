@@ -1,0 +1,36 @@
+import numpy as np
+from config.multicontact.planner_config import PlannerConfig
+
+
+class MultiContactDoorConfig(PlannerConfig):
+    W_RIGID_LINK = [5., 0., 0.]
+    # W_RIGID_LINK_SINGLE_STEP = [5., 0., 0.]
+    # W_RIGID_LINK_STEP_ON_DOOR = [1000., 0., 0.]
+
+    ALPHA = [0.5, 0.1, 0.01]
+    N_HORIZON_LST = [180, 200, 220, 200, 200]
+
+    # Note: contact seq 1 tested with:
+    # 'torso', np.array([2.5, 3.5, 1.5] + [0.5, 0.5, 0.001])
+    WBC_FRAME_TRACKING_GAINS = {
+            'torso': np.array([2.5, 1.5, 1.0] + [0.5, 0.5, 0.01]),  # (lin, ang)
+            'feet': np.array([12.] * 3 + [0.00001] * 3),  # (lin, ang)
+            'L_knee': np.array([8.] * 3 + [0.00001] * 3),
+            'R_knee': np.array([8.] * 3 + [0.00001] * 3),
+            'LH': np.array([2.] * 3 + [0.00001] * 3),
+            'RH': np.array([2.] * 3 + [0.00001] * 3)
+        }
+
+class MultiContactTiltedStairsConfig(PlannerConfig):
+    W_RIGID_LINK = [1., 0., 10.]
+    ALPHA = [0.1, 0.2, 0.8]
+    N_HORIZON_LST = [180, 250, 250, 250, 280, 250]
+
+    WBC_FRAME_TRACKING_GAINS = {
+            'torso': np.array([2.0, 1.5, 1.0, 0.5, 0.5, 0.1]),
+            'feet': np.array([12.0] * 3 + [0.05, 0.00001, 0.00001]),
+            'L_knee': np.array([2.0, 2.5, 3.0] + [0.0001] * 3),
+            'R_knee': np.array([2.0, 2.5, 3.0] + [0.0001] * 3),
+            'LH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
+            'RH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
+        }

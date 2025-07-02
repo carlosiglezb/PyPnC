@@ -16,19 +16,8 @@ def get_terminal_feet_gains():
 
 
 class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
-    def __init__(self, robot_model, contact_seqs, time_per_phase, ik_cfree_planner):
-        super().__init__(robot_model, contact_seqs, time_per_phase, ik_cfree_planner)
-
-        self.gains = {
-            'torso': np.array([2.5, 3.5, 1.5] + [1.0, 3.0, 0.001]),  # (lin, ang)
-            'feet': np.array([10.] * 3 + [0.01, 1.0, 0.01]),  # (lin, ang)
-            'L_knee': np.array([8.] * 3 + [0.00001] * 3),
-            'R_knee': np.array([6.] * 3 + [0.00001] * 3),
-            'LH': np.array([2.] * 3 + [0.00001] * 3),
-            'RH': np.array([2] * 3 + [0.00001] * 3)
-        }
-        self._default_gains = copy(self.gains)
-        self._zero_config = None
+    def __init__(self, robot_model, contact_seqs, ik_cfree_planner, planner_params):
+        super().__init__(robot_model, contact_seqs, ik_cfree_planner, planner_params)
 
         # names of joints used in reduced states (for plotting only)
         self.lleg_jnames = ['l_hip_roll', 'l_hip_pitch', 'l_hip_yaw',
@@ -37,6 +26,11 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
         self.rleg_jnames = ['r_hip_roll', 'r_hip_pitch', 'r_hip_yaw',
                             'r_knee', 'r_ankle_roll', 'r_ankle_pitch']
 
+        self.larm_jnames = ['l_shoulder_pitch', 'l_shoulder_roll', 'l_shoulder_yaw',
+                            'l_elbow', 'l_wrist_yaw', 'l_wrist_roll', 'l_wrist_pitch']
+
+        self.rarm_jnames = ['r_shoulder_pitch', 'r_shoulder_roll', 'r_shoulder_yaw',
+                            'r_elbow', 'r_wrist_yaw', 'r_wrist_roll', 'r_wrist_pitch']
 
     def plan(self):
         print("===============")

@@ -16,16 +16,9 @@ def get_terminal_feet_gains():
 
 
 class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
-    def __init__(self, robot_model, contact_seqs, time_per_phase, ik_cfree_planner):
-        super().__init__(robot_model, contact_seqs, time_per_phase, ik_cfree_planner)
+    def __init__(self, robot_model, contact_seqs, ik_cfree_planner, planner_params):
+        super().__init__(robot_model, contact_seqs, ik_cfree_planner, planner_params)
 
-        self.gains = {
-            'torso': np.array([3.0] * 3 + [0.5, 0.5, 0.01]),    # (lin, ang)
-            'feet': np.array([6.] * 3 + [0.00001] * 3),         # (lin, ang)
-            'L_knee': np.array([2.] * 3 + [0.00001] * 3),
-            'R_knee': np.array([2.] * 3 + [0.00001] * 3),
-            'hands': np.array([2.] * 3 + [0.00001] * 3)
-        }
         self._default_gains = copy(self.gains)
 
         # names of joints used in reduced states (for plotting only)
@@ -35,6 +28,11 @@ class ValkyrieMulticontactPlanner(HumanoidMulticontactPlanner):
         self.rleg_jnames = ['rightHipRoll', 'rightHipPitch', 'rightHipYaw',
                             'rightKneePitch', 'rightAnkleRoll', 'rightAnklePitch']
 
+        self.larm_jnames = ['leftShoulderPitch', 'leftShoulderRoll', 'leftShoulderYaw',
+                            'leftElbowPitch']
+
+        self.rarm_jnames = ['rightShoulderPitch', 'rightShoulderRoll', 'rightShoulderYaw',
+                            'rightElbowPitch']
 
     def plan(self):
         dyn_solve_time = 0.
