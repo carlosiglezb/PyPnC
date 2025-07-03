@@ -35,29 +35,50 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         SE3_ee = pin.SE3.Identity()
         SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
 
-        fr_contact = crocoddyl.ContactModel6D(
-            state,
-            fr_id,
-            SE3_ee,
-            pin.LOCAL_WORLD_ALIGNED,
-            actuation.nu,
-            np.array([0, 1e-6]),
-        )
+        if 'H' in fr_name:
+            fr_contact = crocoddyl.ContactModel3D(
+                state,
+                fr_id,
+                np.zeros(3),
+                pin.LOCAL_WORLD_ALIGNED,
+                actuation.nu,
+                np.array([0, 1e-6]),
+            )
+        else:
+            fr_contact = crocoddyl.ContactModel6D(
+                state,
+                fr_id,
+                SE3_ee,
+                pin.LOCAL_WORLD_ALIGNED,
+                actuation.nu,
+                np.array([0, 1e-6]),
+            )
         contacts.addContact(fr_name + "_contact", fr_contact)
 
         # Add friction cone penalization according to foot or hand contact
         floor_rotation = np.eye(3)
-        surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+        if 'H' in fr_name:
+            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+        else:
+            foot_size = planner_weights.FOOT_SIZE
+            surf_cone = crocoddyl.WrenchCone(floor_rotation, mu, foot_size, 4, True)     # better if False?
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
             crocoddyl.ActivationBounds(surf_cone.lb, surf_cone.ub)
         )
-        fr_friction = crocoddyl.CostModelResidual(
-            state,
-            surf_activation_friction,
-            crocoddyl.ResidualModelContactFrictionCone(state, fr_id, surf_cone, actuation.nu),
-        )
+        if 'H' in fr_name:
+            fr_friction = crocoddyl.CostModelResidual(
+                state,
+                surf_activation_friction,
+                crocoddyl.ResidualModelContactFrictionCone(state, fr_id, surf_cone, actuation.nu),
+            )
+        else:
+            fr_friction = crocoddyl.CostModelResidual(
+                state,
+                surf_activation_friction,
+                crocoddyl.ResidualModelContactWrenchCone(state, fr_id, surf_cone, actuation.nu),
+            )
         costs.addCost(fr_name + "_friction",
                       fr_friction,
                       planner_weights.WBC_COST_WEIGHTS['friction'])
@@ -166,29 +187,50 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
         SE3_ee = pin.SE3.Identity()
         SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
 
-        fr_contact = crocoddyl.ContactModel6D(
-            state,
-            fr_id,
-            SE3_ee,
-            pin.LOCAL_WORLD_ALIGNED,
-            actuation.nu,
-            np.array([0, 1e-6]),
-        )
+        if 'H' in fr_name:
+            fr_contact = crocoddyl.ContactModel3D(
+                state,
+                fr_id,
+                np.zeros(3),
+                pin.LOCAL_WORLD_ALIGNED,
+                actuation.nu,
+                np.array([0, 1e-6]),
+            )
+        else:
+            fr_contact = crocoddyl.ContactModel6D(
+                state,
+                fr_id,
+                SE3_ee,
+                pin.LOCAL_WORLD_ALIGNED,
+                actuation.nu,
+                np.array([0, 1e-6]),
+            )
         contacts.addContact(fr_name + "_contact", fr_contact)
 
         # Add friction cone penalization according to foot or hand contact
         floor_rotation = np.eye(3)
-        surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+        if 'H' in fr_name:
+            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+        else:
+            foot_size = planner_weights.FOOT_SIZE
+            surf_cone = crocoddyl.WrenchCone(floor_rotation, mu, foot_size, 4, True)
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
             crocoddyl.ActivationBounds(surf_cone.lb, surf_cone.ub)
         )
-        fr_friction = crocoddyl.CostModelResidual(
-            state,
-            surf_activation_friction,
-            crocoddyl.ResidualModelContactFrictionCone(state, fr_id, surf_cone, actuation.nu),
-        )
+        if 'H' in fr_name:
+            fr_friction = crocoddyl.CostModelResidual(
+                state,
+                surf_activation_friction,
+                crocoddyl.ResidualModelContactFrictionCone(state, fr_id, surf_cone, actuation.nu),
+            )
+        else:
+            fr_friction = crocoddyl.CostModelResidual(
+                state,
+                surf_activation_friction,
+                crocoddyl.ResidualModelContactWrenchCone(state, fr_id, surf_cone, actuation.nu),
+            )
         costs.addCost(fr_name + "_friction",
                       fr_friction,
                       planner_weights.WBC_FINAL_COST_WEIGHTS['friction'])
@@ -296,9 +338,14 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
             SE3_ee = pin.SE3.Identity()
             SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
 
-            supportContactModel = crocoddyl.ImpulseModel6D(
-                state, fr_id, pin.LOCAL_WORLD_ALIGNED
-            )
+            if 'H' in fr_name:
+                supportContactModel = crocoddyl.ImpulseModel3D(
+                    state, fr_id, pin.LOCAL_WORLD_ALIGNED
+                )
+            else:
+                supportContactModel = crocoddyl.ImpulseModel6D(
+                    state, fr_id, pin.LOCAL_WORLD_ALIGNED
+                )
             impulseModel.addImpulse(
                 fr_name + "_impulse", supportContactModel
             )

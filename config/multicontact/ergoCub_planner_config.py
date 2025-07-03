@@ -8,6 +8,7 @@ class MultiContactDoorConfig(PlannerConfig):
     W_RIGID_LINK = [1.2, 0., 4.0]   # used to step on door
 
     ALPHA = [0.2, 0.2, 1.0]
+    FOOT_SIZE = [0.15, 0.09]  # [length, width]
     N_HORIZON_LST = [100, 250, 250, 200, 150]   # tested on contact_seq in contact_seq [0, 1]
     # N_HORIZON_LST = [100, 250, 250, 200, 200]   # tested on contact_seq in contact_seq [2]
 
@@ -28,6 +29,7 @@ class MultiContactTiltedStairsConfig(PlannerConfig):
     W_RIGID_LINK = [1., 0., 10.]
 
     ALPHA = [0.1, 0.2, 0.8]
+    FOOT_SIZE = [0.15, 0.09]  # [length, width]
     N_HORIZON_LST = [100, 250, 250, 250, 280, 250]
 
     WBC_FRAME_TRACKING_GAINS = {

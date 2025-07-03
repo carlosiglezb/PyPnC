@@ -997,7 +997,8 @@ def main(args):
                                                      aux_frames_path=aux_frames_path,
                                                      fixed_frames=fixed_frames_seq,
                                                      motion_frames_seq=motion_frames_seq,
-                                                     sca_robot_geom=sca_geometry)
+                                                     sca_robot_geom=sca_geometry,
+                                                     b_use_knees_in_smooth_plan=True)
 
         # compute paths and create targets
         ik_cfree_planner.set_planner(frame_planner)
@@ -1245,7 +1246,6 @@ def main(args):
 def get_root_to_torso_offset(package_dir, rob_model, robot_urdf_file):
     geom_model = pin.buildGeomFromUrdf(rob_model,
                                        robot_urdf_file,
-                                       package_dir,
                                        pin.GeometryType.COLLISION)
     root_to_torso_offset = None
     for i, gm in enumerate(geom_model.geometryObjects):

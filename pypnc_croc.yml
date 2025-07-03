@@ -3,21 +3,20 @@ channels:
   - anaconda
   - conda-forge
 dependencies:
-  - crocoddyl=2.0.2
-  - pinocchio=2.7.0
-  - python=3.10
+  - crocoddyl=3.0.1
+  - pinocchio=3.6.0
+  - sqlite=3.50.2
+  - python=3.12
   - pip
   - pip:
-      - casadi==3.6.5
-      - pycddlib==2.1.7
-#      - conda-env-export
+      - casadi==3.7.0
+      - pycddlib==3.0.2
       - drake
       - matplotlib
       - meshcat
       - opencv-python
       - pybullet
       - pypoman
-      - pin-pink
       - qpsolvers
       - ruamel.yaml
       - open3d
