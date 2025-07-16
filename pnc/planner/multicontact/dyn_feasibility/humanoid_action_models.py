@@ -61,7 +61,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
         else:
             foot_size = planner_weights.FOOT_SIZE
-            surf_cone = crocoddyl.WrenchCone(floor_rotation, mu, foot_size, 4, True)     # better if False?
+            surf_cone = crocoddyl.WrenchCone(floor_rotation, mu, np.array(foot_size), 4, True)     # better if False?
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
@@ -213,7 +213,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
             surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
         else:
             foot_size = planner_weights.FOOT_SIZE
-            surf_cone = crocoddyl.WrenchCone(floor_rotation, mu, foot_size, 4, True)
+            surf_cone = crocoddyl.WrenchCone(floor_rotation, mu, np.array(foot_size), 4, True)
 
         # friction cone activation function
         surf_activation_friction = crocoddyl.ActivationModelQuadraticBarrier(
