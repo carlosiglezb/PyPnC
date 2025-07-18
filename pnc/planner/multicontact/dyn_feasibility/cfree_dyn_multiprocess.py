@@ -14,7 +14,6 @@ from pnc.planner.multicontact.kin_feasibility import SCARobotGeometry
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 from util.environment_creator import TiltedStairs
 import pnc.planner.multicontact.contact_sequence_plans.tilted_stairs_plans as stairs_plan
-from util.util import try_multiprocess
 
 cwd = os.getcwd()
 sys.path.append(cwd)

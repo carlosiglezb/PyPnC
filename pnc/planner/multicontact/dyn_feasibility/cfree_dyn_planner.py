@@ -51,6 +51,7 @@ B_VERBOSE = False
 B_SAVE_HTML = False
 B_USE_SELF_COLLISION_AVOIDANCE = False
 B_USE_KNEES = True
+B_USE_KNEES_IN_SMOOTH_PLAN = True
 
 
 def get_g1_default_initial_pose(n_joints:int, env: str = 'door'):
@@ -998,7 +999,7 @@ def main(args):
                                                      fixed_frames=fixed_frames_seq,
                                                      motion_frames_seq=motion_frames_seq,
                                                      sca_robot_geom=sca_geometry,
-                                                     b_use_knees_in_smooth_plan=True)
+                                                     b_use_knees_in_smooth_plan=B_USE_KNEES_IN_SMOOTH_PLAN)
 
         # compute paths and create targets
         ik_cfree_planner.set_planner(frame_planner)
@@ -1199,7 +1200,13 @@ def main(args):
     if B_SAVE_DYN_DATA:
         # Saving data tools
         dyn_data_saver = DataSaver(robot_name + sca_str + 'step_' + seq_str + '_knee_knocker.pkl')
+        # save kinematic TO solution
         dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
+        dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
+        dyn_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
+        dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
+        dyn_data_saver.add('fixed_frames', fixed_frames_seq)
+        dyn_data_saver.add('contact_seq_planes', contact_seq_planes)
         for (i, fp) in enumerate(robot_dyn_plan.fddp):
             com_lst = []
             torso_pos, lf_pos, rf_pos, lkn_pos, rkn_pos, lh_pos, rh_pos = [], [], [], [], [], [], []
@@ -1234,12 +1241,6 @@ def main(args):
             dyn_data_saver.add('lh_act', lh_pos)
             dyn_data_saver.add('rh_act', rh_pos)
             dyn_data_saver.advance()
-        # save kinematic TO solution
-        dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
-        dyn_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
-        dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
-        dyn_data_saver.add('fixed_frames', fixed_frames_seq)
-        dyn_data_saver.add('contact_seq_planes', contact_seq_planes)
         dyn_data_saver.close()
 
 

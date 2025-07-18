@@ -10,7 +10,6 @@ class SCARobotGeometry:
             urdf_path, robot_model_path, root_joint=pin.JointModelFreeFlyer())
         geom_model = pin.buildGeomFromUrdf(robot.model,
                                            urdf_path,
-                                           robot_model_path,
                                            pin.GeometryType.COLLISION)
         geom_model.addAllCollisionPairs()
 

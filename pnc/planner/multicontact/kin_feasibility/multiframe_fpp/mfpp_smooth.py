@@ -381,7 +381,7 @@ def pack_points_for_single_vector(points, vec_type: str):
     Casadi's reshape method follows a column-major order, so we reshape the matrices
     accordingly to output:
     x = [p0_x, p0_y, p0_z, v0_x, v0_y, v0_z, ..., p1_x, p1_y, p1_z, v1_x, v1_y, v1_z, ...]
-    where p0_x \in \mathbb{R}^(n_points)
+    where p0_x in mathbb{R}^(n_points)
     """
     vector_out = []
     if type(points) is dict:
@@ -614,10 +614,14 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     opts = {
         "ipopt": {
-            "hessian_approximation": "exact",   # limited-memory
+            "hessian_approximation": "limited-memory",   # exact
             "max_iter": 100,
             "mu_init": 1e-6,
-            "tol": 1e-1,
+            "tol": 1e-2,
+            "constr_viol_tol": 1e-2,
+            # "mu_strategy":"adaptive",
+            "nlp_scaling_method": "gradient-based",
+            "jacobian_regularization_value": 2e-4
             # "derivative_test": "first-order",
             # "derivative_test_print_all": "no",
             # "derivative_test_perturbation": 1e-6,
@@ -684,7 +688,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
             initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points),1))))
 
-        opts["ipopt"]["max_iter"] = 50
+        opts["ipopt"]["max_iter"] = 100
         opts["ipopt"]["warm_start_init_point"] = "yes"
         opts["ipopt"]["warm_start_mult_bound_push"] = 1e-8
         opts["ipopt"]["warm_start_slack_bound_push"] = 1e-8
