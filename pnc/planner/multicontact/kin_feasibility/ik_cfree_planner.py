@@ -55,6 +55,7 @@ class IKCFreePlanner:
                  dt: float = 0.02):
         self.dt = dt
         self.task_dict = {}             # filled out in PInk tasks (setup_tasks)
+        self.solver_stats = {}
         self.planner = None
         self.plan_to_model_frames = None
         self._b_record_anim = False
@@ -172,7 +173,10 @@ class IKCFreePlanner:
         w_rigid = np.array(planner_params.W_RIGID_LINK)
         ik_all_start_time = time.time()
         self.planner.plan_iris(p_init, T, alpha, w_rigid, self.w_rigid_poly, verbose)
-        print("[Compute Time] Total IK solve time: ", time.time() - ik_all_start_time)
+        self.solver_stats = self.planner.solver_stats
+        self.solver_stats['ik_plan_total_time'] = time.time() - ik_all_start_time
+        if verbose:
+            print("[Compute Time] Total IK solve time: ", self.solver_stats['plan_iris_time'])
         if visualizer is not None:
             self.planner.plot(visualizer, save_html)
 

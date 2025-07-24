@@ -18,6 +18,7 @@ class HumanoidMulticontactPlanner:
                  contact_seqs: ContactSequence,
                  ik_cfree_planner,
                  planner_params):
+        self.solver_stats = {}
         self.frame_names_lst = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
         self.contact_planes_seq = contact_seqs.contact_planes_seq
         self.horizon_lst = contact_seqs.phases_knots

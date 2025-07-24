@@ -182,6 +182,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                   sca_robot_geometry: SCARobotGeometry=None,
                   w_rigid=None, w_rigid_poly=None,
                   b_use_knees_in_smooth_plan =True):
+    solver_stats = {}
     # Find IRIS sequence and minimize length between safe points
     motion_frames_lst = motion_frames_seq.get_motion_frames()
     iris_seq, safe_pnt_lst = plan_multistage_iris_seq(S, fixed_frames, motion_frames_lst, p_init)
@@ -189,7 +190,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     traj, length, solver_time = solve_min_reach_iris_distance(R, S, iris_seq, safe_pnt_lst,
                                                               aux_frames=A,
                                                               weights_rigid=w_rigid_poly)
-
+    solver_stats['min_reach_iris_distance_cvxpy_time'] = solver_time
     if verbose:
         print(f"[Compute Time] Min. distance solve time: {solver_time}")
 
@@ -238,6 +239,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                              weights_rigid_link=w_rigid,
                                                              verbose=verbose,
                                                              b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan)
+    solver_stats['multiple_bezier_iris_cvxpy_time'] = sol_stats['runtime']
     if verbose:
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
 
@@ -255,5 +257,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                                  initial_guess=initial_guess,
                                                                  verbose=verbose,
                                                                  b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan)
-
-    return paths, iris_seq, points, safe_pnt_lst
+        solver_stats['multiple_bezier_iris_sca_casadi_time'] = sol_stats['runtime']
+        solver_stats['multiple_bezier_iris_sca_build_time'] = sol_stats['sca_build_time']
+        solver_stats['multiple_bezier_iris_sca_construct_time'] = sol_stats['prob_construct_time']
+    return paths, iris_seq, points, safe_pnt_lst, solver_stats

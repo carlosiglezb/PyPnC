@@ -78,6 +78,7 @@ class LocomanipulationFramePlanner:
             self.aux_frames = aux_frames_path
 
         self.sca_robot_geom = sca_robot_geom
+        self.solver_stats = {}
 
     def add_offset_to_plane_eqn_from_file(self, frame_name,
                                           ee_offset_file_path,
@@ -120,7 +121,7 @@ class LocomanipulationFramePlanner:
         motion_frames_seq = self.motion_frames_seq
         sca_robot_geom = self.sca_robot_geom
         b_use_knees_in_smooth_plan = self.b_use_knees_in_smooth_plan
-        self.path, self.box_seq, self.points, self.safe_points = plan_multiple_iris(S, R, p_init, T,
+        self.path, self.box_seq, self.points, self.safe_points, self.solver_stats = plan_multiple_iris(S, R, p_init, T,
                                                                                     alpha, verbose,
                                                                                     A, fixed_frames,
                                                                                     motion_frames_seq,

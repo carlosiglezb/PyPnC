@@ -34,7 +34,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
 
     def plan(self):
-        dyn_solve_time = 0.
+        dyn_seg_solve_time = []
         b_terminal_step = False
 
         state = self.state
@@ -160,13 +160,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
             start_ddp_solve_time = time.time()
             print("Problem solved:", fddp[i].solve(xs, us, max_iter))
-            dyn_seg_solve_time = time.time() - start_ddp_solve_time
+            dyn_seg_solve_time.append(time.time() - start_ddp_solve_time)
             print("Number of iterations:", fddp[i].iter)
             print("Total cost:", fddp[i].cost)
             print("Gradient norm:", fddp[i].stoppingCriteria())
-            print("Time to solve:", dyn_seg_solve_time)
+            print("Time to solve:", sum(dyn_seg_solve_time))
             print("===============")
-            dyn_solve_time += dyn_seg_solve_time
 
             # Set final state as initial state of next phase
             x0 = fddp[i].xs[-1]
@@ -175,7 +174,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             gains = copy(self._default_gains)
 
         super().update_costs_from_solver()
-        print("[Compute Time] Dynamic feasibility check: ", dyn_solve_time)
+        self.solver_stats['contact_phases_solve_times'] = dyn_seg_solve_time
+        print("[Compute Time] Dynamic feasibility check: ", sum(dyn_seg_solve_time))
 
     def reset_default_gains(self, frame_name: str, updated_gains: np.array):
         self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains

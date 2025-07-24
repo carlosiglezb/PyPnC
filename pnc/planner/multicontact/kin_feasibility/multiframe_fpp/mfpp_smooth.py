@@ -1,4 +1,5 @@
 import copy
+import time
 from typing import List
 
 import casadi as ca
@@ -669,6 +670,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             else:
                 raise ValueError(f'Invalid primitive shape {ee_geom_type} type specified for SCA.')
 
+            sca_build_start_time = time.time()
             for i in sca_bez_points:
                 mfpp_bezier_data['current_point'] = i
                 i_name = 'f_dist_' + str(frame_list[col_idx]) + str(i)
@@ -683,6 +685,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 sca_constraints.append(f_dist[i_name](points_all))
                 lbg.append(1.0)
                 ubg.append(ca.inf)
+            sca_build_time = time.time() - sca_build_start_time
 
             # assume lagrange multipliers of SCA constraints are zero
             # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
@@ -695,12 +698,15 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         opts["ipopt"]["warm_start_bound_push"] = 1e-8
 
     # Solve problem
+    prob_construct_start_time = time.time()
     nlp = {'x': points_all,
            'f': cost + cost_log_abs_sum,
            'g': ca.vertcat(*constraints, *sca_constraints)
            }
     solver = nlpsol('solver', 'ipopt', nlp, opts)
+    prob_construct_time = time.time() - prob_construct_start_time
 
+    solver_start_time = time.time()
     if initial_guess is not None:
         sol = solver(x0=initial_guess['x0'],
                      lam_g0=initial_guess['lam_g0'],
@@ -708,6 +714,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                      lbg=lbg, ubg=ubg)
     else:
         sol = solver(lbg=lbg, ubg=ubg)
+    solver_compute_time = time.time() - solver_start_time
 
     x_sol = sol['x'].full()
 
@@ -770,7 +777,9 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     # Solution statistics.
     # sol_stats_all = sol.stats()
-    sol_stats = {}
+    sol_stats = {'runtime': solver_compute_time,
+                 'sca_build_time': sca_build_time if bool(aux_frames) else 0.0,
+                 'prob_construct_time': prob_construct_time,}
     # sol_stats['cost'] = prob.value
     # sol_stats['runtime'] = sol_stats_all['t_wall_total']
     # sol_stats['cost_breakdown'] = cost_breakdown

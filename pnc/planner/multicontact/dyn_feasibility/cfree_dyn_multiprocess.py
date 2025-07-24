@@ -48,7 +48,7 @@ from plot.data_saver import *
 B_SHOW_JOINT_PLOTS = False
 B_SHOW_COST_PLOTS = False
 B_SHOW_GRF_PLOTS = False
-B_VISUALIZE = True
+B_VISUALIZE = False
 B_SAVE_KIN_DATA = False
 B_SAVE_DYN_DATA = False
 B_VERBOSE = False
@@ -964,7 +964,12 @@ def plan_kin_dyn(robot_name, rob_model, col_model, vis_model,
     if B_SAVE_DYN_DATA:
         # Saving data tools
         dyn_data_saver = DataSaver(robot_name + sca_str + 'step_knee_knocker.pkl')
+        # save kinematic TO solution
+        dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
+        dyn_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
         dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
+        dyn_data_saver.add('fixed_frames', fixed_frames_seq)
+        dyn_data_saver.add('contact_seq_planes', contact_seq_planes)
         for (i, fp) in enumerate(robot_dyn_plan.fddp):
             com_lst = []
             torso_pos, lf_pos, rf_pos, lkn_pos, rkn_pos, lh_pos, rh_pos = [], [], [], [], [], [], []
@@ -999,12 +1004,6 @@ def plan_kin_dyn(robot_name, rob_model, col_model, vis_model,
             dyn_data_saver.add('lh_act', lh_pos)
             dyn_data_saver.add('rh_act', rh_pos)
             dyn_data_saver.advance()
-        # save kinematic TO solution
-        dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
-        dyn_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
-        dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
-        dyn_data_saver.add('fixed_frames', fixed_frames_seq)
-        dyn_data_saver.add('contact_seq_planes', contact_seq_planes)
         dyn_data_saver.close()
 
 
@@ -1012,7 +1011,6 @@ def main(args):
     env = args.env
     contact_seq = args.sequence
     robot_name = args.robot_name
-    kin_plan_path = args.kin_plan_path
 
     #
     # Initialize frames to consider for contact planning
@@ -1198,20 +1196,26 @@ def main(args):
         p_init, x0
     ]
 
-    process1 = multiprocessing.Process(target=plan_kin_dyn, args=kin_args1)
-    process2 = multiprocessing.Process(target=plan_kin_dyn, args=kin_args2)
-    process3 = multiprocessing.Process(target=plan_kin_dyn, args=kin_args3)
+    num_simultaneous_plans = 2
+    res = []
+    # Create processes for each planning task using Pools
+    with multiprocessing.Pool(processes=2) as pool:
+        res = pool.map(plan_kin_dyn, (*kin_args1,))
+        # for i in range(num_simultaneous_plans):
+        #     async_res = pool.apply_async(plan_kin_dyn, args=kin_args1)
+        #     res.append(async_res)
+    # for r in res:
+    #     print(r.get())
 
-    # Start the processes
-    print("Starting planner processes...")
-    process1.start()
-    process2.start()
-    process3.start()
+    # Create processes for each planning task using Processing
+    # process_lst = []
+    # for i in range(num_simultaneous_plans):
+    #     process_lst.append(multiprocessing.Process(target=plan_kin_dyn, args=kin_args1))
+    # for process in process_lst:
+    #     process.start()
+    # for process in process_lst:
+    #     process.join()
 
-    # Wait for all processes to complete
-    process1.join()
-    process2.join()
-    process3.join()
 
 def get_root_to_torso_offset(package_dir, rob_model, robot_urdf_file):
     geom_model = pin.buildGeomFromUrdf(rob_model,
@@ -1240,7 +1244,5 @@ if __name__ == "__main__":
     parser.add_argument("--robot_name", type=str, default='g1',
                         choices=['g1', 'valkyrie', 'ergoCub'],
                         help="Robot name to use for planning")
-    parser.add_argument("--kin_plan_path", type=str, default=None,
-                        help="Path to pkl file containing mfpp paths")
     args = parser.parse_args()
     main(args)
