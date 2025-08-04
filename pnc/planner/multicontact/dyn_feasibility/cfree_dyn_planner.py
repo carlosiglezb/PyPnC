@@ -42,9 +42,9 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 from plot.data_saver import *
 
 B_SHOW_JOINT_PLOTS = False
-B_SHOW_COST_PLOTS = True
+B_SHOW_COST_PLOTS = False
 B_SHOW_GRF_PLOTS = False
-B_VISUALIZE = True
+B_VISUALIZE = False
 B_SAVE_KIN_DATA = False
 B_SAVE_DYN_DATA = False
 B_VERBOSE = False
@@ -1263,12 +1263,12 @@ def get_root_to_torso_offset(package_dir, rob_model, robot_urdf_file):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", type=str, default='stairs',
+    parser.add_argument("--env", type=str, default='door',
                         choices=['door', 'stairs'],
                         help="Environment to load for planning")
-    parser.add_argument("--sequence", type=int, default=1,
+    parser.add_argument("--sequence", type=int, default=2,
                         help="Contact sequence to solve for")
-    parser.add_argument("--robot_name", type=str, default='ergoCub',
+    parser.add_argument("--robot_name", type=str, default='g1',
                         choices=['g1', 'valkyrie', 'ergoCub'],
                         help="Robot name to use for planning")
     parser.add_argument("--kin_plan_path", type=str, default=None,

@@ -8,7 +8,7 @@ from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (cre
                                                                              createMultiFrameFinalActionModel,
                                                                              createMultiFrameFinalImpulseModel,
                                                                              createSequence,
-                                                                             createFinalSequence)
+                                                                             createFinalSequence, quasi_static)
 
 
 def get_terminal_feet_gains():
@@ -56,8 +56,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 if t == (i + 1) * T:
                     b_terminal_step = False
                     gains['feet'] = get_terminal_feet_gains()
-                # frame_targets_dict = self.pack_current_targets(t)   # used for data reload
-                frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
+                frame_targets_dict = self.pack_current_targets(t)   # used for data reload
+                # frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
                 if t < (i + 1) * T:
                     if i != (self.contact_phases - 1):
                         dmodel = createMultiFrameActionModel(state,
@@ -120,51 +120,55 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 self.knot_idx += 1
 
             # add impulse model on frames in contact at the end of every contact phase
-            if i != (self.contact_phases - 1):
-                imp_model = createMultiFrameFinalImpulseModel(state,
-                                                              x0,
-                                                              plan_to_model_ids,
-                                                              frames_in_contact,
-                                                              self.contact_planes_seq[i + 1],
-                                                              frame_targets_dict,
-                                                              planner_weights=planner_params)
-                model_seqs = [*model_seqs, [imp_model]]
-                new_contact_fr = [fr for fr in self.contact_planes_seq[i + 1].keys() if fr not in frames_in_contact.keys()]
-                print(f"Applied impulse model at {i} on frame {new_contact_fr}")
-            else:
-                dmodel = createMultiFrameFinalActionModel(state,
-                                                          actuation,
-                                                          x0,
-                                                          plan_to_model_ids,
-                                                          frames_in_contact,
-                                                          frames_in_contact,
-                                                          frame_targets_dict,
-                                                          planner_weights=planner_params,
-                                                          zero_config=zero_config,
-                                                          terminal_step=True)
-                model_seqs += createFinalSequence([dmodel])
-                print(f"Applying Final Sequence model at {i}")
+            # if i != (self.contact_phases - 1):
+            #     imp_model = createMultiFrameFinalImpulseModel(state,
+            #                                                   x0,
+            #                                                   plan_to_model_ids,
+            #                                                   frames_in_contact,
+            #                                                   self.contact_planes_seq[i + 1],
+            #                                                   frame_targets_dict,
+            #                                                   planner_weights=planner_params)
+            #     model_seqs = [*model_seqs, [imp_model]]
+            #     new_contact_fr = [fr for fr in self.contact_planes_seq[i + 1].keys() if fr not in frames_in_contact.keys()]
+            #     print(f"Applied impulse model at {i} on frame {new_contact_fr}")
+            # else:
+            dmodel = createMultiFrameFinalActionModel(state,
+                                                      actuation,
+                                                      x0,
+                                                      plan_to_model_ids,
+                                                      frames_in_contact,
+                                                      frames_in_contact,
+                                                      frame_targets_dict,
+                                                      planner_weights=planner_params,
+                                                      zero_config=zero_config,
+                                                      terminal_step=True)
+            model_seqs += createFinalSequence([dmodel])
+            print(f"Applying Final Sequence model at {i}")
 
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
             fddp[i] = crocoddyl.SolverFDDP(problem)
 
             # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
-            fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
+            fddp[i].setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
 
             # Solver settings
             max_iter = 200
             fddp[i].th_stop = 1e-3
+            fddp[i].th_gapTol = 1e-2
+            # fddp[i].th_grad = 1e-2
+            # fddp[i].th_feas = 1e-3
 
             # Set initial guess
             xs = [x0] * (fddp[i].problem.T + 1)
-            us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
+            # us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
+            us = [quasi_static(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
             start_ddp_solve_time = time.time()
             print("Problem solved:", fddp[i].solve(xs, us, max_iter))
             dyn_seg_solve_time.append(time.time() - start_ddp_solve_time)
             print("Number of iterations:", fddp[i].iter)
             print("Total cost:", fddp[i].cost)
             print("Gradient norm:", fddp[i].stoppingCriteria())
-            print("Time to solve:", sum(dyn_seg_solve_time))
+            print("Time to solve:", dyn_seg_solve_time[-1])
             print("===============")
 
             # Set final state as initial state of next phase

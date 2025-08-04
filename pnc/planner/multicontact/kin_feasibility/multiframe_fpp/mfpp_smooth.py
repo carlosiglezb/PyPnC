@@ -133,8 +133,8 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
         if k % num_iris_tot == 0:          # initial position for each frame
             # if also a fixed frame, repeat for entire segment duration
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
-                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points, axis=0)
-                constraints.append(points[k][0] == fixed_frame_pos_mat)
+                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
+                constraints.append(points[k][0][:-1] == fixed_frame_pos_mat)
             else:   # assign for just the first time instant
                 constraints.append(points[k][0][0] == safe_points_lst[0][f_name])   # initial position
                 # check if it has a final safe point assigned
@@ -147,8 +147,8 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
             if any(safe_pnt):
                 constraints.append(points[k][0][0] == safe_pnt) # pos
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
-                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
-                constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
+                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-2, axis=0)
+                constraints.append(points[k][0][1:-1] == fixed_frame_pos_mat)
             else:
                 constraints.append(points[k][0][-1] == safe_points_lst[-1][f_name])
             # TODO check if below is needed since the last motion is taken into account below
@@ -250,11 +250,11 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 if b_use_knees_in_smooth_plan:
                     if frame_name == 'L_knee' or frame_name == 'R_knee':
                         # note: in some cases, scaling the reach polytope for knees helps the solver
-                        reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
+                        reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -1.1*d_mat)
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + reach_constr + soc_constraint)
-    prob.solve(solver='SCS')
+    prob.solve(solver='CLARABEL')
 
     if prob.status == 'infeasible':
         print(f'{"*" * 5} Smooth Problem was infeasible. Retrying with relaxed tolerances.')
@@ -492,7 +492,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         if k % num_iris_tot == 0:          # initial position for each frame
             # if also a fixed frame, repeat for entire segment duration
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
-                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0], constraints, lbg, ubg)
+                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][:-1,:], constraints, lbg, ubg)
             else:   # assign for just the first time instant
                 parse_vec_eq_constr(safe_points_lst[0][f_name], points[k][0][0,:], constraints, lbg, ubg)
                 # check if it has a final safe point assigned
@@ -506,7 +506,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 # constraints.append(points[k][0][0] == safe_pnt) # pos
                 parse_repvec_eq_constr(np.array([safe_pnt]), points[k][0][0,:], constraints, lbg, ubg)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
-                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
+                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:-1, :], constraints, lbg, ubg)
             else:
                 parse_vec_eq_constr(safe_points_lst[-1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
                 # TODO add vel constraint
@@ -608,7 +608,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                     parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
                 if b_use_knees_in_smooth_plan:
                     if frame_name == 'L_knee' or frame_name == 'R_knee':
-                        parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
+                        parse_mat_leq_constr(H, -1.1*d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
 
     # Collect points into a single vector
     points_all = pack_points_for_single_vector(points, 'casadi')
@@ -656,7 +656,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
-            sca_bez_points = range(0, num_iris_tot * n_points, n_points)
+            sca_bez_points = range(0, num_iris_tot * n_points, 2)
 
             # populate col_pair_geom_data with respective primitive shape pair type information
             ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])

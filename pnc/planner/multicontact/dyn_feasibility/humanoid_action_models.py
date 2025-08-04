@@ -1,7 +1,9 @@
 import numpy as np
 import crocoddyl
+import pinocchio
 import pinocchio as pin
 
+import util.liegroup
 from config.multicontact.planner_config import PlannerConfig
 from util.util import so3_from_vec_to_vec
 
@@ -446,3 +448,85 @@ def createFinalSequence(dmodels):
     #     [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.two, 0)]
     #     for m in dmodels
     # ]
+
+def quasi_static(frames_in_contact: dict[str: np.ndarray],
+                 pin_model: pinocchio.Model,
+                 x0: np.ndarray,):
+    lf_frame_id = pin_model.getFrameId("left_ankle_roll_joint")
+    lf_joint_id =  pin_model.getJointId('left_ankle_roll_joint')
+    rf_frame_id = pin_model.getFrameId("right_ankle_roll_joint")
+    rf_joint_id = pin_model.getJointId('right_ankle_roll_joint')
+    pin_data = pin_model.createData()
+    pin.forwardKinematics(pin_model, pin_data, x0[:pin_model.nq])
+    pin.updateFramePlacements(pin_model, pin_data)
+
+    # get positions of the feet
+    lf_placement = pin.updateFramePlacement(pin_model, pin_data, lf_frame_id)
+    lf_pos = lf_placement.translation
+    rf_placement = pin.updateFramePlacement(pin_model, pin_data, rf_frame_id)
+    rf_pos = rf_placement.translation
+
+    # get positions of the hands
+    lh_frame_id = pin_model.getFrameId("left_wrist_yaw_joint")
+    lh_joint_id = pin_model.getJointId('left_wrist_yaw_joint')
+    rh_frame_id = pin_model.getFrameId("right_wrist_yaw_joint")
+    rh_joint_id = pin_model.getJointId('right_wrist_yaw_joint')
+    lh_placement = pin.updateFramePlacement(pin_model, pin_data, lh_frame_id)
+    lh_pos = lh_placement.translation
+    rh_placement = pin.updateFramePlacement(pin_model, pin_data, rh_frame_id)
+    rh_pos = rh_placement.translation
+
+    # get center of mass position
+    com_pos = pin.centerOfMass(pin_model, pin_data, x0[:pin_model.nq])
+
+    delta_lf = util.liegroup.VecToso3(lf_pos - com_pos)
+    delta_rf = util.liegroup.VecToso3(rf_pos - com_pos)
+    aug_sys_A = np.zeros((7, 6))
+    aug_sys_A[:3, :3] = np.eye(3)
+    aug_sys_A[:3, 3:6] = np.eye(3)
+    aug_sys_A[6, 2] = 1.0               # weight percentage is mostly on first component
+    aug_sys_b = np.zeros((7, 1))
+    aug_sys_b[2] = pin_data.mass[0] * 9.81
+
+    # use the respective end-effector based on current contact state
+    if 'LF' in frames_in_contact and 'RF' in frames_in_contact:
+        # both feet are in contact
+        aug_sys_A[3:6, :3] = delta_lf
+        aug_sys_A[3:6, 3:6] = delta_rf
+
+        percentage = 0.5
+        foot_joint_id = lf_joint_id
+        hand_joint_id = rf_joint_id
+    elif len(frames_in_contact) == 2 and 'LF' in frames_in_contact and 'RH' in frames_in_contact:
+        delta_rh = util.liegroup.VecToso3(lh_pos - com_pos)
+
+        # only one foot is in contact
+        aug_sys_A[3:6, :3] = delta_lf
+        aug_sys_A[3:6, 3:6] = delta_rh
+
+        percentage = 0.95
+        foot_joint_id = lf_joint_id
+        hand_joint_id = rh_joint_id
+    elif len(frames_in_contact) == 2 and 'RF' in frames_in_contact and 'LH' in frames_in_contact:
+        delta_lh = util.liegroup.VecToso3(lh_pos - com_pos)
+
+        # only one foot is in contact
+        aug_sys_A[3:6, :3] = delta_rf
+        aug_sys_A[3:6, 3:6] = delta_lh
+
+        percentage = 0.95
+        foot_joint_id = rf_joint_id
+        hand_joint_id = lh_joint_id
+    aug_sys_b[6] = percentage * pin_data.mass[0] * 9.81
+
+    # solve the linear system
+    static_forces = np.linalg.lstsq(aug_sys_A, aug_sys_b, rcond=None)[0]
+
+    # get static torque using inverse dynamics
+    foot_wrench = pin.Force(np.vstack((static_forces[:3,], np.zeros((3,1)))))
+    hand_wrench = pin.Force(np.vstack((static_forces[3:,], np.zeros((3,1)))))
+    pin_forces = pin.StdVec_Force(pin_model.njoints, pin.Force.Zero())
+    pin_forces[foot_joint_id] = foot_wrench
+    pin_forces[hand_joint_id] = hand_wrench
+    static_torques = pin.rnea(pin_model, pin_data, x0[:pin_model.nq], np.zeros(pin_model.nv), np.zeros(pin_model.nv), pin_forces)[6:]
+    return static_torques

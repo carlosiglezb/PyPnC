@@ -12,12 +12,12 @@ class MultiContactDoorConfig(PlannerConfig):
     ALPHA = [1, 0, 0.1]    # seq 0: single hand, step through door
     # ALPHA = [0.5, 0.1, 0.01]
     FOOT_SIZE = [0.15, 0.08]  # [length, width]
-    N_HORIZON_LST = [180, 200, 220, 200, 200]
+    N_HORIZON_LST = [180, 200, 250, 220, 200]
 
     # Note: contact seq 1 tested with:
     # 'torso', np.array([2.5, 3.5, 1.5] + [0.5, 0.5, 0.001])
     WBC_FRAME_TRACKING_GAINS = {
-            'torso': np.array([3, 3, 1.0] + [0.1, 0.1, 0.01]),  # (lin, ang)
+            'torso': np.array([3, 3, 2.0] + [0.1, 0.1, 0.01]),  # (lin, ang)
             'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
             'L_knee': np.array([8.] * 3 + [0.00001] * 3),
             'R_knee': np.array([10.] * 3 + [0.00001] * 3),
