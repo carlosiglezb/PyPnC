@@ -1,0 +1,3 @@
+[submodule "external_source/stabilipy"]
+	path = external_source/stabilipy
+	url = https://github.com/haudren/stabilipy.git
