@@ -42,6 +42,7 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 from plot.data_saver import *
 
 B_SHOW_JOINT_PLOTS = False
+B_SHOW_JOINT_LIM_PLOTS = True
 B_SHOW_COST_PLOTS = False
 B_SHOW_GRF_PLOTS = False
 B_VISUALIZE = False
@@ -1151,12 +1152,14 @@ def main(args):
         if B_SAVE_HTML:
             display.save_html(cwd + "/data/ONR/", robot_name + sca_str + "DYN_" + seq_str + "_anim.html")
 
-    if B_SHOW_JOINT_PLOTS or B_SHOW_COST_PLOTS:
+    if B_SHOW_JOINT_PLOTS or B_SHOW_COST_PLOTS or B_SHOW_JOINT_LIM_PLOTS:
         plan_plotter = MulticontactPlotter(robot_dyn_plan)
         if B_SHOW_JOINT_PLOTS:
             plan_plotter.plot_reduced_xs_us()
         if B_SHOW_COST_PLOTS:
             plan_plotter.plot_costs()
+        if B_SHOW_JOINT_LIM_PLOTS:
+            plan_plotter.plot_joint_limit_margins()
         plt.show()
 
     if B_SHOW_GRF_PLOTS or B_SAVE_DYN_DATA:

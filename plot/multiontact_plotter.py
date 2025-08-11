@@ -96,6 +96,87 @@ class MulticontactPlotter:
         plot_multiple_state_traj(time[:-1], [xs_rarm_reduced[:-1, :], us_rarm_reduced[:, :]],
                                  phase, ax_labels=signals_names)
 
+    def plot_joint_limit_margins(self):
+        njoints = self._robot_planner.robot_model.nv - 6
+        rob_nq = self._robot_planner.robot_model.nq
+        fddp = self._robot_planner.fddp
+        horizon_lst = self._robot_planner.horizon_lst
+        tot_knots = sum([fp.problem.T for fp in fddp])
+        time = np.zeros(tot_knots)
+        T = self._robot_planner.T
+        phase = np.zeros(tot_knots, dtype=int)
+
+        # variables to plot
+        joints_pos = np.zeros((tot_knots, njoints))
+        joints_vel = np.zeros((tot_knots, njoints))
+        joints_tau = np.zeros((tot_knots, njoints))
+
+        # get joint pos, vel, and tau limits
+        jp_llim = self._robot_planner.robot_model.lowerPositionLimit[7:]
+        jp_ulim = self._robot_planner.robot_model.upperPositionLimit[7:]
+        jv_lim = self._robot_planner.robot_model.velocityLimit[6:]
+        jtau_lim = self._robot_planner.robot_model.effortLimit[6:]
+
+        # get actual pos, vel, and tau, and store margins
+        curr_idx = 0
+        for (it_num, it) in enumerate(fddp):
+            curr_knots = fddp[it_num].problem.T
+            curr_dt = fddp[it_num].problem.runningModels.tolist()[0].dt
+            next_idx = curr_idx + curr_knots
+            # time[curr_idx:next_idx+1] = np.arange(it_num * T,  (it_num + 1) * T, curr_dt)
+            time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, curr_knots)
+
+            log = it.getCallbacks()[0]
+            joints_pos[curr_idx:next_idx, :] = np.array(log.xs)[:-1, 7:rob_nq]  # ignore floating base pos
+            joints_vel[curr_idx:next_idx, :] = np.array(log.xs)[:-1, rob_nq+6:] # ignore floating base vel
+            joints_tau[curr_idx:next_idx, :] = np.array(log.us)[:, :]  # no floating base tau
+            phase[curr_idx:next_idx] = int(it_num)
+
+            # Compute margins: positive if within bounds, negative if out of bounds
+            for k in range(curr_idx, next_idx):
+                for j in range(njoints):
+                    # joint position margins
+                    pos = joints_pos[k, j]
+                    lower_pos_margin = pos - jp_llim[j]
+                    upper_pos_margin = jp_ulim[j] - pos
+                    if lower_pos_margin < 0:
+                        joints_pos[k, j] = lower_pos_margin  # negative: below lower bound
+                    elif upper_pos_margin < 0:
+                        joints_pos[k, j] = -upper_pos_margin  # negative: above upper bound
+                    else:
+                        joints_pos[k, j] = min(lower_pos_margin, upper_pos_margin)  # positive: within bounds
+
+                    # joint velocity margins
+                    vel = joints_vel[k, j]
+                    vel_margin = jv_lim[j] - np.abs(vel)
+                    joints_vel[k, j] = vel_margin   # neg = out of bound, pos = within bounds
+
+                    # joint torque margins
+                    tau = joints_tau[k, j]
+                    tau_margin = jtau_lim[j] - np.abs(tau)
+                    joints_tau[k, j] = tau_margin  # neg = out of bound, pos = within bounds
+
+            curr_idx = next_idx
+
+        # crate margin plots
+        jp_names = [None] * njoints
+        jv_names = [None] * njoints
+        jtau_names = [None] * njoints
+        jnames = [None] * njoints
+        for j in range(njoints):
+            jp_names[j] = 'q_' + self._robot_planner.robot_model.names[j + 2]
+            jv_names[j] = 'v_' + self._robot_planner.robot_model.names[j + 2]
+            jtau_names[j] = 'tau_' + self._robot_planner.robot_model.names[j + 2]
+            jnames[j] = self._robot_planner.robot_model.names[j + 2]
+
+        # plot joint position margins
+        signals_names = [jp_names, jv_names, jtau_names]
+        signals_names = [jnames, jnames, jnames]
+        margins_names = ['Joint Pos [rad]', 'Joint Vel [rad/s]', 'Joint Tau [Nm]']
+        # plot_multiple_state_traj(time, [joints_pos, joints_vel, joints_tau],
+        #                          phase, ylabels=margins_names)
+        plot_multiple_state_traj(time, [joints_pos, joints_vel, joints_tau],
+                                 phase, ax_labels=signals_names, ylabels=margins_names)
 
     def plot_costs(self):
         T = self._robot_planner.T

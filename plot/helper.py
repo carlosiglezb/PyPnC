@@ -172,7 +172,8 @@ def plot_hold_vector_traj(time, vector, suptitle, ax_label=None, legends=None):
     plt.xlabel('time')
     fig.suptitle(suptitle)
 
-def plot_multiple_state_traj(time, states_traj_lst, phase, suptitle=None, ax_labels=None):
+def plot_multiple_state_traj(time, states_traj_lst, phase,
+                             suptitle=None, ax_labels=None, ylabels=None):
     """
     Creates 'n_subplots' subplots of 'n_signals' signals. Assumes:
         states_traj_lst: List of n arrays. Each array is size (time_dur, n_signals) where
@@ -191,6 +192,8 @@ def plot_multiple_state_traj(time, states_traj_lst, phase, suptitle=None, ax_lab
         plot_phase(axes[i], time, phase)
         axes[i].grid(True)
         axes[i].set_xlabel('time')
+        if ylabels is not None:
+            axes[i].set_ylabel(ylabels[i])
         axes[i].legend()
     fig.suptitle(suptitle)
 

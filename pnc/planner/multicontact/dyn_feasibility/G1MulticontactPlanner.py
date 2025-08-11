@@ -149,7 +149,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             fddp[i] = crocoddyl.SolverFDDP(problem)
 
             # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
-            fddp[i].setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
+            # fddp[i].setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
+            fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
 
             # Solver settings
             max_iter = 200
@@ -160,8 +161,11 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
             # Set initial guess
             xs = [x0] * (fddp[i].problem.T + 1)
-            # us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
-            us = [quasi_static(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
+            us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
+            # if i == 0:
+            #     us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
+            # else:
+            #     us = [quasi_static(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
             start_ddp_solve_time = time.time()
             print("Problem solved:", fddp[i].solve(xs, us, max_iter))
             dyn_seg_solve_time.append(time.time() - start_ddp_solve_time)
