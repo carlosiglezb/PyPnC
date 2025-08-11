@@ -15,3 +15,10 @@ def pydrake_geom_to_meshcat(mut_polyhedron: HPolyhedron):
 
 def scipy_hull_to_meshcat(convex_hull: ConvexHull):
     return TriangularMeshGeometry(convex_hull.points, convex_hull.simplices)
+
+def polytope_intersections_to_meshcat(intersections: np.ndarray):
+    """
+    Convert an array of points to a Meshcat TriangularMeshGeometry.
+    """
+    poly_chull = ConvexHull(intersections)
+    return TriangularMeshGeometry(poly_chull.points, poly_chull.simplices)

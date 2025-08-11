@@ -8,7 +8,8 @@ from util.polytope_math import get_closest_distance_to_polytope_surface
 cwd = os.getcwd()
 
 from meshcat.geometry import Sphere
-from util.pydrake_meshcat_interface import scipy_hull_to_meshcat, pydrake_geom_to_meshcat
+from util.pydrake_meshcat_interface import scipy_hull_to_meshcat, pydrake_geom_to_meshcat, \
+    polytope_intersections_to_meshcat
 from pydrake.geometry.optimization import HPolyhedron
 from visualizer.meshcat_tools.meshcat_palette import (meshcat_iris_obj, meshcat_collision_obj,
                                                       meshcat_domain_obj, meshcat_obstacle_obj)
@@ -225,6 +226,8 @@ class TestStabilipy(unittest.TestCase):
 
 
     def test_stabilipy_meshcat_animation(self):
+        from scipy.spatial import ConvexHull
+
         b_plot_final = False
 
         # Specify location of urdf files
@@ -233,7 +236,9 @@ class TestStabilipy(unittest.TestCase):
         package_dir = cwd + "/robot_model/g1_description"
 
         # get list of configurations throughout multiple contacts
-        cfree_soln_file = cwd + '/experiment_data/g1_sca_step_over_knee_knocker.pkl'
+        contact_seq_str_opts = ['over', 'on', 'on_balanced']
+        cs_opt = contact_seq_str_opts[0]  # 'over' or 'on' or 'on_balanced'
+        cfree_soln_file = cwd + '/experiment_data/g1_sca_step_' + cs_opt + '_knee_knocker.pkl'
         q_all = get_all_poses_from_file(cfree_soln_file)
 
         # Create robot system
@@ -264,11 +269,25 @@ class TestStabilipy(unittest.TestCase):
         c_obj = Sphere(0.01)
         com_obj = Sphere(0.02)
 
-        contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
-                            ['right_ankle_roll_link', 'left_rubber_hand'],
-                            ['left_ankle_roll_link', 'right_ankle_roll_link'],
-                            ['left_ankle_roll_link', 'right_rubber_hand'],
-                            ['left_ankle_roll_link', 'right_ankle_roll_link']]
+        if cs_opt == 'over':
+            contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                ['right_ankle_roll_link', 'left_rubber_hand'],
+                                ['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                ['left_ankle_roll_link', 'right_rubber_hand'],
+                                ['left_ankle_roll_link', 'right_ankle_roll_link']]
+        elif cs_opt == 'on':
+            contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                ['right_ankle_roll_link', 'left_rubber_hand'],
+                                ['left_rubber_hand', 'right_ankle_roll_link'],
+                                ['left_ankle_roll_link'],
+                                ['left_ankle_roll_link', 'right_ankle_roll_link']]
+        elif cs_opt  == 'on_balanced':
+            contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                ['left_ankle_roll_link', 'left_rubber_hand', 'right_rubber_hand'],
+                                ['left_rubber_hand', 'right_rubber_hand', 'right_ankle_roll_link'],
+                                ['left_ankle_roll_link', 'right_rubber_hand'],
+                                ['left_ankle_roll_link', 'right_ankle_roll_link']]
+
         # visualize entire motion while super-impossing stability regions after each new contact
         zero_qd = np.zeros((model.nv))
         display.start_animation()
@@ -354,7 +373,10 @@ class TestStabilipy(unittest.TestCase):
             p_out_name = f"{robot_name}/stability/outer/{n}"
             p_inner_mcat = scipy_hull_to_meshcat(polyhedron.inner)
             p_o = HPolyhedron(polyhedron.outer.halfspaces[:, :3], -polyhedron.outer.halfspaces[:, -1])
-            p_outer_mcat = pydrake_geom_to_meshcat(p_o)
+            if not p_o.IsBounded():
+                print(f"Warning: outer polyhedron is unbounded for contact sequence {n}")
+            # p_outer_mcat = pydrake_geom_to_meshcat(p_o)
+            p_outer_mcat = polytope_intersections_to_meshcat(polyhedron.outer.intersections)
             p_i = HPolyhedron(polyhedron.inner.equations[:, :3], -polyhedron.inner.equations[:, -1])
             display.add_shape(p_in_name, p_inner_mcat, meshcat_iris_obj())
             display.add_shape(p_out_name, p_outer_mcat, meshcat_domain_obj())
