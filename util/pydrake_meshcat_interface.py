@@ -1,3 +1,4 @@
+import numpy as np
 # Convex Hull description
 from scipy.spatial import ConvexHull
 from pypoman import compute_polytope_vertices
