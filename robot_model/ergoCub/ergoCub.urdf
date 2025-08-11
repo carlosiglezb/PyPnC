@@ -697,13 +697,11 @@
  </material>
  </visual>
  </link>
- <joint name="camera_tilt" type="revolute">
+ <joint name="camera_tilt" type="fixed">
  <origin xyz="0.06250999999999993 -3.0000000001105853e-5 0.07639250000000064" rpy="9.166950960511526e-15 2.595819949100105e-4 1.9343583275079285e-15"/>
  <axis xyz="-3.1332662159460226e-17 -1 -1.3036401662462866e-15"/>
  <parent link="head"/>
  <child link="realsense"/>
- <limit lower="-0.5235987755982988" upper="0.5235987755982988" effort="1e+9" velocity="1e+9"/>
- <dynamics damping="2" friction="0"/>
  </joint>
  <link name="realsense">
  <inertial>
