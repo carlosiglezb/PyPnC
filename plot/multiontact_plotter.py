@@ -172,7 +172,7 @@ class MulticontactPlotter:
         # plot joint position margins
         signals_names = [jp_names, jv_names, jtau_names]
         signals_names = [jnames, jnames, jnames]
-        margins_names = ['Joint Pos [rad]', 'Joint Vel [rad/s]', 'Joint Tau [Nm]']
+        margins_names = ['Joint Pos Margin [rad]', 'Joint Vel Margin[rad/s]', 'Joint Tau Margin [Nm]']
         # plot_multiple_state_traj(time, [joints_pos, joints_vel, joints_tau],
         #                          phase, ylabels=margins_names)
         plot_multiple_state_traj(time, [joints_pos, joints_vel, joints_tau],

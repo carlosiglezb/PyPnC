@@ -226,8 +226,6 @@ class TestStabilipy(unittest.TestCase):
 
 
     def test_stabilipy_meshcat_animation(self):
-        from scipy.spatial import ConvexHull
-
         b_plot_final = False
 
         # Specify location of urdf files

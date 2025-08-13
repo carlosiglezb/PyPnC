@@ -112,9 +112,7 @@ class HumanoidMulticontactPlanner:
 
     def update_costs_from_solver(self):
         for fddp_idx, fddp in enumerate(self.fddp):
-            len_datas = self.horizon_lst[fddp_idx]
-            if fddp_idx == (len(self.fddp) - 1):
-                len_datas -= 1
+            len_datas = fddp.problem.T
             for model_idx in range(len_datas):
                 costs_vec = list(fddp.problem.runningDatas)[model_idx].differential.costs.costs
                 for cv in costs_vec:

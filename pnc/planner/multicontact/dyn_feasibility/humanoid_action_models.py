@@ -122,7 +122,10 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                       fr_cost,
                       planner_weights.WBC_COST_WEIGHTS['frame_goal'])
 
+    #
     # Adding state and control regularization terms
+    #
+    # Change reference state if zero_config is provided, otherwise use the initial state
     if zero_config is not None and terminal_step:
         x0[3:state.nq] = zero_config[3:]
     if v_ref is not None:

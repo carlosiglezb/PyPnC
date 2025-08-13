@@ -11,7 +11,7 @@ quat_label = ['x', ' y', ' z', 'w']
 markers = ['*', '+', 'h', 'x', 'o', 'v', 'd']
 facecolors = [
     'grey', 'brown', 'red', 'orange', 'yellow', 'green', 'blue', 'purple',
-    'crimson'
+    'crimson', 'cyan', 'lime', 'magenta', 'teal', 'coral', 'gold', 'salmon',
 ] * 10
 
 

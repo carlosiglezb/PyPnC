@@ -1009,7 +1009,12 @@ def main(args):
 
         if B_SAVE_KIN_DATA:
             # save the solution parameters needed to reconstruct the Bezier curves
-            save_filename = robot_name + sca_str + 'step_' + seq_str + '_knee_knocker_kin.pkl'
+            if env == 'door':
+                save_filename = robot_name + sca_str + 'step_' + seq_str + '_knee_knocker_kin.pkl'
+            elif env == 'stairs':
+                save_filename = robot_name + sca_str + 'tilted_stairs_kin.pkl'
+            else:
+                raise NotImplementedError(f"Filename to save data for environment {env} not implemented")
             transition_times = []
             n_frames = len(ik_cfree_planner.planner.path)
             kin_data_saver = DataSaver(save_filename)
