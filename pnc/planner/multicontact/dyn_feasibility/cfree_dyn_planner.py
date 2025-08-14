@@ -869,6 +869,7 @@ def main(args):
         x0 = np.concatenate([q0, v0])
         door_pose, obstacles, domain_ubody, domain_lbody_l, domain_lbody_r = load_navy_env(robot_name, door_pos)
     elif env == 'stairs':
+        seq_str = '_'
         # create tilted stairs environment
         stairs = TiltedStairs()
 
@@ -1057,6 +1058,7 @@ def main(args):
     contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
     if robot_name == 'g1':
         robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params)
+        robot_dyn_plan.set_zero_configuration(q0)   # TODO: check if this is needed in all scenarios
         if env == 'door':
             if contact_seq == 1:    # step on knee knocker
                 robot_dyn_plan.reset_default_gains('torso', np.array([2.5, 3.5, 1.5] + [0.5, 0.5, 0.001]))
@@ -1206,8 +1208,15 @@ def main(args):
             plt.show()
 
     if B_SAVE_DYN_DATA:
+        if kin_plan_path is not None:
+            sca_str = '_sca' if 'sca' in kin_plan_path else '_'
+            action_str = '_step_' if 'knocker' in kin_plan_path else '_'
+            seq_str = next((s for s in ['over', 'on', 'on_balanced'] if s in kin_plan_path), '')
+            env = 'door' if 'door' in kin_plan_path else 'stairs'
+        else:
+            action_str = 'step_' if env == 'door' else '_'
         # Saving data tools
-        dyn_data_saver = DataSaver(robot_name + sca_str + 'step_' + seq_str + '_knee_knocker.pkl')
+        dyn_data_saver = DataSaver(robot_name + sca_str + action_str + seq_str + env +'.pkl')
         # save kinematic TO solution
         dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
         dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)

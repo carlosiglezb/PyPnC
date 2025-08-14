@@ -24,9 +24,20 @@ class MultiContactDoorConfig(PlannerConfig):
             'LH': np.array([4.] * 3 + [0.00001] * 3),
             'RH': np.array([4.] * 3 + [0.00001] * 3)
         }
+    WBC_FINAL_FRAME_TRACKING_GAINS = {
+            'torso': np.array([3, 3, 2.0] + [0.1, 0.1, 0.01]),  # (lin, ang)
+            'feet': np.array([12.] * 3 + [4.5] * 3),  # (lin, ang)
+            'L_knee': np.array([8.] * 3 + [0.00001] * 3),
+            'R_knee': np.array([10.] * 3 + [0.00001] * 3),
+            'LH': np.array([4.] * 3 + [0.00001] * 3),
+            'RH': np.array([4.] * 3 + [0.00001] * 3)
+        }
     WBC_WEIGHTED_COSTS = {
-        'xReg': np.array([0.1] * 3 + [5.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [4.] * (N_V - 6)),
+        'xReg': np.array([0] * 3 + [5.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [4.] * (N_V - 6)),
         'uReg': np.array([0.5] * N_U),
+    }
+    WBC_FINAL_WEIGHTED_COSTS = {
+        'xReg': np.array([0] * 3 + [50.0] * 3 + [10.] * (N_V - 6) + [40.] * N_V),
     }
 
 class MultiContactTiltedStairsConfig(PlannerConfig):
@@ -43,7 +54,18 @@ class MultiContactTiltedStairsConfig(PlannerConfig):
             'LH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
             'RH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
         }
+    WBC_FINAL_FRAME_TRACKING_GAINS = {
+            'torso': np.array([2.0, 1.5, 1.0, 0.5, 0.5, 0.1]),
+            'feet': np.array([15.0] * 3 + [5.0] * 3),
+            'L_knee': np.array([2.0, 2.5, 3.0] + [0.0001] * 3),
+            'R_knee': np.array([2.0, 2.5, 3.0] + [0.0001] * 3),
+            'LH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
+            'RH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
+        }
     WBC_WEIGHTED_COSTS = {
-        'xReg': np.array([0.1] * 3 + [10.0] * 3 + [2.] * (N_V - 6) + [4.] * N_V),
-        'uReg': np.array([0.5] * N_U),
+        'xReg': np.array([0] * 3 + [10.0] * 3 + [1.] * (N_V - 6) + [4.] * N_V),
+        'uReg': np.array([15.] * N_U),
+    }
+    WBC_FINAL_WEIGHTED_COSTS = {
+        'xReg': np.array([0] * 3 + [50.0] * 3 + [10.] * (N_V - 6) + [40.] * N_V),
     }

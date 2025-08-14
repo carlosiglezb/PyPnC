@@ -35,14 +35,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
     def plan(self):
         dyn_seg_solve_time = []
-        b_terminal_step = False
 
         state = self.state
         actuation = self.actuation
         x0 = self.x0
         T = self.T
         plan_to_model_ids = self.plan_to_model_ids
-        gains = self.gains
         planner_params = self.planner_params
         zero_config = self._zero_config
 
@@ -53,11 +51,10 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             N_current = self.horizon_lst[i]
             DT = T / (N_current - 1)
             for t in np.linspace(i * T, (i + 1) * T, N_current):
-                if t == (i + 1) * T:
-                    b_terminal_step = False
-                    gains['feet'] = get_terminal_feet_gains()
-                frame_targets_dict = self.pack_current_targets(t)   # used for data reload
-                # frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
+                if hasattr(self.ik_cfree_planner, "planner"):
+                    frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
+                else:
+                    frame_targets_dict = self.pack_current_targets(t)   # used for data reload
                 if t < (i + 1) * T:
                     if i != (self.contact_phases - 1):
                         dmodel = createMultiFrameActionModel(state,
@@ -67,8 +64,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                              frames_in_contact,
                                                              self.contact_planes_seq[i + 1],
                                                              frame_targets_dict,
-                                                             planner_weights=planner_params,
-                                                             terminal_step=True)
+                                                             planner_weights=planner_params)
                     else:
                         dmodel = createMultiFrameActionModel(state,
                                                              actuation,
@@ -77,24 +73,29 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                              frames_in_contact,
                                                              frames_in_contact,
                                                              frame_targets_dict,
-                                                             planner_weights=planner_params,
-                                                             terminal_step=b_terminal_step)
+                                                             planner_weights=planner_params)
                         # print(f"Applying Final Sequence model at {i}")
                     model_seqs += createSequence([dmodel], DT, 1)
                 else:   # last time knot in current contact phase
                     if i != (self.contact_phases - 1):
-                        # in the last time step, we use higher weights on frame orientations
-                        dmodel = createMultiFrameFinalActionModel(state,
-                                                                  actuation,
-                                                                  x0,
-                                                                  plan_to_model_ids,
-                                                                  frames_in_contact,
-                                                                  self.contact_planes_seq[i + 1],
-                                                                  frame_targets_dict,
-                                                                  planner_weights=planner_params,
-                                                                  terminal_step=b_terminal_step)
-                        model_seqs += createFinalSequence([dmodel])
-                        print(f"Last time in mode {i}. Applying Final Sequence")
+                        next_frames_in_contact = self.contact_planes_seq[i + 1]
+                        terminal_step = False
+                    else:
+                        next_frames_in_contact = frames_in_contact
+                        terminal_step = True
+                    # in the last time step, we use higher weights on frame orientations
+                    dmodel = createMultiFrameFinalActionModel(state,
+                                                              actuation,
+                                                              x0,
+                                                              plan_to_model_ids,
+                                                              frames_in_contact,
+                                                              next_frames_in_contact,
+                                                              frame_targets_dict,
+                                                              planner_weights=planner_params,
+                                                              zero_config=zero_config,
+                                                              terminal_step=terminal_step)
+                    model_seqs += createFinalSequence([dmodel])
+                    print(f"Last time in mode {i}. Applying Final Sequence")
 
                     # if in final contact phase, add extra knot to match dimensions of other phases
                     # else:
@@ -132,18 +133,18 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             #     new_contact_fr = [fr for fr in self.contact_planes_seq[i + 1].keys() if fr not in frames_in_contact.keys()]
             #     print(f"Applied impulse model at {i} on frame {new_contact_fr}")
             # else:
-            dmodel = createMultiFrameFinalActionModel(state,
-                                                      actuation,
-                                                      x0,
-                                                      plan_to_model_ids,
-                                                      frames_in_contact,
-                                                      frames_in_contact,
-                                                      frame_targets_dict,
-                                                      planner_weights=planner_params,
-                                                      zero_config=zero_config,
-                                                      terminal_step=True)
-            model_seqs += createFinalSequence([dmodel])
-            print(f"Applying Final Sequence model at {i}")
+            # dmodel = createMultiFrameFinalActionModel(state,
+            #                                           actuation,
+            #                                           x0,
+            #                                           plan_to_model_ids,
+            #                                           frames_in_contact,
+            #                                           frames_in_contact,
+            #                                           frame_targets_dict,
+            #                                           planner_weights=planner_params,
+            #                                           zero_config=zero_config,
+            #                                           terminal_step=True)
+            # model_seqs += createFinalSequence([dmodel])
+            # print(f"Applying Final Sequence model at {i}")
 
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
             fddp[i] = crocoddyl.SolverFDDP(problem)
@@ -178,12 +179,11 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             # Set final state as initial state of next phase
             x0 = fddp[i].xs[-1]
 
-            # Reset desired EE rpy and gains for next contact phase
-            gains = copy(self._default_gains)
-
         super().update_costs_from_solver()
-        self.solver_stats['contact_phases_solve_times'] = dyn_seg_solve_time
+        self.solver_stats['contacts_phases_solve_times'] = dyn_seg_solve_time
         print("[Compute Time] Dynamic feasibility check: ", sum(dyn_seg_solve_time))
+
+        # TODO re-solve with impulse models in-between transitions
 
     def reset_default_gains(self, frame_name: str, updated_gains: np.array):
         self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains

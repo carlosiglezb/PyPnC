@@ -105,10 +105,12 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         else:
             raise ValueError(f"Weights to track frame {fr_name} were not set")
 
-        # set the desired frame position (and orientation fo upcoming feet contact planes)
+        # set the desired frame position (and orientation for upcoming feet contact planes)
         fr_Mref = pin.SE3.Identity()
         if fr_name in next_frames_in_contact.keys() and 'H' not in fr_name:
             fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, next_frames_in_contact[fr_name])
+        elif fr_name in frames_in_contact.keys() and 'H' not in fr_name:
+            fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, frames_in_contact[fr_name])
         fr_Mref.translation = frame_targets_dict[fr_name]
 
         # add as cost
@@ -137,7 +139,10 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     x_reg_cost = crocoddyl.CostModelResidual(
         state, activation_xreg, crocoddyl.ResidualModelState(state, x0, actuation.nu)
     )
-    w_u = planner_weights.WBC_WEIGHTED_COSTS['uReg']
+    w_u = np.copy(planner_weights.WBC_WEIGHTED_COSTS['uReg'])
+    weight_by_ulim = state.pinocchio.effortLimit[-(state.nv-6):]
+    weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv-6):]]
+    w_u /= weight_by_ulim
     activation_ureg = crocoddyl.ActivationModelWeightedQuad(w_u ** 2)
     u_reg_cost = crocoddyl.CostModelResidual(
         state, activation_ureg, crocoddyl.ResidualModelControl(state, actuation.nu)
@@ -244,17 +249,17 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
     for fr_name, fr_id in plan_to_model_ids.items():
         # set higher tracking cost on feet
         if 'F' in fr_name:
-            w_fr = planner_weights.WBC_FRAME_TRACKING_GAINS['feet']
+            w_fr = planner_weights.WBC_FINAL_FRAME_TRACKING_GAINS['feet']
         elif 'LH' in fr_name:
-            w_fr = planner_weights.WBC_FRAME_TRACKING_GAINS['LH']
+            w_fr = planner_weights.WBC_FINAL_FRAME_TRACKING_GAINS['LH']
         elif 'RH' in fr_name:
-            w_fr = planner_weights.WBC_FRAME_TRACKING_GAINS['RH']
+            w_fr = planner_weights.WBC_FINAL_FRAME_TRACKING_GAINS['RH']
         elif 'R_knee' in fr_name:
-            w_fr = planner_weights.WBC_FRAME_TRACKING_GAINS['R_knee']
+            w_fr = planner_weights.WBC_FINAL_FRAME_TRACKING_GAINS['R_knee']
         elif 'L_knee' in fr_name:
-            w_fr = planner_weights.WBC_FRAME_TRACKING_GAINS['L_knee']
+            w_fr = planner_weights.WBC_FINAL_FRAME_TRACKING_GAINS['L_knee']
         elif 'torso' in fr_name:
-            w_fr = planner_weights.WBC_FRAME_TRACKING_GAINS['torso']
+            w_fr = planner_weights.WBC_FINAL_FRAME_TRACKING_GAINS['torso']
             # if zero_config is not None:
             #     w_fr = np.array([0.1] * 3 + [0.01] * 3)
         else:
@@ -277,24 +282,30 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                       planner_weights.WBC_FINAL_COST_WEIGHTS['frame_goal'])
 
     # Adding state and control regularization terms
-    w_x = planner_weights.WBC_WEIGHTED_COSTS['xReg']
+    w_x = planner_weights.WBC_FINAL_WEIGHTED_COSTS['xReg']
     if zero_config is not None and terminal_step:
-        x0[3:state.nq] = zero_config[3:]
+        # x0[3:state.nq] = zero_config[3:]  # all joints
+        x0[7+14:state.nq] = zero_config[7+14:]    # only upper body joints (of G1)
+        w_x[:7+14] = 0
     if v_ref is not None:
         x0[-state.nv:] = v_ref
     else:
         x0[-state.nv:] = np.zeros(state.nv)
 
-    if terminal_step:
-        activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x ** 2)
-        x_reg_cost = crocoddyl.CostModelResidual(
-            state, activation_xreg, crocoddyl.ResidualModelState(state, x0, actuation.nu)
-        )
-        costs.addCost("xReg",
-                      x_reg_cost,
-                      planner_weights.WBC_FINAL_COST_WEIGHTS['xReg'])
+    # if terminal_step:
+    activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x ** 2)
+    x_reg_cost = crocoddyl.CostModelResidual(
+        state, activation_xreg, crocoddyl.ResidualModelState(state, x0, actuation.nu)
+    )
+    costs.addCost("xReg",
+                  x_reg_cost,
+                  planner_weights.WBC_FINAL_COST_WEIGHTS['xReg'])
 
-    w_u = planner_weights.WBC_WEIGHTED_COSTS['uReg']
+    # Allow larger control input where torque limits are larger
+    w_u = np.copy(planner_weights.WBC_WEIGHTED_COSTS['uReg'])
+    weight_by_ulim = state.pinocchio.effortLimit[-(state.nv-6):]
+    weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv-6):]]
+    w_u /= weight_by_ulim
     activation_ureg = crocoddyl.ActivationModelWeightedQuad(w_u ** 2)
     u_reg_cost = crocoddyl.CostModelResidual(
         state, activation_ureg, crocoddyl.ResidualModelControl(state, actuation.nu)
