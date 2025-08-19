@@ -178,12 +178,17 @@ class MulticontactPlotter:
         plot_multiple_state_traj(time, [joints_pos, joints_vel, joints_tau],
                                  phase, ax_labels=signals_names, ylabels=margins_names)
 
-    def plot_costs(self):
+    def plot_costs(self, costs_type='seq'):
         T = self._robot_planner.T
         horizon_lst = self._robot_planner.horizon_lst
         time = np.zeros((sum(horizon_lst) - 1, ))
         phase = np.zeros((sum(horizon_lst) - 1, ), dtype=int)
-        costsDict = self._robot_planner.costs
+        if costs_type == 'seq':
+            costsDict = self._robot_planner.costs
+        elif costs_type == 'full':
+            costsDict = self._robot_planner.costs_full
+        else:
+            raise ValueError("Unknown costs type: {}".format(costs_type))
 
         # create time vector (same for all costs)
         for contact_phase in range(len(horizon_lst)):
@@ -204,13 +209,27 @@ class MulticontactPlotter:
         for cost_idx, (cost_name, costs_lst) in enumerate(costsDict.items()):
             for contact_phase in range(len(horizon_lst)):
                 # get current and next index and populate current costs vector
-                curr_idx = sum(horizon_lst[:contact_phase])
-                if contact_phase == (len(horizon_lst) - 1):
-                    next_idx = curr_idx + horizon_lst[contact_phase] - 1
-                    all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][contact_phase][:-1]
+                if costs_type == 'seq':
+                    curr_idx = sum(horizon_lst[:contact_phase])
                 else:
-                    next_idx = curr_idx + horizon_lst[contact_phase]
-                    all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][contact_phase]
+                    curr_idx = sum(horizon_lst[:contact_phase])
+                    curr_full_idx = sum(horizon_lst[:contact_phase]) + contact_phase
+                    next_full_idx = curr_full_idx + horizon_lst[contact_phase]
+
+                if contact_phase == (len(horizon_lst) - 1):
+                    # last phase does not have impulse model, so it's the same length on both cases
+                    next_idx = curr_idx + horizon_lst[contact_phase] - 1
+                    if costs_type == 'seq':
+                        all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][contact_phase][:-1]
+                    else:
+                        all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][curr_full_idx:next_full_idx]
+                else:
+                    # next_idx = curr_idx + horizon_lst[contact_phase]
+                    next_idx = sum(horizon_lst[:contact_phase + 1])
+                    if costs_type == 'seq':
+                        all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][contact_phase]
+                    else:
+                        all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][curr_full_idx:next_full_idx]
 
         plot_hold_vector_traj(time, all_costs, 'Costs', legends=list(costsDict.keys()))
 

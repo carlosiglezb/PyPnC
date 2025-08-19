@@ -1150,7 +1150,7 @@ def main(args):
         display.add_arrow("forces/" + force_joint_frames['RF'], color=[0, 0, 1])
         display.add_arrow("forces/" + force_joint_frames['LH'], color=[0, 1, 0])
         display.add_arrow("forces/" + force_joint_frames['RH'], color=[0, 1, 0])
-        display.displayFromCrocoddylSolver(robot_dyn_plan.fddp)
+        display.displayFromCrocoddylSolver([robot_dyn_plan.fddp_full])
         # viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
         #                     "lfoot_target", "lknee_target",
         #                     "rfoot_target", "rknee_target"))
@@ -1164,7 +1164,8 @@ def main(args):
         if B_SHOW_JOINT_PLOTS:
             plan_plotter.plot_reduced_xs_us()
         if B_SHOW_COST_PLOTS:
-            plan_plotter.plot_costs()
+            plan_plotter.plot_costs('seq')
+            plan_plotter.plot_costs('full')
         if B_SHOW_JOINT_LIM_PLOTS:
             plan_plotter.plot_joint_limit_margins()
         plt.show()

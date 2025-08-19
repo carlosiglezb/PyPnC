@@ -34,6 +34,7 @@ class HumanoidMulticontactPlanner:
 
         self.contact_phases = num_contact_phases = len(contact_seqs.phases_knots)
         self.fddp = [crocoddyl.SolverFDDP] * num_contact_phases
+        self.fddp_full = crocoddyl.SolverFDDP
         self.T = contact_seqs.phases_durations  # time_per_phase
 
         self.planner_params = planner_params
@@ -70,6 +71,21 @@ class HumanoidMulticontactPlanner:
                       'RH_goal': [None] * num_contact_phases,
                       'L_knee_goal': [None] * num_contact_phases,
                       'R_knee_goal': [None] * num_contact_phases}
+
+        self.costs_full = {'uReg': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'xReg': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'xBounds': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'LF_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'RF_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'LH_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'RH_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'torso_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'LF_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'RF_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'LH_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'RH_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'L_knee_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'R_knee_goal': [None] * (tot_num_knots + num_contact_phases - 2)}
 
         # initialize all costs
         for cost_name, cost_lst in self.costs.items():
@@ -110,10 +126,23 @@ class HumanoidMulticontactPlanner:
         }
         return frame_targets_dict
 
-    def update_costs_from_solver(self):
-        for fddp_idx, fddp in enumerate(self.fddp):
+    def update_costs_from_solver(self, solver_type='seq'):
+        if solver_type == 'seq':
+            fddp_solver = self.fddp
+            costs = self.costs
+        elif solver_type == 'full':
+            fddp_solver = [self.fddp_full]
+            costs = self.costs_full
+        else:
+            raise ValueError("Unknown solver type: {}".format(solver_type))
+        for fddp_idx, fddp in enumerate(fddp_solver):
             len_datas = fddp.problem.T
             for model_idx in range(len_datas):
-                costs_vec = list(fddp.problem.runningDatas)[model_idx].differential.costs.costs
+                runData = list(fddp.problem.runningDatas)[model_idx]
+                if hasattr(runData, 'differential'):
+                    costs_vec = runData.differential.costs.costs
                 for cv in costs_vec:
-                    self.costs[cv.key()][fddp_idx][model_idx] = costs_vec[cv.key()].cost
+                    if solver_type == 'seq':
+                        costs[cv.key()][fddp_idx][model_idx] = costs_vec[cv.key()].cost
+                    else:
+                        costs[cv.key()][model_idx] = costs_vec[cv.key()].cost

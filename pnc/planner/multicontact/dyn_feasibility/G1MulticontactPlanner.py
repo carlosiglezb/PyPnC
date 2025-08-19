@@ -3,6 +3,8 @@ from copy import copy
 
 import numpy as np
 import crocoddyl
+from crocoddyl.libcrocoddyl_pywrap import StdVec_VectorX
+
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import HumanoidMulticontactPlanner
 from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (createMultiFrameActionModel,
                                                                              createMultiFrameFinalActionModel,
@@ -45,6 +47,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         zero_config = self._zero_config
 
         fddp = self.fddp
+        model_seq_all = []
         for i in range(self.contact_phases):
             model_seqs = []
             frames_in_contact = self.contact_planes_seq[i]
@@ -168,8 +171,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             # else:
             #     us = [quasi_static(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
             start_ddp_solve_time = time.time()
-            print("Problem solved:", fddp[i].solve(xs, us, max_iter))
+            print("Problem solved to convergence:", fddp[i].solve(xs, us, max_iter))
             dyn_seg_solve_time.append(time.time() - start_ddp_solve_time)
+            print(f"Is feasible: {fddp[i].isFeasible}")
             print("Number of iterations:", fddp[i].iter)
             print("Total cost:", fddp[i].cost)
             print("Gradient norm:", fddp[i].stoppingCriteria())
@@ -178,12 +182,59 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
             # Set final state as initial state of next phase
             x0 = fddp[i].xs[-1]
+            model_seq_all.append(np.copy([*model_seqs]))
 
-        super().update_costs_from_solver()
+        super().update_costs_from_solver(solver_type='seq')
         self.solver_stats['contacts_phases_solve_times'] = dyn_seg_solve_time
         print("[Compute Time] Dynamic feasibility check: ", sum(dyn_seg_solve_time))
 
-        # TODO re-solve with impulse models in-between transitions
+        #
+        # Full trajectory with Impulse models
+        #
+        # Add Impulse model into previous phases
+        x_guess = []
+        u_guess = StdVec_VectorX.copy(fddp[0].us)
+        u_guess.append(fddp[0].us[-1])  # add for last step
+        u_guess.append(np.array([]))    # add for impulse
+        for i in range(self.contact_phases - 1):
+            frames_in_contact = self.contact_planes_seq[i]
+            next_frames_in_contact = self.contact_planes_seq[i + 1]
+            frame_targets_dict = self.pack_current_targets((i + 1) * T)
+            x_last = fddp[i].xs[-1]
+            # add impulse model on frames in contact at the end of every contact phase
+            imp_model = createMultiFrameFinalImpulseModel(state,
+                                                          x_last,
+                                                          plan_to_model_ids,
+                                                          frames_in_contact,
+                                                          next_frames_in_contact,
+                                                          frame_targets_dict,
+                                                          planner_weights=planner_params)
+            model_seq_all.insert(2 * i + 1, imp_model)
+
+            # re-construct initial guess trajectory
+            x_guess += fddp[i].xs.tolist()  # for full trajectory
+            x_guess += [fddp[i].xs[-1]]  # add for impulse
+            if i > 0:
+                for j in range(len(fddp[i].us)):
+                    u_guess.append(fddp[i].us[j])
+                u_guess.append(fddp[i].us[-1])
+                u_guess.append(np.array([]))
+
+        x_guess += fddp[i+1].xs.tolist()  # for full trajectory
+        for j in range(len(fddp[i+1].us)):
+            u_guess.append(fddp[i+1].us[j])
+
+        # Re-compute as full hybrid trajectory with Impulse model
+        problem_full = crocoddyl.ShootingProblem(fddp[0].xs[0], sum(np.vstack(model_seq_all).tolist(),[])[:-1], model_seq_all[-1][-1].tolist()[0])
+        self.fddp_full = crocoddyl.SolverFDDP(problem_full)
+        self.fddp_full.setCallbacks([crocoddyl.CallbackLogger()])
+
+        start_full_fddp_solve_time = time.time()
+        print("Problem solved to convergence:", self.fddp_full.solve(x_guess, u_guess, max_iter))
+        full_dyn_solve_time = time.time() - start_full_fddp_solve_time
+        print("Is feasible:", self.fddp_full.isFeasible)
+        print(f"Full hybrid TO solve time: {full_dyn_solve_time}")
+        super().update_costs_from_solver(solver_type='full')
 
     def reset_default_gains(self, frame_name: str, updated_gains: np.array):
         self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains
