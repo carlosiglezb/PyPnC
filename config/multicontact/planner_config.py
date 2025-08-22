@@ -16,6 +16,7 @@ class PlannerConfig(ABC):
         'xReg': 5e-3,
         'uReg': 1e-1,
         'xBounds': 5e4,
+        'sca': -1e3
     }
     WBC_FINAL_COST_WEIGHTS = {
         'friction': 1e2,

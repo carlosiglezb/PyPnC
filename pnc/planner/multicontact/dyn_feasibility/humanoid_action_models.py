@@ -20,7 +20,9 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 planner_weights: PlannerConfig = None,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
-                                terminal_step: bool = False):
+                                terminal_step: bool = False,
+                                geom_model: pinocchio.GeometryModel = None,
+                                robot_model: pinocchio.Model = None,):
     mu = 0.7
 
     # Define the cost sum (cost manager)
@@ -162,6 +164,36 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         crocoddyl.ResidualModelState(state, nu=actuation.nu),
     )
     costs.addCost("xBounds", x_bounds, planner_weights.WBC_COST_WEIGHTS['xBounds'])
+
+    #
+    # Collision Avoidance at Joint Level
+    #
+    if geom_model is not None:
+        for cp_idx, cp in enumerate(geom_model.collisionPairs):
+            cp_first_name = geom_model.geometryObjects[cp.first].name
+            cp_second_name = geom_model.geometryObjects[cp.second].name
+            if 'link_0' in cp_first_name:
+                cp_first_name = cp_first_name.replace('_link_0', '_joint')
+            elif 'primitive_shape' in cp_first_name:
+                cp_first_name = 'root_joint'
+            elif 'hand' in cp_first_name:
+                cp_first_name = cp_first_name.replace('rubber_hand_0', 'wrist_yaw_joint')
+            else:
+                raise ValueError(f'[SCA] Name parsing of {cp_first_name} not specified.')
+            # get joint id of nearest joint to the collision pair
+            j_id = robot_model.getJointId(cp_first_name)
+
+            # add as cost
+            sca_alpha = 0.005
+            activation_sca = crocoddyl.ActivationModelQuadFlatExp(3, sca_alpha)
+            sca_cost = crocoddyl.CostModelResidual(
+                state,
+                activation_sca,
+                crocoddyl.ResidualModelPairCollision(state, actuation.nu, geom_model, cp_idx, j_id),
+            )
+            costs.addCost(cp_first_name + '_to_' + cp_second_name + "_sca",
+                          sca_cost,
+                          planner_weights.WBC_COST_WEIGHTS['sca'])
 
     # Creating the action model
     dmodel = crocoddyl.DifferentialActionModelContactFwdDynamics(
@@ -310,6 +342,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
     u_reg_cost = crocoddyl.CostModelResidual(
         state, activation_ureg, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
+    # crocoddyl.ResidualModelJointEffort
     costs.addCost("uReg",
                   u_reg_cost,
                   planner_weights.WBC_FINAL_COST_WEIGHTS['uReg'])
@@ -466,10 +499,10 @@ def createFinalSequence(dmodels):
 def quasi_static(frames_in_contact: dict[str: np.ndarray],
                  pin_model: pinocchio.Model,
                  x0: np.ndarray,):
-    lf_frame_id = pin_model.getFrameId("left_ankle_roll_joint")
-    lf_joint_id =  pin_model.getJointId('left_ankle_roll_joint')
-    rf_frame_id = pin_model.getFrameId("right_ankle_roll_joint")
-    rf_joint_id = pin_model.getJointId('right_ankle_roll_joint')
+    lf_frame_id = pin_model.getFrameId("left_ankle_pitch_joint")
+    lf_joint_id =  pin_model.getJointId('left_ankle_pitch_joint')
+    rf_frame_id = pin_model.getFrameId("right_ankle_pitch_joint")
+    rf_joint_id = pin_model.getJointId('right_ankle_pitch_joint')
     pin_data = pin_model.createData()
     pin.forwardKinematics(pin_model, pin_data, x0[:pin_model.nq])
     pin.updateFramePlacements(pin_model, pin_data)
@@ -481,10 +514,10 @@ def quasi_static(frames_in_contact: dict[str: np.ndarray],
     rf_pos = rf_placement.translation
 
     # get positions of the hands
-    lh_frame_id = pin_model.getFrameId("left_wrist_yaw_joint")
-    lh_joint_id = pin_model.getJointId('left_wrist_yaw_joint')
-    rh_frame_id = pin_model.getFrameId("right_wrist_yaw_joint")
-    rh_joint_id = pin_model.getJointId('right_wrist_yaw_joint')
+    lh_frame_id = pin_model.getFrameId("left_rubber_hand")
+    lh_joint_id = pin_model.getJointId('left_wrist_roll_joint')
+    rh_frame_id = pin_model.getFrameId("right_rubber_hand")
+    rh_joint_id = pin_model.getJointId('right_wrist_roll_joint')
     lh_placement = pin.updateFramePlacement(pin_model, pin_data, lh_frame_id)
     lh_pos = lh_placement.translation
     rh_placement = pin.updateFramePlacement(pin_model, pin_data, rh_frame_id)
@@ -531,6 +564,8 @@ def quasi_static(frames_in_contact: dict[str: np.ndarray],
         percentage = 0.95
         foot_joint_id = rf_joint_id
         hand_joint_id = lh_joint_id
+    else:
+        raise NotImplementedError("Quasi-static model is not implemented for this contact state.")
     aug_sys_b[6] = percentage * pin_data.mass[0] * 9.81
 
     # solve the linear system
@@ -543,4 +578,8 @@ def quasi_static(frames_in_contact: dict[str: np.ndarray],
     pin_forces[foot_joint_id] = foot_wrench
     pin_forces[hand_joint_id] = hand_wrench
     static_torques = pin.rnea(pin_model, pin_data, x0[:pin_model.nq], np.zeros(pin_model.nv), np.zeros(pin_model.nv), pin_forces)[6:]
+
+    # check
+    # jac = pin.computeJointJacobians(pin_model, pin_data, x0[:pin_model.nq])
+    # pin.forwardDynamics(pin_model, pin_data, x0[:pin_model.nq], np.zeros(pin_model.nv), static_torques, jac)
     return static_torques

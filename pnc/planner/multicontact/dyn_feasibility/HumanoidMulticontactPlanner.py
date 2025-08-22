@@ -17,7 +17,9 @@ class HumanoidMulticontactPlanner:
     def __init__(self, robot_model,
                  contact_seqs: ContactSequence,
                  ik_cfree_planner,
-                 planner_params):
+                 planner_params,
+                 geom_model=None):
+        self.geom_model = geom_model
         self.solver_stats = {}
         self.frame_names_lst = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
         self.contact_planes_seq = contact_seqs.contact_planes_seq
@@ -135,6 +137,22 @@ class HumanoidMulticontactPlanner:
             costs = self.costs_full
         else:
             raise ValueError("Unknown solver type: {}".format(solver_type))
+
+        # Check that all cost names exist. If not, create them (e.g., for SCA constraints)
+        for cost_entry in fddp_solver[0].problem.runningDatas[0].differential.costs.costs:
+            if cost_entry.key() not in costs:
+                # costs[cost_entry.key()] = [None] * len(fddp_solver[0].problem.runningDatas)
+                if solver_type == 'seq':
+                    for fddp_idx in range(len(fddp_solver)):
+                        if fddp_idx == 0:
+                            costs[cost_entry.key()] = [[None] * (len(fddp_solver[fddp_idx].problem.runningDatas) + 1)]
+                        else:
+                            costs[cost_entry.key()].append([None] * (len(fddp_solver[fddp_idx].problem.runningDatas) + 1))
+                        # costs[cost_entry.key()] = [[None] * len(costs[next(iter(costs))][0])] * len(fddp_solver)
+                    # costs[cost_entry.key()] = [[None] * len(fddp_solver[0].problem.runningDatas)] * len(fddp_solver)
+                else:
+                    costs[cost_entry.key()] = [None] * len(fddp_solver[0].problem.runningDatas)
+
         for fddp_idx, fddp in enumerate(fddp_solver):
             len_datas = fddp.problem.T
             for model_idx in range(len_datas):

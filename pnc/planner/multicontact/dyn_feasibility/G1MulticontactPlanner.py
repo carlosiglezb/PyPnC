@@ -18,8 +18,12 @@ def get_terminal_feet_gains():
 
 
 class G1MulticontactPlanner(HumanoidMulticontactPlanner):
-    def __init__(self, robot_model, contact_seqs, ik_cfree_planner, planner_params):
-        super().__init__(robot_model, contact_seqs, ik_cfree_planner, planner_params)
+    def __init__(self, robot_model,
+                 contact_seqs,
+                 ik_cfree_planner,
+                 planner_params,
+                 geom_model=None):
+        super().__init__(robot_model, contact_seqs, ik_cfree_planner, planner_params, geom_model)
 
         # names of joints used in reduced states (for plotting only)
         self.lleg_jnames = ['left_hip_roll_joint', 'left_hip_pitch_joint', 'left_hip_yaw_joint',
@@ -67,7 +71,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                              frames_in_contact,
                                                              self.contact_planes_seq[i + 1],
                                                              frame_targets_dict,
-                                                             planner_weights=planner_params)
+                                                             planner_weights=planner_params,
+                                                             geom_model=self.geom_model,
+                                                             robot_model=self.robot_model)
                     else:
                         dmodel = createMultiFrameActionModel(state,
                                                              actuation,
@@ -199,7 +205,10 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         for i in range(self.contact_phases - 1):
             frames_in_contact = self.contact_planes_seq[i]
             next_frames_in_contact = self.contact_planes_seq[i + 1]
-            frame_targets_dict = self.pack_current_targets((i + 1) * T)
+            if hasattr(self.ik_cfree_planner, "planner"):
+                frame_targets_dict = self.ik_cfree_planner.pack_current_targets((i + 1) * T)
+            else:
+                frame_targets_dict = self.pack_current_targets((i + 1) * T)  # used for data reload
             x_last = fddp[i].xs[-1]
             # add impulse model on frames in contact at the end of every contact phase
             imp_model = createMultiFrameFinalImpulseModel(state,

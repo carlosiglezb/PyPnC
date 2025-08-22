@@ -823,7 +823,11 @@ def main(args):
     rob_model, col_model, vis_model, rob_data, col_data, vis_data = load_robot_model(package_dir, robot_urdf_file)
 
     # get root to torso offset
-    root_to_torso_offset = get_root_to_torso_offset(package_dir, rob_model, robot_urdf_file)
+    geom_model = pin.buildGeomFromUrdf(rob_model,
+                                       robot_urdf_file,
+                                       pin.GeometryType.COLLISION)
+    geom_model.addAllCollisionPairs()
+    root_to_torso_offset = get_root_to_torso_offset(geom_model)
 
     # Getting the frame ids
     plan_to_model_ids = {}
@@ -1057,7 +1061,7 @@ def main(args):
     N_horizon_lst = planner_params.N_HORIZON_LST
     contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
     if robot_name == 'g1':
-        robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params)
+        robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params, geom_model)
         robot_dyn_plan.set_zero_configuration(q0)   # TODO: check if this is needed in all scenarios
         if env == 'door':
             if contact_seq == 1:    # step on knee knocker
@@ -1164,8 +1168,9 @@ def main(args):
         if B_SHOW_JOINT_PLOTS:
             plan_plotter.plot_reduced_xs_us()
         if B_SHOW_COST_PLOTS:
-            plan_plotter.plot_costs('seq')
-            plan_plotter.plot_costs('full')
+            # plan_plotter.plot_costs('seq')
+            # plan_plotter.plot_costs('full')
+            plan_plotter.plot_costs('full', ['right_hip_yaw_joint_to_torso_primitive_shape_0_sca'])
         if B_SHOW_JOINT_LIM_PLOTS:
             plan_plotter.plot_joint_limit_margins()
         plt.show()
@@ -1213,7 +1218,7 @@ def main(args):
             sca_str = '_sca' if 'sca' in kin_plan_path else '_'
             action_str = '_step_' if 'knocker' in kin_plan_path else '_'
             seq_str = next((s for s in ['over', 'on', 'on_balanced'] if s in kin_plan_path), '')
-            env = 'door' if 'door' in kin_plan_path else 'stairs'
+            env = '_door' if 'door' in kin_plan_path else '_stairs'
         else:
             action_str = 'step_' if env == 'door' else '_'
         # Saving data tools
@@ -1225,10 +1230,10 @@ def main(args):
         dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
         dyn_data_saver.add('fixed_frames', fixed_frames_seq)
         dyn_data_saver.add('contact_seq_planes', contact_seq_planes)
-        for (i, fp) in enumerate(robot_dyn_plan.fddp):
+        for (i, fp) in enumerate([robot_dyn_plan.fddp_full]):
             com_lst = []
             torso_pos, lf_pos, rf_pos, lkn_pos, rkn_pos, lh_pos, rh_pos = [], [], [], [], [], [], []
-            if i == len(robot_dyn_plan.fddp)-1:      # variables that need to be logged only once
+            if i == len([robot_dyn_plan.fddp_full])-1:      # variables that need to be logged only once
                 dyn_data_saver.add('grf_lfoot', rf_lfoot.tolist())
                 dyn_data_saver.add('grf_rfoot', rf_rfoot.tolist())
                 dyn_data_saver.add('grf_lhand', rf_lwrist.tolist())
@@ -1239,7 +1244,7 @@ def main(args):
             qd = np.array(log.xs)[:, rob_model.nq:]
             dyn_data_saver.add('joint_pos', q.tolist())
             dyn_data_saver.add('joint_vel', qd.tolist())
-            dyn_data_saver.add('joint_torque', (np.array(log.us)[:, :]).tolist())
+            dyn_data_saver.add('joint_torque', log.us.tolist())
             for (qi, qdi) in zip(q, qd):
                 com_lst.append(pin.centerOfMass(rob_model, rob_data, qi, qdi))
                 pin.forwardKinematics(rob_model, rob_data, qi, qdi)
@@ -1262,10 +1267,7 @@ def main(args):
         dyn_data_saver.close()
 
 
-def get_root_to_torso_offset(package_dir, rob_model, robot_urdf_file):
-    geom_model = pin.buildGeomFromUrdf(rob_model,
-                                       robot_urdf_file,
-                                       pin.GeometryType.COLLISION)
+def get_root_to_torso_offset(geom_model):
     root_to_torso_offset = None
     for i, gm in enumerate(geom_model.geometryObjects):
         if 'torso_primitive_shape' in gm.name:

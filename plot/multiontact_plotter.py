@@ -178,7 +178,7 @@ class MulticontactPlotter:
         plot_multiple_state_traj(time, [joints_pos, joints_vel, joints_tau],
                                  phase, ax_labels=signals_names, ylabels=margins_names)
 
-    def plot_costs(self, costs_type='seq'):
+    def plot_costs(self, costs_type='seq', costNames=None):
         T = self._robot_planner.T
         horizon_lst = self._robot_planner.horizon_lst
         time = np.zeros((sum(horizon_lst) - 1, ))
@@ -204,7 +204,21 @@ class MulticontactPlotter:
             # time[curr_idx:next_idx] = np.arange(T * contact_phase, T * (contact_phase + 1), T / horizon_lst[contact_phase])
             phase[curr_idx:next_idx] = contact_phase
 
-        # parse all costs
+        # parse and plot all costs
+        all_costs = self.parse_costs(costsDict, costs_type, horizon_lst)
+        plot_hold_vector_traj(time, all_costs, 'Costs', legends=list(costsDict.keys()))
+
+        # plot only specific costs of interest
+        if costNames is not None:
+            target_costs = np.zeros((sum(horizon_lst) - 1, len(costNames)))
+            for t_idx, cn in enumerate(costNames):
+                if cn in costsDict.keys():
+                    idx = list(costsDict.keys()).index(cn)
+                    target_costs[:, t_idx] = all_costs[:, idx]
+
+            plot_hold_vector_traj(time, target_costs, 'Specified Costs', legends=costNames)
+
+    def parse_costs(self, costsDict, costs_type, horizon_lst):
         all_costs = np.zeros((sum(horizon_lst) - 1, len(costsDict.keys())))
         for cost_idx, (cost_name, costs_lst) in enumerate(costsDict.items()):
             for contact_phase in range(len(horizon_lst)):
@@ -230,8 +244,7 @@ class MulticontactPlotter:
                         all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][contact_phase]
                     else:
                         all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][curr_full_idx:next_full_idx]
-
-        plot_hold_vector_traj(time, all_costs, 'Costs', legends=list(costsDict.keys()))
+        return all_costs
 
     def _get_lleg_joint_ids(self):
         lleg_j_ids = []
