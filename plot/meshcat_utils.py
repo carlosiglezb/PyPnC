@@ -21,7 +21,8 @@ from pydrake.geometry.optimization import HPolyhedron
 
 from util.pydrake_meshcat_interface import pydrake_geom_to_meshcat
 from util.util import vec_to_roll_pitch
-from visualizer.meshcat_tools.meshcat_palette import meshcat_iris_obj, meshcat_obstacle_obj
+from visualizer.meshcat_tools.meshcat_palette import meshcat_iris_obj, meshcat_obstacle_obj, meshcat_domain_obj, \
+    meshcat_point_obj, PURPLE, GREEN, GREY, BLUE
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -237,7 +238,16 @@ class MeshcatPinocchioAnimation:
         for i, shape in enumerate(shapes_lst):
             name = 'env/' + str(i)
             meshcat_geom = pydrake_geom_to_meshcat(shape)
-            self.add_shape(name, meshcat_geom, meshcat_obstacle_obj())
+            if i == 0:
+                self.add_shape(name, meshcat_geom, meshcat_obstacle_obj())
+            if i == 1 or i == 2:
+                self.add_shape(name, meshcat_geom, meshcat_obstacle_obj(GREY, 0.5))
+            elif i == 3:
+                self.add_shape(name, meshcat_geom, meshcat_obstacle_obj(BLUE, 0.7))
+            elif i == 4:
+                self.add_shape(name, meshcat_geom, meshcat_obstacle_obj(GREEN, 0.7))
+            elif i == 5:
+                self.add_shape(name, meshcat_geom, meshcat_obstacle_obj(PURPLE, 0.7))
 
     def add_shape(self, viewer_name, meshcat_shape, obj_material=None):
         if obj_material is None:
