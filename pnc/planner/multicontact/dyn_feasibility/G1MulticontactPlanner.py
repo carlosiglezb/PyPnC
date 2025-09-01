@@ -10,7 +10,8 @@ from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (cre
                                                                              createMultiFrameFinalActionModel,
                                                                              createMultiFrameFinalImpulseModel,
                                                                              createSequence,
-                                                                             createFinalSequence, quasi_static)
+                                                                             createFinalSequence, quasi_static,
+                                                                             quasi_static_ocp)
 
 
 def get_terminal_feet_gains():
@@ -39,7 +40,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                             'right_elbow_joint', 'right_wrist_roll_joint', 'right_wrist_pitch_joint', 'right_wrist_yaw_joint']
 
 
-    def plan(self):
+    def plan(self, b_solve_hybrid = True):
         dyn_seg_solve_time = []
 
         state = self.state
@@ -171,11 +172,13 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
             # Set initial guess
             xs = [x0] * (fddp[i].problem.T + 1)
-            us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
-            # if i == 0:
-            #     us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
-            # else:
-            #     us = [quasi_static(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
+            # us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
+            if i == 0:
+                us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
+            else:
+                # us = [quasi_static(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
+                us = [quasi_static_ocp(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
+            us = [quasi_static_ocp(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
             start_ddp_solve_time = time.time()
             print("Problem solved to convergence:", fddp[i].solve(xs, us, max_iter))
             dyn_seg_solve_time.append(time.time() - start_ddp_solve_time)
@@ -229,21 +232,22 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 u_guess.append(fddp[i].us[-1])
                 u_guess.append(np.array([]))
 
-        x_guess += fddp[i+1].xs.tolist()  # for full trajectory
-        for j in range(len(fddp[i+1].us)):
-            u_guess.append(fddp[i+1].us[j])
+        if b_solve_hybrid:
+            x_guess += fddp[i+1].xs.tolist()  # for full trajectory
+            for j in range(len(fddp[i+1].us)):
+                u_guess.append(fddp[i+1].us[j])
 
-        # Re-compute as full hybrid trajectory with Impulse model
-        problem_full = crocoddyl.ShootingProblem(fddp[0].xs[0], sum(np.vstack(model_seq_all).tolist(),[])[:-1], model_seq_all[-1][-1].tolist()[0])
-        self.fddp_full = crocoddyl.SolverFDDP(problem_full)
-        self.fddp_full.setCallbacks([crocoddyl.CallbackLogger()])
+            # Re-compute as full hybrid trajectory with Impulse model
+            problem_full = crocoddyl.ShootingProblem(fddp[0].xs[0], sum(np.vstack(model_seq_all).tolist(),[])[:-1], model_seq_all[-1][-1].tolist()[0])
+            self.fddp_full = crocoddyl.SolverFDDP(problem_full)
+            self.fddp_full.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
 
-        start_full_fddp_solve_time = time.time()
-        print("Problem solved to convergence:", self.fddp_full.solve(x_guess, u_guess, max_iter))
-        full_dyn_solve_time = time.time() - start_full_fddp_solve_time
-        print("Is feasible:", self.fddp_full.isFeasible)
-        print(f"Full hybrid TO solve time: {full_dyn_solve_time}")
-        super().update_costs_from_solver(solver_type='full')
+            start_full_fddp_solve_time = time.time()
+            print("Problem solved to convergence:", self.fddp_full.solve(x_guess, u_guess, max_iter))
+            full_dyn_solve_time = time.time() - start_full_fddp_solve_time
+            print("Is feasible:", self.fddp_full.isFeasible)
+            print(f"Full hybrid TO solve time: {full_dyn_solve_time}")
+            super().update_costs_from_solver(solver_type='full')
 
     def reset_default_gains(self, frame_name: str, updated_gains: np.array):
         self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains

@@ -8,7 +8,7 @@ from config.multicontact.planner_config import PlannerConfig
 from util.util import so3_from_vec_to_vec
 
 Z_UP =  np.array([0., 0., 1])
-
+mu = 0.7
 
 def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 actuation: crocoddyl.ActuationModelFloatingBase,
@@ -23,7 +23,6 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 terminal_step: bool = False,
                                 geom_model: pinocchio.GeometryModel = None,
                                 robot_model: pinocchio.Model = None,):
-    mu = 0.7
 
     # Define the cost sum (cost manager)
     costs = crocoddyl.CostModelSum(state, actuation.nu)
@@ -37,7 +36,9 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
 
         # set the corresponding rotation for all frames in contact
         SE3_ee = pin.SE3.Identity()
-        SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
+        # SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
+        r,p = util.util.vec_to_roll_pitch(fr_plane)
+        SE3_ee.rotation = util.util.euler_to_rot([r,p,0])
 
         if 'H' in fr_name:
             fr_contact = crocoddyl.ContactModel3D(
@@ -46,7 +47,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                 np.zeros(3),
                 pin.LOCAL_WORLD_ALIGNED,
                 actuation.nu,
-                np.array([0, 1e-6]),
+                np.array([1e-6, 1e-6]),
             )
         else:
             fr_contact = crocoddyl.ContactModel6D(
@@ -55,14 +56,15 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                 SE3_ee,
                 pin.LOCAL_WORLD_ALIGNED,
                 actuation.nu,
-                np.array([0, 1e-6]),
+                np.array([1e-6, 1e-6]),
             )
         contacts.addContact(fr_name + "_contact", fr_contact)
 
         # Add friction cone penalization according to foot or hand contact
         floor_rotation = np.eye(3)
         if 'H' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+            # surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?s
+            surf_cone = crocoddyl.FrictionCone(SE3_ee.rotation, mu, 4, True)     # better if False?s
         else:
             foot_size = planner_weights.FOOT_SIZE
             surf_cone = crocoddyl.WrenchCone(floor_rotation, mu, np.array(foot_size), 4, True)     # better if False?
@@ -110,9 +112,13 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         # set the desired frame position (and orientation for upcoming feet contact planes)
         fr_Mref = pin.SE3.Identity()
         if fr_name in next_frames_in_contact.keys() and 'H' not in fr_name:
-            fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, next_frames_in_contact[fr_name])
+            # fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, next_frames_in_contact[fr_name])
+            r, p = util.util.vec_to_roll_pitch(next_frames_in_contact[fr_name])
+            fr_Mref.rotation = util.util.euler_to_rot([r, p, 0])
         elif fr_name in frames_in_contact.keys() and 'H' not in fr_name:
-            fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, frames_in_contact[fr_name])
+            # fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, frames_in_contact[fr_name])
+            r, p = util.util.vec_to_roll_pitch(frames_in_contact[fr_name])
+            fr_Mref.rotation = util.util.euler_to_rot([r, p, 0])
         fr_Mref.translation = frame_targets_dict[fr_name]
 
         # add as cost
@@ -213,8 +219,6 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
                                 terminal_step: bool = False):
-    mu = 0.7
-
     # Define the cost sum (cost manager)
     costs = crocoddyl.CostModelSum(state, actuation.nu)
 
@@ -227,7 +231,9 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 
         # for hand contact frames, set the corresponding rotation
         SE3_ee = pin.SE3.Identity()
-        SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
+        # SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
+        r,p = util.util.vec_to_roll_pitch(fr_plane)
+        SE3_ee.rotation = util.util.euler_to_rot([r,p,0])
 
         if 'H' in fr_name:
             fr_contact = crocoddyl.ContactModel3D(
@@ -236,7 +242,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                 np.zeros(3),
                 pin.LOCAL_WORLD_ALIGNED,
                 actuation.nu,
-                np.array([0, 1e-6]),
+                np.array([1e-6, 1e-6]),
             )
         else:
             fr_contact = crocoddyl.ContactModel6D(
@@ -245,14 +251,15 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                 SE3_ee,
                 pin.LOCAL_WORLD_ALIGNED,
                 actuation.nu,
-                np.array([0, 1e-6]),
+                np.array([1e-6, 1e-6]),
             )
         contacts.addContact(fr_name + "_contact", fr_contact)
 
         # Add friction cone penalization according to foot or hand contact
         floor_rotation = np.eye(3)
         if 'H' in fr_name:
-            surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+            # surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+            surf_cone = crocoddyl.FrictionCone(SE3_ee.rotation, mu, 4, True)     # better if False?
         else:
             foot_size = planner_weights.FOOT_SIZE
             surf_cone = crocoddyl.WrenchCone(floor_rotation, mu, np.array(foot_size), 4, True)
@@ -582,4 +589,144 @@ def quasi_static(frames_in_contact: dict[str: np.ndarray],
     # check
     # jac = pin.computeJointJacobians(pin_model, pin_data, x0[:pin_model.nq])
     # pin.forwardDynamics(pin_model, pin_data, x0[:pin_model.nq], np.zeros(pin_model.nv), static_torques, jac)
+    return static_torques
+
+def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
+                     pin_model: pinocchio.Model,
+                     x0: np.ndarray, ):
+    import cvxpy as cp
+    # max allowed normal force of some factor x robot weight
+    mu = 0.6
+
+    # construct equality constraints from Centroidal Dynamics
+    lf_frame_id = pin_model.getFrameId("left_ankle_roll_joint")
+    lf_joint_id =  pin_model.getJointId('left_ankle_roll_joint')
+    rf_frame_id = pin_model.getFrameId("right_ankle_roll_joint")
+    rf_joint_id = pin_model.getJointId('right_ankle_roll_joint')
+    pin_data = pin_model.createData()
+    pin.forwardKinematics(pin_model, pin_data, x0[:pin_model.nq])
+    pin.updateFramePlacements(pin_model, pin_data)
+
+    # get positions of the hands
+    lh_frame_id = pin_model.getFrameId("left_rubber_hand")
+    lh_joint_id = pin_model.getJointId('left_wrist_roll_joint')
+    rh_frame_id = pin_model.getFrameId("right_rubber_hand")
+    rh_joint_id = pin_model.getJointId('right_wrist_roll_joint')
+
+    # get positions of the feet and hands
+    lf_placement = pin.updateFramePlacement(pin_model, pin_data, lf_frame_id)
+    lf_pos = lf_placement.translation
+    rf_placement = pin.updateFramePlacement(pin_model, pin_data, rf_frame_id)
+    rf_pos = rf_placement.translation
+    lh_placement = pin.updateFramePlacement(pin_model, pin_data, lh_frame_id)
+    lh_pos = lh_placement.translation
+    rh_placement = pin.updateFramePlacement(pin_model, pin_data, rh_frame_id)
+    rh_pos = rh_placement.translation
+
+    # get center of mass position
+    com_pos = pin.centerOfMass(pin_model, pin_data, x0[:pin_model.nq])
+
+    delta_lf = util.liegroup.VecToso3(lf_pos - com_pos)
+    delta_rf = util.liegroup.VecToso3(rf_pos - com_pos)
+    delta_lh = util.liegroup.VecToso3(lh_pos - com_pos)
+    delta_rh = util.liegroup.VecToso3(rh_pos - com_pos)
+
+    # assume point contacts for simplicity
+    num_contacts = len(frames_in_contact)
+    floor_friction_submat = np.zeros((5, 3))
+    lwall_friction_submat = np.zeros((6, 3))
+    rwall_friction_submat = np.zeros((6, 3))
+    A_ineq = []
+    b_ineq = []
+    A_eq = np.zeros((6, 3 * num_contacts))
+    b_eq = np.zeros((6, 1))
+    b_eq[2] = pin_data.mass[0] * 9.81
+
+    # create friction sub-matrix with linearized constraints
+    #------------ floor: normal in +z
+    floor_friction_submat[0, :] = np.array([1, 0, -mu])
+    floor_friction_submat[1, :] = np.array([-1, 0, -mu])
+    floor_friction_submat[2, :] = np.array([0, 1, -mu])
+    floor_friction_submat[3, :] = np.array([0, -1, -mu])
+    floor_friction_submat[4, :] = np.array([0, 0, 1])
+    #------------ left wall: normal in -y
+    lwall_friction_submat[0, :] = np.array([1, mu, 0])
+    lwall_friction_submat[1, :] = np.array([-1, mu, 0])
+    lwall_friction_submat[2, :] = np.array([0, mu, 1])
+    lwall_friction_submat[3, :] = np.array([0, mu, -1])
+    lwall_friction_submat[4, :] = np.array([0, -1, 0])
+    lwall_friction_submat[5, :] = np.array([0, 0, -1])  # choose positive z force
+    #------------ right wall: normal in +y
+    rwall_friction_submat[0, :] = np.array([1, -mu, 0])
+    rwall_friction_submat[1, :] = np.array([-1, -mu, 0])
+    rwall_friction_submat[2, :] = np.array([0, -mu, 1])
+    rwall_friction_submat[3, :] = np.array([0, -mu, -1])
+    rwall_friction_submat[4, :] = np.array([0, 1, 0])
+    rwall_friction_submat[5, :] = np.array([0, 0, -1])   # choose positive z force
+
+    # fill equality constraint matrices considering all contacts
+    contact_joint_ids = []
+    for i, (fr_name, fr_plane) in enumerate(frames_in_contact.items()):
+        A_eq[0:3, i * 3:(i + 1) * 3] = np.eye(3)
+
+        if fr_name == 'LF':
+            current_friction_submat = np.zeros((5, 3 * num_contacts))
+            r_hat = delta_lf
+            contact_joint_ids.append(lf_joint_id)
+            current_friction_submat[:, 3*i:3*(i+1)] = floor_friction_submat
+            fz_max = pin.computeTotalMass(pin_model) * 9.81
+            current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max]])
+        elif fr_name == 'RF':
+            current_friction_submat = np.zeros((5, 3 * num_contacts))
+            r_hat = delta_rf
+            contact_joint_ids.append(rf_joint_id)
+            current_friction_submat[:, 3*i:3*(i+1)] = floor_friction_submat
+            fz_max = pin.computeTotalMass(pin_model) * 9.81
+            current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max]])
+        elif fr_name == 'LH':
+            current_friction_submat = np.zeros((6, 3 * num_contacts))
+            r_hat = delta_lh
+            contact_joint_ids.append(lh_joint_id)
+            current_friction_submat[:, 3*i:3*(i+1)] = lwall_friction_submat
+            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.25 # hands take less load
+            current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max], [0]])
+        elif fr_name == 'RH':
+            current_friction_submat = np.zeros((6, 3 * num_contacts))
+            r_hat = delta_rh
+            contact_joint_ids.append(rh_joint_id)
+            current_friction_submat[:, 3*i:3*(i+1)] = rwall_friction_submat
+            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.25 # hands take less load
+            current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max], [0]])
+        else:
+            raise ValueError(f"Contact {fr_name} not recognized for quasi-static LP equality constraint.")
+        A_eq[3:6, i * 3:(i + 1) * 3] = r_hat
+
+        # populate inequality constraint matrices considering all contacts
+        A_ineq.append(current_friction_submat)
+        b_ineq.append(current_friction_subvec)
+
+    # create and solve optimization problem
+    f = cp.Variable((3 * num_contacts, 1))   # decision variable: contact forces
+    # minimize static sum of moments without reaction torques
+    objective = cp.Minimize(cp.norm(A_eq[3:6,:] @ f - b_eq[3:6]))
+    A_ineq = np.concatenate(A_ineq)
+    b_ineq = np.concatenate(b_ineq)
+    constraints = [A_eq[:3,:] @ f == b_eq[:3], A_ineq @ f <= b_ineq]
+    prob = cp.Problem(objective, constraints)
+    prob.solve(solver='CLARABEL', verbose=False)
+    if prob.status != 'optimal':
+        raise ValueError('[quasi_static_lp] Contact force optimization problem not solved optimally.')
+
+    # Convert pin_forces from world frame to local frame at the respective joints
+    pin_forces = pin.StdVec_Force(pin_model.njoints, pin.Force.Zero())
+    for con_idx, j_idx in enumerate(contact_joint_ids):
+        curr_f = f.value[3 * con_idx:3 * (con_idx + 1)]     # current fx, fy, fz
+        wrench = pin.Force(np.vstack((curr_f, np.zeros((3, 1)))))    # we assumed only forces
+        joint_placement = pin_data.oMi[j_idx]
+        pin_forces[j_idx] = joint_placement.actInv(wrench)
+        pin_forces[j_idx].angular = np.zeros(3)   # ignore torques for quasi-static
+
+    static_torques = pin.rnea(pin_model, pin_data, x0[:pin_model.nq], np.zeros(pin_model.nv), np.zeros(pin_model.nv),
+                              pin_forces)[6:]
+
     return static_torques
