@@ -214,7 +214,7 @@ def load_navy_env(robot_name, door_pos):
         dom_lbody_ub_r = np.array([1.6, 0.8, 1.2])
         knee_knocker_base = HPolyhedron.MakeBox(
             np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
-            np.array([0.06, 0.9, 0.4]) + door_pos + door_width)
+            np.array([0.14, 0.9, 0.4]) + door_pos + door_width)
     elif robot_name == 'valkyrie':
         dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
         dom_lbody_lb_r = np.array([-1.6, -0.8, -0.])

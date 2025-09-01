@@ -11,16 +11,16 @@ class PlannerConfig(ABC):
     WBC_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for the whole-body planner frame tracking tasks
     WBC_FINAL_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for the whole-body planner frame regularization task
     WBC_COST_WEIGHTS = {
-        'friction': 1e2,
-        'frame_goal': 1e3,
+        'friction': 2e0,
+        'frame_goal': 3e3,
         'xReg': 5e-3,
         'uReg': 1e-1,
-        'xBounds': 5e4,
-        'sca': -1e3
+        'xBounds': 6e4,
+        'sca': -2e2
     }
     WBC_FINAL_COST_WEIGHTS = {
-        'friction': 1e2,
-        'frame_goal': 4e3,
+        'friction': 2e0,
+        'frame_goal': 5e3,
         'xReg': 5e-2,
         'uReg': 1e-1,
         'xBounds': 5e4,
