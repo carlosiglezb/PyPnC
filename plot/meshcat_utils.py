@@ -54,12 +54,15 @@ def get_force_trajectory_from_solver(solver):
                         joint = model.differential.state.pinocchio.frames[
                             contact.frame
                         ].parentJoint
-                        oMf = contact.pinocchio.oMi[joint] * contact.jMf
+                        oMi = contact.pinocchio.oMi[joint]
+                        oMf = oMi * contact.jMf
                         fiMo = pin.SE3(
-                            contact.pinocchio.oMi[joint].rotation.T,
+                            oMi.rotation.T,
                             contact.jMf.translation,
                         )
                         force = fiMo.actInv(contact.f)
+                        w_force = fiMo.act(force)
+                        # w_force = oMi.act(force)
                         R = np.eye(3)
                         mu = 0.7
                         for k, c in model.differential.costs.costs.todict().items():
@@ -76,6 +79,7 @@ def get_force_trajectory_from_solver(solver):
                                 "key": str(joint),
                                 "oMf": oMf,
                                 "f": force,
+                                "w_f": w_force,
                                 "R": R,
                                 "mu": mu,
                             }
@@ -130,6 +134,7 @@ def get_force_trajectory_from_solver(solver):
                         impulse.jMf.translation,
                     )
                     force = fiMo.actInv(impulse.f)
+                    w_force = fiMo.act(force)
                     R = np.eye(3)
                     mu = 0.7
                     for k, c in model.costs.costs.todict().items():
@@ -146,6 +151,7 @@ def get_force_trajectory_from_solver(solver):
                             "key": str(joint),
                             "oMf": oMf,
                             "f": force,
+                            "w_f": w_force,
                             "R": R,
                             "mu": mu,
                         }
@@ -258,7 +264,7 @@ class MeshcatPinocchioAnimation:
         for contact in range(len(fs_ti)):
             pos = fs_ti[contact]['oMf'].translation
             ori = fs_ti[contact]['oMf'].rotation
-            force_dir = fs_ti[contact]['f'].linear
+            force_dir = fs_ti[contact]['w_f'].linear
 
             scale = np.linalg.norm(force_dir) / 100.
             grf_tf = get_scaled_and_oriented_grf_tf(scale, pos, ori, force_dir)

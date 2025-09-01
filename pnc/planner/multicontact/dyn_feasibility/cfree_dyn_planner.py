@@ -1182,6 +1182,8 @@ def main(args):
         sim_time = np.zeros((sim_steps,))
         rf_lfoot, rf_rfoot, rf_lwrist, rf_rwrist = np.zeros((3, sim_steps)), \
             np.zeros((3, sim_steps)), np.zeros((3, sim_steps)), np.zeros((3, sim_steps))
+        w_rf_lfoot, w_rf_rfoot, w_rf_lwrist, w_rf_rwrist = np.zeros((3, sim_steps)), \
+            np.zeros((3, sim_steps)), np.zeros((3, sim_steps)), np.zeros((3, sim_steps))
         time_idx = 0
         for it in robot_dyn_plan.fddp:
             rf_list = vis_tools.get_force_trajectory_from_solver(it)
@@ -1191,12 +1193,16 @@ def main(args):
                     cur_link = int(contact['key'])
                     if rob_model.names[cur_link] == force_joint_frames['LF']:
                         rf_lfoot[:, time_idx] = contact['f'].linear
+                        w_rf_lfoot[:, time_idx] = contact['w_f'].linear
                     elif rob_model.names[cur_link] == force_joint_frames['RF']:
                         rf_rfoot[:, time_idx] = contact['f'].linear
+                        w_rf_rfoot[:, time_idx] = contact['w_f'].linear
                     elif rob_model.names[cur_link] == force_joint_frames['LH']:
                         rf_lwrist[:, time_idx] = contact['f'].linear
+                        w_rf_lwrist[:, time_idx] = contact['w_f'].linear
                     elif rob_model.names[cur_link] == force_joint_frames['RH']:
                         rf_rwrist[:, time_idx] = contact['f'].linear
+                        w_rf_rwrist[:, time_idx] = contact['w_f'].linear
                     else:
                         print(f"ERROR: Non-specified contact {rob_model.names[cur_link]}")
                 dt = it.problem.runningModels[0].dt     # assumes constant dt over fddp sequence
@@ -1207,10 +1213,10 @@ def main(args):
                     continue
 
         if B_SHOW_GRF_PLOTS:
-            plot_vector_traj(sim_time, rf_lfoot.T, 'RF LFoot (World)', Fxyz_labels)
-            plot_vector_traj(sim_time, rf_rfoot.T, 'RF RFoot (World)', Fxyz_labels)
-            plot_vector_traj(sim_time, rf_lwrist.T, 'RF LWrist (World)', Fxyz_labels)
-            plot_vector_traj(sim_time, rf_rwrist.T, 'RF RWrist (World)', Fxyz_labels)
+            plot_vector_traj(sim_time, w_rf_lfoot.T, 'RF LFoot (World)', Fxyz_labels)
+            plot_vector_traj(sim_time, w_rf_rfoot.T, 'RF RFoot (World)', Fxyz_labels)
+            plot_vector_traj(sim_time, w_rf_lwrist.T, 'RF LWrist (World)', Fxyz_labels)
+            plot_vector_traj(sim_time, w_rf_rwrist.T, 'RF RWrist (World)', Fxyz_labels)
             plt.show()
 
     if B_SAVE_DYN_DATA:
@@ -1224,7 +1230,6 @@ def main(args):
         # Saving data tools
         dyn_data_saver = DataSaver(robot_name + sca_str + action_str + seq_str + env +'.pkl')
         # save kinematic TO solution
-        dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
         dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
         dyn_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
         dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
@@ -1234,17 +1239,17 @@ def main(args):
             com_lst = []
             torso_pos, lf_pos, rf_pos, lkn_pos, rkn_pos, lh_pos, rh_pos = [], [], [], [], [], [], []
             if i == len([robot_dyn_plan.fddp_full])-1:      # variables that need to be logged only once
-                dyn_data_saver.add('grf_lfoot', rf_lfoot.tolist())
-                dyn_data_saver.add('grf_rfoot', rf_rfoot.tolist())
-                dyn_data_saver.add('grf_lhand', rf_lwrist.tolist())
-                dyn_data_saver.add('grf_rhand', rf_rwrist.tolist())
+                dyn_data_saver.add('w_grf_lfoot', w_rf_lfoot.tolist())
+                dyn_data_saver.add('w_grf_rfoot', w_rf_rfoot.tolist())
+                dyn_data_saver.add('w_grf_lhand', w_rf_lwrist.tolist())
+                dyn_data_saver.add('w_grf_rhand', w_rf_rwrist.tolist())
                 dyn_data_saver.add('time', sim_time.tolist())
             log = fp.getCallbacks()[0]
             q = np.array(log.xs)[:, :rob_model.nq]
             qd = np.array(log.xs)[:, rob_model.nq:]
             dyn_data_saver.add('joint_pos', q.tolist())
             dyn_data_saver.add('joint_vel', qd.tolist())
-            dyn_data_saver.add('joint_torque', log.us.tolist())
+            dyn_data_saver.add('joint_torque', [vec.tolist() for vec in log.us.tolist()])
             for (qi, qdi) in zip(q, qd):
                 com_lst.append(pin.centerOfMass(rob_model, rob_data, qi, qdi))
                 pin.forwardKinematics(rob_model, rob_data, qi, qdi)

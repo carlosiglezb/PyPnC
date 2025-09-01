@@ -15,6 +15,7 @@ sys.path.append(cwd)
 
 import pinocchio as pin
 import numpy as np
+import config.multicontact.g1_planner_config as g1_params
 
 B_VISUALIZE = True
 B_SHOW_GRF_PLOTS = True
@@ -24,6 +25,7 @@ B_SHOW_COST_PLOTS = True
 class DummyIKPlanner:
     def __init__(self, starting_frame_pos):
         self.starting_frame_pos = starting_frame_pos
+        self.planner = None
 
     def pack_current_targets(self, time: float) -> dict[str: np.ndarray]:
         # use a constant target for all frames
@@ -47,12 +49,13 @@ def get_g1_default_initial_pose(n_joints):
     q0[0] = -np.pi / 4  # left_hip_pitch_joint
     q0[3] = np.pi / 2   # left_knee_joint
     q0[4] = -np.pi / 6  # left_ankle_pitch_joint
-    q0[6] = -np.pi / 6  # right_hip_pitch_joint
+    q0[6] = -np.pi / 6  # right_hip_pitch_joints
     q0[9] = np.pi / 3   # right_knee_joint
     q0[10] = -np.pi / 6 # right_ankle_pitch_joint
     q0[14] = np.pi / 2  # left_shoulder_roll_joint
     # q0[15] = np.pi / 2  # left_shoulder_yaw_joint
     # q0[16] = np.pi / 4   # left_elbow_joint
+    q0[17] = np.pi / 2   # left_wrist_roll_joint
     floating_base = np.array([0., 0., 0.7, 0., 0., 0., 1.])
     return np.concatenate((floating_base, q0))
 
@@ -112,8 +115,10 @@ class TestG1Planner(unittest.TestCase):
         for fr_name in ['torso', 'LF', 'RF', 'LH', 'RH', 'L_knee', 'R_knee']:
             starting_frame_pos[fr_name] = rob_data.oMf[plan_to_model_ids[fr_name]].translation
         self.starting_frame_pos = starting_frame_pos
+        self.planner_params = g1_params.MultiContactDoorConfig()
 
     def test_lean_on_left_wall(self):
+        planner_params = self.planner_params
         rob_model = self.rob_model
         force_joint_frames = self.force_joint_frames
         contact_seq_planes = [{'RF': np.array([0, 0, 1]),
@@ -126,11 +131,11 @@ class TestG1Planner(unittest.TestCase):
         N_horizon_lst = [100]
         T = 2
         contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
-        robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, T, ik_cfree_planner)
+        robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params, None)
         robot_dyn_plan.set_plan_to_model_params(self.plan_to_model_ids)
         robot_dyn_plan.set_initial_configuration(self.x0)
         robot_dyn_plan.set_zero_configuration(self.x0[:rob_model.nq])
-        robot_dyn_plan.plan()
+        robot_dyn_plan.plan(False)
         self.assertEqual(True, True)
 
         if B_VISUALIZE:
@@ -158,6 +163,8 @@ class TestG1Planner(unittest.TestCase):
             sim_time = np.zeros((sim_steps,))
             rf_lfoot, rf_rfoot, rf_lwrist, rf_rwrist = np.zeros((3, sim_steps)), \
                 np.zeros((3, sim_steps)), np.zeros((3, sim_steps)), np.zeros((3, sim_steps))
+            w_rf_lfoot, w_rf_rfoot, w_rf_lwrist, w_rf_rwrist = np.zeros((3, sim_steps)), \
+                np.zeros((3, sim_steps)), np.zeros((3, sim_steps)), np.zeros((3, sim_steps))
             time_idx = 0
             for it in robot_dyn_plan.fddp:
                 rf_list = vis_tools.get_force_trajectory_from_solver(it)
@@ -167,12 +174,16 @@ class TestG1Planner(unittest.TestCase):
                         cur_link = int(contact['key'])
                         if rob_model.names[cur_link] == force_joint_frames['LF']:
                             rf_lfoot[:, time_idx] = contact['f'].linear
+                            w_rf_lfoot[:, time_idx] = contact['w_f'].linear
                         elif rob_model.names[cur_link] == force_joint_frames['RF']:
                             rf_rfoot[:, time_idx] = contact['f'].linear
+                            w_rf_rfoot[:, time_idx] = contact['w_f'].linear
                         elif rob_model.names[cur_link] == force_joint_frames['LH']:
                             rf_lwrist[:, time_idx] = contact['f'].linear
+                            w_rf_lwrist[:, time_idx] = contact['w_f'].linear
                         elif rob_model.names[cur_link] == force_joint_frames['RH']:
                             rf_rwrist[:, time_idx] = contact['f'].linear
+                            w_rf_rwrist[:, time_idx] = contact['w_f'].linear
                         else:
                             print(f"ERROR: Non-specified contact {rob_model.names[cur_link]}")
                     dt = it.problem.runningModels[0].dt     # assumes constant dt over fddp sequence
@@ -183,10 +194,10 @@ class TestG1Planner(unittest.TestCase):
                         continue
 
             if B_SHOW_GRF_PLOTS:
-                plot_vector_traj(sim_time, rf_lfoot.T, 'RF LFoot (World)', Fxyz_labels)
-                plot_vector_traj(sim_time, rf_rfoot.T, 'RF RFoot (World)', Fxyz_labels)
-                plot_vector_traj(sim_time, rf_lwrist.T, 'RF LWrist (World)', Fxyz_labels)
-                plot_vector_traj(sim_time, rf_rwrist.T, 'RF RWrist (World)', Fxyz_labels)
+                plot_vector_traj(sim_time, w_rf_lfoot.T, 'RF LFoot (World)', Fxyz_labels)
+                plot_vector_traj(sim_time, w_rf_rfoot.T, 'RF RFoot (World)', Fxyz_labels)
+                plot_vector_traj(sim_time, w_rf_lwrist.T, 'RF LWrist (World)', Fxyz_labels)
+                plot_vector_traj(sim_time, w_rf_rwrist.T, 'RF RWrist (World)', Fxyz_labels)
                 plt.show()
 
         if B_SHOW_COST_PLOTS:

@@ -48,8 +48,8 @@ class HumanoidMulticontactPlanner:
         self.larm_jnames = None
         self.rarm_jnames = None
         self.ik_cfree_planner = ik_cfree_planner
-        self.gains = planner_params.WBC_FRAME_TRACKING_GAINS    # TODO remove?
-        self._default_gains = copy(self.gains)                  # TODO remove?
+        # self.gains = planner_params.WBC_FRAME_TRACKING_GAINS    # TODO remove?
+        # self._default_gains = copy(self.gains)                  # TODO remove?
         self._zero_config = None
 
 
@@ -157,10 +157,12 @@ class HumanoidMulticontactPlanner:
             len_datas = fddp.problem.T
             for model_idx in range(len_datas):
                 runData = list(fddp.problem.runningDatas)[model_idx]
+                runModel = list(fddp.problem.runningModels)[model_idx]
                 if hasattr(runData, 'differential'):
                     costs_vec = runData.differential.costs.costs
+                    costs_model = runModel.differential.costs.costs
                 for cv in costs_vec:
                     if solver_type == 'seq':
-                        costs[cv.key()][fddp_idx][model_idx] = costs_vec[cv.key()].cost
+                        costs[cv.key()][fddp_idx][model_idx] = costs_model[cv.key()].weight * costs_vec[cv.key()].cost
                     else:
-                        costs[cv.key()][model_idx] = costs_vec[cv.key()].cost
+                        costs[cv.key()][model_idx] = costs_model[cv.key()].weight * costs_vec[cv.key()].cost
