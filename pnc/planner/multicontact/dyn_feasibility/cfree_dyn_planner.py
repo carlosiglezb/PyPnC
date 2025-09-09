@@ -1154,7 +1154,10 @@ def main(args):
         display.add_arrow("forces/" + force_joint_frames['RF'], color=[0, 0, 1])
         display.add_arrow("forces/" + force_joint_frames['LH'], color=[0, 1, 0])
         display.add_arrow("forces/" + force_joint_frames['RH'], color=[0, 1, 0])
-        display.displayFromCrocoddylSolver([robot_dyn_plan.fddp_full])
+        if type(robot_dyn_plan.fddp_full.cost) == float:
+            display.displayFromCrocoddylSolver([robot_dyn_plan.fddp_full])
+        else:
+            display.displayFromCrocoddylSolver(robot_dyn_plan.fddp)
         # viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
         #                     "lfoot_target", "lknee_target",
         #                     "rfoot_target", "rknee_target"))
@@ -1170,7 +1173,7 @@ def main(args):
         if B_SHOW_COST_PLOTS:
             # plan_plotter.plot_costs('seq')
             # plan_plotter.plot_costs('full')
-            plan_plotter.plot_costs('full', ['right_hip_yaw_joint_to_torso_primitive_shape_0_sca'])
+            plan_plotter.plot_costs('full', ['right_hip_roll_joint_to_torso_primitive_shape_0_sca'])
         if B_SHOW_JOINT_LIM_PLOTS:
             plan_plotter.plot_joint_limit_margins()
         plt.show()
@@ -1230,7 +1233,8 @@ def main(args):
         # Saving data tools
         dyn_data_saver = DataSaver(robot_name + sca_str + action_str + seq_str + env +'.pkl')
         # save kinematic TO solution
-        dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
+        if hasattr(ik_cfree_planner, 'planner'):
+            dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
         dyn_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
         dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
         dyn_data_saver.add('fixed_frames', fixed_frames_seq)

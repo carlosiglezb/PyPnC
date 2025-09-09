@@ -76,6 +76,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                              geom_model=self.geom_model,
                                                              robot_model=self.robot_model)
                     else:
+                        # last contact phase
                         dmodel = createMultiFrameActionModel(state,
                                                              actuation,
                                                              x0,
@@ -130,32 +131,6 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
                 self.knot_idx += 1
 
-            # add impulse model on frames in contact at the end of every contact phase
-            # if i != (self.contact_phases - 1):
-            #     imp_model = createMultiFrameFinalImpulseModel(state,
-            #                                                   x0,
-            #                                                   plan_to_model_ids,
-            #                                                   frames_in_contact,
-            #                                                   self.contact_planes_seq[i + 1],
-            #                                                   frame_targets_dict,
-            #                                                   planner_weights=planner_params)
-            #     model_seqs = [*model_seqs, [imp_model]]
-            #     new_contact_fr = [fr for fr in self.contact_planes_seq[i + 1].keys() if fr not in frames_in_contact.keys()]
-            #     print(f"Applied impulse model at {i} on frame {new_contact_fr}")
-            # else:
-            # dmodel = createMultiFrameFinalActionModel(state,
-            #                                           actuation,
-            #                                           x0,
-            #                                           plan_to_model_ids,
-            #                                           frames_in_contact,
-            #                                           frames_in_contact,
-            #                                           frame_targets_dict,
-            #                                           planner_weights=planner_params,
-            #                                           zero_config=zero_config,
-            #                                           terminal_step=True)
-            # model_seqs += createFinalSequence([dmodel])
-            # print(f"Applying Final Sequence model at {i}")
-
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
             fddp[i] = crocoddyl.SolverFDDP(problem)
 
@@ -172,12 +147,6 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
             # Set initial guess
             xs = [x0] * (fddp[i].problem.T + 1)
-            # us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
-            if i == 0:
-                us = fddp[i].problem.quasiStatic([x0] * fddp[i].problem.T)
-            else:
-                # us = [quasi_static(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
-                us = [quasi_static_ocp(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
             us = [quasi_static_ocp(frames_in_contact, state.pinocchio, x0)] * fddp[i].problem.T
             start_ddp_solve_time = time.time()
             print("Problem solved to convergence:", fddp[i].solve(xs, us, max_iter))
@@ -232,7 +201,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 u_guess.append(fddp[i].us[-1])
                 u_guess.append(np.array([]))
 
+        self.solver_type = 'seq'
         if b_solve_hybrid:
+            self.solver_type = 'full'
             x_guess += fddp[i+1].xs.tolist()  # for full trajectory
             for j in range(len(fddp[i+1].us)):
                 u_guess.append(fddp[i+1].us[j])
@@ -247,7 +218,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             full_dyn_solve_time = time.time() - start_full_fddp_solve_time
             print("Is feasible:", self.fddp_full.isFeasible)
             print(f"Full hybrid TO solve time: {full_dyn_solve_time}")
-            super().update_costs_from_solver(solver_type='full')
+            super().update_costs_from_solver(solver_type=self.solver_type)
 
     def reset_default_gains(self, frame_name: str, updated_gains: np.array):
         self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains

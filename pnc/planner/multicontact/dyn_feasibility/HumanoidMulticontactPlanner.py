@@ -19,6 +19,7 @@ class HumanoidMulticontactPlanner:
                  ik_cfree_planner,
                  planner_params,
                  geom_model=None):
+        self.solver_type = 'seq'
         self.geom_model = geom_model
         self.solver_stats = {}
         self.frame_names_lst = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
@@ -128,7 +129,8 @@ class HumanoidMulticontactPlanner:
         }
         return frame_targets_dict
 
-    def update_costs_from_solver(self, solver_type='seq'):
+    def get_solver_and_costs(self):
+        solver_type = self.solver_type
         if solver_type == 'seq':
             fddp_solver = self.fddp
             costs = self.costs
@@ -137,6 +139,10 @@ class HumanoidMulticontactPlanner:
             costs = self.costs_full
         else:
             raise ValueError("Unknown solver type: {}".format(solver_type))
+        return fddp_solver, costs
+
+    def update_costs_from_solver(self, solver_type='seq'):
+        fddp_solver, costs = self.get_solver_and_costs()
 
         # Check that all cost names exist. If not, create them (e.g., for SCA constraints)
         for cost_entry in fddp_solver[0].problem.runningDatas[0].differential.costs.costs:

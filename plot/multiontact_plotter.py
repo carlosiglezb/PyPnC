@@ -11,9 +11,58 @@ class MulticontactPlotter:
         self.rleg_joint_ids = self._get_rleg_joint_ids()
         self.larm_joint_ids = self._get_larm_joint_ids()
         self.rarm_joint_ids = self._get_rarm_joint_ids()
+        self.solver_type = robot_planner.solver_type
 
     def plot_reduced_xs_us(self):
-        fddp = self._robot_planner.fddp
+        xr_dim = len(self.lleg_joint_ids)
+        ur_dim = len(self.lleg_joint_ids)
+        xrarm_dim = len(self.larm_joint_ids)
+        urarm_dim = len(self.larm_joint_ids)
+
+        if self.solver_type == 'seq':
+            phase, time, us_l_reduced, us_larm_reduced, us_r_reduced, us_rarm_reduced, xs_l_reduced, xs_larm_reduced, xs_r_reduced, xs_rarm_reduced = self.get_seq_to_trajectories()
+        else:
+            phase, time, us_l_reduced, us_larm_reduced, us_r_reduced, us_rarm_reduced, xs_l_reduced, xs_larm_reduced, xs_r_reduced, xs_rarm_reduced = self.get_full_to_trajectories()
+
+        # create names of signals and plot left/right leg joints
+        xs_names = [None] * xr_dim
+        us_names = [None] * ur_dim
+        control_lenth = us_l_reduced.shape[0]
+        for jn_i, jn in enumerate(self._robot_planner.lleg_jnames):
+            xs_names[jn_i] = 'q_' + jn
+            us_names[jn_i] = 'u_' + jn
+        signals_names = [xs_names, us_names]
+        plot_multiple_state_traj(time[:control_lenth], [xs_l_reduced[:control_lenth, :], us_l_reduced[:control_lenth, :]],
+                                 phase, ax_labels=signals_names)
+
+        # create names of signals and plot right leg joints
+        for jn_i, jn in enumerate(self._robot_planner.rleg_jnames):
+            xs_names[jn_i] = 'q_' + jn
+            us_names[jn_i] = 'u_' + jn
+        signals_names = [xs_names, us_names]
+        plot_multiple_state_traj(time[:control_lenth], [xs_r_reduced[:control_lenth, :],
+                    us_r_reduced[:control_lenth, :]], phase, ax_labels=signals_names)
+
+        # create names of signals and plot left/right arm joints
+        xs_arm_names = [None] * xrarm_dim
+        us_arm_names = [None] * urarm_dim
+        for jn_i, jn in enumerate(self._robot_planner.larm_jnames):
+            xs_arm_names[jn_i] = 'q_' + jn
+            us_arm_names[jn_i] = 'u_' + jn
+        signals_names = [xs_arm_names, us_arm_names]
+        plot_multiple_state_traj(time[:control_lenth], [xs_larm_reduced[:control_lenth, :],
+                    us_larm_reduced[:control_lenth, :]], phase, ax_labels=signals_names)
+
+        # create names of signals and plot right arm joints
+        for jn_i, jn in enumerate(self._robot_planner.rarm_jnames):
+            xs_arm_names[jn_i] = 'q_' + jn
+            us_arm_names[jn_i] = 'u_' + jn
+        signals_names = [xs_arm_names, us_arm_names]
+        plot_multiple_state_traj(time[:control_lenth], [xs_rarm_reduced[:control_lenth, :],
+                    us_rarm_reduced[:control_lenth, :]], phase, ax_labels=signals_names)
+
+    def get_seq_to_trajectories(self):
+        fddp, _ = self._robot_planner.get_solver_and_costs()
         lleg_jids = self.lleg_joint_ids
         rleg_jids = self.rleg_joint_ids
         larm_jids = self.larm_joint_ids
@@ -25,23 +74,24 @@ class MulticontactPlotter:
         xrarm_dim = len(self.larm_joint_ids)
         urarm_dim = len(self.larm_joint_ids)
 
-        xs_l_reduced = np.zeros((sum(horizon_lst) - len(fddp) + 1, xr_dim))
-        us_l_reduced = np.zeros((sum(horizon_lst) - len(fddp), ur_dim))
-        xs_r_reduced = np.zeros((sum(horizon_lst) - len(fddp) + 1, xr_dim))
-        us_r_reduced = np.zeros((sum(horizon_lst) - len(fddp), ur_dim))
-        xs_larm_reduced = np.zeros((sum(horizon_lst) - len(fddp) + 1, xrarm_dim))
-        us_larm_reduced = np.zeros((sum(horizon_lst) - len(fddp), urarm_dim))
-        xs_rarm_reduced = np.zeros((sum(horizon_lst) - len(fddp) + 1, xrarm_dim))
-        us_rarm_reduced = np.zeros((sum(horizon_lst) - len(fddp), urarm_dim))
-        time = np.zeros(sum(horizon_lst) - len(fddp) + 1)
-        phase = np.zeros(sum(horizon_lst) - len(fddp) + 1, dtype=int)
+        # initialize dimensions by contact phase
+        xs_l_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, xr_dim))
+        us_l_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), ur_dim))
+        xs_r_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, xr_dim))
+        us_r_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), ur_dim))
+        xs_larm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, xrarm_dim))
+        us_larm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), urarm_dim))
+        xs_rarm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, xrarm_dim))
+        us_rarm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), urarm_dim))
+        time = np.zeros(sum(horizon_lst) - len(horizon_lst) + 1)
+        phase = np.zeros(sum(horizon_lst) - len(horizon_lst) + 1, dtype=int)
         curr_idx = 0
         for (it_num, it) in enumerate(fddp):
             if it_num == (len(fddp) - 1):
                 next_idx = curr_idx + horizon_lst[it_num]  # last phase does not have impulse model
                 time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num])
             else:
-                next_idx = curr_idx + horizon_lst[it_num] + 1   # add terminal impulse models
+                next_idx = curr_idx + horizon_lst[it_num] + 1  # add terminal impulse models
                 time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num] + 1)
 
             log = it.getCallbacks()[0]
@@ -59,47 +109,72 @@ class MulticontactPlotter:
             us_rarm_reduced[curr_idx:next_idx - 1, :] = np.array(log.us)[:, rarm_jids]
             phase[curr_idx:next_idx] = int(it_num)
             curr_idx += horizon_lst[it_num] - 1
+        return phase, time, us_l_reduced, us_larm_reduced, us_r_reduced, us_rarm_reduced, xs_l_reduced, xs_larm_reduced, xs_r_reduced, xs_rarm_reduced
 
-        # create names of signals and plot left/right leg joints
-        xs_names = [None] * xr_dim
-        us_names = [None] * ur_dim
-        for jn_i, jn in enumerate(self._robot_planner.lleg_jnames):
-            xs_names[jn_i] = 'q_' + jn
-            us_names[jn_i] = 'u_' + jn
-        signals_names = [xs_names, us_names]
-        plot_multiple_state_traj(time[:-1], [xs_l_reduced[:-1, :], us_l_reduced[:, :]],
-                                 phase, ax_labels=signals_names)
+    def get_full_to_trajectories(self):
+        fddp, _ = self._robot_planner.get_solver_and_costs()
+        lleg_jids = self.lleg_joint_ids
+        rleg_jids = self.rleg_joint_ids
+        larm_jids = self.larm_joint_ids
+        rarm_jids = self.rarm_joint_ids
+        horizon_lst = self._robot_planner.horizon_lst
+        T = self._robot_planner.T
+        xr_dim = len(self.lleg_joint_ids)
+        ur_dim = len(self.lleg_joint_ids)
+        xrarm_dim = len(self.larm_joint_ids)
+        urarm_dim = len(self.larm_joint_ids)
 
-        # create names of signals and plot right leg joints
-        for jn_i, jn in enumerate(self._robot_planner.rleg_jnames):
-            xs_names[jn_i] = 'q_' + jn
-            us_names[jn_i] = 'u_' + jn
-        signals_names = [xs_names, us_names]
-        plot_multiple_state_traj(time[:-1], [xs_r_reduced[:-1, :], us_r_reduced[:, :]],
-                                 phase, ax_labels=signals_names)
+        log = fddp[0].getCallbacks()[0]
+        lleg_jid_fb = [7 + ji for ji in lleg_jids]
+        rleg_jid_fb = [7 + ji for ji in rleg_jids]
+        larm_jid_fb = [7 + ji for ji in larm_jids]
+        rarm_jid_fb = [7 + ji for ji in rarm_jids]
 
-        # create names of signals and plot left/right arm joints
-        xs_arm_names = [None] * xrarm_dim
-        us_arm_names = [None] * urarm_dim
-        for jn_i, jn in enumerate(self._robot_planner.larm_jnames):
-            xs_arm_names[jn_i] = 'q_' + jn
-            us_arm_names[jn_i] = 'u_' + jn
-        signals_names = [xs_arm_names, us_arm_names]
-        plot_multiple_state_traj(time[:-1], [xs_larm_reduced[:-1, :], us_larm_reduced[:, :]],
-                                 phase, ax_labels=signals_names)
+        # initialize dimensions by contact phase
+        xs_l_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), xr_dim))
+        us_l_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), ur_dim))
+        xs_r_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), xr_dim))
+        us_r_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), ur_dim))
+        xs_larm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), xrarm_dim))
+        us_larm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), urarm_dim))
+        xs_rarm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), xrarm_dim))
+        us_rarm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), urarm_dim))
+        time = np.zeros(sum(horizon_lst) - len(horizon_lst))
+        phase = np.zeros(sum(horizon_lst) - len(horizon_lst), dtype=int)
+        curr_idx, curr_cont_idx = 0, 0
+        for it_num in range(len(horizon_lst)):
+            next_cont_idx = curr_cont_idx + horizon_lst[it_num] - 1 # next index on continuous variables
+            time[curr_cont_idx:next_cont_idx] = np.arange(it_num * T, (it_num + 1) * T, fddp[0].problem.runningModels[curr_idx].dt)
+            # time can be extracted from time=np.arange(it_num*T, (it_num+1)*T, fddp[0].problem.runningModels[0].dt)
+            if it_num == (len(horizon_lst) - 1):
+                next_idx = curr_idx + horizon_lst[it_num] - 1  # last phase does not have impulse model
+                # time[curr_cont_idx:next_cont_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num] - 1)
+            else:
+                next_idx = curr_idx + horizon_lst[it_num] - 1# without impulse model
+                # time[curr_cont_idx:next_cont_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num])
 
-        # create names of signals and plot right arm joints
-        for jn_i, jn in enumerate(self._robot_planner.rarm_jnames):
-            xs_arm_names[jn_i] = 'q_' + jn
-            us_arm_names[jn_i] = 'u_' + jn
-        signals_names = [xs_arm_names, us_arm_names]
-        plot_multiple_state_traj(time[:-1], [xs_rarm_reduced[:-1, :], us_rarm_reduced[:, :]],
-                                 phase, ax_labels=signals_names)
+            xs_l_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, lleg_jid_fb]
+            us_l_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, lleg_jids]
+            xs_r_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, rleg_jid_fb]
+            us_r_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, rleg_jids]
+            xs_larm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, larm_jid_fb]
+            us_larm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, larm_jids]
+            xs_rarm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, rarm_jid_fb]
+            us_rarm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, rarm_jids]
+            phase[curr_idx:next_idx] = int(it_num)
+            curr_idx += horizon_lst[it_num] + 1
+            curr_cont_idx += horizon_lst[it_num] - 1
+        return phase, time, us_l_reduced, us_larm_reduced, us_r_reduced, us_rarm_reduced, xs_l_reduced, xs_larm_reduced, xs_r_reduced, xs_rarm_reduced
 
-    def plot_joint_limit_margins(self):
+    def plot_joint_limit_margins(self, to_type:str = 'seq'):
         njoints = self._robot_planner.robot_model.nv - 6
         rob_nq = self._robot_planner.robot_model.nq
-        fddp = self._robot_planner.fddp
+        if to_type == 'seq':
+            fddp = self._robot_planner.fddp
+        elif to_type == 'full':
+            fddp = self._robot_planner.fddp_full
+        else:
+            raise ValueError("[Multi-contact Plotter] Unknown solver type: {}".format(to_type))
         horizon_lst = self._robot_planner.horizon_lst
         tot_knots = sum([fp.problem.T for fp in fddp])
         time = np.zeros(tot_knots)
