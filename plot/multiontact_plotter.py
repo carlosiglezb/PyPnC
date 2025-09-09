@@ -144,14 +144,12 @@ class MulticontactPlotter:
         curr_idx, curr_cont_idx = 0, 0
         for it_num in range(len(horizon_lst)):
             next_cont_idx = curr_cont_idx + horizon_lst[it_num] - 1 # next index on continuous variables
-            time[curr_cont_idx:next_cont_idx] = np.arange(it_num * T, (it_num + 1) * T, fddp[0].problem.runningModels[curr_idx].dt)
-            # time can be extracted from time=np.arange(it_num*T, (it_num+1)*T, fddp[0].problem.runningModels[0].dt)
+            dt = fddp[0].problem.runningModels[curr_idx].dt
+            time[curr_cont_idx:next_cont_idx] = np.arange(it_num * T, (it_num + 1) * T, dt)
             if it_num == (len(horizon_lst) - 1):
                 next_idx = curr_idx + horizon_lst[it_num] - 1  # last phase does not have impulse model
-                # time[curr_cont_idx:next_cont_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num] - 1)
             else:
                 next_idx = curr_idx + horizon_lst[it_num] - 1# without impulse model
-                # time[curr_cont_idx:next_cont_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num])
 
             xs_l_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, lleg_jid_fb]
             us_l_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, lleg_jids]
@@ -166,17 +164,22 @@ class MulticontactPlotter:
             curr_cont_idx += horizon_lst[it_num] - 1
         return phase, time, us_l_reduced, us_larm_reduced, us_r_reduced, us_rarm_reduced, xs_l_reduced, xs_larm_reduced, xs_r_reduced, xs_rarm_reduced
 
-    def plot_joint_limit_margins(self, to_type:str = 'seq'):
+    def plot_joint_limit_margins(self, to_type=None):
         njoints = self._robot_planner.robot_model.nv - 6
         rob_nq = self._robot_planner.robot_model.nq
+
+        # if no solver type specified, use the last one computed by planner
+        if to_type is None:
+            to_type = self._robot_planner.solver_type
+
         if to_type == 'seq':
             fddp = self._robot_planner.fddp
         elif to_type == 'full':
-            fddp = self._robot_planner.fddp_full
+            fddp = [self._robot_planner.fddp_full]
         else:
             raise ValueError("[Multi-contact Plotter] Unknown solver type: {}".format(to_type))
         horizon_lst = self._robot_planner.horizon_lst
-        tot_knots = sum([fp.problem.T for fp in fddp])
+        tot_knots = sum(horizon_lst) - len(horizon_lst)
         time = np.zeros(tot_knots)
         T = self._robot_planner.T
         phase = np.zeros(tot_knots, dtype=int)
@@ -192,23 +195,25 @@ class MulticontactPlotter:
         jv_lim = self._robot_planner.robot_model.velocityLimit[6:]
         jtau_lim = self._robot_planner.robot_model.effortLimit[6:]
 
+        log = fddp[0].getCallbacks()[0]
         # get actual pos, vel, and tau, and store margins
-        curr_idx = 0
-        for (it_num, it) in enumerate(fddp):
-            curr_knots = fddp[it_num].problem.T
-            curr_dt = fddp[it_num].problem.runningModels.tolist()[0].dt
-            next_idx = curr_idx + curr_knots
-            # time[curr_idx:next_idx+1] = np.arange(it_num * T,  (it_num + 1) * T, curr_dt)
-            time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, curr_knots)
+        curr_idx, curr_cont_idx = 0, 0
+        for it_num in range(len(horizon_lst)):
+            if to_type == 'seq':
+                curr_dt = fddp[it_num].problem.runningModels[curr_idx].dt
+            else:
+                curr_dt = fddp[0].problem.runningModels[curr_idx].dt
+            next_cont_idx = curr_cont_idx + horizon_lst[it_num] - 1
+            next_idx = curr_idx + horizon_lst[it_num] - 1
+            time[curr_cont_idx:next_cont_idx] = np.arange(it_num * T,  (it_num + 1) * T, curr_dt)
 
-            log = it.getCallbacks()[0]
-            joints_pos[curr_idx:next_idx, :] = np.array(log.xs)[:-1, 7:rob_nq]  # ignore floating base pos
-            joints_vel[curr_idx:next_idx, :] = np.array(log.xs)[:-1, rob_nq+6:] # ignore floating base vel
-            joints_tau[curr_idx:next_idx, :] = np.array(log.us)[:, :]  # no floating base tau
-            phase[curr_idx:next_idx] = int(it_num)
+            joints_pos[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, 7:rob_nq]  # ignore floating base pos
+            joints_vel[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, rob_nq+6:] # ignore floating base vel
+            joints_tau[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, :]  # no floating base tau
+            phase[curr_cont_idx:next_cont_idx] = int(it_num)
 
             # Compute margins: positive if within bounds, negative if out of bounds
-            for k in range(curr_idx, next_idx):
+            for k in range(curr_cont_idx, next_cont_idx):
                 for j in range(njoints):
                     # joint position margins
                     pos = joints_pos[k, j]
@@ -231,7 +236,8 @@ class MulticontactPlotter:
                     tau_margin = jtau_lim[j] - np.abs(tau)
                     joints_tau[k, j] = tau_margin  # neg = out of bound, pos = within bounds
 
-            curr_idx = next_idx
+            curr_idx += horizon_lst[it_num] + 1
+            curr_cont_idx += horizon_lst[it_num] - 1
 
         # crate margin plots
         jp_names = [None] * njoints
@@ -246,7 +252,7 @@ class MulticontactPlotter:
 
         # plot joint position margins
         signals_names = [jp_names, jv_names, jtau_names]
-        signals_names = [jnames, jnames, jnames]
+        # signals_names = [jnames, jnames, jnames]
         margins_names = ['Joint Pos Margin [rad]', 'Joint Vel Margin[rad/s]', 'Joint Tau Margin [Nm]']
         # plot_multiple_state_traj(time, [joints_pos, joints_vel, joints_tau],
         #                          phase, ylabels=margins_names)

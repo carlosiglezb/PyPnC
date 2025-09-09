@@ -322,12 +322,19 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                       fr_cost,
                       planner_weights.WBC_FINAL_COST_WEIGHTS['frame_goal'])
 
+    weight_by_ulim = state.pinocchio.effortLimit[-(state.nv-6):]
+    weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv-6):]]
+
     # Adding state and control regularization terms
-    w_x = planner_weights.WBC_FINAL_WEIGHTED_COSTS['xReg']
+    w_x = np.copy(planner_weights.WBC_FINAL_WEIGHTED_COSTS['xReg'])
+    # w_x[-actuation.nu:] /= weight_by_ulim
     if zero_config is not None and terminal_step:
-        # x0[3:state.nq] = zero_config[3:]  # all joints
-        x0[7+14:state.nq] = zero_config[7+14:]    # only upper body joints (of G1)
-        w_x[:7+14] = 0
+        # ---- all joints except base (linear) position
+        x0[3:state.nq] = zero_config[3:]
+        w_x[:3] = 0
+        # ---- only upper body joints (of G1)
+        # x0[7+14:state.nq] = zero_config[7+14:]
+        # w_x[:7+14] = 0
     if v_ref is not None:
         x0[-state.nv:] = v_ref
     else:
@@ -344,8 +351,6 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 
     # Allow larger control input where torque limits are larger
     w_u = np.copy(planner_weights.WBC_WEIGHTED_COSTS['uReg'])
-    weight_by_ulim = state.pinocchio.effortLimit[-(state.nv-6):]
-    weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv-6):]]
     w_u /= weight_by_ulim
     activation_ureg = crocoddyl.ActivationModelWeightedQuad(w_u ** 2)
     u_reg_cost = crocoddyl.CostModelResidual(
@@ -393,9 +398,6 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
         if fr_name not in frames_in_contact.keys():
             fr_id = plan_to_model_ids[fr_name]
 
-            SE3_ee = pin.SE3.Identity()
-            SE3_ee.rotation = so3_from_vec_to_vec(Z_UP, fr_plane)
-
             if 'H' in fr_name:
                 supportContactModel = crocoddyl.ImpulseModel3D(
                     state, fr_id, pin.LOCAL_WORLD_ALIGNED
@@ -426,15 +428,15 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
             w_fr = planner_weights.WBC_FRAME_TRACKING_GAINS['L_knee']
         elif 'torso' in fr_name:
             w_fr = planner_weights.WBC_FRAME_TRACKING_GAINS['torso']
-            # if zero_config is not None:
-            #     w_fr = np.array([0.1] * 3 + [0.01] * 3)
         else:
             raise ValueError(f"Weights to track frame {fr_name} were not set")
 
         # set the desired frame pose
         fr_Mref = pin.SE3.Identity()
         if fr_name in next_frames_in_contact.keys() and 'H' not in fr_name:
-            fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, next_frames_in_contact[fr_name])
+            # fr_Mref.rotation = so3_from_vec_to_vec(Z_UP, next_frames_in_contact[fr_name])
+            r, p = util.util.vec_to_roll_pitch(next_frames_in_contact[fr_name])
+            fr_Mref.rotation = util.util.euler_to_rot([r, p, 0])
         fr_Mref.translation = frame_targets_dict[fr_name]
 
         activation_fr = crocoddyl.ActivationModelWeightedQuad(w_fr ** 2)
