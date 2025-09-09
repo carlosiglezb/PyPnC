@@ -33,7 +33,8 @@ class MultiContactDoorConfig(PlannerConfig):
             'RH': np.array([4.] * 3 + [0.00001] * 3)
         }
     WBC_WEIGHTED_COSTS = {
-        'xReg': np.array([0] * 3 + [5.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [4.] * (N_V - 6)),
+        #                 q_b_lin, q_b_ang, q_j, v_b_lin, v_b_ang, v_j
+        'xReg': np.array([0] * 3 + [2.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [12.] * (N_V - 6)),
         'uReg': np.array([0.5] * N_U),
     }
     WBC_FINAL_WEIGHTED_COSTS = {

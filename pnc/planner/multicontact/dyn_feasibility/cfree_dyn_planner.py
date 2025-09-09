@@ -827,7 +827,10 @@ def main(args):
                                        robot_urdf_file,
                                        pin.GeometryType.COLLISION)
     geom_model.addAllCollisionPairs()
-    root_to_torso_offset = get_root_to_torso_offset(geom_model)
+    if B_USE_SELF_COLLISION_AVOIDANCE:
+        root_to_torso_offset = get_root_to_torso_offset(geom_model)
+    else:
+        root_to_torso_offset = np.array([0., 0., 0.])
 
     # Getting the frame ids
     plan_to_model_ids = {}

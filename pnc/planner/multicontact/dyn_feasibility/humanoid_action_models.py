@@ -142,14 +142,16 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         x0[-state.nv:] = v_ref
     else:
         x0[-state.nv:] = np.zeros(state.nv)
-    w_x = planner_weights.WBC_WEIGHTED_COSTS['xReg']
+
+    weight_by_ulim = state.pinocchio.effortLimit[-(state.nv - 6):]
+    weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv - 6):]]
+    w_x = np.copy(planner_weights.WBC_WEIGHTED_COSTS['xReg'])
+    w_x[-actuation.nu:] /= weight_by_ulim
     activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x**2)
     x_reg_cost = crocoddyl.CostModelResidual(
         state, activation_xreg, crocoddyl.ResidualModelState(state, x0, actuation.nu)
     )
     w_u = np.copy(planner_weights.WBC_WEIGHTED_COSTS['uReg'])
-    weight_by_ulim = state.pinocchio.effortLimit[-(state.nv-6):]
-    weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv-6):]]
     w_u /= weight_by_ulim
     activation_ureg = crocoddyl.ActivationModelWeightedQuad(w_u ** 2)
     u_reg_cost = crocoddyl.CostModelResidual(
