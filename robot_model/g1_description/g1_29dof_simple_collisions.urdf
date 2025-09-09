@@ -99,6 +99,24 @@
       </material>
     </visual>
 <!--    <collision>-->
+<!--      <origin xyz="0.02 0.0 0." rpy="0 0 0"/>-->
+<!--      <geometry>-->
+<!--        <sphere radius="0.05"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
+    <collision>
+      <origin xyz="0.02 0.0 -0.11" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.22"/>
+      </geometry>
+    </collision>
+<!--    <collision>-->
+<!--      <origin xyz="0.02 0.0 -0.22" rpy="0 0 0"/>-->
+<!--      <geometry>-->
+<!--        <sphere radius="0.05"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
+<!--    <collision>-->
 <!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
 <!--      <geometry>-->
 <!--        <mesh filename="meshes/left_hip_roll_link.STL"/>-->
@@ -162,12 +180,24 @@
         <color rgba="0.7 0.7 0.7 1"/>
       </material>
     </visual>
+<!--    <collision>-->
+<!--      <origin xyz="0.007 0.005 0." rpy="0 0 0"/>-->
+<!--      <geometry>-->
+<!--        <sphere radius="0.05"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
     <collision>
-      <origin xyz="0.007 0.005 0." rpy="0 0 0"/>
+      <origin xyz="0.007 0.005 -0.13" rpy="0 0 0"/>
       <geometry>
-        <sphere radius="0.05"/>
+        <cylinder radius="0.05" length="0.26"/>
       </geometry>
     </collision>
+<!--    <collision>-->
+<!--      <origin xyz="0.007 0.005 -0.26" rpy="0 0 0"/>-->
+<!--      <geometry>-->
+<!--        <sphere radius="0.05"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
   </link>
   <joint name="left_knee_joint" type="revolute">
     <origin xyz="-0.078273 0.0021489 -0.17734" rpy="0 0.1749 0"/>
@@ -303,6 +333,24 @@
       </material>
     </visual>
 <!--    <collision>-->
+<!--      <origin xyz="0.02 -0.0 0." rpy="0 0 0"/>-->
+<!--      <geometry>-->
+<!--        <sphere radius="0.05"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
+    <collision>
+      <origin xyz="0.02 -0.0 -0.11" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.22"/>
+      </geometry>
+    </collision>
+<!--    <collision>-->
+<!--      <origin xyz="0.02 -0.0 -0.22" rpy="0 0 0"/>-->
+<!--      <geometry>-->
+<!--        <sphere radius="0.05"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
+<!--    <collision>-->
 <!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
 <!--      <geometry>-->
 <!--        <mesh filename="meshes/right_hip_roll_link.STL"/>-->
@@ -366,12 +414,24 @@
         <color rgba="0.7 0.7 0.7 1"/>
       </material>
     </visual>
+<!--    <collision>-->
+<!--      <origin xyz="0.007 -0.005 0." rpy="0 0 0"/>-->
+<!--      <geometry>-->
+<!--        <sphere radius="0.05"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
     <collision>
-      <origin xyz="0.007 -0.005 0." rpy="0 0 0"/>
+      <origin xyz="0.007 -0.005 -0.13" rpy="0 0 0"/>
       <geometry>
-        <sphere radius="0.05"/>
+        <cylinder radius="0.05" length="0.26"/>
       </geometry>
     </collision>
+<!--    <collision>-->
+<!--      <origin xyz="0.007 -0.005 -0.26" rpy="0 0 0"/>-->
+<!--      <geometry>-->
+<!--        <sphere radius="0.05"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
   </link>
   <joint name="right_knee_joint" type="revolute">
     <origin xyz="-0.078273 -0.0021489 -0.17734" rpy="0 0.1749 0"/>
