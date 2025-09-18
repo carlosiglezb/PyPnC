@@ -102,6 +102,7 @@ def get_force_trajectory_from_solver(solver):
                             contact.jMf.translation,
                         )
                         force = fiMo.actInv(contact.fext)
+                        w_force = fiMo.act(force)
                         R = np.eye(3)
                         mu = 0.7
                         for k, c in model.differential.costs.costs.todict().items():
@@ -118,6 +119,7 @@ def get_force_trajectory_from_solver(solver):
                                 "key": str(joint),
                                 "oMf": oMf,
                                 "f": contact.fext,
+                                "w_f": w_force,
                                 "R": R,
                                 "mu": mu,
                             }

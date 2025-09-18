@@ -11,21 +11,26 @@ class PlannerConfig(ABC):
     WBC_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for the whole-body planner frame tracking tasks
     WBC_FINAL_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for the whole-body planner frame regularization task
     WBC_COST_WEIGHTS = {
-        'friction': 2e0,
-        'frame_goal': 3e3,
+        # 'friction': 5e0,  # on_balanced
+        'friction': 2e0,    # step_over
+        'frame_goal': 5e3,
         'xReg': 5e-1,
         'uReg': 1e-1,
-        'xBounds': 6e4,
-        'sca': -2e2
+        'xBounds': 8e3,
+        # 'xBounds': 6e4,   # step over/on_balanced
+        # 'sca': 2e-2     # using Exponential activation
+        'sca': -1e2   # using QuadFlatExp activation
     }
     WBC_FINAL_COST_WEIGHTS = {
-        'friction': 2e0,
+        # 'friction': 1e0,  # on_balanced
+        'friction': 2e0,   # step_over
         'frame_goal': 5e3,
         'xReg': 2e0,
         'uReg': 1e-1,
-        'xBounds': 5e4,
+        # 'xBounds': 5e4,   # step over/on_balanced
+        'xBounds': 6e3,
     }
     WBC_IMPULSE_COST_WEIGHTS = {
-        'frame_goal': 1000,
+        'frame_goal': 1e3,
         'xReg': 5e-2,
     }
