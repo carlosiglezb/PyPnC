@@ -262,9 +262,23 @@ class TestStabilipy(unittest.TestCase):
 
         # get list of configurations throughout multiple contacts
         contact_seq_str_opts = ['over', 'on', 'on_balanced']
-        cs_opt = contact_seq_str_opts[0]  # 'over' or 'on' or 'on_balanced'
-        cfree_soln_file = cwd + '/experiment_data/g1_sca_step_' + cs_opt + '_knee_knocker.pkl'
+        cs_opt = contact_seq_str_opts[1]  # 'over' or 'on' or 'on_balanced'
+        # cfree_soln_file = cwd + '/experiment_data/g1_sca_step_' + cs_opt + '_knee_knocker.pkl'
+        cfree_soln_file = cwd + '/experiment_data/g1_step_' + cs_opt + '_door.pkl'
+        # cfree_soln_file = cwd + '/experiment_data/g1_sca_step_' + cs_opt + '_door.pkl'
         q_all = get_all_poses_from_file(cfree_soln_file)
+        if len(q_all) == 1:
+            # in case using full TO with impulse model, separate by contact phase
+            q_phases = []
+            i_np = 0
+            # N_HORIZON_LST = [180, 240, 280, 220, 250] # step over
+            N_HORIZON_LST = [250, 250, 250, 250, 250]   # step on
+            for n in N_HORIZON_LST:
+                prev_idx = sum(N_HORIZON_LST[:i_np]) + i_np
+                next_idx = prev_idx + n
+                q_phases.append(q_all[0][prev_idx:next_idx])
+                i_np += 1
+            q_all = q_phases    # re-assign
 
         # Create robot system
         model, collision_model, visual_model = pin.buildModelsFromUrdf(
@@ -303,8 +317,8 @@ class TestStabilipy(unittest.TestCase):
         elif cs_opt == 'on':
             contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
                                 ['right_ankle_roll_link', 'left_rubber_hand'],
-                                ['left_rubber_hand', 'right_ankle_roll_link'],
-                                ['left_ankle_roll_link'],
+                                ['right_rubber_hand', 'left_ankle_roll_link'],
+                                ['right_ankle_roll_link', 'left_rubber_hand'],
                                 ['left_ankle_roll_link', 'right_ankle_roll_link']]
         elif cs_opt  == 'on_balanced':
             contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
@@ -322,7 +336,7 @@ class TestStabilipy(unittest.TestCase):
 
             # set up stabilipy problem
             robot_mass = sum([inertia.mass for inertia in model.inertias])
-            margin = 2.0
+            margin = 0.
             mu = 0.9
             pos, normals = [], []
             current_contact_links = contacts_seq_lst[n]
@@ -373,7 +387,7 @@ class TestStabilipy(unittest.TestCase):
                     raise ValueError(f"Contact location for {lnk} not specified")
 
             contacts = [stab.Contact(mu, p, n) for p, n in zip(pos, normals)]
-            polyhedron = stab.StabilityPolygon(robot_mass, dimension=3, radius=0.8, robust_sphere=False)
+            polyhedron = stab.StabilityPolygon(robot_mass, dimension=3, radius=1.0)
             polyhedron.contacts = contacts
             shape = [
                 np.array([[-1., 0, 0]]).T,
@@ -386,7 +400,7 @@ class TestStabilipy(unittest.TestCase):
 
             polytope = [margin * s for s in shape]
             polyhedron.gravity_envelope = polytope
-            polyhedron.compute(stab.Mode.iteration, epsilon=2e-3, maxIter=10, solver='qhull',
+            polyhedron.compute(stab.Mode.best, epsilon=2e-3, maxIter=10, solver='qhull',
                                record_anim=False, plot_init=False,
                                plot_step=False, plot_final=b_plot_final)
 
@@ -423,8 +437,8 @@ class TestStabilipy(unittest.TestCase):
                 com_pos_proj = com_pos[0], com_pos[1], 0.
 
                 # update meshcat frames
-                display.animate_single_shape(p_in_name, tf.translation_matrix([0., 0., com_pos[2]]))
-                display.animate_single_shape(p_out_name, tf.translation_matrix([0., 0., com_pos[2]]))
+                # display.animate_single_shape(p_in_name, tf.translation_matrix([0., 0., com_pos[2]]))
+                # display.animate_single_shape(p_out_name, tf.translation_matrix([0., 0., com_pos[2]]))
                 # --- contacts
                 for i, contact in enumerate(contacts):
                     c_pos = contact.r.reshape(-1,)
@@ -437,18 +451,18 @@ class TestStabilipy(unittest.TestCase):
 
                 # distance from outer polyhedron to CoM
                 # dist_out, _ = p_o.Projection(com_pos_proj)
-                dist_out = get_closest_distance_to_polytope_surface(com_pos_proj, p_o.A(), p_o.b())
+                dist_out = get_closest_distance_to_polytope_surface(com_pos, p_o.A(), p_o.b())
 
                 # distance from inner polyhedron to CoM
                 # dist_in, _ = p_i.Projection(com_pos_proj)
-                dist_in = get_closest_distance_to_polytope_surface(com_pos_proj, p_i.A(), p_i.b())
+                dist_in = get_closest_distance_to_polytope_surface(com_pos, p_i.A(), p_i.b())
 
                 # make distance negative if CoM is outside the polytope
-                if not p_i.PointInSet(com_pos_proj):
+                if not p_i.PointInSet(com_pos):
                     dist_in *= -1
 
                 # make distance negative if CoM is outside the polytope
-                if not p_o.PointInSet(com_pos_proj):
+                if not p_o.PointInSet(com_pos):
                     dist_out *= -1
                 # dist = get_closest_distance_to_polytope_surface(com_pos, p_o.A(), p_o.b())
 
@@ -520,12 +534,12 @@ class TestStabilipy(unittest.TestCase):
         c_obj = Sphere(0.01)
         com_obj = Sphere(0.02)
 
-        contacts_seq_lst, contacts_normals_lst = [], []
+        contacts_seq_lst = []
         contacts_seq_planes = get_contact_seq_from_file(cfree_soln_file)
         for con_plane in contacts_seq_planes:
             next_contacts, next_normals = [], []
-            for k, v in con_plane.items():
-                next_contacts.append(self.plan_to_model_frames[k])
+            for fname in con_plane.keys():
+                next_contacts.append(self.plan_to_model_frames[fname])
             contacts_seq_lst.append(next_contacts)
 
         # visualize entire motion while super-imposing stability regions after each new contact
@@ -537,7 +551,7 @@ class TestStabilipy(unittest.TestCase):
 
             # set up stabilipy problem
             robot_mass = sum([inertia.mass for inertia in model.inertias])
-            margin = 2.0
+            margin = 1.2
             mu = 0.9
             pos, normals = [], []
             current_contact_links = contacts_seq_lst[n]
@@ -607,7 +621,7 @@ class TestStabilipy(unittest.TestCase):
 
             polytope = [margin * s for s in shape]
             polyhedron.gravity_envelope = polytope
-            polyhedron.compute(stab.Mode.best, epsilon=2e-3, maxIter=30, solver='qhull',
+            polyhedron.compute(stab.Mode.best, epsilon=2e-3, maxIter=10, solver='qhull',
                                record_anim=False, plot_init=False,
                                plot_step=False, plot_final=b_plot_final)
 
@@ -644,8 +658,8 @@ class TestStabilipy(unittest.TestCase):
                 com_pos_proj = com_pos[0], com_pos[1], 0.
 
                 # update meshcat frames
-                # display.animate_single_shape(p_in_name, tf.translation_matrix([0., 0., com_pos[2]]))
-                # display.animate_single_shape(p_out_name, tf.translation_matrix([0., 0., com_pos[2]]))
+                # display.animate_single_shape(p_in_name, tf.translation_matrix(polyhedron.com.T))
+                # display.animate_single_shape(p_out_name, tf.translation_matrix(polyhedron.com.T))
                 # --- contacts
                 for i, contact in enumerate(contacts):
                     c_pos = contact.r.reshape(-1,)
@@ -658,20 +672,20 @@ class TestStabilipy(unittest.TestCase):
 
                 # distance from outer polyhedron to CoM
                 # dist_out, _ = p_o.Projection(com_pos_proj)
-                # dist_out = get_closest_distance_to_polytope_surface(com_pos_proj, p_o.A(), p_o.b())
                 dist_out = get_closest_distance_to_polytope_surface(com_pos, p_o.A(), p_o.b())
+                # dist_out = get_closest_distance_to_polytope_surface(com_pos, p_o.A(), p_o.b(), polyhedron.com.reshape(-1,))
 
                 # distance from inner polyhedron to CoM
                 # dist_in, _ = p_i.Projection(com_pos_proj)
-                # dist_in = get_closest_distance_to_polytope_surface(com_pos_proj, p_i.A(), p_i.b())
                 dist_in = get_closest_distance_to_polytope_surface(com_pos, p_i.A(), p_i.b())
+                # dist_in = get_closest_distance_to_polytope_surface(com_pos, p_i.A(), p_i.b(), polyhedron.com.reshape(-1,))
 
                 # make distance negative if CoM is outside the polytope
-                if not p_i.PointInSet(com_pos_proj):
+                if not p_i.PointInSet(com_pos):
                     dist_in *= -1
 
                 # make distance negative if CoM is outside the polytope
-                if not p_o.PointInSet(com_pos_proj):
+                if not p_o.PointInSet(com_pos):
                     dist_out *= -1
                 # dist = get_closest_distance_to_polytope_surface(com_pos, p_o.A(), p_o.b())
 

@@ -17,7 +17,7 @@ import pinocchio as pin
 import numpy as np
 import config.multicontact.g1_planner_config as g1_params
 
-B_VISUALIZE = True
+B_VISUALIZE = False
 B_SHOW_GRF_PLOTS = True
 B_SHOW_COST_PLOTS = True
 
@@ -55,7 +55,7 @@ def get_g1_default_initial_pose(n_joints):
     q0[14] = np.pi / 2  # left_shoulder_roll_joint
     # q0[15] = np.pi / 2  # left_shoulder_yaw_joint
     # q0[16] = np.pi / 4   # left_elbow_joint
-    q0[17] = np.pi / 2   # left_wrist_roll_joint
+    # q0[17] = np.pi / 2   # left_wrist_roll_joint
     floating_base = np.array([0., 0., 0.7, 0., 0., 0., 1.])
     return np.concatenate((floating_base, q0))
 
