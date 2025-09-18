@@ -1134,7 +1134,7 @@ def main(args):
 
     robot_dyn_plan.set_plan_to_model_params(plan_to_model_ids)
     robot_dyn_plan.set_initial_configuration(x0)
-    robot_dyn_plan.plan()
+    robot_dyn_plan.plan(integration_type='Euler')
 
     # Creating display
     if B_VISUALIZE:
@@ -1229,7 +1229,7 @@ def main(args):
         if kin_plan_path is not None:
             sca_str = '_sca' if 'sca' in kin_plan_path else '_'
             action_str = '_step_' if 'knocker' in kin_plan_path else '_'
-            seq_str = next((s for s in ['over', 'on', 'on_balanced'] if s in kin_plan_path), '')
+            seq_str = next((s for s in ['over', 'on_balanced', 'on'] if s in kin_plan_path), '')
             env = '_door' if 'door' in kin_plan_path else '_stairs'
         else:
             action_str = 'step_' if env == 'door' else '_'
@@ -1238,9 +1238,12 @@ def main(args):
         # save kinematic TO solution
         if hasattr(ik_cfree_planner, 'planner'):
             dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
-        dyn_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
-        dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
-        dyn_data_saver.add('fixed_frames', fixed_frames_seq)
+            dyn_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
+            dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
+            dyn_data_saver.add('fixed_frames', fixed_frames_seq)
+        else:
+            dyn_data_saver.add('bez_path', ik_cfree_planner)
+            dyn_data_saver.add('fixed_frames', fixed_frames)
         dyn_data_saver.add('contact_seq_planes', contact_seq_planes)
         for (i, fp) in enumerate([robot_dyn_plan.fddp_full]):
             com_lst = []

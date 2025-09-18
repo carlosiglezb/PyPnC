@@ -141,11 +141,14 @@ class HumanoidMulticontactPlanner:
             raise ValueError("Unknown solver type: {}".format(solver_type))
         return fddp_solver, costs
 
-    def update_costs_from_solver(self, solver_type='seq'):
+    def update_costs_from_solver(self, solver_type='seq', integration_type='Euler'):
         fddp_solver, costs = self.get_solver_and_costs()
 
         # Check that all cost names exist. If not, create them (e.g., for SCA constraints)
-        for cost_entry in fddp_solver[0].problem.runningDatas[0].differential.costs.costs:
+        diff_model = fddp_solver[0].problem.runningDatas[0].differential
+        if integration_type != 'Euler':
+            diff_model = fddp_solver[0].problem.runningDatas[0].differential[0]
+        for cost_entry in diff_model.costs.costs:
             if cost_entry.key() not in costs:
                 # costs[cost_entry.key()] = [None] * len(fddp_solver[0].problem.runningDatas)
                 if solver_type == 'seq':
@@ -165,7 +168,10 @@ class HumanoidMulticontactPlanner:
                 runData = list(fddp.problem.runningDatas)[model_idx]
                 runModel = list(fddp.problem.runningModels)[model_idx]
                 if hasattr(runData, 'differential'):
-                    costs_vec = runData.differential.costs.costs
+                    if integration_type != 'Euler':
+                        costs_vec = runData.differential[0].costs.costs
+                    else:
+                        costs_vec = runData.differential.costs.costs
                     costs_model = runModel.differential.costs.costs
                 for cv in costs_vec:
                     if solver_type == 'seq':

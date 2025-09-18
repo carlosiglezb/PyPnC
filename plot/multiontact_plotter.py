@@ -164,7 +164,7 @@ class MulticontactPlotter:
             curr_cont_idx += horizon_lst[it_num] - 1
         return phase, time, us_l_reduced, us_larm_reduced, us_r_reduced, us_rarm_reduced, xs_l_reduced, xs_larm_reduced, xs_r_reduced, xs_rarm_reduced
 
-    def plot_joint_limit_margins(self, to_type=None):
+    def plot_joint_limit_margins(self, to_type=None, integration_type='Euler'):
         njoints = self._robot_planner.robot_model.nv - 6
         rob_nq = self._robot_planner.robot_model.nq
 
@@ -209,7 +209,7 @@ class MulticontactPlotter:
 
             joints_pos[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, 7:rob_nq]  # ignore floating base pos
             joints_vel[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, rob_nq+6:] # ignore floating base vel
-            joints_tau[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, :]  # no floating base tau
+            joints_tau[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, :njoints]  # no floating base tau
             phase[curr_cont_idx:next_cont_idx] = int(it_num)
 
             # Compute margins: positive if within bounds, negative if out of bounds

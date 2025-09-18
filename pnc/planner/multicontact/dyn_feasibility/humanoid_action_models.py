@@ -23,6 +23,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 terminal_step: bool = False,
                                 geom_model: pinocchio.GeometryModel = None,
                                 robot_model: pinocchio.Model = None,):
+    desired_config = np.copy(x0)
 
     # Define the cost sum (cost manager)
     costs = crocoddyl.CostModelSum(state, actuation.nu)
@@ -63,8 +64,8 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         # Add friction cone penalization according to foot or hand contact
         floor_rotation = np.eye(3)
         if 'H' in fr_name:
-            # surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?s
-            surf_cone = crocoddyl.FrictionCone(SE3_ee.rotation, mu, 4, True)     # better if False?s
+            # surf_cone = crocoddyl.FrictionCone(floor_rotation, mu, 4, True)     # better if False?
+            surf_cone = crocoddyl.FrictionCone(SE3_ee.rotation, mu, 4, True)     # better if False?
         else:
             foot_size = planner_weights.FOOT_SIZE
             surf_cone = crocoddyl.WrenchCone(floor_rotation, mu, np.array(foot_size), 4, True)     # better if False?
@@ -135,21 +136,23 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     #
     # Adding state and control regularization terms
     #
-    # Change reference state if zero_config is provided, otherwise use the initial state
-    if zero_config is not None and terminal_step:
-        x0[3:state.nq] = zero_config[3:]
-    if v_ref is not None:
-        x0[-state.nv:] = v_ref
-    else:
-        x0[-state.nv:] = np.zeros(state.nv)
-
     weight_by_ulim = state.pinocchio.effortLimit[-(state.nv - 6):]
     weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv - 6):]]
     w_x = np.copy(planner_weights.WBC_WEIGHTED_COSTS['xReg'])
-    w_x[-actuation.nu:] /= weight_by_ulim
+    # w_x[-actuation.nu:] /= weight_by_ulim
+
+    # Change reference state if zero_config is provided, otherwise use the initial state
+    if zero_config is not None and terminal_step:
+        desired_config[3:state.nq] = zero_config[3:]
+        w_x[:3] = 0
+    if v_ref is not None:
+        desired_config[-state.nv:] = v_ref
+    else:
+        desired_config[-state.nv:] = np.zeros(state.nv)
+
     activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x**2)
     x_reg_cost = crocoddyl.CostModelResidual(
-        state, activation_xreg, crocoddyl.ResidualModelState(state, x0, actuation.nu)
+        state, activation_xreg, crocoddyl.ResidualModelState(state, desired_config, actuation.nu)
     )
     w_u = np.copy(planner_weights.WBC_WEIGHTED_COSTS['uReg'])
     w_u /= weight_by_ulim
@@ -221,6 +224,8 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
                                 terminal_step: bool = False):
+    desired_config = np.copy(x0)
+
     # Define the cost sum (cost manager)
     costs = crocoddyl.CostModelSum(state, actuation.nu)
 
@@ -301,8 +306,6 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
             w_fr = planner_weights.WBC_FINAL_FRAME_TRACKING_GAINS['L_knee']
         elif 'torso' in fr_name:
             w_fr = planner_weights.WBC_FINAL_FRAME_TRACKING_GAINS['torso']
-            # if zero_config is not None:
-            #     w_fr = np.array([0.1] * 3 + [0.01] * 3)
         else:
             raise ValueError(f"Weights to track frame {fr_name} were not set")
 
@@ -330,20 +333,23 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
     # w_x[-actuation.nu:] /= weight_by_ulim
     if zero_config is not None and terminal_step:
         # ---- all joints except base (linear) position
-        x0[3:state.nq] = zero_config[3:]
-        w_x[:3] = 0
+        # desired_config[3:7] = np.array([0, 0, 0, 1])
+        desired_config[7+14:state.nq] = zero_config[7+14:]
+        w_x[:3] = 0         # do not track linear base position
+        w_x[7:7+14] = 0     # do not track lower body joints
         # ---- only upper body joints (of G1)
-        # x0[7+14:state.nq] = zero_config[7+14:]
+        # desired_config[7+14:state.nq] = zero_config[7+14:]
         # w_x[:7+14] = 0
     if v_ref is not None:
-        x0[-state.nv:] = v_ref
+        desired_config[-state.nv:] = v_ref
     else:
-        x0[-state.nv:] = np.zeros(state.nv)
+        desired_config[-state.nv:] = np.zeros(state.nv)
+        # TODO: penalize joints in fixed limbs more than joints in moving limbs?
 
     # if terminal_step:
     activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x ** 2)
     x_reg_cost = crocoddyl.CostModelResidual(
-        state, activation_xreg, crocoddyl.ResidualModelState(state, x0, actuation.nu)
+        state, activation_xreg, crocoddyl.ResidualModelState(state, desired_config, actuation.nu)
     )
     costs.addCost("xReg",
                   x_reg_cost,
@@ -390,6 +396,8 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
                                       planner_weights: PlannerConfig = None,
                                       zero_config: np.array = None,
                                       v_ref: np.array = None):
+    desired_config = np.copy(x0)
+
     # Creating a 6D multi-contact model, and then including the supporting foot
     impulseModel = crocoddyl.ImpulseModelMultiple(state)
 
@@ -450,16 +458,17 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
                       planner_weights.WBC_IMPULSE_COST_WEIGHTS['frame_goal'])
 
     # Adding state and control regularization terms
-    if zero_config is not None:     # and terminal_step:
-        x0[3:state.nq] = zero_config[3:]
-    if v_ref is not None:
-        x0[-state.nv:] = v_ref
-    else:
-        x0[-state.nv:] = np.zeros(state.nv)
     w_x = planner_weights.WBC_WEIGHTED_COSTS['xReg']
+    if zero_config is not None:     # and terminal_step:
+        desired_config[3:state.nq] = zero_config[3:]
+        w_x[:3] = 0
+    if v_ref is not None:
+        desired_config[-state.nv:] = v_ref
+    else:
+        desired_config[-state.nv:] = np.zeros(state.nv)
     activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x**2)
     x_reg_cost = crocoddyl.CostModelResidual(
-        state, activation_xreg, crocoddyl.ResidualModelState(state, x0, 0)
+        state, activation_xreg, crocoddyl.ResidualModelState(state, desired_config, 0)
     )
     costs.addCost("xReg",
                   x_reg_cost,
@@ -469,7 +478,7 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
     #     [1.0] * 6 + [0.1] * (state.nv - 6) + [10] * state.nv
     # )
     # stateResidual = crocoddyl.ResidualModelState(
-    #     state, x0, 0
+    #     state, desired_config, 0
     # )
     # stateActivation = crocoddyl.ActivationModelWeightedQuad(stateWeights ** 2)
     # stateReg = crocoddyl.CostModelResidual(
@@ -485,27 +494,35 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
     return dmodel
 
 
-def createSequence(dmodels, DT, N):
-    # control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
-    return [
-        [crocoddyl.IntegratedActionModelEuler(m, DT)] * N
-        for m in dmodels
-    ]
-    # return [
-    #     [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.two, DT)] * N
-    #     for m in dmodels
-    # ]
+def createSequence(dmodels, DT, N, integration_type='Euler'):
+    control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
+    if integration_type == 'Euler':
+        return [
+            [crocoddyl.IntegratedActionModelEuler(m, DT)] * N
+            for m in dmodels
+        ]
+    elif integration_type == 'RK2':
+        return [
+            [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.two, DT)] * N
+            for m in dmodels
+        ]
+    else:
+        raise ValueError(f"Integration type {integration_type} not recognized.")
 
-def createFinalSequence(dmodels):
-    # control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
-    return [
-        [crocoddyl.IntegratedActionModelEuler(m, 0)]
-        for m in dmodels
-    ]
-    # return [
-    #     [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.two, 0)]
-    #     for m in dmodels
-    # ]
+def createFinalSequence(dmodels, integration_type='Euler'):
+    control = crocoddyl.ControlParametrizationModelPolyOne(dmodels[0].actuation.nu)
+    if integration_type == 'Euler':
+        return [
+            [crocoddyl.IntegratedActionModelEuler(m, 0)]
+            for m in dmodels
+        ]
+    elif integration_type == 'RK2':
+        return [
+            [crocoddyl.IntegratedActionModelRK(m, control, crocoddyl.RKType.two, 0)]
+            for m in dmodels
+        ]
+    else:
+        raise ValueError(f"Integration type {integration_type} not recognized.")
 
 def quasi_static(frames_in_contact: dict[str: np.ndarray],
                  pin_model: pinocchio.Model,
@@ -652,20 +669,20 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
     floor_friction_submat[1, :] = np.array([-1, 0, -mu])
     floor_friction_submat[2, :] = np.array([0, 1, -mu])
     floor_friction_submat[3, :] = np.array([0, -1, -mu])
-    floor_friction_submat[4, :] = np.array([0, 0, 1])
+    floor_friction_submat[4, :] = np.array([0, 0, -1])
     #------------ left wall: normal in -y
     lwall_friction_submat[0, :] = np.array([1, mu, 0])
     lwall_friction_submat[1, :] = np.array([-1, mu, 0])
     lwall_friction_submat[2, :] = np.array([0, mu, 1])
     lwall_friction_submat[3, :] = np.array([0, mu, -1])
-    lwall_friction_submat[4, :] = np.array([0, -1, 0])
+    lwall_friction_submat[4, :] = np.array([0, 1, 0])
     lwall_friction_submat[5, :] = np.array([0, 0, -1])  # choose positive z force
     #------------ right wall: normal in +y
     rwall_friction_submat[0, :] = np.array([1, -mu, 0])
     rwall_friction_submat[1, :] = np.array([-1, -mu, 0])
     rwall_friction_submat[2, :] = np.array([0, -mu, 1])
     rwall_friction_submat[3, :] = np.array([0, -mu, -1])
-    rwall_friction_submat[4, :] = np.array([0, 1, 0])
+    rwall_friction_submat[4, :] = np.array([0, -1, 0])
     rwall_friction_submat[5, :] = np.array([0, 0, -1])   # choose positive z force
 
     # fill equality constraint matrices considering all contacts
@@ -692,14 +709,14 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
             r_hat = delta_lh
             contact_joint_ids.append(lh_joint_id)
             current_friction_submat[:, 3*i:3*(i+1)] = lwall_friction_submat
-            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.25 # hands take less load
+            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.1 # hands take less load
             current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max], [0]])
         elif fr_name == 'RH':
             current_friction_submat = np.zeros((6, 3 * num_contacts))
             r_hat = delta_rh
             contact_joint_ids.append(rh_joint_id)
             current_friction_submat[:, 3*i:3*(i+1)] = rwall_friction_submat
-            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.25 # hands take less load
+            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.10 # hands take less load
             current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max], [0]])
         else:
             raise ValueError(f"Contact {fr_name} not recognized for quasi-static LP equality constraint.")
