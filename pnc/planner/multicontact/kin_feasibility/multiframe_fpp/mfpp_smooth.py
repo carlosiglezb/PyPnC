@@ -615,6 +615,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     opts = {
         "ipopt": {
+            "print_level": 3,   # {0: none; 1: final compute statistics; 3: num of vars, EXIT; 12: all}
             "hessian_approximation": "limited-memory",   # exact
             "max_iter": 100,
             "mu_init": 1e-6,

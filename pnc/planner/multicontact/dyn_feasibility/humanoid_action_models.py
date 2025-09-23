@@ -10,6 +10,12 @@ from util.util import so3_from_vec_to_vec
 Z_UP =  np.array([0., 0., 1])
 mu = 0.7
 
+
+def get_limb_joint_idx(limb_joint_names: list[str],
+                  robot_model: pinocchio.Model):
+    # do not count the universe and root joints
+    return [robot_model.getJointId(joint_name) - 2 for joint_name in limb_joint_names]
+
 def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 actuation: crocoddyl.ActuationModelFloatingBase,
                                 x0: np.array,
@@ -17,6 +23,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 frames_in_contact: dict[str: np.array],
                                 next_frames_in_contact: dict[str: np.array],
                                 frame_targets_dict: dict[str, np.array],
+                                joint_names_dict: dict[str, list[str]] = None,
                                 planner_weights: PlannerConfig = None,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
@@ -30,6 +37,9 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
 
     # Define contacts (e.g., feet / hand supports)
     contacts = crocoddyl.ContactModelMultiple(state, actuation.nu)
+
+    # scale cost of joint velocities to be higher on limbs in contact
+    wx_scale =  np.ones(actuation.nu)
 
     # create contact models for each frame in contact
     for fr_name, fr_plane in frames_in_contact.items():
@@ -48,7 +58,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                 np.zeros(3),
                 pin.LOCAL_WORLD_ALIGNED,
                 actuation.nu,
-                np.array([1e-6, 1e-6]),
+                np.array(planner_weights.WBP_BAUMGARTE_GAINS3D),
             )
         else:
             fr_contact = crocoddyl.ContactModel6D(
@@ -57,7 +67,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                 SE3_ee,
                 pin.LOCAL_WORLD_ALIGNED,
                 actuation.nu,
-                np.array([1e-6, 1e-6]),
+                np.array(planner_weights.WBP_BAUMGARTE_GAINS6D),
             )
         contacts.addContact(fr_name + "_contact", fr_contact)
 
@@ -89,6 +99,18 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         costs.addCost(fr_name + "_friction",
                       fr_friction,
                       planner_weights.WBC_COST_WEIGHTS['friction'])
+
+        # increase cost of joint velocities on limbs in contact
+        if joint_names_dict is not None:
+            if 'LF' in fr_name:
+                jnt_in_contact = get_limb_joint_idx(joint_names_dict['left_leg'], robot_model)
+            elif 'RF' in fr_name:
+                jnt_in_contact = get_limb_joint_idx(joint_names_dict['right_leg'], robot_model)
+            elif 'LH' in fr_name:
+                jnt_in_contact = get_limb_joint_idx(joint_names_dict['left_arm'], robot_model)
+            elif 'RH' in fr_name:
+                jnt_in_contact = get_limb_joint_idx(joint_names_dict['right_arm'], robot_model)
+            wx_scale[jnt_in_contact] *= planner_weights.WBP_CONTACT_JVEL_SCALE
 
     # Add frame-placement cost
     for fr_name, fr_id in plan_to_model_ids.items():
@@ -139,7 +161,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     weight_by_ulim = state.pinocchio.effortLimit[-(state.nv - 6):]
     weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv - 6):]]
     w_x = np.copy(planner_weights.WBC_WEIGHTED_COSTS['xReg'])
-    # w_x[-actuation.nu:] /= weight_by_ulim
+    w_x[-actuation.nu:] *= wx_scale
 
     # Change reference state if zero_config is provided, otherwise use the initial state
     if zero_config is not None and terminal_step:
@@ -164,8 +186,9 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     costs.addCost("uReg", u_reg_cost, planner_weights.WBC_COST_WEIGHTS['uReg'])
 
     # Adding the state limits penalization
-    x_lb = np.concatenate([state.lb[1: state.nv + 1], state.lb[-state.nv:]])
-    x_ub = np.concatenate([state.ub[1: state.nv + 1], state.ub[-state.nv:]])
+    jvel_lim_safety_margin = 1
+    x_lb = np.concatenate([state.lb[1: state.nv + 1], jvel_lim_safety_margin * state.lb[-state.nv:]])
+    x_ub = np.concatenate([state.ub[1: state.nv + 1], jvel_lim_safety_margin * state.ub[-state.nv:]])
     activation_xbounds = crocoddyl.ActivationModelQuadraticBarrier(
         crocoddyl.ActivationBounds(x_lb, x_ub)
     )
@@ -179,7 +202,8 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     #
     # Collision Avoidance at Joint Level
     #
-    if geom_model is not None:
+    # if geom_model is not None:
+    if False:
         for cp_idx, cp in enumerate(geom_model.collisionPairs):
             cp_first_name = geom_model.geometryObjects[cp.first].name
             cp_second_name = geom_model.geometryObjects[cp.second].name
@@ -249,7 +273,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                 np.zeros(3),
                 pin.LOCAL_WORLD_ALIGNED,
                 actuation.nu,
-                np.array([1e-6, 1e-6]),
+                np.array(planner_weights.WBP_BAUMGARTE_GAINS3D),
             )
         else:
             fr_contact = crocoddyl.ContactModel6D(
@@ -258,7 +282,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                 SE3_ee,
                 pin.LOCAL_WORLD_ALIGNED,
                 actuation.nu,
-                np.array([1e-6, 1e-6]),
+                np.array(planner_weights.WBP_BAUMGARTE_GAINS6D),
             )
         contacts.addContact(fr_name + "_contact", fr_contact)
 
@@ -344,7 +368,6 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
         desired_config[-state.nv:] = v_ref
     else:
         desired_config[-state.nv:] = np.zeros(state.nv)
-        # TODO: penalize joints in fixed limbs more than joints in moving limbs?
 
     # if terminal_step:
     activation_xreg = crocoddyl.ActivationModelWeightedQuad(w_x ** 2)
@@ -709,14 +732,14 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
             r_hat = delta_lh
             contact_joint_ids.append(lh_joint_id)
             current_friction_submat[:, 3*i:3*(i+1)] = lwall_friction_submat
-            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.1 # hands take less load
+            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.2 # hands take less load
             current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max], [0]])
         elif fr_name == 'RH':
             current_friction_submat = np.zeros((6, 3 * num_contacts))
             r_hat = delta_rh
             contact_joint_ids.append(rh_joint_id)
             current_friction_submat[:, 3*i:3*(i+1)] = rwall_friction_submat
-            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.10 # hands take less load
+            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.20 # hands take less load
             current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max], [0]])
         else:
             raise ValueError(f"Contact {fr_name} not recognized for quasi-static LP equality constraint.")

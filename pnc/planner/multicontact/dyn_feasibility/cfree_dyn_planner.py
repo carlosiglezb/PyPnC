@@ -1152,15 +1152,24 @@ def main(args):
     robot_dyn_plan.set_initial_configuration(x0)
     robot_dyn_plan.plan(integration_type='Euler')
 
+    # strings for saving data
+    if kin_plan_path is not None:
+        sca_str = '_sca' if 'sca' in kin_plan_path else '_'
+        action_str = '_step_' if 'knocker' in kin_plan_path else '_'
+        seq_str = next((s for s in ['over', 'on_balanced', 'on'] if s in kin_plan_path), '')
+        env = '_door' if 'door' in kin_plan_path else '_stairs'
+    else:
+        action_str = 'step_' if env == 'door' else '_'
+
     # Creating display
     if B_VISUALIZE:
         save_freq = 10
         display_idx = np.arange(0, len(robot_dyn_plan.lf_targets), save_freq)
         display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
                           rob_data, vis_data, col_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
-        if env == 'door':
+        if 'door' in env:
             display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
-        elif env == 'stairs':
+        elif 'stairs' in env:
             display.add_shapes_from(stairs.obstacles)
         display.display_targets("lfoot_target", robot_dyn_plan.lf_targets[display_idx], [1, 1, 0])
         display.display_targets("lknee_target", robot_dyn_plan.lkn_targets[display_idx], [0, 0, 1])
@@ -1180,10 +1189,10 @@ def main(args):
         # viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
         #                     "lfoot_target", "lknee_target",
         #                     "rfoot_target", "rknee_target"))
-        display.hide_visuals(["env/1", "env/2"])
+        # display.hide_visuals(["env/1", "env/2"])
         display.hide_visuals(["g1_29dof_lock_waist/collisions"], True)
         if B_SAVE_HTML:
-            display.save_html(cwd + "/data/ONR/", robot_name + sca_str + "DYN_" + seq_str + "_anim.html")
+            display.save_html(cwd + "/experiment_data/RAL/", robot_name + sca_str + action_str + seq_str + env + "_DYN_" + "_anim.html")
 
     if B_SHOW_JOINT_PLOTS or B_SHOW_COST_PLOTS or B_SHOW_JOINT_LIM_PLOTS:
         plan_plotter = MulticontactPlotter(robot_dyn_plan)
@@ -1242,13 +1251,6 @@ def main(args):
             plt.show()
 
     if B_SAVE_DYN_DATA:
-        if kin_plan_path is not None:
-            sca_str = '_sca' if 'sca' in kin_plan_path else '_'
-            action_str = '_step_' if 'knocker' in kin_plan_path else '_'
-            seq_str = next((s for s in ['over', 'on_balanced', 'on'] if s in kin_plan_path), '')
-            env = '_door' if 'door' in kin_plan_path else '_stairs'
-        else:
-            action_str = 'step_' if env == 'door' else '_'
         # Saving data tools
         dyn_data_saver = DataSaver(robot_name + sca_str + action_str + seq_str + env +'.pkl')
         # save kinematic TO solution
@@ -1317,7 +1319,7 @@ if __name__ == "__main__":
     parser.add_argument("--env", type=str, default='door',
                         choices=['door', 'stairs'],
                         help="Environment to load for planning")
-    parser.add_argument("--sequence", type=int, default=2,
+    parser.add_argument("--sequence", type=int, default=0,
                         help="Contact sequence to solve for")
     parser.add_argument("--robot_name", type=str, default='g1',
                         choices=['g1', 'valkyrie', 'ergoCub'],

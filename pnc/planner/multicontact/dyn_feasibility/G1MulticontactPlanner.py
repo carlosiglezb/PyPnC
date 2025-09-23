@@ -38,6 +38,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
         self.rarm_jnames = ['right_shoulder_roll_joint', 'right_shoulder_pitch_joint', 'right_shoulder_yaw_joint',
                             'right_elbow_joint', 'right_wrist_roll_joint', 'right_wrist_pitch_joint', 'right_wrist_yaw_joint']
+        self.joint_names_dict = {
+            'left_leg': self.lleg_jnames,
+            'right_leg': self.rleg_jnames,
+            'left_arm': self.larm_jnames,
+            'right_arm': self.rarm_jnames
+        }
 
 
     def plan(self, b_solve_hybrid = True, integration_type='Euler'):
@@ -77,6 +83,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                          frames_in_contact,
                                                          next_frames_in_contact,
                                                          frame_targets_dict,
+                                                         joint_names_dict=self.joint_names_dict,
                                                          planner_weights=planner_params,
                                                          geom_model=self.geom_model,
                                                          robot_model=self.robot_model)
@@ -127,9 +134,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             fddp[i].reg_max = 1e4
             fddp[i].reg_incFactor = 5
             fddp[i].reg_decFactor = 5
-            # if i == 2 or i == 3:   # harder to solve, needs more iterations
-            #     fddp[i].reg_incFactor = 1.2         # default is 10 (this works for tight guess)
-            #     fddp[i].reg_decFactor = 1.2         # default is 10 (this works for tight guess)
+            if i == 2 or i == 3:   # harder to solve, needs more iterations
+                fddp[i].reg_incFactor = 1.2         # default is 10 (this works for tight guess)
+                fddp[i].reg_decFactor = 1.2         # default is 10 (this works for tight guess)
             #     fddp[i].th_acceptStep = 0.01        # default is 0.1
             # fddp[i].th_acceptStep = 0.01     # default is 0.1
             # fddp[i].reg_min = 1e-3             # default is 1e-9

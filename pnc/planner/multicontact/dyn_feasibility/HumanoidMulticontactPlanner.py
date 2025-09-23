@@ -48,9 +48,8 @@ class HumanoidMulticontactPlanner:
         self.rleg_jnames = None
         self.larm_jnames = None
         self.rarm_jnames = None
+        self.joint_names_dict = None
         self.ik_cfree_planner = ik_cfree_planner
-        # self.gains = planner_params.WBC_FRAME_TRACKING_GAINS    # TODO remove?
-        # self._default_gains = copy(self.gains)                  # TODO remove?
         self._zero_config = None
 
 

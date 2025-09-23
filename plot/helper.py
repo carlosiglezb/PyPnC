@@ -10,9 +10,9 @@ xyz_label = ['x', 'y', 'z']
 quat_label = ['x', ' y', ' z', 'w']
 markers = ['*', '+', 'h', 'x', 'o', 'v', 'd']
 facecolors = [
-    'grey', 'brown', 'red', 'orange', 'yellow', 'green', 'blue', 'purple',
-    'crimson', 'cyan', 'lime', 'magenta', 'teal', 'coral', 'gold', 'salmon',
-] * 10
+'grey', 'brown', 'red', 'orange', 'yellow', 'green', 'blue', 'purple',
+'crimson', 'cyan', 'lime', 'magenta', 'teal', 'coral', 'gold', 'salmon',
+'navy', 'olive', 'maroon', 'aqua', 'fuchsia', 'indigo', 'peru', 'orchid'] * 5
 
 
 def plot_task(time, pos_des, pos, vel_des, vel, phase, suptitle):
