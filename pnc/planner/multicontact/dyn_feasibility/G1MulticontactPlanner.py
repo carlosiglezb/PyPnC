@@ -103,9 +103,11 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                               frames_in_contact,
                                                               next_frames_in_contact,
                                                               frame_targets_dict,
+                                                              joint_names_dict=self.joint_names_dict,
                                                               planner_weights=planner_params,
                                                               zero_config=zero_config,
-                                                              terminal_step=terminal_step)
+                                                              terminal_step=terminal_step,
+                                                              robot_model=self.robot_model)
                     model_seqs += createFinalSequence([dmodel], integration_type)
                     print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
 

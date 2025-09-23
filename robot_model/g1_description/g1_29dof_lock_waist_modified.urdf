@@ -130,6 +130,12 @@
 <!--    <collision>-->
 <!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
 <!--      <geometry>-->
+<!--        <sphere radius="0.05"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
+<!--    <collision>-->
+<!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
+<!--      <geometry>-->
 <!--        <mesh filename="meshes/left_hip_yaw_link.STL"/>-->
 <!--      </geometry>-->
 <!--    </collision>-->
@@ -214,12 +220,12 @@
         <color rgba="0.2 0.2 0.2 1"/>
       </material>
     </visual>
-<!--    <collision>-->
-<!--      <origin xyz="0.0 0.0 -0.03" rpy="0 0 0"/>-->
-<!--      <geometry>-->
-<!--        <sphere radius="0.025"/>-->
-<!--      </geometry>-->
-<!--    </collision>-->
+    <collision>
+      <origin xyz="0.0 0.0 -0.03" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.04"/>
+      </geometry>
+    </collision>
 <!--    <collision>-->
 <!--      <origin xyz="-0.05 0.025 -0.03" rpy="0 0 0"/>-->
 <!--      <geometry>-->
@@ -328,6 +334,12 @@
 <!--    <collision>-->
 <!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
 <!--      <geometry>-->
+<!--        <sphere radius="0.05"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
+<!--    <collision>-->
+<!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
+<!--      <geometry>-->
 <!--        <mesh filename="meshes/right_hip_yaw_link.STL"/>-->
 <!--      </geometry>-->
 <!--    </collision>-->
@@ -412,12 +424,12 @@
         <color rgba="0.2 0.2 0.2 1"/>
       </material>
     </visual>
-<!--    <collision>-->
-<!--      <origin xyz="0.0 0.0 -0.03" rpy="0 0 0"/>-->
-<!--      <geometry>-->
-<!--        <sphere radius="0.025"/>-->
-<!--      </geometry>-->
-<!--    </collision>-->
+    <collision>
+      <origin xyz="0.0 0.0 -0.03" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.04"/>
+      </geometry>
+    </collision>
 <!--    <collision>-->
 <!--      <origin xyz="-0.05 0.025 -0.03" rpy="0 0 0"/>-->
 <!--      <geometry>-->
@@ -522,7 +534,7 @@
 <joint name="torso_primitive_shape_joint" type="fixed">
 <!-- <origin xyz="-0.0013625 0.000257 0.055" rpy="0 0 0"/>-->
  <origin xyz="0 0 0.2" rpy="0 0 0"/>
- <parent link="pelvis"/>
+ <parent link="torso_link"/>
  <child link="torso_primitive_shape"/>
  </joint>
  <link name="torso_primitive_shape">
@@ -888,12 +900,12 @@
         <color rgba="0.7 0.7 0.7 1"/>
       </material>
     </visual>
-<!--    <collision>-->
-<!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
-<!--      <geometry>-->
-<!--        <sphere radius="0.035"/>-->
-<!--      </geometry>-->
-<!--    </collision>-->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.035"/>
+      </geometry>
+    </collision>
   </link>
   <link name="right_shoulder_pitch_link">
     <inertial>
@@ -1118,11 +1130,11 @@
         <color rgba="0.7 0.7 0.7 1"/>
       </material>
     </visual>
-<!--    <collision>-->
-<!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
-<!--      <geometry>-->
-<!--        <sphere radius="0.035"/>-->
-<!--      </geometry>-->
-<!--    </collision>-->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.035"/>
+      </geometry>
+    </collision>
   </link>
 </robot>

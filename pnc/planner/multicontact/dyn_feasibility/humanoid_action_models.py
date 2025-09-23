@@ -315,6 +315,18 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                       fr_friction,
                       planner_weights.WBC_FINAL_COST_WEIGHTS['friction'])
 
+        # increase cost of joint velocities on limbs in contact
+        if joint_names_dict is not None:
+            if 'LF' in fr_name:
+                jnt_in_contact = get_limb_joint_idx(joint_names_dict['left_leg'], robot_model)
+            elif 'RF' in fr_name:
+                jnt_in_contact = get_limb_joint_idx(joint_names_dict['right_leg'], robot_model)
+            elif 'LH' in fr_name:
+                jnt_in_contact = get_limb_joint_idx(joint_names_dict['left_arm'], robot_model)
+            elif 'RH' in fr_name:
+                jnt_in_contact = get_limb_joint_idx(joint_names_dict['right_arm'], robot_model)
+            wx_scale[jnt_in_contact] *= planner_weights.WBP_CONTACT_JVEL_SCALE
+
     # Add frame-placement cost
     for fr_name, fr_id in plan_to_model_ids.items():
         # set higher tracking cost on feet
