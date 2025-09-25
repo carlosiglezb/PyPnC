@@ -244,10 +244,12 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                                 frames_in_contact: dict[str: np.array],
                                 next_frames_in_contact: dict[str: np.array],
                                 frame_targets_dict: dict[str, np.array],
+                                joint_names_dict: dict[str, list[str]] = None,
                                 planner_weights: PlannerConfig = None,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
-                                terminal_step: bool = False):
+                                terminal_step: bool = False,
+                                robot_model: pinocchio.Model = None):
     desired_config = np.copy(x0)
 
     # Define the cost sum (cost manager)
@@ -255,6 +257,9 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 
     # Define contacts (e.g., feet / hand supports)
     contacts = crocoddyl.ContactModelMultiple(state, actuation.nu)
+
+    # scale cost of joint velocities to be higher on limbs in contact
+    wx_scale =  np.ones(actuation.nu)
 
     # create contact models for each frame in contact
     for fr_name, fr_plane in frames_in_contact.items():
@@ -689,9 +694,9 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
 
     # assume point contacts for simplicity
     num_contacts = len(frames_in_contact)
-    floor_friction_submat = np.zeros((5, 3))
-    lwall_friction_submat = np.zeros((6, 3))
-    rwall_friction_submat = np.zeros((6, 3))
+    floor_friction_submat = np.zeros((6, 3))
+    lwall_friction_submat = np.zeros((7, 3))
+    rwall_friction_submat = np.zeros((7, 3))
     A_ineq = []
     b_ineq = []
     A_eq = np.zeros((6, 3 * num_contacts))
@@ -704,21 +709,24 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
     floor_friction_submat[1, :] = np.array([-1, 0, -mu])
     floor_friction_submat[2, :] = np.array([0, 1, -mu])
     floor_friction_submat[3, :] = np.array([0, -1, -mu])
-    floor_friction_submat[4, :] = np.array([0, 0, -1])
+    floor_friction_submat[4, :] = np.array([0, 0, -1])  # positive z force
+    floor_friction_submat[5, :] = np.array([0, 0, 1])   # max normal force bounded by weight
     #------------ left wall: normal in -y
     lwall_friction_submat[0, :] = np.array([1, mu, 0])
     lwall_friction_submat[1, :] = np.array([-1, mu, 0])
     lwall_friction_submat[2, :] = np.array([0, mu, 1])
     lwall_friction_submat[3, :] = np.array([0, mu, -1])
     lwall_friction_submat[4, :] = np.array([0, 1, 0])
-    lwall_friction_submat[5, :] = np.array([0, 0, -1])  # choose positive z force
+    lwall_friction_submat[5, :] = np.array([0, -1, 0])  # max normal force bounded by weight
+    lwall_friction_submat[6, :] = np.array([0, 0, -1])  # choose positive z force
     #------------ right wall: normal in +y
     rwall_friction_submat[0, :] = np.array([1, -mu, 0])
     rwall_friction_submat[1, :] = np.array([-1, -mu, 0])
     rwall_friction_submat[2, :] = np.array([0, -mu, 1])
     rwall_friction_submat[3, :] = np.array([0, -mu, -1])
     rwall_friction_submat[4, :] = np.array([0, -1, 0])
-    rwall_friction_submat[5, :] = np.array([0, 0, -1])   # choose positive z force
+    rwall_friction_submat[5, :] = np.array([0, 1, 0])   # max normal force bounded by weight
+    rwall_friction_submat[6, :] = np.array([0, 0, -1])  # choose positive z force
 
     # fill equality constraint matrices considering all contacts
     contact_joint_ids = []
@@ -726,33 +734,33 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
         A_eq[0:3, i * 3:(i + 1) * 3] = np.eye(3)
 
         if fr_name == 'LF':
-            current_friction_submat = np.zeros((5, 3 * num_contacts))
+            current_friction_submat = np.zeros((6, 3 * num_contacts))
             r_hat = delta_lf
             contact_joint_ids.append(lf_joint_id)
             current_friction_submat[:, 3*i:3*(i+1)] = floor_friction_submat
             fz_max = pin.computeTotalMass(pin_model) * 9.81
-            current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max]])
+            current_friction_subvec = np.array([[0], [0], [0], [0], [0], [fz_max]])
         elif fr_name == 'RF':
-            current_friction_submat = np.zeros((5, 3 * num_contacts))
+            current_friction_submat = np.zeros((6, 3 * num_contacts))
             r_hat = delta_rf
             contact_joint_ids.append(rf_joint_id)
             current_friction_submat[:, 3*i:3*(i+1)] = floor_friction_submat
             fz_max = pin.computeTotalMass(pin_model) * 9.81
-            current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max]])
+            current_friction_subvec = np.array([[0], [0], [0], [0], [0], [fz_max]])
         elif fr_name == 'LH':
-            current_friction_submat = np.zeros((6, 3 * num_contacts))
+            current_friction_submat = np.zeros((7, 3 * num_contacts))
             r_hat = delta_lh
             contact_joint_ids.append(lh_joint_id)
             current_friction_submat[:, 3*i:3*(i+1)] = lwall_friction_submat
-            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.2 # hands take less load
-            current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max], [0]])
+            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.15 # hands take less load
+            current_friction_subvec = np.array([[0], [0], [0], [0], [0], [fz_max], [0]])
         elif fr_name == 'RH':
-            current_friction_submat = np.zeros((6, 3 * num_contacts))
+            current_friction_submat = np.zeros((7, 3 * num_contacts))
             r_hat = delta_rh
             contact_joint_ids.append(rh_joint_id)
             current_friction_submat[:, 3*i:3*(i+1)] = rwall_friction_submat
-            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.20 # hands take less load
-            current_friction_subvec = np.array([[0], [0], [0], [0], [fz_max], [0]])
+            fz_max = pin.computeTotalMass(pin_model) * 9.81 * 0.15 # hands take less load
+            current_friction_subvec = np.array([[0], [0], [0], [0], [0], [fz_max], [0]])
         else:
             raise ValueError(f"Contact {fr_name} not recognized for quasi-static LP equality constraint.")
         A_eq[3:6, i * 3:(i + 1) * 3] = r_hat
