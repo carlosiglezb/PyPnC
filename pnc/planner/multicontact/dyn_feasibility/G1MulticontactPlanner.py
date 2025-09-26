@@ -136,9 +136,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             fddp[i].reg_max = 1e4
             fddp[i].reg_incFactor = 5
             fddp[i].reg_decFactor = 5
-            if i == 2 or i == 3:   # harder to solve, needs more iterations
-                fddp[i].reg_incFactor = 1.2         # default is 10 (this works for tight guess)
-                fddp[i].reg_decFactor = 1.2         # default is 10 (this works for tight guess)
+            if i == 1 or i == 2 or i == 3:   # harder to solve, needs more iterations
+                fddp[i].reg_incFactor = 2         # default is 10 (smaller works for tight guess)
+                fddp[i].reg_decFactor = 2         # default is 10 (smaller works for tight guess)
             #     fddp[i].th_acceptStep = 0.01        # default is 0.1
             # fddp[i].th_acceptStep = 0.01     # default is 0.1
             # fddp[i].reg_min = 1e-3             # default is 1e-9
