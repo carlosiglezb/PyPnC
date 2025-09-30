@@ -21,10 +21,12 @@ class MultiContactDoorConfig(PlannerConfig):
     # ALPHA = [1, 0.0, {0.0, 0.001}]           # option 5: roll shins w/ knee on right side
     # W_RIGID_LINK = [10, 0., 30.]    # option 6: high knees
     # ALPHA = [0.1, 0.01, 0.]         # option 6: high knees
+    W_RIGID_LINK = [5, 0., 2]       # option 7: roll shins outwards
+    ALPHA = [0.5, 0.0, 0.1]         # option 7: roll shins outwards
     # N_HORIZON_LST = [180, 240, 280, 250, 250]
     # ----- seq 1 (step on): opposite hand-foot pair at each contact
-    W_RIGID_LINK = [1.0, 0., 8.]  # option 1: high knees
-    ALPHA = [0.01, 0.01, 0.]        # option 1: high knees
+    # W_RIGID_LINK = [1.0, 0., 8.]  # option 1: high knees
+    # ALPHA = [0.01, 0.01, 0.]        # option 1: high knees
     # N_HORIZON_LST = [200, 250, 280, 250, 250]
     # ----- seq 2 (step on balanced)
     # W_RIGID_LINK = [30.0, 0., 5.]       # option 1: knee forward
@@ -34,23 +36,23 @@ class MultiContactDoorConfig(PlannerConfig):
     FOOT_SIZE = [0.15, 0.08]  # [length, width]
 
     # ----- seq 0 (step over)
-    # WBC_FRAME_TRACKING_GAINS = {
-    #         'torso': np.array([2, 2, 2.0] + [0.1, 0.1, 0.01]),  # (lin, ang)
-    #         'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
-    #         'L_knee': np.array([2.] * 3 + [0.00001] * 3),
-    #         'R_knee': np.array([2.] * 3 + [0.00001] * 3),
-    #         'LH': np.array([4.] * 3 + [0.00001] * 3),
-    #         'RH': np.array([4.] * 3 + [0.00001] * 3)
-    #     }
-    # ----- seq 1 (step on)
     WBC_FRAME_TRACKING_GAINS = {
-            'torso': np.array([2.0, 2.5, 1.5] + [0.5, 0.5, 0.001]),
+            'torso': np.array([2.0, 2.0, 1.0] + [0.5, 0.5, 0.01]),  # (lin, ang)
             'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
             'L_knee': np.array([4.] * 3 + [0.00001] * 3),
             'R_knee': np.array([4.] * 3 + [0.00001] * 3),
             'LH': np.array([4.] * 3 + [0.00001] * 3),
             'RH': np.array([4.] * 3 + [0.00001] * 3)
         }
+    # ----- seq 1 (step on)
+    # WBC_FRAME_TRACKING_GAINS = {
+    #         'torso': np.array([2.0, 2.5, 1.5] + [0.5, 0.5, 0.001]),
+    #         'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
+    #         'L_knee': np.array([4.] * 3 + [0.00001] * 3),
+    #         'R_knee': np.array([4.] * 3 + [0.00001] * 3),
+    #         'LH': np.array([4.] * 3 + [0.00001] * 3),
+    #         'RH': np.array([4.] * 3 + [0.00001] * 3)
+    #     }
     # ----- seq 2 (step on balanced)
     # WBC_FRAME_TRACKING_GAINS = {
     #         'torso': np.array([2.5, 3.5, 2.5] + [0.5, 0.5, 0.001]),
@@ -61,9 +63,8 @@ class MultiContactDoorConfig(PlannerConfig):
     #         'RH': np.array([4.] * 3 + [0.00001] * 3)
     #     }
     WBC_FINAL_FRAME_TRACKING_GAINS = {
-            # 'torso': np.array([3, 3.0, 2.0] + [0.1, 0.1, 0.1]),  # (lin, ang)  step over
-            'torso': np.array([5, 5.0, 5.0] + [1.0, 1.0, 1.]),  # (lin, ang)   step on
-            # 'torso': np.array([5, 5.0, 5.0] + [1.0, 1.0, 1.]),  # (lin, ang)   step on balanced
+            'torso': np.array([3, 3.0, 1.5] + [0.5, 0.5, 0.1]),  # (lin, ang)  step over
+            # 'torso': np.array([5, 5.0, 5.0] + [1.0, 1.0, 1.]),  # (lin, ang)   step on_balanced, step on
             'feet': np.array([12.] * 3 + [4.5] * 3),  # (lin, ang)
             'L_knee': np.array([6.] * 3 + [0.00001] * 3),
             'R_knee': np.array([6.] * 3 + [0.00001] * 3),
@@ -72,8 +73,8 @@ class MultiContactDoorConfig(PlannerConfig):
         }
     WBC_WEIGHTED_COSTS = {
         #                 q_b_lin, q_b_ang, q_j, (v_b_lin, v_b_ang), v_j
-        'xReg': np.array([0] * 3 + [3.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [0.4] * (N_V - 6)), # step on
-        # 'xReg': np.array([0] * 3 + [3.0] * 3 + [2.0] * (N_V - 6) + [0.2] * 6 + [0.1] * (N_V - 6)),  # step over
+        # 'xReg': np.array([0] * 3 + [3.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [0.4] * (N_V - 6)), # step on
+        'xReg': np.array([0] * 3 + [3.0] * 3 + [2.0] * (N_V - 6) + [0.2] * 6 + [0.8] * (N_V - 6)),  # step over
         # 'xReg': np.array([0] * 3 + [3.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [0.2] * (N_V - 6)), # step on balanced
         # 'uReg': np.array([0.4] * N_U),
         'uReg': np.array([0.5] * N_U),  # over, on

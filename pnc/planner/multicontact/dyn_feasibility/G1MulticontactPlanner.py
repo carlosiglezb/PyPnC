@@ -221,8 +221,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
             self.fddp_full.th_stop = 1e-3
             self.fddp_full.th_gapTol = 1e-2
-            self.fddp_full.reg_incFactor = 10  # default is 10 (this works for tight guess)
-            self.fddp_full.reg_decFactor = 10  # default is 10 (this works for tight guess)
+            self.fddp_full.reg_incFactor = 5  # default is 10 (this works for tight guess)
+            self.fddp_full.reg_decFactor = 5  # default is 10 (this works for tight guess)
             # self.fddp_full.th_acceptStep = 0.01  # default is 0.1
 
             start_full_fddp_solve_time = time.time()

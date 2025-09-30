@@ -11,38 +11,37 @@ class PlannerConfig(ABC):
     WBC_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for the whole-body planner frame tracking tasks
     WBC_FINAL_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for the whole-body planner frame regularization task
     # ------ seq 0
-    # WBP_CONTACT_JVEL_SCALE : float = 2.0   # weight on joint velocity scale of contact limb in the whole-body planner
-    # WBP_BAUMGARTE_GAINS3D : list[float] = [0, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
-    # WBP_BAUMGARTE_GAINS6D : list[float] = [0, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
-    # ------ seq 1
-    WBP_CONTACT_JVEL_SCALE : float = 5.0   # weight on joint velocity scale of contact limb in the whole-body planner -- seq 1
-    WBP_BAUMGARTE_GAINS3D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
+    WBP_CONTACT_JVEL_SCALE : float = 4.0   # weight on joint velocity scale of contact limb in the whole-body planner
+    WBP_BAUMGARTE_GAINS3D : list[float] = [1e-6, 1e-4]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
     WBP_BAUMGARTE_GAINS6D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
+    # ------ seq 1
+    # WBP_CONTACT_JVEL_SCALE : float = 4.0   # weight on joint velocity scale of contact limb in the whole-body planner -- seq 1
+    # WBP_BAUMGARTE_GAINS3D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
+    # WBP_BAUMGARTE_GAINS6D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
     # ------ seq 2
     # WBP_CONTACT_JVEL_SCALE : float = 4.0   # weight on joint velocity scale of contact limb in the whole-body planner -- seq 1
     # WBP_BAUMGARTE_GAINS3D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
     # WBP_BAUMGARTE_GAINS6D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
     WBC_COST_WEIGHTS = {
-        'friction': 5e0,    # step_over, on_balanced, step_on
-        # 'frame_goal': 3e3,
-        'frame_goal': 1e2,  # step on
+        # 'friction': 5e0,    # step_over, on_balanced, step_on
+        'friction': 3e0,    # step_over, on_balanced, step_on
+        'frame_goal': 3e3,  # step over
+        # 'frame_goal': 1e2,  # step on
         'xReg': 5e-1,
         'uReg': 1e-1,
-        # 'xBounds': 6e3,   # step on
-        'xBounds': 1e4,   # step on
-        # 'xBounds': 6e4,   # step over
+        'xBounds': 1e4,   # step on, step over
         # 'xBounds': 6e2,   # step on_balanced
         # 'sca': 2e-2     # using Exponential activation
         'sca': -1e2   # using QuadFlatExp activation
     }
     WBC_FINAL_COST_WEIGHTS = {
-        'friction': 5e0,   # step_over, on_balanced, step_on
+        'friction': 1e0,   # step_over, on_balanced, step_on
         'frame_goal': 3e3,
-        'xReg': 2e0,
+        # 'xReg': 2e0,
+        'xReg': 5e-1,    # step over
         'uReg': 1e-1,
-        # 'xBounds': 6e4,   # step over
         # 'xBounds': 6e2,   # step on_balanced
-        'xBounds': 6e3,     # step on
+        'xBounds': 6e3,     # step on, step over
     }
     WBC_IMPULSE_COST_WEIGHTS = {
         'frame_goal': 1e3,
