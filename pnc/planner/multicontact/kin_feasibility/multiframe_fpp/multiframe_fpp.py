@@ -244,6 +244,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
 
     if sca_robot_geometry is not None:
+        b_skip_sca = False
         initial_guess = {}
         initial_guess['x0'] = pack_points_for_single_vector(points, 'cvxpy')
         initial_guess['lam_g0'] = pack_points_for_single_vector(dvars['lam_g0'], 'cvxpy')
@@ -256,8 +257,10 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                                  weights_rigid_link=w_rigid,
                                                                  initial_guess=initial_guess,
                                                                  verbose=verbose,
-                                                                 b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan)
+                                                                 b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan,
+                                                                 b_skip_sca=b_skip_sca)
         solver_stats['multiple_bezier_iris_sca_casadi_time'] = sol_stats['runtime']
-        solver_stats['multiple_bezier_iris_sca_build_time'] = sol_stats['sca_build_time']
-        solver_stats['multiple_bezier_iris_sca_construct_time'] = sol_stats['prob_construct_time']
+        if not b_skip_sca:
+            solver_stats['multiple_bezier_iris_sca_build_time'] = sol_stats['sca_build_time']
+            solver_stats['multiple_bezier_iris_sca_construct_time'] = sol_stats['prob_construct_time']
     return paths, iris_seq, points, safe_pnt_lst, solver_stats

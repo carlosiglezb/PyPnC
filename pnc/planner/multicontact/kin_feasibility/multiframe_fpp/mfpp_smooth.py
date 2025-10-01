@@ -434,6 +434,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                   initial_guess=None,
                                   weights_rigid_link=None,
                                   b_use_knees_in_smooth_plan=True,
+                                  b_skip_sca=True,
                                   n_points=None, **kwargs):
     if weights_rigid_link is None:
         weights_rigid_link = np.array([3500., 0.5, 10.])     # default for g1
@@ -632,7 +633,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     }
 
     sca_constraints = []
-    if robot_geom_data is not None:
+    if robot_geom_data is not None and not b_skip_sca:
         print(f'{"*" * 10} Solving with Primitive Self Collision Avoidance! {"*" * 10}')
         f_dist = {}
         Q = np.eye(3)
@@ -777,8 +778,11 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     # Solution statistics.
     sol_stats = {'runtime': solver_compute_time,
-                 'sca_build_time': sca_build_time if bool(aux_frames) else 0.0,
-                 'prob_construct_time': prob_construct_time,}
+                 }
+    if not b_skip_sca:
+        sol_stats['sca_build_time'] = sca_build_time if bool(aux_frames) else 0.0
+        sol_stats['prob_construct_time'] = prob_construct_time
+
     # sol_stats['cost'] = prob.value
     # sol_stats['runtime'] = sol_stats_all['t_wall_total']
     # sol_stats['cost_breakdown'] = cost_breakdown
