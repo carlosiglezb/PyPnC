@@ -9,8 +9,8 @@ class MultiContactDoorConfig(PlannerConfig):
     # W_RIGID_LINK_STEP_ON_DOOR = [1000., 0., 0.]
 
     # ----- seq 0 (step over): single hand, step through door
-    # W_RIGID_LINK = [10., 0., 0.]  # option 1: roll shins
-    # ALPHA = [1, 0, 0.1]           # option 1: roll shins
+    W_RIGID_LINK = [5., 0., 0.]  # option 1: knees forward
+    ALPHA = [1.4, 0., 0.1]           # option 1: knees forward
     # W_RIGID_LINK = [5., 0., 0.]   # option 2: roll shins
     # ALPHA = [1, 0., 0.05]         # option 2: roll shins
     # W_RIGID_LINK = [20., 0., {5., 10.}]  # option 3: roll shins (push up on last step)
@@ -21,8 +21,8 @@ class MultiContactDoorConfig(PlannerConfig):
     # ALPHA = [1, 0.0, {0.0, 0.001}]           # option 5: roll shins w/ knee on right side
     # W_RIGID_LINK = [10, 0., 30.]    # option 6: high knees
     # ALPHA = [0.1, 0.01, 0.]         # option 6: high knees
-    W_RIGID_LINK = [5, 0., 2]       # option 7: roll shins outwards
-    ALPHA = [0.5, 0.0, 0.1]         # option 7: roll shins outwards
+    # W_RIGID_LINK = [5, 0., 2]       # option 7: roll shins outwards
+    # ALPHA = [0.5, 0.0, 0.1]         # option 7: roll shins outwards
     # N_HORIZON_LST = [180, 240, 280, 250, 250]
     # ----- seq 1 (step on): opposite hand-foot pair at each contact
     # W_RIGID_LINK = [1.0, 0., 8.]  # option 1: high knees

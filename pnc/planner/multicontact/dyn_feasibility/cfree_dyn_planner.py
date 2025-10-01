@@ -50,9 +50,9 @@ B_SAVE_KIN_DATA = False
 B_SAVE_DYN_DATA = False
 B_VERBOSE = False
 B_SAVE_HTML = False
-B_USE_SELF_COLLISION_AVOIDANCE = False
+B_USE_SELF_COLLISION_AVOIDANCE = True
 B_USE_KNEES = True
-B_USE_KNEES_IN_SMOOTH_PLAN = True   # set to False when crossing door in single step (i.e., mode 0)
+B_USE_KNEES_IN_SMOOTH_PLAN = False   # set to False when crossing door in single step (i.e., mode 0)
 
 
 def get_g1_default_initial_pose(n_joints:int, env: str = 'door'):
