@@ -216,7 +216,11 @@ class MeshcatPinocchioAnimation:
         self.collision_data = collision_data
 
     def add_robot(self, robot_name, pin_rob_model, collision_model, visual_model,
-                  rob_position, rob_quaternion):
+                  rob_position=None, rob_quaternion=None):
+        if rob_position is None:
+            rob_position = np.array([0., 0., 0.])
+        if rob_quaternion is None:
+            rob_quaternion = np.array([0, 0., 0., 1.])   # xyzw
         viz = MeshcatVisualizer(pin_rob_model, collision_model, visual_model)
         viz.initViewer(self.viz.viewer)
         viz.loadViewerModel(rootNodeName=robot_name)
@@ -321,6 +325,11 @@ class MeshcatPinocchioAnimation:
     def animate_frame(self, q):
         with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
             self.display_visualizer_frames(frame, q)
+
+    def animate_frame_with_collisions(self, q):
+        with self.anim.at_frame(self.viz.viewer, self.frame_idx) as frame:
+            self.display_visualizer_frames(frame, q)
+            self.display_collisions(frame, q)
 
     def animation_step(self):
         self.frame_idx += 1
