@@ -330,6 +330,18 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     sol_stats['retiming_weights'] = retiming_weights
     dual_vars = {}
     dual_vars['lam_g0'] = prob.solution.dual_vars
+    dual_vars['constraints_idx'] = sum(
+        c.size if hasattr(c, 'size') else (c.shape[0] if hasattr(c, 'shape') else 1)
+        for c in constraints
+    )
+    dual_vars['reach_constr_idx'] = sum(
+        c.size if hasattr(c, 'size') else (c.shape[0] if hasattr(c, 'shape') else 1)
+        for c in reach_constr
+    )
+    dual_vars['soc_constr_idx'] = sum(
+        c.size if hasattr(c, 'size') else (c.shape[0] if hasattr(c, 'shape') else 1)
+        for c in soc_constraint
+    )
     dual_vars['lam_x0'] = np.zeros(prob.size_metrics.num_scalar_variables)
 
     return path, sol_stats, points, dual_vars
@@ -562,32 +574,6 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             else:
                 fr_seg_k_box += 1
 
-    # Rigid links (e.g., shin link length) constraint relaxation
-    # soc_constraint, cost_log_abs = [], []
-    cost_log_abs_sum = 0.
-    if bool(aux_frames):     # check if empty dictionary
-        link_threshold = 0.001
-        # apply auxiliary rigid link constraint throughout all safe regions
-        for aux_fr in aux_frames:
-            prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
-                aux_fr, frame_list, num_iris_tot)
-
-            # loop through all safe boxes
-            # link_length += link_threshold     # threshold for relaxation
-            for nb in range(1, num_iris_tot-1):
-                # for pnt in range(n_points-1):
-                for pnt in range(1):
-                    link_proximal_point = points[prox_fr_idx+nb][0][pnt,:]
-                    link_distal_point = points[dist_fr_idx+nb][0][pnt,:]
-                    # --- as equality constraint
-                    constraints.append(ca.norm_2(link_proximal_point - link_distal_point))
-                    lbg.append(link_length - link_threshold/2)
-                    ubg.append(link_length + link_threshold/2)
-                    if initial_guess is not None:
-                        initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.array([0.])))
-
-        # cost_log_abs_sum = -(cp.sum(cost_log_abs))
-
     # Reachability constraints
     if reach_region is not None:
         for fr_idx, frame_name in enumerate(frame_list):
@@ -611,6 +597,30 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                     if frame_name == 'L_knee' or frame_name == 'R_knee':
                         parse_mat_leq_constr(H, -d_vec, (z_ee_seg - z_t), constraints, lbg, ubg)
 
+    # Rigid links (e.g., shin link length) constraint relaxation
+    if bool(aux_frames):     # check if empty dictionary
+        link_threshold = 0.001
+        # apply auxiliary rigid link constraint throughout all safe regions
+        for aux_fr in aux_frames:
+            prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
+                aux_fr, frame_list, num_iris_tot)
+
+            # loop through all safe boxes
+            # link_length += link_threshold     # threshold for relaxation
+            for nb in range(1, num_iris_tot-1):
+                # for pnt in range(n_points-1):
+                for pnt in range(1):
+                    link_proximal_point = points[prox_fr_idx+nb][0][pnt,:]
+                    link_distal_point = points[dist_fr_idx+nb][0][pnt,:]
+                    # --- as equality constraint
+                    constraints.append(ca.norm_2(link_proximal_point - link_distal_point))
+                    lbg.append(link_length - link_threshold/2)
+                    ubg.append(link_length + link_threshold/2)
+                    if initial_guess is not None:
+                        # initial_guess['lam_g0'] = np.insert(initial_guess['lam_g0'], initial_guess['constraints_idx'], 0.)
+                        initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.array([0.])))
+                        # initial_guess['lam_g0'] = np.delete(initial_guess['lam_g0'], -1)
+
     # Collect points into a single vector
     points_all = pack_points_for_single_vector(points, 'casadi')
 
@@ -618,13 +628,13 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         "ipopt": {
             "print_level": 3,   # {0: none; 1: final compute statistics; 3: num of vars, EXIT; 12: all}
             "hessian_approximation": "limited-memory",   # exact
-            "max_iter": 100,
+            "max_iter": 150,
             "mu_init": 1e-6,
             "tol": 1e-2,
             "constr_viol_tol": 1e-2,
-            # "mu_strategy":"adaptive",
+            "mu_strategy":"adaptive",
             "nlp_scaling_method": "gradient-based",
-            "jacobian_regularization_value": 1e-6,  # 2e-4
+            "jacobian_regularization_value": 1e-4,  # 2e-4
             # "derivative_test": "first-order",
             # "derivative_test_print_all": "no",
             # "derivative_test_perturbation": 1e-6,
@@ -701,7 +711,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     # Solve problem
     prob_construct_start_time = time.time()
     nlp = {'x': points_all,
-           'f': cost + cost_log_abs_sum,
+           'f': cost,
            'g': ca.vertcat(*constraints, *sca_constraints)
            }
     solver = nlpsol('solver', 'ipopt', nlp, opts)

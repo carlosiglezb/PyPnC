@@ -249,6 +249,9 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
         initial_guess['x0'] = pack_points_for_single_vector(points, 'cvxpy')
         initial_guess['lam_g0'] = pack_points_for_single_vector(dvars['lam_g0'], 'cvxpy')
         initial_guess['lam_x0'] = dvars['lam_x0']
+        initial_guess['constraints_idx'] = dvars['constraints_idx']
+        initial_guess['reach_constr_idx'] = dvars['reach_constr_idx']
+        initial_guess['soc_constr_idx'] = dvars['soc_constr_idx']
         paths, sol_stats, points, _ = optimize_multiple_bezier_iris_casadi(R, A, S, durations, alpha, safe_pnt_lst,
                                                                  sca_robot_geometry,
                                                                  fixed_frames=fixed_frames,
