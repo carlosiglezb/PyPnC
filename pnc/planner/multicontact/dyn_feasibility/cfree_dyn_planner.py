@@ -860,11 +860,11 @@ def main(args):
 
     if env == 'door':
         if contact_seq == 0:
-            seq_str = 'over'
+            seq_str = 'over_'
         elif contact_seq == 1:
-            seq_str = 'on'
+            seq_str = 'on_'
         elif contact_seq == 2:
-            seq_str = 'on_balanced'
+            seq_str = 'on_balanced_'
         else:
             raise NotImplementedError('Contact sequence not defined')
 
@@ -1105,7 +1105,7 @@ def main(args):
         if env == 'door':
             kin_display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
         elif env == 'stairs':
-            kin_display.add_shapes_from(stairs.obstacles)
+            kin_display.add_shapes_from(stairs.obstacles_vis)
         else:
             raise NotImplementedError(f"Visualization for environment {env} not implemented")
 
@@ -1170,7 +1170,7 @@ def main(args):
         if 'door' in env:
             display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
         elif 'stairs' in env:
-            display.add_shapes_from(stairs.obstacles)
+            display.add_shapes_from(stairs.obstacles_vis)
         display.display_targets("lfoot_target", robot_dyn_plan.lf_targets[display_idx], [1, 1, 0])
         display.display_targets("lknee_target", robot_dyn_plan.lkn_targets[display_idx], [0, 0, 1])
         display.display_targets("rfoot_target", robot_dyn_plan.rf_targets[display_idx], [1, 1, 0])
@@ -1189,10 +1189,10 @@ def main(args):
         # viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
         #                     "lfoot_target", "lknee_target",
         #                     "rfoot_target", "rknee_target"))
-        # display.hide_visuals(["env/1", "env/2"])
-        display.hide_visuals(["g1_29dof_lock_waist/collisions"], True)
+        display.hide_visuals(["env/2"])
+        display.hide_visuals(["g1_29dof_lock_waist/collisions"])
         if B_SAVE_HTML:
-            display.save_html(cwd + "/experiment_data/RAL/", robot_name + sca_str + action_str + seq_str + env + "_DYN_" + "_anim.html")
+            display.save_html(cwd + "/experiment_data/RAL/", robot_name + sca_str + action_str + seq_str + env + "_DYN_anim.html")
 
     if B_SHOW_JOINT_PLOTS or B_SHOW_COST_PLOTS or B_SHOW_JOINT_LIM_PLOTS:
         plan_plotter = MulticontactPlotter(robot_dyn_plan)

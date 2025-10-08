@@ -66,6 +66,8 @@ class TiltedStairs:
         b_lbox_origin = [0.35, box_width/2, (box_h1_left + box_h2_left)/2]
         tilted_left_box = TiltedBox(box_width, box_depth, box_h1_left, lbox_angle, b_lbox_origin)
         tilted_left_step = tilted_left_box.get_polytope()
+        tilted_left_box_vis = TiltedBox(box_width, box_depth-0.05, box_h1_left, lbox_angle, b_lbox_origin)
+        tilted_left_step_vis = tilted_left_box_vis.get_polytope()
 
         # right box
         box_h1_right = 0.55
@@ -74,6 +76,8 @@ class TiltedStairs:
         b_rbox_origin = [0.35 + box_depth, -box_width/2, (box_h1_right + box_h2_right)/2]
         tilted_right_box = TiltedBox(box_width, box_depth, box_h1_right, rbox_angle, b_rbox_origin)
         tilted_right_step = tilted_right_box.get_polytope()
+        tilted_right_box_vis = TiltedBox(box_width, box_depth-0.05, box_h1_right, rbox_angle, b_rbox_origin)
+        tilted_right_step_vis = tilted_right_box_vis.get_polytope()
 
         # center box
         box_center_origin = np.array([0.35 + 2.5*box_depth, 0., 0.])
@@ -82,6 +86,12 @@ class TiltedStairs:
         center_box = HPolyhedron.MakeBox(
             np.array(box_center_origin - cbox_lbounds),
             np.array(box_center_origin + cbox_ubounds),
+        )
+        cbox_lbounds_vis = [box_depth-0.05, box_depth, 0.]
+        cbox_ubounds_vis = [box_depth-0.05, box_depth, 1.0]
+        center_box_vis = HPolyhedron.MakeBox(
+            np.array(box_center_origin - cbox_lbounds_vis),
+            np.array(box_center_origin + cbox_ubounds_vis),
         )
 
         floor = HPolyhedron.MakeBox(
@@ -101,6 +111,12 @@ class TiltedStairs:
                      tilted_left_step,
                      tilted_right_step,
                      center_box]
+        self.obstacles_vis = [floor,
+                     lwall,
+                     rwall,
+                     tilted_left_step_vis,
+                     tilted_right_step_vis,
+                     center_box_vis]
         self.domain = HPolyhedron.MakeBox(dom_lb, dom_ub)
 
         self.box_width = box_width
