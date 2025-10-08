@@ -12,18 +12,16 @@ sys.path.append(cwd)
 # --- Configuration ---
 ROBOT_URDF = cwd + "/robot_model/g1_description/g1_29dof_simple_collisions.urdf"
 ENV_URDF = cwd + "/robot_model/ground/navy_door_fixed.urdf"
-TRAJECTORY_PKL = cwd + "/experiment_data/g1_sca_on_balanced_door_boxfddp.pkl"
 
 B_VISUALIZE = False
-B_ANIMATE = True
+B_ANIMATE = False
 
-def load_simulated_models_and_trajectory(robot_urdf_path, env_urdf_path, traj_pkl_path):
+def load_simulated_models(robot_urdf_path, env_urdf_path):
     """
     Loads a robot model, environment geometry, and a floating-base trajectory.
     """
 
     print(f"Loading models from: {robot_urdf_path} and {env_urdf_path}")
-    print(f"Loading trajectory from: {traj_pkl_path}")
 
     # Load Robot Model
     robot_model = pin.buildModelFromUrdf(robot_urdf_path, pin.JointModelFreeFlyer())
@@ -43,15 +41,25 @@ def load_simulated_models_and_trajectory(robot_urdf_path, env_urdf_path, traj_pk
         door_vis.display_collisions = True
         door_vis.display()
 
-    # --- Load Trajectory ---
-    with open(traj_pkl_path, 'rb') as f:
-        d = pickle.load(f)
-        joint_pos = d['joint_pos']
-        time = d['time']
+    return robot_model, robot_geom_model, env_geom_model
 
-    print("Successfully loaded models and trajectory data.")
-    return robot_model, robot_geom_model, env_geom_model, joint_pos, time
 
+def load_trajectory(trajectory_pkl):
+    """
+    Loads a joint trajectory from a pickle file.
+    """
+
+    with open(trajectory_pkl, 'rb') as file:
+        try:
+            d = pickle.load(file)
+            joint_pos = d['joint_pos']
+            time = d['time']
+        except EOFError:
+            raise NotImplementedError
+
+    print(f"Loaded trajectory with {len(joint_pos)} time steps.")
+
+    return joint_pos, time
 
 def merge_and_define_collision_pairs(robot_geom_model, env_geom_model):
     """
@@ -167,7 +175,8 @@ def plot_results():
     import matplotlib.pyplot as plt
 
     plt.figure()
-    plt.plot(time, penetration_depths, label='SCA')
+    plt.plot(time, penetration_depths, label='simple')
+    plt.plot(time, sca_penetration_depths, label='SCA')
     plt.xlabel('Time (s)')
     plt.ylabel('Penetration Depth (m)')
     plt.title('Penetration Depth Over Time')
@@ -177,14 +186,23 @@ def plot_results():
 
 
 if __name__ == '__main__':
-    # Load models and trajectory
-    robot_model, robot_geom_model, env_geom_model, joint_pos, time = \
-        load_simulated_models_and_trajectory(ROBOT_URDF, ENV_URDF, TRAJECTORY_PKL)
+    TRAJECTORY_PKL = cwd + "/experiment_data/g1_step_on_balanced_door_boxfddp.pkl"
+    SCA_TRAJECTORY_PKL = cwd + "/experiment_data/g1_sca_step_on_balanced_door_boxfddp.pkl"
+
+    # Load models
+    robot_model, robot_geom_model, env_geom_model = load_simulated_models(ROBOT_URDF, ENV_URDF)
+
+    # Load trajectories
+    sca_joint_pos, time = load_trajectory(SCA_TRAJECTORY_PKL)
+    joint_pos, _ = load_trajectory(TRAJECTORY_PKL)
 
     # Combine collision geometries and define pairs
     combined_geom_model = merge_and_define_collision_pairs(robot_geom_model, env_geom_model)
 
     # Replay trajectory and check collisions
+    sca_total_penetration, sca_penetration_depths = check_trajectory_collisions(
+        robot_model, combined_geom_model, sca_joint_pos, time
+    )
     total_penetration, penetration_depths = check_trajectory_collisions(
         robot_model, combined_geom_model, joint_pos, time
     )
