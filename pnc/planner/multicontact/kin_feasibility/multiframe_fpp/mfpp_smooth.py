@@ -147,8 +147,8 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
             if any(safe_pnt):
                 constraints.append(points[k][0][0] == safe_pnt) # pos
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
-                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-2, axis=0)
-                constraints.append(points[k][0][1:-1] == fixed_frame_pos_mat)
+                fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
+                constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
             else:
                 constraints.append(points[k][0][-1] == safe_points_lst[-1][f_name])
             # TODO check if below is needed since the last motion is taken into account below
@@ -158,8 +158,8 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
             if any(safe_pnt):
                 constraints.append(points[k][0][0] == safe_pnt) # pos
                 # ignore if at initial stance
-                # if (k-1) % num_iris_tot != 0:
-                #     add_vel_acc_constr(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, False)
+                if (k-1) % num_iris_tot != 0:
+                    add_vel_acc_constr(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
                 constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
@@ -512,26 +512,25 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 if fr_seg_k_box == (num_iris_current-1) and f_name in safe_points_lst[seg_idx+1].keys():
                     parse_vec_eq_constr(safe_points_lst[seg_idx+1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
                     # TODO add vel constraint
-                    # add_vel_acc_constr(f_name, surface_normals_lst[seg_idx], points[k], constraints)
+                    # add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx], points[k][], constraints, lbg, ubg)
         elif (k + 1) % num_iris_tot == 0:  # final position for each frame
             safe_pnt = has_safe_point_at(point_seg_order, num_iris_tot, safe_points_lst, k, f_name)
             if any(safe_pnt):
-                # constraints.append(points[k][0][0] == safe_pnt) # pos
                 parse_repvec_eq_constr(np.array([safe_pnt]), points[k][0][0,:], constraints, lbg, ubg)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
-                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:-1, :], constraints, lbg, ubg)
+                parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
             else:
                 parse_vec_eq_constr(safe_points_lst[-1][f_name], points[k][0][-1,:], constraints, lbg, ubg)
                 # TODO add vel constraint
-                # add_vel_acc_constr(f_name, surface_normals_lst[-1], points[k], constraints)
+                # add_vel_acc_constr_casadi(f_name, surface_normals_lst[-1], points[k], constraints, lbg, ubg)
         else:       # safe and fixed positions at other times
             safe_pnt = has_safe_point_at(point_seg_order, num_iris_tot, safe_points_lst, k, f_name)
             if any(safe_pnt):
                 # constraints.append(points[k][0][0] == safe_pnt) # pos
                 parse_repvec_eq_constr(np.array([safe_pnt]), points[k][0][0,:], constraints, lbg, ubg)
                 # ignore if at initial stance
-                # if (k-1) % num_iris_tot != 0:
-                #     add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, lbg, ubg,False)
+                if (k-1) % num_iris_tot != 0:
+                    add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, lbg, ubg,False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
 
