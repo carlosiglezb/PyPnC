@@ -937,7 +937,12 @@ def main(args):
             starting_pose = {}
             for fr in plan_to_model_frames.keys():
                 starting_pose[fr] = robot_fwdk.get_link_iso(plan_to_model_frames[fr])[:3, 3]
-            fixed_frames_seq, motion_frames_seq = stairs_plan.get_opposing_limbs_contact_sequence(stairs, starting_pose, robot_name, b_use_knees=B_USE_KNEES)
+            if contact_seq == 0:
+                fixed_frames_seq, motion_frames_seq = stairs_plan.get_opposing_limbs_contact_sequence(stairs, starting_pose, robot_name, b_use_knees=B_USE_KNEES)
+            elif contact_seq == 1:
+                fixed_frames_seq, motion_frames_seq = stairs_plan.get_fully_opposing_limbs_contact_sequence(stairs, starting_pose, robot_name, b_use_knees=B_USE_KNEES)
+            else:
+                NotImplementedError(f"Contact sequence {contact_seq} not implemented for stairs")
 
             # process vision and create IRIS regions
             standing_pos = q0[:3]
@@ -1316,10 +1321,10 @@ def get_root_to_torso_offset(geom_model):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", type=str, default='door',
+    parser.add_argument("--env", type=str, default='stairs',
                         choices=['door', 'stairs'],
                         help="Environment to load for planning")
-    parser.add_argument("--sequence", type=int, default=0,
+    parser.add_argument("--sequence", type=int, default=1,
                         help="Contact sequence to solve for")
     parser.add_argument("--robot_name", type=str, default='g1',
                         choices=['g1', 'valkyrie', 'ergoCub'],
