@@ -67,10 +67,10 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
 
     # intermediate locations
     rh1_wall = np.array([0.34, -0.32, rh1_height])
-    lf_step1 = np.array([0.35, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height])
+    lf_step1 = np.array([0.35, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height + 0.04])
     lh_wall_step_12 = np.array([0.2 + box_depth, box_width - 0.03, lh2_height])
     rh_wall_final_step = np.array([2 * box_depth + 0.1, -(box_width - 0.03), rh3_height])
-    rf_step2 = np.array([0.32+ box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height])
+    rf_step2 = np.array([0.32+ box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height + 0.01])
 
     # initialize fixed and motion frame sets
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()

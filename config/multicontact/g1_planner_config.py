@@ -37,7 +37,7 @@ class MultiContactDoorConfig(PlannerConfig):
 
     # ----- seq 0 (step over, on_balanced)
     WBC_FRAME_TRACKING_GAINS = {
-            'torso': np.array([2.0, 2.0, 1.0] + [0.5, 0.5, 0.01]),  # (lin, ang)
+            'torso': np.array([1.0, 1.0, 0.5] + [0.5, 0.5, 0.01]),  # (lin, ang)
             'feet': np.array([8.] * 3 + [0.00001] * 3),  # (lin, ang)
             'L_knee': np.array([4.] * 3 + [0.00001] * 3),
             'R_knee': np.array([4.] * 3 + [0.00001] * 3),
@@ -86,23 +86,25 @@ class MultiContactDoorConfig(PlannerConfig):
 
 class MultiContactTiltedStairsConfig(PlannerConfig):
     W_RIGID_LINK = [1., 0., 10.]
-    ALPHA = [0.1, 0.2, 0.8]
+    # ALPHA = [0.1, 0.2, 0.8]
+    # ALPHA = [0.1, 0.0, 1.0]
+    ALPHA = [0.5, 0.2, 0.0]
     FOOT_SIZE = [0.15, 0.08]  # [length, width]
     N_HORIZON_LST = [180, 250, 250, 250, 280, 250]
 
     WBC_FRAME_TRACKING_GAINS = {
             'torso': np.array([2.0, 1.5, 1.0, 0.5, 0.5, 0.1]),
-            'feet': np.array([12.0] * 3 + [0.05, 0.00001, 0.00001]),
-            'L_knee': np.array([2.0, 2.5, 3.0] + [0.0001] * 3),
-            'R_knee': np.array([2.0, 2.5, 3.0] + [0.0001] * 3),
+            'feet': np.array([8.0] * 3 + [0.1, 0.1, 0.1]),
+            'L_knee': np.array([6.0] * 3 + [0.0001] * 3),
+            'R_knee': np.array([6.0] * 3 + [0.0001] * 3),
             'LH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
             'RH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
         }
     WBC_FINAL_FRAME_TRACKING_GAINS = {
             'torso': np.array([2.0, 1.5, 1.0, 0.5, 0.5, 0.1]),
-            'feet': np.array([15.0] * 3 + [5.0] * 3),
-            'L_knee': np.array([2.0, 2.5, 3.0] + [0.0001] * 3),
-            'R_knee': np.array([2.0, 2.5, 3.0] + [0.0001] * 3),
+            'feet': np.array([10.0] * 3 + [10.0] * 3),
+            'L_knee': np.array([4.0] * 3+ [0.0001] * 3),
+            'R_knee': np.array([4.0] * 3+ [0.0001] * 3),
             'LH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
             'RH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
         }

@@ -33,17 +33,17 @@ class TiltedBox:
 
         # create a tilted box
         tilted_box_A = np.array([[1, 0., 0.],
-                                 [0, 1., 0.],
+                                 [0., 1., 0.],
                                  self.plane_a,
                                  [-1, 0., 0.],
-                                 [0, -1., 0.],
-                                 [0, 0., -1.]])
+                                 [0., -1., 0.],
+                                 [0., 0., -1.]])
         tilted_box_b = np.array([[box_depth/2 + origin_pos[0]] ,
                                  [box_width/2 + origin_pos[1]],
                                  [d_box],
                                  [box_depth/2 - origin_pos[0]],
                                  [box_width/2 - origin_pos[1]],
-                                 [0]])
+                                 [0.]])
         return HPolyhedron(tilted_box_A, tilted_box_b)
 
     def get_polytope(self):
@@ -58,25 +58,32 @@ class TiltedStairs:
         # stairs parameters
         box_width = 0.35
         box_depth = 0.2
+        clearance = 0.05
 
         # left box
-        box_h1_left = 0.25
-        box_h2_left = 0.5
+        box_h1_left_vis = 0.25
+        box_h2_left_vis = 0.5
+        box_h1_left = box_h1_left_vis - clearance
+        box_h2_left = box_h2_left_vis - clearance
         lbox_angle = np.arctan((box_h2_left - box_h1_left) / box_width)
         b_lbox_origin = [0.35, box_width/2, (box_h1_left + box_h2_left)/2]
         tilted_left_box = TiltedBox(box_width, box_depth, box_h1_left, lbox_angle, b_lbox_origin)
         tilted_left_step = tilted_left_box.get_polytope()
-        tilted_left_box_vis = TiltedBox(box_width, box_depth-0.05, box_h1_left, lbox_angle, b_lbox_origin)
+        b_lbox_origin_vis = [0.35, box_width/2, (box_h1_left_vis + box_h2_left_vis)/2]
+        tilted_left_box_vis = TiltedBox(box_width, box_depth - clearance, box_h1_left_vis, lbox_angle, b_lbox_origin_vis)
         tilted_left_step_vis = tilted_left_box_vis.get_polytope()
 
         # right box
-        box_h1_right = 0.55
-        box_h2_right = 0.8
+        box_h1_right_vis = 0.55
+        box_h2_right_vis = 0.8
+        box_h1_right = box_h1_right_vis - clearance
+        box_h2_right = box_h2_right_vis - clearance
         rbox_angle = -np.arctan((box_h2_right - box_h1_right) / box_width)
         b_rbox_origin = [0.35 + box_depth, -box_width/2, (box_h1_right + box_h2_right)/2]
         tilted_right_box = TiltedBox(box_width, box_depth, box_h1_right, rbox_angle, b_rbox_origin)
         tilted_right_step = tilted_right_box.get_polytope()
-        tilted_right_box_vis = TiltedBox(box_width, box_depth-0.05, box_h1_right, rbox_angle, b_rbox_origin)
+        b_rbox_origin_vis = [0.35 + box_depth, -box_width/2, (box_h1_right_vis + box_h2_right_vis)/2]
+        tilted_right_box_vis = TiltedBox(box_width, box_depth - clearance, box_h1_right_vis, rbox_angle, b_rbox_origin_vis)
         tilted_right_step_vis = tilted_right_box_vis.get_polytope()
 
         # center box
