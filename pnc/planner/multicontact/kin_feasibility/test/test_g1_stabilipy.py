@@ -62,6 +62,55 @@ def get_key_from_value_next(d, target_value):
     return next((key for key, value in d.items() if value == target_value), None)
 
 
+def add_env_normal(env_opt: str,
+                   link_name: str,
+                   normals: list[np.ndarray],
+                   contact_phase: int=0):
+    if 'door' in env_opt:
+        if 'ankle' in link_name:
+            # feet are flat on all surfaces in door env
+            normals.append(np.array([[0.], [0.], [1.]]))
+        elif 'left' in link_name and 'hand' in link_name:
+            normals.append(np.array([[0.], [-1], [0.]]))    # lhand on door side
+        elif 'right' in link_name and 'hand' in link_name:
+            normals.append(np.array([[0.], [1], [0.]]))     # rhand on door side
+        else:
+            raise ValueError(f"Contact location for {link_name} not specified")
+        return
+    elif 'stairs' in env_opt:
+        # parse feet
+        if 'ankle' in link_name:
+            # flat ground at the beginning and end of plan
+            if contact_phase == 0 or contact_phase == 5:
+                normals.append(np.array([[0.], [0.], [1.]]))
+            elif contact_phase == 1 and 'right' in link_name:
+                normals.append(np.array([[0.], [0.], [1.]]))
+            elif contact_phase == 4 and 'left' in link_name:
+                normals.append(np.array([[0.], [0.], [1.]]))
+            else:
+                # stairs are tilted 35.5 deg
+                if 'left' in link_name:
+                    normal = np.array([[0.], [-np.sin(np.deg2rad(35.5))], [np.cos(np.deg2rad(35.5))]])
+                elif 'right' in link_name:
+                    normal = np.array([[0.], [np.sin(np.deg2rad(35.5))], [np.cos(np.deg2rad(35.5))]])
+                else:
+                    raise ValueError(f"Contact normal for {link_name} not specified")
+                normal /= np.linalg.norm(normal)
+                normals.append(normal)
+            return
+        # hands are always on wall side, either left or right wall
+        elif 'hand' in link_name:
+            if 'left' in link_name:
+                normals.append(np.array([[0.], [-1], [0.]]))    # lhand on wall side
+            elif 'right' in link_name:
+                normals.append(np.array([[0.], [1], [0.]]))     # rhand on wall side
+            else:
+                raise ValueError(f"Contact normal for {link_name} not specified")
+            return
+    else:
+        raise ValueError(f"Environment option {env_opt} not recognized")
+
+
 class TestStabilipy(unittest.TestCase):
     def __init__(self, methodName: str = "runTest"):
         super().__init__(methodName)
@@ -261,10 +310,15 @@ class TestStabilipy(unittest.TestCase):
         package_dir = cwd + "/robot_model/g1_description"
 
         # get list of configurations throughout multiple contacts
+        env_opts = ['_door', '_stairs']
         contact_seq_str_opts = ['over', 'on', 'on_balanced']
+        env_opt = env_opts[1]
         cs_opt = contact_seq_str_opts[1]  # 'over' or 'on' or 'on_balanced'
         # cfree_soln_file = cwd + '/experiment_data/g1_sca_step_' + cs_opt + '_knee_knocker.pkl'
-        cfree_soln_file = cwd + '/experiment_data/g1_step_' + cs_opt + '_door.pkl'
+        if 'door' in env_opt:
+            cfree_soln_file = cwd + '/experiment_data/g1_skip_step_' + cs_opt + env_opt + '_boxfddp.pkl'
+        else:
+            cfree_soln_file = cwd + '/experiment_data/g1_skip_sca' + env_opt + '_boxfddp.pkl'
         # cfree_soln_file = cwd + '/experiment_data/g1_sca_step_' + cs_opt + '_door.pkl'
         q_all = get_all_poses_from_file(cfree_soln_file)
         if len(q_all) == 1:
@@ -272,7 +326,8 @@ class TestStabilipy(unittest.TestCase):
             q_phases = []
             i_np = 0
             # N_HORIZON_LST = [180, 240, 280, 220, 250] # step over
-            N_HORIZON_LST = [250, 250, 250, 250, 250]   # step on
+            # N_HORIZON_LST = [250, 250, 250, 250, 250]   # step on
+            N_HORIZON_LST = [180, 250, 250, 250, 280, 250]  # stairs
             for n in N_HORIZON_LST:
                 prev_idx = sum(N_HORIZON_LST[:i_np]) + i_np
                 next_idx = prev_idx + n
@@ -308,26 +363,36 @@ class TestStabilipy(unittest.TestCase):
         c_obj = Sphere(0.01)
         com_obj = Sphere(0.02)
 
-        if cs_opt == 'over':
+        if env_opt == '_door':
+            if cs_opt == 'over':
+                contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                    ['right_ankle_roll_link', 'left_rubber_hand'],
+                                    ['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                    ['left_ankle_roll_link', 'right_rubber_hand'],
+                                    ['left_ankle_roll_link', 'right_ankle_roll_link']]
+            elif cs_opt == 'on':
+                contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                    ['right_ankle_roll_link', 'left_rubber_hand'],
+                                    ['right_rubber_hand', 'left_ankle_roll_link'],
+                                    ['right_ankle_roll_link', 'left_rubber_hand'],
+                                    ['left_ankle_roll_link', 'right_ankle_roll_link']]
+            elif cs_opt  == 'on_balanced':
+                contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                    ['left_ankle_roll_link', 'left_rubber_hand', 'right_rubber_hand'],
+                                    ['left_rubber_hand', 'right_rubber_hand', 'right_ankle_roll_link'],
+                                    ['left_ankle_roll_link', 'right_rubber_hand'],
+                                    ['left_ankle_roll_link', 'right_ankle_roll_link']]
+            else:
+                raise ValueError(f"Contact sequence option {cs_opt} for {env_opt} env not recognized")
+        elif env_opt == '_stairs':
             contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
-                                ['right_ankle_roll_link', 'left_rubber_hand'],
-                                ['left_ankle_roll_link', 'right_ankle_roll_link'],
-                                ['left_ankle_roll_link', 'right_rubber_hand'],
-                                ['left_ankle_roll_link', 'right_ankle_roll_link']]
-        elif cs_opt == 'on':
-            contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
-                                ['right_ankle_roll_link', 'left_rubber_hand'],
+                                ['right_ankle_roll_link', 'right_rubber_hand'],
                                 ['right_rubber_hand', 'left_ankle_roll_link'],
                                 ['right_ankle_roll_link', 'left_rubber_hand'],
-                                ['left_ankle_roll_link', 'right_ankle_roll_link']]
-        elif cs_opt  == 'on_balanced':
-            contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
-                                ['left_ankle_roll_link', 'left_rubber_hand', 'right_rubber_hand'],
-                                ['left_rubber_hand', 'right_rubber_hand', 'right_ankle_roll_link'],
                                 ['left_ankle_roll_link', 'right_rubber_hand'],
                                 ['left_ankle_roll_link', 'right_ankle_roll_link']]
 
-        # visualize entire motion while super-impossing stability regions after each new contact
+        # visualize entire motion while super-imposing stability regions after each new contact
         zero_qd = np.zeros((model.nv))
         display.start_animation()
         for (n, N) in enumerate(N_horizon_lst):
@@ -337,7 +402,7 @@ class TestStabilipy(unittest.TestCase):
             # set up stabilipy problem
             robot_mass = sum([inertia.mass for inertia in model.inertias])
             margin = 0.
-            mu = 0.9
+            mu = 0.7
             pos, normals = [], []
             current_contact_links = contacts_seq_lst[n]
             for lnk in current_contact_links:
@@ -347,47 +412,51 @@ class TestStabilipy(unittest.TestCase):
                 if lnk == 'left_ankle_roll_link' or lnk == 'right_ankle_roll_link':
                     # left-front
                     pos.append(ee_pos + np.array([[ankle_toe_dist], [half_foot_width], [foot_height]]))
-                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                    add_env_normal(env_opt, lnk, normals, n)
                     # right-front
                     pos.append(ee_pos + np.array([[ankle_toe_dist], [-half_foot_width], [foot_height]]))
-                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                    add_env_normal(env_opt, lnk, normals, n)
                     # right-back
                     pos.append(ee_pos + np.array([[-ankle_heel_dist], [-half_foot_width], [foot_height]]))
-                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                    add_env_normal(env_opt, lnk, normals, n)
                     # left-back
                     pos.append(ee_pos + np.array([[-ankle_heel_dist], [half_foot_width], [foot_height]]))
-                    normals.append(np.array([[0.], [0.], [1.]]))    # feet are flat on ground
+                    add_env_normal(env_opt, lnk, normals, n)
                 elif lnk == 'left_rubber_hand':
                     # top-front
                     pos.append(ee_pos + np.array([[hand_box_side], [0.], [hand_box_side]]))
-                    normals.append(np.array([[0.], [-1], [0.]]))    # lhand on door side
+                    add_env_normal(env_opt, lnk, normals, n)
                     # low-front
                     pos.append(ee_pos + np.array([[hand_box_side], [0.], [-hand_box_side]]))
-                    normals.append(np.array([[0.], [-1.], [0.]]))    # lhand on door side
+                    add_env_normal(env_opt, lnk, normals, n)
                     # low-back
                     pos.append(ee_pos + np.array([[-hand_box_side], [0.], [-hand_box_side]]))
-                    normals.append(np.array([[0.], [-1.], [0.]]))    # lhand on door side
+                    add_env_normal(env_opt, lnk, normals, n)
                     # top-back
                     pos.append(ee_pos + np.array([[-hand_box_side], [0.], [hand_box_side]]))
-                    normals.append(np.array([[0.], [-1.], [0.]]))    # lhand on door side
+                    add_env_normal(env_opt, lnk, normals, n)
                 elif lnk == 'right_rubber_hand':
                     # top-front
                     pos.append(ee_pos + np.array([[hand_box_side], [0.], [hand_box_side]]))
-                    normals.append(np.array([[0.], [1], [0.]]))    # rhand on door side
+                    add_env_normal(env_opt, lnk, normals, n)
                     # low-front
                     pos.append(ee_pos + np.array([[hand_box_side], [0.], [-hand_box_side]]))
-                    normals.append(np.array([[0.], [1.], [0.]]))    # rhand on door side
+                    add_env_normal(env_opt, lnk, normals, n)
                     # low-back
                     pos.append(ee_pos + np.array([[-hand_box_side], [0.], [-hand_box_side]]))
-                    normals.append(np.array([[0.], [1.], [0.]]))    # rhand on door side
+                    add_env_normal(env_opt, lnk, normals, n)
                     # top-back
                     pos.append(ee_pos + np.array([[-hand_box_side], [0.], [hand_box_side]]))
-                    normals.append(np.array([[0.], [1.], [0.]]))    # rhand on door side
+                    add_env_normal(env_opt, lnk, normals, n)
                 else:
                     raise ValueError(f"Contact location for {lnk} not specified")
 
             contacts = [stab.Contact(mu, p, n) for p, n in zip(pos, normals)]
-            polyhedron = stab.StabilityPolygon(robot_mass, dimension=3, radius=1.0)
+            if 'door' in env_opt:
+                env_rad = 1.0
+            else:
+                env_rad = 2.0
+            polyhedron = stab.StabilityPolygon(robot_mass, dimension=3, radius=env_rad)
             polyhedron.contacts = contacts
             shape = [
                 np.array([[-1., 0, 0]]).T,
@@ -400,7 +469,7 @@ class TestStabilipy(unittest.TestCase):
 
             polytope = [margin * s for s in shape]
             polyhedron.gravity_envelope = polytope
-            polyhedron.compute(stab.Mode.best, epsilon=2e-3, maxIter=10, solver='qhull',
+            polyhedron.compute(stab.Mode.best, epsilon=1e-2, maxIter=20, solver='qhull',
                                record_anim=False, plot_init=False,
                                plot_step=False, plot_final=b_plot_final)
 
