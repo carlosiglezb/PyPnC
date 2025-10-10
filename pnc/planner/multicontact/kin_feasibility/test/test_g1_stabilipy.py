@@ -311,23 +311,20 @@ class TestStabilipy(unittest.TestCase):
 
         # get list of configurations throughout multiple contacts
         env_opts = ['_door', '_stairs']
-        contact_seq_str_opts = ['over', 'on', 'on_balanced']
         env_opt = env_opts[1]
-        cs_opt = contact_seq_str_opts[1]  # 'over' or 'on' or 'on_balanced'
-        # cfree_soln_file = cwd + '/experiment_data/g1_sca_step_' + cs_opt + '_knee_knocker.pkl'
         if 'door' in env_opt:
-            cfree_soln_file = cwd + '/experiment_data/g1_skip_step_' + cs_opt + env_opt + '_boxfddp.pkl'
-        else:
-            cfree_soln_file = cwd + '/experiment_data/g1_skip_sca' + env_opt + '_boxfddp.pkl'
-        # cfree_soln_file = cwd + '/experiment_data/g1_sca_step_' + cs_opt + '_door.pkl'
+            N_HORIZON_LST = [180, 280, 280, 250, 250]
+            contact_seq_str_opts = ['over', 'on', 'on_balanced']
+        else:   # stairs
+            N_HORIZON_LST = [180, 250, 250, 250, 280, 250]
+            contact_seq_str_opts = ['right_side', 'opposing_sides']
+        cs_opt = contact_seq_str_opts[1]  # depends on environment
+        cfree_soln_file = cwd + '/experiment_data/g1_skip_sca_' + cs_opt + env_opt + '_boxfddp.pkl'
         q_all = get_all_poses_from_file(cfree_soln_file)
         if len(q_all) == 1:
             # in case using full TO with impulse model, separate by contact phase
             q_phases = []
             i_np = 0
-            # N_HORIZON_LST = [180, 240, 280, 220, 250] # step over
-            # N_HORIZON_LST = [250, 250, 250, 250, 250]   # step on
-            N_HORIZON_LST = [180, 250, 250, 250, 280, 250]  # stairs
             for n in N_HORIZON_LST:
                 prev_idx = sum(N_HORIZON_LST[:i_np]) + i_np
                 next_idx = prev_idx + n
@@ -385,12 +382,20 @@ class TestStabilipy(unittest.TestCase):
             else:
                 raise ValueError(f"Contact sequence option {cs_opt} for {env_opt} env not recognized")
         elif env_opt == '_stairs':
-            contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
-                                ['right_ankle_roll_link', 'right_rubber_hand'],
-                                ['right_rubber_hand', 'left_ankle_roll_link'],
-                                ['right_ankle_roll_link', 'left_rubber_hand'],
-                                ['left_ankle_roll_link', 'right_rubber_hand'],
-                                ['left_ankle_roll_link', 'right_ankle_roll_link']]
+            if 'right_side' in cs_opt:
+                contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                    ['right_ankle_roll_link', 'right_rubber_hand'],
+                                    ['right_rubber_hand', 'left_ankle_roll_link'],
+                                    ['right_ankle_roll_link', 'left_rubber_hand'],
+                                    ['left_ankle_roll_link', 'right_rubber_hand'],
+                                    ['left_ankle_roll_link', 'right_ankle_roll_link']]
+            elif 'opposing_sides' in cs_opt:
+                contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                    ['right_ankle_roll_link', 'left_rubber_hand'],
+                                    ['right_rubber_hand', 'left_ankle_roll_link'],
+                                    ['right_ankle_roll_link', 'left_rubber_hand'],
+                                    ['left_ankle_roll_link', 'right_rubber_hand'],
+                                    ['left_ankle_roll_link', 'right_ankle_roll_link']]
 
         # visualize entire motion while super-imposing stability regions after each new contact
         zero_qd = np.zeros((model.nv))
