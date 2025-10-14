@@ -883,12 +883,12 @@
  <color rgba="1 1 1 1"/>
  </material>
  </visual>
-<!--   <collision>-->
-<!--     <origin xyz="0.0 0.0 0." rpy="0 0 0"/>-->
-<!--     <geometry>-->
-<!--       <sphere radius="0.03"/>-->
-<!--     </geometry>-->
-<!--   </collision>-->
+   <collision>
+     <origin xyz="0.0 0.0 0." rpy="0 0 0"/>
+     <geometry>
+       <sphere radius="0.03"/>
+     </geometry>
+   </collision>
  </link>
  <joint name="l_index_add" type="fixed">
  <origin xyz="0.022500000000000023 -0.0015000000000006952 -0.0685999999999996" rpy="-8.416895217637947e-16 -0.29670597224465534 5.804755322508926e-17"/>
@@ -1270,7 +1270,8 @@
  <axis xyz="-1 -1.628246671334752e-16 2.560295622560413e-15"/>
  <parent link="r_ankle_1"/>
  <child link="r_ankle_2"/>
- <limit lower="-0.4363323129985824" upper="0.4363323129985824" effort="1e+9" velocity="1e+9"/>
+<!-- <limit lower="-0.4363323129985824" upper="0.4363323129985824" effort="1e+9" velocity="1e+9"/>-->
+ <limit lower="-0.63" upper="0.63" effort="1e+9" velocity="1e+9"/>
  <dynamics damping="2" friction="0"/>
  </joint>
  <link name="r_ankle_2">
@@ -1465,7 +1466,8 @@
  <axis xyz="1 -4.05028482201375e-16 -1.2496691978128869e-15"/>
  <parent link="l_ankle_1"/>
  <child link="l_ankle_2"/>
- <limit lower="-0.4363323129985824" upper="0.4363323129985824" effort="1e+9" velocity="1e+9"/>
+<!-- <limit lower="-0.4363323129985824" upper="0.4363323129985824" effort="1e+9" velocity="1e+9"/>-->
+ <limit lower="-0.63" upper="0.63" effort="1e+9" velocity="1e+9"/>
  <dynamics damping="2" friction="0"/>
  </joint>
  <link name="l_ankle_2">

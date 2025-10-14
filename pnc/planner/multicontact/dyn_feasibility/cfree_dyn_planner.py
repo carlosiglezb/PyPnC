@@ -153,7 +153,7 @@ def get_ergoCub_default_initial_pose(n_joints):
     # q0[26] = -np.pi / 2                   # "r_shoulder_pitch",
     # q0[27] = 0.                           # "r_shoulder_roll",
     # q0[28] = 0.                           # "r_shoulder_yaw",
-    q0[29] = np.pi / 2                      # "r_elbow",
+    q0[28] = np.pi / 2                      # "r_elbow",
     # q0[30] = 0.                           # "r_wrist_yaw",
     # q0[31] = 0.                           # "r_wrist_roll",
     # q0[32] = 0.                           # "r_wrist_pitch",
@@ -637,8 +637,8 @@ def get_on_knocker_balanced_contact_sequence(robot_name: str,
         ft_kn_offset = np.array([0.15, 0., 0.28])
     else:
         # ergoCub settings
-        door_l_inner_location = np.array([0.3, 0.35, 1.0])
-        door_r_inner_location = np.array([0.34, -0.35, 1.0])
+        door_l_inner_location = np.array([0.3, 0.35, 1.1])
+        door_r_inner_location = np.array([0.34, -0.35, 1.1])
         ft_kn_offset = np.array([0.2, 0., 0.3])
 
     starting_lh_pos = safe_regions_mgr_dict['LH'].iris_list[0].seed_pos
@@ -1150,6 +1150,9 @@ def main(args):
         else:
             urdf_robot_name = robot_name
         kin_display.hide_visuals([urdf_robot_name + "/visuals"])
+        if env == 'stairs':
+            # hide side wall of stairs for better view
+            kin_display.hide_visuals(["env/2"])
         kin_display.hide_visuals([urdf_robot_name + "/collisions"], True)
         kin_display.finish_animation()
 
@@ -1205,8 +1208,8 @@ def main(args):
             plan_plotter.plot_reduced_xs_us()
         if B_SHOW_COST_PLOTS:
             # plan_plotter.plot_costs('seq')
-            # plan_plotter.plot_costs('full')
-            plan_plotter.plot_costs('full', ['right_hip_roll_joint_to_torso_primitive_shape_0_sca'])
+            plan_plotter.plot_costs('full')
+            # plan_plotter.plot_costs('full', ['right_hip_roll_joint_to_torso_primitive_shape_0_sca'])
         if B_SHOW_JOINT_LIM_PLOTS:
             plan_plotter.plot_joint_limit_margins()
         plt.show()
@@ -1326,7 +1329,7 @@ if __name__ == "__main__":
                         help="Environment to load for planning")
     parser.add_argument("--sequence", type=int, default=1,
                         help="Contact sequence to solve for")
-    parser.add_argument("--robot_name", type=str, default='g1',
+    parser.add_argument("--robot_name", type=str, default='ergoCub',
                         choices=['g1', 'valkyrie', 'ergoCub'],
                         help="Robot name to use for planning")
     parser.add_argument("--kin_plan_path", type=str, default=None,

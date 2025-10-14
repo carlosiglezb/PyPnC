@@ -598,14 +598,13 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     # Rigid links (e.g., shin link length) constraint relaxation
     if bool(aux_frames):     # check if empty dictionary
-        link_threshold = 0.001
+        link_threshold = 0.05
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
             prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
                 aux_fr, frame_list, num_iris_tot)
 
             # loop through all safe boxes
-            # link_length += link_threshold     # threshold for relaxation
             for nb in range(1, num_iris_tot-1):
                 # for pnt in range(n_points-1):
                 for pnt in range(1):
@@ -618,7 +617,6 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                     if initial_guess is not None:
                         # initial_guess['lam_g0'] = np.insert(initial_guess['lam_g0'], initial_guess['constraints_idx'], 0.)
                         initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.array([0.])))
-                        # initial_guess['lam_g0'] = np.delete(initial_guess['lam_g0'], -1)
 
     # Collect points into a single vector
     points_all = pack_points_for_single_vector(points, 'casadi')

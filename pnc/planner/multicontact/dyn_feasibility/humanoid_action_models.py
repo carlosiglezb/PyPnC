@@ -162,7 +162,8 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     weight_by_ulim = state.pinocchio.effortLimit[-(state.nv - 6):]
     weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv - 6):]]
     w_x = np.copy(planner_weights.WBC_WEIGHTED_COSTS['xReg'])
-    w_x[-actuation.nu:] *= wx_scale
+    w_x[-actuation.nu:] *= wx_scale     # penalize more jvel of contact limb
+    w_x[6:state.nq-1] *= wx_scale    # penalize more jpos of contact limb
 
     # Change reference state if zero_config is provided, otherwise use the initial state
     if zero_config is not None and terminal_step:
@@ -379,6 +380,9 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 
     # Adding state and control regularization terms
     w_x = np.copy(planner_weights.WBC_FINAL_WEIGHTED_COSTS['xReg'])
+    w_x[-actuation.nu:] *= wx_scale     # penalize more jvel of contact limb
+    w_x[6:state.nq-1] *= wx_scale    # penalize more jpos of contact limb
+
     # w_x[-actuation.nu:] /= weight_by_ulim
     if zero_config is not None and terminal_step:
         # ---- all joints except base (linear) position
