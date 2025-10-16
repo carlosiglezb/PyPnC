@@ -10,7 +10,7 @@ from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (cre
                                                                              createMultiFrameFinalActionModel,
                                                                              createMultiFrameFinalImpulseModel,
                                                                              createSequence,
-                                                                             createFinalSequence, quasi_static,
+                                                                             createFinalSequence,
                                                                              quasi_static_ocp)
 
 
@@ -122,7 +122,6 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 self.knot_idx += 1
 
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
-            # fddp[i] = crocoddyl.SolverFDDP(problem)
             fddp[i] = crocoddyl.SolverBoxFDDP(problem)
 
             # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
@@ -130,12 +129,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
 
             # Solver settings
-            max_iter = 200
+            max_iter = 250
             fddp[i].th_stop = 1e-3
             fddp[i].th_gapTol = 1e-2
             fddp[i].reg_max = 1e4
-            fddp[i].reg_incFactor = 5
-            fddp[i].reg_decFactor = 5
+            fddp[i].reg_incFactor = 3
+            fddp[i].reg_decFactor = 3
             if i == 1 or i == 2 or i == 3:   # harder to solve, needs more iterations
                 fddp[i].reg_incFactor = 2         # default is 10 (smaller works for tight guess)
                 fddp[i].reg_decFactor = 2         # default is 10 (smaller works for tight guess)
@@ -150,7 +149,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
             # Set initial guess
             xs = [x0] * (fddp[i].problem.T + 1)
-            us_static = quasi_static_ocp(frames_in_contact, state.pinocchio, x0)
+            us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0)
             if integration_type == 'RK2':
                 us_static = np.concatenate((us_static, us_static))
             us = [us_static] * fddp[i].problem.T

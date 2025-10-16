@@ -134,7 +134,7 @@ class ErgoCubMulticontactPlanner(HumanoidMulticontactPlanner):
 
             # Set initial guess
             xs = [x0] * (fddp[i].problem.T + 1)
-            us_static = quasi_static_ocp(frames_in_contact, state.pinocchio, x0)
+            us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0)
             if integration_type == 'RK2':
                 us_static = np.concatenate((us_static, us_static))
             us = [us_static] * fddp[i].problem.T

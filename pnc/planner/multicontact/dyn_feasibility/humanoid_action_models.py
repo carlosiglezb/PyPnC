@@ -578,6 +578,7 @@ def createFinalSequence(dmodels, integration_type='Euler'):
 
 
 def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
+                     plan_to_model_ids: dict[str: int],
                      pin_model: pinocchio.Model,
                      x0: np.ndarray, ):
     import cvxpy as cp
@@ -585,19 +586,19 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
     mu = 0.6
 
     # construct equality constraints from Centroidal Dynamics
-    lf_frame_id = pin_model.getFrameId("left_ankle_roll_joint")
-    lf_joint_id =  pin_model.getJointId('left_ankle_roll_joint')
-    rf_frame_id = pin_model.getFrameId("right_ankle_roll_joint")
-    rf_joint_id = pin_model.getJointId('right_ankle_roll_joint')
+    lf_frame_id = plan_to_model_ids['LF']
+    lf_joint_id = pin_model.frames[lf_frame_id].parentJoint
+    rf_frame_id = plan_to_model_ids['RF']
+    rf_joint_id = pin_model.frames[rf_frame_id].parentJoint
     pin_data = pin_model.createData()
     pin.forwardKinematics(pin_model, pin_data, x0[:pin_model.nq])
     pin.updateFramePlacements(pin_model, pin_data)
 
     # get positions of the hands
-    lh_frame_id = pin_model.getFrameId("left_rubber_hand")
-    lh_joint_id = pin_model.getJointId('left_wrist_roll_joint')
-    rh_frame_id = pin_model.getFrameId("right_rubber_hand")
-    rh_joint_id = pin_model.getJointId('right_wrist_roll_joint')
+    lh_frame_id = plan_to_model_ids['LH']
+    lh_joint_id = pin_model.frames[lh_frame_id].parentJoint
+    rh_frame_id = plan_to_model_ids['RH']
+    rh_joint_id = pin_model.frames[rh_frame_id].parentJoint
 
     # get positions of the feet and hands
     lf_placement = pin.updateFramePlacement(pin_model, pin_data, lf_frame_id)
