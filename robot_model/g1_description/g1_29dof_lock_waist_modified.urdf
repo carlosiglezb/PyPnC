@@ -165,7 +165,7 @@
     <collision>
       <origin xyz="0.007 0.005 0." rpy="0 0 0"/>
       <geometry>
-        <sphere radius="0.05"/>
+        <sphere radius="0.08"/>
       </geometry>
     </collision>
   </link>
@@ -370,7 +370,7 @@
     <collision>
       <origin xyz="0.007 -0.005 0." rpy="0 0 0"/>
       <geometry>
-        <sphere radius="0.05"/>
+        <sphere radius="0.08"/>
       </geometry>
     </collision>
   </link>
@@ -548,7 +548,7 @@
   <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.14 0.31 0.45"/>
+        <box size="0.20 0.31 0.50"/>
       </geometry>
   </collision>
  </link>

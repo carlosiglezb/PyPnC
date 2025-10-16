@@ -56,14 +56,14 @@ class MultiContactDoorConfig(PlannerConfig):
             'RH': np.array([4.] * 3 + [0.00001] * 3)
         }
     WBC_WEIGHTED_COSTS = {
-        # 'xReg': np.array([0] * 3 + [10.0] * 3 + [2.] * (N_V - 6) + [4.] * N_V),   # step over
-        'xReg': np.array([0] * 3 + [1.0] * 3 + [2.] * (N_V - 6) + [0.4] * N_V),
+        'xReg': np.array([0] * 3 + [10.0] * 3 + [2.] * (N_V - 6) + [4.] * N_V),   # step over
+        # 'xReg': np.array([0] * 3 + [1.0] * 3 + [2.] * (N_V - 6) + [0.4] * N_V),
         'uReg': np.array([0.5] * N_U),
     }
 
     WBC_FINAL_WEIGHTED_COSTS = {
-        # 'xReg': np.array([0] * 3 + [30.0] * 3 + [5.] * (N_V - 6) + [20.] * N_V),    # step over
-        'xReg': np.array([0] * 3 + [30.0] * 3 + [2.] * (N_V - 6) + [40.] * N_V),    # step on
+        'xReg': np.array([0] * 3 + [30.0] * 3 + [5.] * (N_V - 6) + [20.] * N_V),    # step over
+        # 'xReg': np.array([0] * 3 + [30.0] * 3 + [2.] * (N_V - 6) + [40.] * N_V),    # step on
     }
 
 class MultiContactTiltedStairsConfig(PlannerConfig):

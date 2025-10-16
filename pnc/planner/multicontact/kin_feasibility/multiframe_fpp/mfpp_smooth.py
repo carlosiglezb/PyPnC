@@ -158,8 +158,9 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
             if any(safe_pnt):
                 constraints.append(points[k][0][0] == safe_pnt) # pos
                 # ignore if at initial stance
-                if (k-1) % num_iris_tot != 0:
-                    add_vel_acc_constr(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, False)
+                # TODO add flag to toggle this or to customize epsilon value
+                # if (k-1) % num_iris_tot != 0:
+                #     add_vel_acc_constr(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
                 constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
@@ -203,29 +204,6 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
             else:
                 fr_seg_k_box += 1
 
-    # Rigid links (e.g., shin link length) constraint relaxation
-    soc_constraint, cost_log_abs = [], []
-    cost_log_abs_sum = 0.
-    if bool(aux_frames):     # check if empy dictionary
-        link_threshold = 0.05
-        # apply auxiliary rigid link constraint throughout all safe regions
-        for aux_fr in aux_frames:
-            prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
-                aux_fr, frame_list, num_iris_tot)
-
-            # loop through all safe boxes
-            link_length += link_threshold     # threshold for relaxation
-            for nb in range(1, num_iris_tot-1):
-                # for pnt in range(n_points-1):
-                for pnt in range(1):
-                    link_proximal_point = points[prox_fr_idx+nb][0][pnt]
-                    link_distal_point = points[dist_fr_idx+nb][0][pnt]
-                    create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
-                                             link_distal_point, soc_constraint, cost_log_abs,
-                                                         wi=weights_rigid_link)
-
-        cost_log_abs_sum = -(cp.sum(cost_log_abs))
-
     # Reachability constraints
     reach_constr = []
     if reach_region is not None:
@@ -252,13 +230,37 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                         # note: in some cases, scaling the reach polytope for knees helps the solver
                         reach_constr.append(H @ (z_ee_seg.T - z_t.T) <= -d_mat)
 
+    # Rigid links (e.g., shin link length) constraint relaxation
+    soc_constraint, cost_log_abs = [], []
+    cost_log_abs_sum = 0.
+    if bool(aux_frames):     # check if empy dictionary
+        link_threshold = 0.05
+        # apply auxiliary rigid link constraint throughout all safe regions
+        for aux_fr in aux_frames:
+            prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
+                aux_fr, frame_list, num_iris_tot)
+
+            # loop through all safe boxes
+            link_length += link_threshold     # threshold for relaxation
+            for nb in range(1, num_iris_tot-1):
+                # for pnt in range(n_points-1):
+                for pnt in range(1):
+                    link_proximal_point = points[prox_fr_idx+nb][0][pnt]
+                    link_distal_point = points[dist_fr_idx+nb][0][pnt]
+                    create_bezier_cvx_norm_eq_relaxation(link_length, link_proximal_point,
+                                             link_distal_point, soc_constraint, cost_log_abs,
+                                                         wi=weights_rigid_link)
+
+        cost_log_abs_sum = -(cp.sum(cost_log_abs))
+
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + reach_constr + soc_constraint)
     prob.solve(solver='CLARABEL')
+    # prob.solve(solver='SCS')
 
     if prob.status == 'infeasible':
         print(f'{"*" * 5} Smooth Problem was infeasible. Retrying with relaxed tolerances.')
-        prob.solve(solver='SCS', eps_rel=5e-2, eps_abs=5e-2)
+        prob.solve(solver='SCS', eps_rel=5e-1, eps_abs=5e-1)
         if prob.status == 'infeasible':
             print(f'{"*" * 5} Smooth Problem was infeasible. Retrying without reachability constraints.')
             prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + soc_constraint)
@@ -323,6 +325,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     cost_breakdown = {}
 
     # Solution statistics.
+    print(f"[Smooth] Cost: {cost.value:.3f}")
     sol_stats = {}
     sol_stats['cost'] = prob.value
     sol_stats['runtime'] = prob.solver_stats.solve_time
@@ -529,8 +532,9 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 # constraints.append(points[k][0][0] == safe_pnt) # pos
                 parse_repvec_eq_constr(np.array([safe_pnt]), points[k][0][0,:], constraints, lbg, ubg)
                 # ignore if at initial stance
-                if (k-1) % num_iris_tot != 0:
-                    add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, lbg, ubg,False)
+                # TODO add flag to toggle this or to customize epsilon value
+                # if (k-1) % num_iris_tot != 0:
+                #     add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, lbg, ubg, False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
 
@@ -623,15 +627,16 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     opts = {
         "ipopt": {
-            "print_level": 3,   # {0: none; 1: final compute statistics; 3: num of vars, EXIT; 12: all}
+            "print_level": 3,   # {0: none; 1: final compute statistics; 3: num of vars, *5, EXIT; 12: all}
             "hessian_approximation": "limited-memory",   # exact
-            "max_iter": 150,
-            "mu_init": 1e-6,
+            "max_iter": 200,
+            "mu_init": 1e-8,    # *0.1 (applicable if monotone strategy)
             "tol": 1e-2,
-            "constr_viol_tol": 1e-2,
-            "mu_strategy":"adaptive",
-            "nlp_scaling_method": "gradient-based",
-            "jacobian_regularization_value": 1e-4,  # 2e-4
+            "constr_viol_tol": 1e-2,    # *0.0001
+            # "slack_bound_frac": 0.1,          # *0.01
+            "mu_strategy":"monotone",   # {monotone, adaptive}
+            "nlp_scaling_method": "gradient-based", # {none, user-scaling, *gradient-based, equilibration-based}
+            "jacobian_regularization_value": 1e-6,  # 2e-4  * 1e-8
             # "derivative_test": "first-order",
             # "derivative_test_print_all": "no",
             # "derivative_test_perturbation": 1e-6,
@@ -699,11 +704,11 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
             initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points),1))))
 
-        opts["ipopt"]["max_iter"] = 150
-        opts["ipopt"]["warm_start_init_point"] = "yes"
-        opts["ipopt"]["warm_start_mult_bound_push"] = 1e-8
-        opts["ipopt"]["warm_start_slack_bound_push"] = 1e-8
-        opts["ipopt"]["warm_start_bound_push"] = 1e-8
+    opts["ipopt"]["max_iter"] = 200
+    opts["ipopt"]["warm_start_init_point"] = "yes"
+    opts["ipopt"]["warm_start_mult_bound_push"] = 1e-8
+    opts["ipopt"]["warm_start_slack_bound_push"] = 1e-8
+    opts["ipopt"]["warm_start_bound_push"] = 1e-8
 
     # Solve problem
     prob_construct_start_time = time.time()
@@ -716,6 +721,8 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     solver_start_time = time.time()
     if initial_guess is not None:
+        # sol_ig = solver(x0=initial_guess['x0'], lbg=lbg, ubg=ubg)
+        # print(f"[Smooth CasADi] Cost Without LAM: {sol_ig['f'].full()[0][0]:.3f}")
         sol = solver(x0=initial_guess['x0'],
                      lam_g0=initial_guess['lam_g0'],
                      lam_x0=initial_guess['lam_x0'],
@@ -727,6 +734,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     x_sol = sol['x'].full()
 
     sol_points = unpack_sol_to_points(x_sol, num_iris_tot * n_frames, n_points, D, d)
+    ig_points = unpack_sol_to_points(initial_guess['x0'], num_iris_tot * n_frames, n_points, D, d)
 
     # if prob.status == 'infeasible':
     #     print('***** Problem was infeasible with CLARABEL solver. Retrying with relaxed SCS.')
@@ -753,7 +761,9 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     a = 0
     fr_seg_k_box, frame_idx, seg_idx = 0, 0, 0
     frame_name = frame_list[frame_idx]
+    cost_prime = 0
     for k in range(num_iris_tot * n_frames):
+        f_name = frame_list[frame_idx]
         num_iris_current = len(iris_regions[frame_name].iris_idx_seq[seg_idx])
         # move on to next segment after the current number of safe boxes
         if (fr_seg_k_box != 0) and fr_seg_k_box % num_iris_current == 0 and seg_idx != (num_iris_tot-1):
@@ -769,6 +779,19 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         b = a + durations[seg_idx][frame_name][fr_seg_k_box]
         beziers.append(BezierCurve(sol_points[k][0], a, b))
         a = b
+
+        # check cost of initial guess
+        for i, ai in alpha.items():
+            h_prime = n_points - 1 - i
+            A_prime = np.zeros((h_prime + 1, h_prime + 1))
+            for m in range(h_prime + 1):
+                for n in range(h_prime + 1):
+                    A_prime[m, n] = binom(h_prime, m) * binom(h_prime, n) / binom(2 * h_prime, m + n)
+            A_prime *= durations[seg_idx][f_name][fr_seg_k_box] / (2 * h_prime + 1)
+            A_prime = np.kron(A_prime, np.eye(d))
+            p_prime = ca.vec(ig_points[k][i].T)
+            cost_prime += ai * ca.bilin(A_prime, p_prime, p_prime)
+
         fr_seg_k_box += 1
         # skip the final positions, those are assigned later
         if (k + 1) % num_iris_tot == 0:
@@ -784,6 +807,8 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     cost_breakdown = {}
 
     # Solution statistics.
+    print(f"[Smooth CasADi] Initial Guess Cost: {cost_prime.full()[0][0]:.3f}")
+    print(f"[Smooth CasADi] Cost: {sol['f'].full()[0][0]:.3f}")
     sol_stats = {'runtime': solver_compute_time,
                  }
     if not b_skip_sca:
