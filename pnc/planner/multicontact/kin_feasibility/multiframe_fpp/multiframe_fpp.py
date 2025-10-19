@@ -244,7 +244,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
 
     if sca_robot_geometry is not None:
-        b_skip_sca = False
+        b_skip_sca = False   # TODO: automate by checking if there are collisions using current solution
         initial_guess = {}
         initial_guess['x0'] = pack_points_for_single_vector(points, 'cvxpy')
         initial_guess['lam_g0'] = pack_points_for_single_vector(dvars['lam_g0'], 'cvxpy')

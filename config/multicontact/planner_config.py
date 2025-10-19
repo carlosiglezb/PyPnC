@@ -15,13 +15,13 @@ class PlannerConfig(ABC):
     # WBP_BAUMGARTE_GAINS3D : list[float] = [1e-6, 1e-4]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
     # WBP_BAUMGARTE_GAINS6D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
     # ------ seq 1
-    # WBP_CONTACT_JVEL_SCALE : float = 4.0   # weight on joint velocity scale of contact limb in the whole-body planner -- seq 1
-    # WBP_BAUMGARTE_GAINS3D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
-    # WBP_BAUMGARTE_GAINS6D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
-    # ------ seq 2
-    WBP_CONTACT_JVEL_SCALE : float = 6.0   # weight on joint velocity scale of contact limb in the whole-body planner -- seq 1
+    WBP_CONTACT_JVEL_SCALE : float = 4.0   # weight on joint velocity scale of contact limb in the whole-body planner -- seq 1
     WBP_BAUMGARTE_GAINS3D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
     WBP_BAUMGARTE_GAINS6D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
+    # ------ seq 2
+    # WBP_CONTACT_JVEL_SCALE : float = 6.0   # weight on joint velocity scale of contact limb in the whole-body planner -- seq 1
+    # WBP_BAUMGARTE_GAINS3D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
+    # WBP_BAUMGARTE_GAINS6D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
     WBC_COST_WEIGHTS = {
         'friction': 3e0,    # step_over, on_balanced, step_on
         # 'friction': 2e0,    # ergoCub (stairs)

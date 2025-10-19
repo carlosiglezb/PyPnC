@@ -179,6 +179,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         state, activation_xreg, crocoddyl.ResidualModelState(state, desired_config, actuation.nu)
     )
     w_u = np.copy(planner_weights.WBC_WEIGHTED_COSTS['uReg'])
+    # w_u /= weight_by_mass
     w_u /= weight_by_ulim
     activation_ureg = crocoddyl.ActivationModelWeightedQuad(w_u ** 2)
     u_reg_cost = crocoddyl.CostModelResidual(
@@ -409,6 +410,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 
     # Allow larger control input where torque limits are larger
     w_u = np.copy(planner_weights.WBC_WEIGHTED_COSTS['uReg'])
+    # w_u /= weight_by_mass
     w_u /= weight_by_ulim
     activation_ureg = crocoddyl.ActivationModelWeightedQuad(w_u ** 2)
     u_reg_cost = crocoddyl.CostModelResidual(
