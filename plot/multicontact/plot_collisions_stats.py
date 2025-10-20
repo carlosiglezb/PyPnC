@@ -20,7 +20,7 @@ ROBOT_PACKAGE_DIRS = [cwd + "/robot_model/g1_description"]
 ENV_URDF = cwd + "/robot_model/ground/navy_door_fixed.urdf"
 
 B_VISUALIZE_DOOR = False
-B_ANIMATE = True
+B_ANIMATE = False
 
 def load_simulated_models(robot_urdf_path, env_urdf_path):
     """
@@ -109,7 +109,7 @@ def check_trajectory_collisions(robot_model, robot_geom_model, joint_pos, time):
         display.add_robot("door", door_model, door_col_model, door_vis_model)
         display.start_animation()
 
-    penetration_depths = []
+    penetration_depths, sum_penetration_depths = [], []
 
     idx_offset = 0
     for i, q in enumerate(joint_pos):
@@ -132,7 +132,8 @@ def check_trajectory_collisions(robot_model, robot_geom_model, joint_pos, time):
         # Compute all collisions (stopAtFirstCollision = False)
         pin.computeCollisions(robot_model, robot_data, robot_geom_model, robot_geom_data, q, False)
 
-        min_distance_overall = 0.0
+        # metrics to save
+        min_distance_overall, sum_penetrations = 0.0, 0.0
 
         # Check for collisions among all collision pairs (including environment)
         for k, cr in enumerate(robot_geom_data.collisionResults):
@@ -144,6 +145,7 @@ def check_trajectory_collisions(robot_model, robot_geom_model, joint_pos, time):
                 pin.computeDistances(robot_model, robot_data, robot_geom_model, robot_geom_data, q)
 
                 res = robot_geom_data.distanceResults[k]
+                sum_penetrations += abs(res.min_distance) if res.min_distance < 0.0 else 0.0
 
                 # If this pair has the deepest penetration so far, store colliding body names
                 if res.min_distance < min_distance_overall:
@@ -164,6 +166,7 @@ def check_trajectory_collisions(robot_model, robot_geom_model, joint_pos, time):
             )
 
         penetration_depths.append(max_penetration_at_step)
+        sum_penetration_depths.append(sum_penetrations)
 
     # --- Total Penetration Calculation ---
     total_penetration = np.sum(penetration_depths)
@@ -176,7 +179,7 @@ def check_trajectory_collisions(robot_model, robot_geom_model, joint_pos, time):
     if B_ANIMATE:
         display.finish_animation()
 
-    return total_penetration, penetration_depths
+    return total_penetration, penetration_depths, sum_penetration_depths
 
 
 def check_trajectory_env_robot_collisions(robot_model, robot_geom_model, joint_pos, time):
@@ -256,8 +259,10 @@ def check_trajectory_env_robot_collisions(robot_model, robot_geom_model, joint_p
 
 def plot_self_collision_distances():
     plt.figure()
-    plt.plot(time, scol_nom_penetration_depths, label='MFPP')
-    plt.plot(time, scol_sca_penetration_depths, label='SCA')
+    plt.plot(time, scol_nom_penetration_depths, 'b:', label='MFPP (max)')
+    plt.plot(time, scol_sum_penetrations, 'r', alpha=0.4, label='MFPP (sum)')
+    plt.plot(time, scol_sca_penetration_depths, 'k:', label='SCA (max)')
+    plt.plot(time, scol_sca_sum_penetrations, 'c', alpha=0.4, label='SCA (sum)')
     plt.xlabel('Time (s)')
     plt.ylabel('Penetration Depth (m)')
     plt.title('Penetration Depth Over Time')
@@ -305,12 +310,12 @@ if __name__ == '__main__':
     # Check self-collisions
     # ---------
     print("\n--- Replaying MFPP Trajectory and Checking Collisions ---")
-    scol_nom_total_penetration, scol_nom_penetration_depths = check_trajectory_collisions(
+    scol_nom_total_penetration, scol_nom_penetration_depths, scol_sum_penetrations = check_trajectory_collisions(
         robot_model, robot_geom_model, joint_pos, time
     )
     # Replay trajectory and check self-collisions in both nominal and SCA cases
     print("\n--- Replaying SCA Trajectory and Checking Collisions ---")
-    scol_sca_total_penetration, scol_sca_penetration_depths = check_trajectory_collisions(
+    scol_sca_total_penetration, scol_sca_penetration_depths, scol_sca_sum_penetrations = check_trajectory_collisions(
         robot_model, robot_geom_model, sca_joint_pos, sca_time
     )
 
