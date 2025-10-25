@@ -88,11 +88,11 @@ class MulticontactPlotter:
         curr_idx = 0
         for (it_num, it) in enumerate(fddp):
             if it_num == (len(fddp) - 1):
-                next_idx = curr_idx + horizon_lst[it_num]  # last phase does not have impulse model
-                time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num])
+                next_idx = curr_idx + horizon_lst[it_num] - 1  # last phase does not have impulse model
+                time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num] - 1)
             else:
-                next_idx = curr_idx + horizon_lst[it_num] + 1  # add terminal impulse models
-                time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num] + 1)
+                next_idx = curr_idx + horizon_lst[it_num]   # add terminal impulse models
+                time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num])
 
             log = it.getCallbacks()[0]
             lleg_jid_fb = [7 + ji for ji in lleg_jids]
@@ -100,19 +100,27 @@ class MulticontactPlotter:
             larm_jid_fb = [7 + ji for ji in larm_jids]
             rarm_jid_fb = [7 + ji for ji in rarm_jids]
             xs_l_reduced[curr_idx:next_idx - 1, :] = np.array(log.xs)[:-1, lleg_jid_fb]
-            us_l_reduced[curr_idx:next_idx - 1, :] = np.array(log.us)[:, lleg_jids]
+            us_l_reduced[curr_idx:next_idx, :] = np.array(log.us)[:, lleg_jids]
             xs_r_reduced[curr_idx:next_idx - 1, :] = np.array(log.xs)[:-1, rleg_jid_fb]
-            us_r_reduced[curr_idx:next_idx - 1, :] = np.array(log.us)[:, rleg_jids]
+            us_r_reduced[curr_idx:next_idx, :] = np.array(log.us)[:, rleg_jids]
             xs_larm_reduced[curr_idx:next_idx - 1, :] = np.array(log.xs)[:-1, larm_jid_fb]
-            us_larm_reduced[curr_idx:next_idx - 1, :] = np.array(log.us)[:, larm_jids]
+            us_larm_reduced[curr_idx:next_idx, :] = np.array(log.us)[:, larm_jids]
             xs_rarm_reduced[curr_idx:next_idx - 1, :] = np.array(log.xs)[:-1, rarm_jid_fb]
-            us_rarm_reduced[curr_idx:next_idx - 1, :] = np.array(log.us)[:, rarm_jids]
+            us_rarm_reduced[curr_idx:next_idx, :] = np.array(log.us)[:, rarm_jids]
             phase[curr_idx:next_idx] = int(it_num)
             curr_idx += horizon_lst[it_num] - 1
         return phase, time, us_l_reduced, us_larm_reduced, us_r_reduced, us_rarm_reduced, xs_l_reduced, xs_larm_reduced, xs_r_reduced, xs_rarm_reduced
 
     def get_full_to_trajectories(self):
         fddp, _ = self._robot_planner.get_solver_and_costs()
+        # get xs and us from their logs or solver
+        if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ == "SolverSQP":
+            xs =  fddp[0].xs
+            us = fddp[0].us
+        else:
+            log = fddp[0].getCallbacks()[0]
+            xs = log.xs
+            us = log.us
         lleg_jids = self.lleg_joint_ids
         rleg_jids = self.rleg_joint_ids
         larm_jids = self.larm_joint_ids
@@ -124,7 +132,6 @@ class MulticontactPlotter:
         xrarm_dim = len(self.larm_joint_ids)
         urarm_dim = len(self.larm_joint_ids)
 
-        log = fddp[0].getCallbacks()[0]
         lleg_jid_fb = [7 + ji for ji in lleg_jids]
         rleg_jid_fb = [7 + ji for ji in rleg_jids]
         larm_jid_fb = [7 + ji for ji in larm_jids]
@@ -151,14 +158,14 @@ class MulticontactPlotter:
             else:
                 next_idx = curr_idx + horizon_lst[it_num] - 1# without impulse model
 
-            xs_l_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, lleg_jid_fb]
-            us_l_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, lleg_jids]
-            xs_r_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, rleg_jid_fb]
-            us_r_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, rleg_jids]
-            xs_larm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, larm_jid_fb]
-            us_larm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, larm_jids]
-            xs_rarm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, rarm_jid_fb]
-            us_rarm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, rarm_jids]
+            xs_l_reduced[curr_cont_idx:next_cont_idx, :] = np.array(xs[curr_idx:next_idx])[:, lleg_jid_fb]
+            us_l_reduced[curr_cont_idx:next_cont_idx, :] = np.array(us[curr_idx:next_idx])[:, lleg_jids]
+            xs_r_reduced[curr_cont_idx:next_cont_idx, :] = np.array(xs[curr_idx:next_idx])[:, rleg_jid_fb]
+            us_r_reduced[curr_cont_idx:next_cont_idx, :] = np.array(us[curr_idx:next_idx])[:, rleg_jids]
+            xs_larm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(xs[curr_idx:next_idx])[:, larm_jid_fb]
+            us_larm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(us[curr_idx:next_idx])[:, larm_jids]
+            xs_rarm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(xs[curr_idx:next_idx])[:, rarm_jid_fb]
+            us_rarm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(us[curr_idx:next_idx])[:, rarm_jids]
             phase[curr_idx:next_idx] = int(it_num)
             curr_idx += horizon_lst[it_num] + 1
             curr_cont_idx += horizon_lst[it_num] - 1
@@ -176,8 +183,20 @@ class MulticontactPlotter:
             fddp = self._robot_planner.fddp
         elif to_type == 'full':
             fddp = [self._robot_planner.fddp_full]
+        elif to_type == 'sca':
+            fddp = [self._robot_planner.fddp_full_sca]
         else:
             raise ValueError("[Multi-contact Plotter] Unknown solver type: {}".format(to_type))
+
+        # get xs and us from their logs or solver
+        if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ == "SolverSQP":
+            xs =  fddp[0].xs
+            us = fddp[0].us
+        else:
+            log = fddp[0].getCallbacks()[0]
+            xs = log.xs
+            us = log.us
+
         horizon_lst = self._robot_planner.horizon_lst
         tot_knots = sum(horizon_lst) - len(horizon_lst)
         time = np.zeros(tot_knots)
@@ -195,7 +214,6 @@ class MulticontactPlotter:
         jv_lim = self._robot_planner.robot_model.velocityLimit[6:]
         jtau_lim = self._robot_planner.robot_model.effortLimit[6:]
 
-        log = fddp[0].getCallbacks()[0]
         # get actual pos, vel, and tau, and store margins
         curr_idx, curr_cont_idx = 0, 0
         for it_num in range(len(horizon_lst)):
@@ -207,9 +225,9 @@ class MulticontactPlotter:
             next_idx = curr_idx + horizon_lst[it_num] - 1
             time[curr_cont_idx:next_cont_idx] = np.arange(it_num * T,  (it_num + 1) * T, curr_dt)
 
-            joints_pos[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, 7:rob_nq]  # ignore floating base pos
-            joints_vel[curr_cont_idx:next_cont_idx, :] = np.array(log.xs[curr_idx:next_idx])[:, rob_nq+6:] # ignore floating base vel
-            joints_tau[curr_cont_idx:next_cont_idx, :] = np.array(log.us[curr_idx:next_idx])[:, :njoints]  # no floating base tau
+            joints_pos[curr_cont_idx:next_cont_idx, :] = np.array(xs[curr_idx:next_idx])[:, 7:rob_nq]  # ignore floating base pos
+            joints_vel[curr_cont_idx:next_cont_idx, :] = np.array(xs[curr_idx:next_idx])[:, rob_nq+6:] # ignore floating base vel
+            joints_tau[curr_cont_idx:next_cont_idx, :] = np.array(us[curr_idx:next_idx])[:, :njoints]  # no floating base tau
             phase[curr_cont_idx:next_cont_idx] = int(it_num)
 
             # Compute margins: positive if within bounds, negative if out of bounds
@@ -268,6 +286,8 @@ class MulticontactPlotter:
             costsDict = self._robot_planner.costs
         elif costs_type == 'full':
             costsDict = self._robot_planner.costs_full
+        elif costs_type == 'sca':
+            costsDict = self._robot_planner.costs_full_sca
         else:
             raise ValueError("Unknown costs type: {}".format(costs_type))
 
