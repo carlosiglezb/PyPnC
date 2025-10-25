@@ -46,6 +46,6 @@ class PlannerConfig(ABC):
         # 'xBounds': 1e3,     # ergoCub (stairs)
     }
     WBC_IMPULSE_COST_WEIGHTS = {
-        'frame_goal': 1e3,
+        'frame_goal': 1e1,
         'xReg': 5e-1,
     }

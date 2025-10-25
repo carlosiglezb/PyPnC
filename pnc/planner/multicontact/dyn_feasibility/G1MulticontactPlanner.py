@@ -1,6 +1,7 @@
 import time
 from copy import copy
 
+import mim_solvers
 import numpy as np
 import crocoddyl
 from crocoddyl.libcrocoddyl_pywrap import StdVec_VectorX
@@ -46,7 +47,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         }
 
 
-    def plan(self, b_solve_hybrid = True, integration_type='Euler'):
+    def plan(self, b_solve_hybrid: bool=True,
+             integration_type: str='Euler',
+             sca_refinement: bool=False):
         dyn_seg_solve_time = []
 
         state = self.state
@@ -230,6 +233,122 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print("Is feasible:", self.fddp_full.isFeasible)
             print(f"Full hybrid TO solve time: {full_dyn_solve_time}")
             super().update_costs_from_solver(solver_type=self.solver_type, integration_type=integration_type)
+
+        if sca_refinement:
+            self.solver_type = 'sca'
+            self.plan_sca(solver_type='SQP')
+
+    def plan_sca(self, integration_type: str='Euler',
+                 solver_type: str ='FDDP'):
+        T = self.T
+        state = self.state
+        actuation = self.actuation
+        x0 = self.x0
+        plan_to_model_ids = self.plan_to_model_ids
+        planner_params = self.planner_params
+        zero_config = self._zero_config
+
+        knot_idx = 0
+        model_seqs = []
+        for i in range(self.contact_phases):
+            frames_in_contact = self.contact_planes_seq[i]
+            N_current = self.horizon_lst[i]
+            DT = T / (N_current - 1)
+            for t in np.linspace(i * T, (i + 1) * T, N_current):
+                if hasattr(self.ik_cfree_planner, "planner"):
+                    frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
+                else:
+                    frame_targets_dict = self.pack_current_targets(t)   # used for data reload
+                if t < (i + 1) * T:
+                    # get upcoming frames in contact (unless in last contact phase)
+                    if i != (self.contact_phases - 1):
+                        next_frames_in_contact = self.contact_planes_seq[i + 1]
+                    else:
+                        # last contact phase
+                        next_frames_in_contact = frames_in_contact
+                    dmodel = createMultiFrameActionModel(state,
+                                                         actuation,
+                                                         x0,
+                                                         plan_to_model_ids,
+                                                         frames_in_contact,
+                                                         next_frames_in_contact,
+                                                         frame_targets_dict,
+                                                         joint_names_dict=self.joint_names_dict,
+                                                         planner_weights=planner_params,
+                                                         geom_model=self.geom_model,
+                                                         robot_model=self.robot_model,
+                                                         b_sca=True)
+                    model_seqs += createSequence([dmodel], DT, 1, integration_type)
+                else:   # last time knot in current contact phase
+                    if i != (self.contact_phases - 1):
+                        next_frames_in_contact = self.contact_planes_seq[i + 1]
+                        terminal_step = False   # only set desired joint velocities to zero
+                    else:
+                        next_frames_in_contact = frames_in_contact
+                        terminal_step = True    # sets desired pose to zero config and zero joint velocities
+                    # in the last time step, we use higher weights on frame orientations
+                    dmodel = createMultiFrameFinalActionModel(state,
+                                                              actuation,
+                                                              x0,
+                                                              plan_to_model_ids,
+                                                              frames_in_contact,
+                                                              next_frames_in_contact,
+                                                              frame_targets_dict,
+                                                              joint_names_dict=self.joint_names_dict,
+                                                              planner_weights=planner_params,
+                                                              zero_config=zero_config,
+                                                              terminal_step=terminal_step,
+                                                              robot_model=self.robot_model)
+                    model_seqs += createFinalSequence([dmodel], integration_type)
+                    print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
+
+                # save targets again?
+                knot_idx += 1
+
+            # apply impulse model, except at enf of last contact phase
+            if i != (self.contact_phases - 1):
+                x_last = copy(self.fddp_full.xs[knot_idx])
+                imp_model = createMultiFrameFinalImpulseModel(state,
+                                                              x_last,
+                                                              plan_to_model_ids,
+                                                              frames_in_contact,
+                                                              next_frames_in_contact,
+                                                              frame_targets_dict,
+                                                              planner_weights=planner_params)
+                model_seqs += [imp_model]
+
+        problem = crocoddyl.ShootingProblem(x0, sum(np.vstack(model_seqs).tolist(), [])[:-1], model_seqs[-1][-1])
+        if solver_type == 'SQP':
+            print("[SCA-Crocoddyl] Using SQP solver for SCA refinement")
+            self.fddp_full_sca = mim_solvers.SolverSQP(problem)
+            self.fddp_full_sca.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose()])
+            self.fddp_full_sca.termination_tolerance = 1e-3
+        else:
+            print("[SCA-Crocoddyl] Using BoxFDDP solver for SCA refinement")
+            self.fddp_full_sca = crocoddyl.SolverBoxFDDP(problem)
+            self.fddp_full_sca.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
+            # self.fddp_full_sca.setCallbacks([crocoddyl.CallbackLogger()])
+
+            # Solver settings
+            self.fddp_full_sca.th_stop = 1e-3
+            self.fddp_full_sca.th_gapTol = 1e-2
+            self.fddp_full_sca.reg_max = 1e4
+            self.fddp_full_sca.reg_incFactor = 3
+            self.fddp_full_sca.reg_decFactor = 3
+
+        max_iter = 350
+        # Set initial guess from previous full solve
+        xs = copy(self.fddp_full.xs)
+        us = StdVec_VectorX.copy(self.fddp_full.us)
+        start_ddp_solve_time = time.time()
+        print("[SCA-Crocoddyl] Problem solved to convergence:", self.fddp_full_sca.solve(xs, us, max_iter))
+        dyn_seg_solve_time = time.time() - start_ddp_solve_time
+        print(f"[SCA-Crocoddyl] Is feasible: {self.fddp_full_sca.isFeasible}")
+        print("[SCA-Crocoddyl] Number of iterations:", self.fddp_full_sca.iter)
+        print("[SCA-Crocoddyl] Total cost:", self.fddp_full_sca.cost)
+        print("[SCA-Crocoddyl] Time to solve:", dyn_seg_solve_time)
+        print("===============")
+        super().update_costs_from_solver(solver_type=self.solver_type, integration_type=integration_type)
 
     def reset_default_gains(self, frame_name: str, updated_gains: np.array):
         self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains

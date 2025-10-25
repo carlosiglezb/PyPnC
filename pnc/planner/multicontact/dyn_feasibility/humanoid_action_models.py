@@ -29,7 +29,8 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 v_ref: np.array = None,
                                 terminal_step: bool = False,
                                 geom_model: pinocchio.GeometryModel = None,
-                                robot_model: pinocchio.Model = None,):
+                                robot_model: pinocchio.Model = None,
+                                b_sca: bool = False):
     desired_config = np.copy(x0)
 
     # Define the cost sum (cost manager)
@@ -205,8 +206,11 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     #
     # Collision Avoidance at Joint Level
     #
-    # if geom_model is not None:
-    if False:
+    runningConstraintModelManager = crocoddyl.ConstraintModelManager(
+        state, actuation.nu
+    )
+    if b_sca and geom_model is not None:
+        b_soft_col_avoid = False
         for cp_idx, cp in enumerate(geom_model.collisionPairs):
             cp_first_name = geom_model.geometryObjects[cp.first].name
             cp_second_name = geom_model.geometryObjects[cp.second].name
@@ -221,21 +225,42 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
             # get joint id of nearest joint to the collision pair
             j_id = robot_model.getJointId(cp_first_name)
 
-            # add as cost
-            sca_alpha = 0.005
-            activation_sca = crocoddyl.ActivationModelQuadFlatExp(3, sca_alpha)
-            sca_cost = crocoddyl.CostModelResidual(
-                state,
-                activation_sca,
-                crocoddyl.ResidualModelPairCollision(state, actuation.nu, geom_model, cp_idx, j_id),
-            )
-            costs.addCost(cp_first_name + '_to_' + cp_second_name + "_sca",
-                          sca_cost,
-                          planner_weights.WBC_COST_WEIGHTS['sca'])
+            # add as cost just for torso (debugging purposes -- remove IF condition later)
+            if 'root_joint' in cp_first_name or 'torso' in cp_second_name:
+                sca_alpha = 0.005
+                dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx,{},{})
+                # dist_col = crocoddyl.ResidualModelPairCollision(state, actuation.nu, geom_model, cp_idx, j_id)
+                if b_soft_col_avoid:
+                    activation_sca = ActivationModelDistanceQuad(1, 0.4, 0.2)
+                    # activation_sca = crocoddyl.ActivationModelQuadFlatExp(1, sca_alpha)
+                    # activation_sca = crocoddyl.ActivationModelQuadFlatExp(3, sca_alpha)
+                    # activation_sca = crocoddyl.ActivationModelQuadraticBarrier(
+                    #     crocoddyl.ActivationBounds(np.array([0.08, 0.08, 0.08]),
+                    #                                np.array([1.5, 1.5, 1.5]))
+                    # )
+                    sca_cost = crocoddyl.CostModelResidual(
+                        state,
+                        activation_sca,
+                        dist_col,
+                    )
+                    costs.addCost(cp_first_name + '_to_' + cp_second_name + "_sca",
+                                  sca_cost,
+                              planner_weights.WBC_COST_WEIGHTS['sca'])
+                else:   # use as hard inequality constraint
+                    # False to deactivate at terminal step
+                    col_avoid_constr = crocoddyl.ConstraintModelResidual(state,
+                                                                         dist_col,
+                                                                         np.array([0.0]),
+                                                                         np.array([np.inf]),
+                                                                         True)
+                    runningConstraintModelManager.addConstraint(cp_first_name + '_to_' + cp_second_name + "_sca",
+                                                                col_avoid_constr,
+                                                                True)
+
 
     # Creating the action model
     dmodel = crocoddyl.DifferentialActionModelContactFwdDynamics(
-        state, actuation, contacts, costs
+        state, actuation, contacts, costs, runningConstraintModelManager
     )
     return dmodel
 
@@ -545,6 +570,8 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
     dmodel = crocoddyl.ActionModelImpulseFwdDynamics(
         state, impulseModel, costs
     )
+    dmodel.JMinvJt_damping = 1e-12
+    dmodel.r_coeff = 0.0
     return dmodel
 
 

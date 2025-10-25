@@ -38,6 +38,7 @@ class HumanoidMulticontactPlanner:
         self.contact_phases = num_contact_phases = len(contact_seqs.phases_knots)
         self.fddp = [crocoddyl.SolverFDDP] * num_contact_phases
         self.fddp_full = crocoddyl.SolverFDDP
+        self.fddp_full_sca = crocoddyl.SolverFDDP
         self.T = contact_seqs.phases_durations  # time_per_phase
 
         self.planner_params = planner_params
@@ -75,6 +76,21 @@ class HumanoidMulticontactPlanner:
                       'R_knee_goal': [None] * num_contact_phases}
 
         self.costs_full = {'uReg': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'xReg': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'xBounds': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'LF_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'RF_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'LH_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'RH_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'torso_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'LF_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'RF_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'LH_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'RH_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'L_knee_goal': [None] * (tot_num_knots + num_contact_phases - 2),
+                      'R_knee_goal': [None] * (tot_num_knots + num_contact_phases - 2)}
+
+        self.costs_full_sca = {'uReg': [None] * (tot_num_knots + num_contact_phases - 2),
                       'xReg': [None] * (tot_num_knots + num_contact_phases - 2),
                       'xBounds': [None] * (tot_num_knots + num_contact_phases - 2),
                       'LF_friction': [None] * (tot_num_knots + num_contact_phases - 2),
@@ -136,6 +152,9 @@ class HumanoidMulticontactPlanner:
         elif solver_type == 'full':
             fddp_solver = [self.fddp_full]
             costs = self.costs_full
+        elif solver_type == 'sca':
+            fddp_solver = [self.fddp_full_sca]
+            costs = self.costs_full_sca
         else:
             raise ValueError("Unknown solver type: {}".format(solver_type))
         return fddp_solver, costs

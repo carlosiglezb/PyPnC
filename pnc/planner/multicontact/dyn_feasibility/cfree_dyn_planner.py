@@ -1190,9 +1190,14 @@ def main(args):
         display.add_arrow("forces/" + force_joint_frames['RF'], color=[0, 0, 1])
         display.add_arrow("forces/" + force_joint_frames['LH'], color=[0, 1, 0])
         display.add_arrow("forces/" + force_joint_frames['RH'], color=[0, 1, 0])
-        if type(robot_dyn_plan.fddp_full.cost) == float:
+        if type(robot_dyn_plan.fddp_full_sca.cost) == float:
+            print('Displaying sca refined solution')
+            display.displayFromCrocoddylSolver([robot_dyn_plan.fddp_full_sca])
+        elif type(robot_dyn_plan.fddp_full.cost) == float:
+            print('Displaying full dynamics solution')
             display.displayFromCrocoddylSolver([robot_dyn_plan.fddp_full])
         else:
+            print('Displaying per-phase dynamics solution')
             display.displayFromCrocoddylSolver(robot_dyn_plan.fddp)
         # viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
         #                     "lfoot_target", "lknee_target",
@@ -1208,15 +1213,21 @@ def main(args):
             plan_plotter.plot_reduced_xs_us()
         if B_SHOW_COST_PLOTS:
             # plan_plotter.plot_costs('seq')
-            plan_plotter.plot_costs('full')
+            plan_plotter.plot_costs('sca')
             # plan_plotter.plot_costs('full', ['right_hip_roll_joint_to_torso_primitive_shape_0_sca'])
         if B_SHOW_JOINT_LIM_PLOTS:
             plan_plotter.plot_joint_limit_margins()
         plt.show()
 
     if B_SHOW_GRF_PLOTS or B_SAVE_DYN_DATA:
+        if robot_dyn_plan.solver_type == 'sca':
+            fddp = [robot_dyn_plan.fddp_full_sca]
+        elif robot_dyn_plan.solver_type == 'full':
+            fddp = robot_dyn_plan.fddp_full
+        else:
+            fddp = robot_dyn_plan.fddp
         # Note: contact_links are l_ankle_ie, r_ankle_ie, l_wrist_pitch, r_wrist_pitch
-        sim_steps_list = [len(robot_dyn_plan.fddp[i].us) for i in range(len(robot_dyn_plan.fddp))]
+        sim_steps_list = [len(fddp[i].us) for i in range(len(fddp))]
         sim_steps = np.sum(sim_steps_list)
         sim_time = np.zeros((sim_steps,))
         rf_lfoot, rf_rfoot, rf_lwrist, rf_rwrist = np.zeros((3, sim_steps)), \
@@ -1224,7 +1235,7 @@ def main(args):
         w_rf_lfoot, w_rf_rfoot, w_rf_lwrist, w_rf_rwrist = np.zeros((3, sim_steps)), \
             np.zeros((3, sim_steps)), np.zeros((3, sim_steps)), np.zeros((3, sim_steps))
         time_idx = 0
-        for it in robot_dyn_plan.fddp:
+        for it in fddp:
             rf_list = vis_tools.get_force_trajectory_from_solver(it)
             for rf_t in rf_list:
                 for contact in rf_t:
