@@ -5,6 +5,8 @@ import pinocchio as pin
 
 import util.liegroup
 from config.multicontact.planner_config import PlannerConfig
+from pnc.planner.multicontact.crocoddyl_extensions.ActivationModelDistanceQuad import ActivationModelDistanceQuad
+from pnc.planner.multicontact.crocoddyl_extensions.ResidualDistanceCollision import ResidualDistanceCollision
 from util.util import so3_from_vec_to_vec
 
 Z_UP =  np.array([0., 0., 1])
