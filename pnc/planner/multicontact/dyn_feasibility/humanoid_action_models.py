@@ -347,9 +347,9 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                 surf_activation_friction,
                 crocoddyl.ResidualModelContactWrenchCone(state, fr_id, surf_cone, actuation.nu),
             )
-        costs.addCost(fr_name + "_friction",
-                      fr_friction,
-                      planner_weights.WBC_FINAL_COST_WEIGHTS['friction'])
+        # costs.addCost(fr_name + "_friction",
+        #               fr_friction,
+        #               planner_weights.WBC_FINAL_COST_WEIGHTS['friction'])
 
         # increase cost of joint velocities on limbs in contact
         if joint_names_dict is not None:
@@ -413,6 +413,10 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
 
     # w_x[-actuation.nu:] /= weight_by_ulim
     if zero_config is not None and terminal_step:
+        w_x = np.copy(planner_weights.WBC_FINAL_WEIGHTED_COSTS['xReg'])
+        w_x[-actuation.nu:] *= wx_scale  # penalize more jvel of contact limb
+        w_x[6:state.nq - 1] *= wx_scale  # penalize more jpos of contact limb
+
         # ---- all joints except base (linear) position
         # desired_config[3:7] = np.array([0, 0, 0, 1])
         desired_config[7+14:state.nq] = zero_config[7+14:]
@@ -444,9 +448,9 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
         state, activation_ureg, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
     # crocoddyl.ResidualModelJointEffort
-    costs.addCost("uReg",
-                  u_reg_cost,
-                  planner_weights.WBC_FINAL_COST_WEIGHTS['uReg'])
+    # costs.addCost("uReg",
+    #               u_reg_cost,
+    #               planner_weights.WBC_FINAL_COST_WEIGHTS['uReg'])
 
     # Adding the state limits penalization
     x_lb = np.concatenate([state.lb[1: state.nv + 1], state.lb[-state.nv:]])

@@ -1158,7 +1158,7 @@ def main(args):
 
     robot_dyn_plan.set_plan_to_model_params(plan_to_model_ids)
     robot_dyn_plan.set_initial_configuration(x0)
-    robot_dyn_plan.plan(integration_type='Euler')
+    robot_dyn_plan.plan(b_solve_hybrid=True, integration_type='Euler', sca_refinement=True)
 
     # strings for saving data
     if kin_plan_path is not None:
@@ -1213,7 +1213,7 @@ def main(args):
             plan_plotter.plot_reduced_xs_us()
         if B_SHOW_COST_PLOTS:
             # plan_plotter.plot_costs('seq')
-            plan_plotter.plot_costs('sca')
+            plan_plotter.plot_costs()
             # plan_plotter.plot_costs('full', ['right_hip_roll_joint_to_torso_primitive_shape_0_sca'])
         if B_SHOW_JOINT_LIM_PLOTS:
             plan_plotter.plot_joint_limit_margins()
@@ -1223,7 +1223,7 @@ def main(args):
         if robot_dyn_plan.solver_type == 'sca':
             fddp = [robot_dyn_plan.fddp_full_sca]
         elif robot_dyn_plan.solver_type == 'full':
-            fddp = robot_dyn_plan.fddp_full
+            fddp = [robot_dyn_plan.fddp_full]
         else:
             fddp = robot_dyn_plan.fddp
         # Note: contact_links are l_ankle_ie, r_ankle_ie, l_wrist_pitch, r_wrist_pitch

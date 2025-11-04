@@ -174,44 +174,50 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         self.solver_stats['contacts_phases_solve_times'] = dyn_seg_solve_time
         print("[Compute Time] Dynamic feasibility check: ", sum(dyn_seg_solve_time))
 
-        #
-        # Full trajectory with Impulse models
-        #
-        # Add Impulse model into previous phases
-        x_guess = []
-        u_guess = StdVec_VectorX.copy(fddp[0].us)
-        u_guess.append(fddp[0].us[-1])  # add for last step
-        u_guess.append(np.array([]))    # add for impulse
-        for i in range(self.contact_phases - 1):
-            frames_in_contact = self.contact_planes_seq[i]
-            next_frames_in_contact = self.contact_planes_seq[i + 1]
-            if hasattr(self.ik_cfree_planner, "planner"):
-                frame_targets_dict = self.ik_cfree_planner.pack_current_targets((i + 1) * T)
-            else:
-                frame_targets_dict = self.pack_current_targets((i + 1) * T)  # used for data reload
-            x_last = copy(fddp[i].xs[-1])
-            # add impulse model on frames in contact at the end of every contact phase
-            imp_model = createMultiFrameFinalImpulseModel(state,
-                                                          x_last,
-                                                          plan_to_model_ids,
-                                                          frames_in_contact,
-                                                          next_frames_in_contact,
-                                                          frame_targets_dict,
-                                                          planner_weights=planner_params)
-            model_seq_all.insert(2 * i + 1, imp_model)
-
-            # re-construct initial guess trajectory
-            x_guess += fddp[i].xs.tolist()  # for full trajectory
-            x_guess += [fddp[i].xs[-1]]  # add for impulse
-            if i > 0:
-                for j in range(len(fddp[i].us)):
-                    u_guess.append(fddp[i].us[j])
-                u_guess.append(fddp[i].us[-1])
-                u_guess.append(np.array([]))
-
         self.solver_type = 'seq'
         if b_solve_hybrid:
             self.solver_type = 'full'
+            #
+            # Full trajectory with Impulse models
+            #
+            # Add Impulse model into previous phases
+            x_guess = []
+            u_guess = StdVec_VectorX.copy(fddp[0].us)
+            u_guess.append(fddp[0].us[-1])  # add for last step
+            u_guess.append(np.array([]))  # add for impulse
+            for i in range(self.contact_phases - 1):
+                frames_in_contact = self.contact_planes_seq[i]
+                next_frames_in_contact = self.contact_planes_seq[i + 1]
+                if hasattr(self.ik_cfree_planner, "planner"):
+                    frame_targets_dict = self.ik_cfree_planner.pack_current_targets((i + 1) * T)
+                else:
+                    frame_targets_dict = self.pack_current_targets((i + 1) * T)  # used for data reload
+                x_last = copy(fddp[i].xs[-1])
+                # add impulse model on frames in contact at the end of every contact phase
+                imp_model = createMultiFrameFinalImpulseModel(state,
+                                                              x_last,
+                                                              plan_to_model_ids,
+                                                              frames_in_contact,
+                                                              next_frames_in_contact,
+                                                              frame_targets_dict,
+                                                              planner_weights=planner_params)
+                model_seq_all.insert(2 * i + 1, imp_model)
+
+                # remove previous terminal models and replace with runningModel
+                model_seq_all[2 * i] = np.reshape(np.delete(model_seq_all[2 * i], -1), (-1, 1))
+                last_entry = copy(model_seq_all[2 * i][-1, 0])
+                model_seq_all[2 * i] = np.concatenate(
+                    (model_seq_all[2 * i], np.reshape(np.array([last_entry]), (-1, 1))))
+
+                # re-construct initial guess trajectory
+                x_guess += fddp[i].xs.tolist()  # for full trajectory
+                x_guess += [fddp[i].xs[-1]]  # add for impulse
+                if i > 0:
+                    for j in range(len(fddp[i].us)):
+                        u_guess.append(fddp[i].us[j])
+                    u_guess.append(fddp[i].us[-1])
+                    u_guess.append(np.array([]))
+
             x_guess += fddp[i+1].xs.tolist()  # include last contact phase for full trajectory
             for j in range(len(fddp[i+1].us)):
                 u_guess.append(fddp[i+1].us[j])
@@ -305,7 +311,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 # save targets again?
                 knot_idx += 1
 
-            # apply impulse model, except at enf of last contact phase
+            # apply impulse model, except at end of last contact phase
             if i != (self.contact_phases - 1):
                 x_last = copy(self.fddp_full.xs[knot_idx])
                 imp_model = createMultiFrameFinalImpulseModel(state,
@@ -322,7 +328,13 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print("[SCA-Crocoddyl] Using SQP solver for SCA refinement")
             self.fddp_full_sca = mim_solvers.SolverSQP(problem)
             self.fddp_full_sca.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose()])
-            self.fddp_full_sca.termination_tolerance = 1e-3
+            self.fddp_full_sca.termination_tolerance = 1e-2
+            self.fddp_full_sca.eps_abs = 1e-2
+            self.fddp_full_sca.eps_rel = 1e-2
+            # self.fddp_full_sca.filter_size = 5
+            self.fddp_full_sca.use_filter_line_search = False   # (default: True)
+            self.fddp_full_sca.mu_dynamic = -1  # Nocedal's L1 merit function
+            # self.fddp_full_sca.lag_mul_inf_norm_coef = 10
         else:
             print("[SCA-Crocoddyl] Using BoxFDDP solver for SCA refinement")
             self.fddp_full_sca = crocoddyl.SolverBoxFDDP(problem)
@@ -336,7 +348,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.reg_incFactor = 3
             self.fddp_full_sca.reg_decFactor = 3
 
-        max_iter = 350
+        max_iter = 450
         # Set initial guess from previous full solve
         xs = copy(self.fddp_full.xs)
         us = StdVec_VectorX.copy(self.fddp_full.us)
