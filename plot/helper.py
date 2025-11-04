@@ -11,8 +11,8 @@ quat_label = ['x', ' y', ' z', 'w']
 markers = ['*', '+', 'h', 'x', 'o', 'v', 'd']
 facecolors = [
 'grey', 'brown', 'red', 'orange', 'yellow', 'green', 'blue', 'purple',
-'cyan', 'lime', 'magenta', 'teal', 'coral', 'gold', 'salmon',
-'navy', 'olive', 'maroon', 'aqua', 'fuchsia', 'indigo', 'peru', 'orchid'] * 5
+'cyan', 'lime', 'magenta', 'teal', 'coral',
+'olive', 'maroon', 'aqua', 'fuchsia', 'indigo', 'peru', 'orchid'] * 5
 
 
 def plot_task(time, pos_des, pos, vel_des, vel, phase, suptitle):

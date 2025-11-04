@@ -75,40 +75,40 @@ class MulticontactPlotter:
         urarm_dim = len(self.larm_joint_ids)
 
         # initialize dimensions by contact phase
-        xs_l_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, xr_dim))
-        us_l_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), ur_dim))
-        xs_r_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, xr_dim))
-        us_r_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), ur_dim))
-        xs_larm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, xrarm_dim))
-        us_larm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), urarm_dim))
-        xs_rarm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst) + 1, xrarm_dim))
-        us_rarm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), urarm_dim))
-        time = np.zeros(sum(horizon_lst) - len(horizon_lst) + 1)
-        phase = np.zeros(sum(horizon_lst) - len(horizon_lst) + 1, dtype=int)
+        xs_l_reduced = np.zeros((sum(horizon_lst), xr_dim))
+        us_l_reduced = np.zeros((sum(horizon_lst), ur_dim))
+        xs_r_reduced = np.zeros((sum(horizon_lst), xr_dim))
+        us_r_reduced = np.zeros((sum(horizon_lst), ur_dim))
+        xs_larm_reduced = np.zeros((sum(horizon_lst), xrarm_dim))
+        us_larm_reduced = np.zeros((sum(horizon_lst), urarm_dim))
+        xs_rarm_reduced = np.zeros((sum(horizon_lst), xrarm_dim))
+        us_rarm_reduced = np.zeros((sum(horizon_lst), urarm_dim))
+        time = np.zeros(sum(horizon_lst))
+        phase = np.zeros(sum(horizon_lst), dtype=int)
         curr_idx = 0
         for (it_num, it) in enumerate(fddp):
-            if it_num == (len(fddp) - 1):
-                next_idx = curr_idx + horizon_lst[it_num] - 1  # last phase does not have impulse model
-                time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num] - 1)
-            else:
-                next_idx = curr_idx + horizon_lst[it_num]   # add terminal impulse models
-                time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num])
+            # if it_num == (len(fddp) - 1):
+            #     next_idx = curr_idx + horizon_lst[it_num] - 1  # last phase does not have impulse model
+            #     time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num] - 1)
+            # else:
+            next_idx = curr_idx + horizon_lst[it_num]   # add terminal models
+            time[curr_idx:next_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num])
 
             log = it.getCallbacks()[0]
             lleg_jid_fb = [7 + ji for ji in lleg_jids]
             rleg_jid_fb = [7 + ji for ji in rleg_jids]
             larm_jid_fb = [7 + ji for ji in larm_jids]
             rarm_jid_fb = [7 + ji for ji in rarm_jids]
-            xs_l_reduced[curr_idx:next_idx - 1, :] = np.array(log.xs)[:-1, lleg_jid_fb]
-            us_l_reduced[curr_idx:next_idx, :] = np.array(log.us)[:, lleg_jids]
-            xs_r_reduced[curr_idx:next_idx - 1, :] = np.array(log.xs)[:-1, rleg_jid_fb]
-            us_r_reduced[curr_idx:next_idx, :] = np.array(log.us)[:, rleg_jids]
-            xs_larm_reduced[curr_idx:next_idx - 1, :] = np.array(log.xs)[:-1, larm_jid_fb]
-            us_larm_reduced[curr_idx:next_idx, :] = np.array(log.us)[:, larm_jids]
-            xs_rarm_reduced[curr_idx:next_idx - 1, :] = np.array(log.xs)[:-1, rarm_jid_fb]
-            us_rarm_reduced[curr_idx:next_idx, :] = np.array(log.us)[:, rarm_jids]
+            xs_l_reduced[curr_idx:next_idx, :] = np.array(log.xs)[:, lleg_jid_fb]
+            us_l_reduced[curr_idx:next_idx - 1, :] = np.array(log.us)[:, lleg_jids]
+            xs_r_reduced[curr_idx:next_idx, :] = np.array(log.xs)[:, rleg_jid_fb]
+            us_r_reduced[curr_idx:next_idx - 1, :] = np.array(log.us)[:, rleg_jids]
+            xs_larm_reduced[curr_idx:next_idx, :] = np.array(log.xs)[:, larm_jid_fb]
+            us_larm_reduced[curr_idx:next_idx - 1 , :] = np.array(log.us)[:, larm_jids]
+            xs_rarm_reduced[curr_idx:next_idx, :] = np.array(log.xs)[:, rarm_jid_fb]
+            us_rarm_reduced[curr_idx:next_idx - 1 , :] = np.array(log.us)[:, rarm_jids]
             phase[curr_idx:next_idx] = int(it_num)
-            curr_idx += horizon_lst[it_num] - 1
+            curr_idx += horizon_lst[it_num]
         return phase, time, us_l_reduced, us_larm_reduced, us_r_reduced, us_rarm_reduced, xs_l_reduced, xs_larm_reduced, xs_r_reduced, xs_rarm_reduced
 
     def get_full_to_trajectories(self):
@@ -179,23 +179,28 @@ class MulticontactPlotter:
         if to_type is None:
             to_type = self._robot_planner.solver_type
 
+        b_update_xs = False
         if to_type == 'seq':
             fddp = self._robot_planner.fddp
+            # xs and us need to be updated from each fddp instance
+            b_update_xs = True
         elif to_type == 'full':
             fddp = [self._robot_planner.fddp_full]
-        elif to_type == 'sca':
-            fddp = [self._robot_planner.fddp_full_sca]
-        else:
-            raise ValueError("[Multi-contact Plotter] Unknown solver type: {}".format(to_type))
-
-        # get xs and us from their logs or solver
-        if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ == "SolverSQP":
-            xs =  fddp[0].xs
-            us = fddp[0].us
-        else:
             log = fddp[0].getCallbacks()[0]
             xs = log.xs
             us = log.us
+        elif to_type == 'sca':
+            fddp = [self._robot_planner.fddp_full_sca]
+            # get xs and us from their logs or solver
+            if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ == "SolverSQP":
+                xs = fddp[0].xs
+                us = fddp[0].us
+            else:
+                log = fddp[0].getCallbacks()[0]
+                xs = log.xs
+                us = log.us
+        else:
+            raise ValueError("[Multi-contact Plotter] Unknown solver type: {}".format(to_type))
 
         horizon_lst = self._robot_planner.horizon_lst
         tot_knots = sum(horizon_lst) - len(horizon_lst)
@@ -224,6 +229,12 @@ class MulticontactPlotter:
             next_cont_idx = curr_cont_idx + horizon_lst[it_num] - 1
             next_idx = curr_idx + horizon_lst[it_num] - 1
             time[curr_cont_idx:next_cont_idx] = np.arange(it_num * T,  (it_num + 1) * T, curr_dt)
+
+            # update xs and us from each fddp instance
+            if b_update_xs:
+                log = fddp[it_num].getCallbacks()[0]
+                xs = log.xs
+                us = log.us
 
             joints_pos[curr_cont_idx:next_cont_idx, :] = np.array(xs[curr_idx:next_idx])[:, 7:rob_nq]  # ignore floating base pos
             joints_vel[curr_cont_idx:next_cont_idx, :] = np.array(xs[curr_idx:next_idx])[:, rob_nq+6:] # ignore floating base vel
@@ -254,7 +265,10 @@ class MulticontactPlotter:
                     tau_margin = jtau_lim[j] - np.abs(tau)
                     joints_tau[k, j] = tau_margin  # neg = out of bound, pos = within bounds
 
-            curr_idx += horizon_lst[it_num] + 1
+            if b_update_xs:
+                curr_idx = 0
+            else:
+                curr_idx += horizon_lst[it_num] + 1
             curr_cont_idx += horizon_lst[it_num] - 1
 
         # crate margin plots
@@ -277,11 +291,13 @@ class MulticontactPlotter:
         plot_multiple_state_traj(time, [joints_pos, joints_vel, joints_tau],
                                  phase, ax_labels=signals_names, ylabels=margins_names)
 
-    def plot_costs(self, costs_type='seq', costNames=None):
+    def plot_costs(self, costs_type=None, costNames=None):
         T = self._robot_planner.T
         horizon_lst = self._robot_planner.horizon_lst
         time = np.zeros((sum(horizon_lst) - 1, ))
         phase = np.zeros((sum(horizon_lst) - 1, ), dtype=int)
+        if costs_type is None:
+            costs_type = self._robot_planner.solver_type
         if costs_type == 'seq':
             costsDict = self._robot_planner.costs
         elif costs_type == 'full':
