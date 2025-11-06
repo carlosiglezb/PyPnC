@@ -289,24 +289,36 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                     if i != (self.contact_phases - 1):
                         next_frames_in_contact = self.contact_planes_seq[i + 1]
                         terminal_step = False   # only set desired joint velocities to zero
+                        dmodel = createMultiFrameActionModel(state,
+                                                             actuation,
+                                                             x0,
+                                                             plan_to_model_ids,
+                                                             frames_in_contact,
+                                                             next_frames_in_contact,
+                                                             frame_targets_dict,
+                                                             joint_names_dict=self.joint_names_dict,
+                                                             planner_weights=planner_params,
+                                                             geom_model=self.geom_model,
+                                                             robot_model=self.robot_model)
+                        model_seqs += createSequence([dmodel], DT, 1, integration_type)
                     else:
                         next_frames_in_contact = frames_in_contact
                         terminal_step = True    # sets desired pose to zero config and zero joint velocities
-                    # in the last time step, we use higher weights on frame orientations
-                    dmodel = createMultiFrameFinalActionModel(state,
-                                                              actuation,
-                                                              x0,
-                                                              plan_to_model_ids,
-                                                              frames_in_contact,
-                                                              next_frames_in_contact,
-                                                              frame_targets_dict,
-                                                              joint_names_dict=self.joint_names_dict,
-                                                              planner_weights=planner_params,
-                                                              zero_config=zero_config,
-                                                              terminal_step=terminal_step,
-                                                              robot_model=self.robot_model)
-                    model_seqs += createFinalSequence([dmodel], integration_type)
-                    print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
+                        # in the last time step, we use higher weights on frame orientations
+                        dmodel = createMultiFrameFinalActionModel(state,
+                                                                  actuation,
+                                                                  x0,
+                                                                  plan_to_model_ids,
+                                                                  frames_in_contact,
+                                                                  next_frames_in_contact,
+                                                                  frame_targets_dict,
+                                                                  joint_names_dict=self.joint_names_dict,
+                                                                  planner_weights=planner_params,
+                                                                  zero_config=zero_config,
+                                                                  terminal_step=terminal_step,
+                                                                  robot_model=self.robot_model)
+                        model_seqs += createFinalSequence([dmodel], integration_type)
+                        print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
 
                 # save targets again?
                 knot_idx += 1
@@ -328,12 +340,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print("[SCA-Crocoddyl] Using SQP solver for SCA refinement")
             self.fddp_full_sca = mim_solvers.SolverSQP(problem)
             self.fddp_full_sca.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose()])
-            self.fddp_full_sca.termination_tolerance = 1e-2
-            self.fddp_full_sca.eps_abs = 1e-2
-            self.fddp_full_sca.eps_rel = 1e-2
-            # self.fddp_full_sca.filter_size = 5
-            self.fddp_full_sca.use_filter_line_search = False   # (default: True)
-            self.fddp_full_sca.mu_dynamic = -1  # Nocedal's L1 merit function
+            self.fddp_full_sca.termination_tolerance = 1e-1
+            self.fddp_full_sca.eps_abs = 1e-1
+            self.fddp_full_sca.eps_rel = 1e-1
+            self.fddp_full_sca.filter_size = 10
+            # self.fddp_full_sca.use_filter_line_search = False   # (default: True)
+            # self.fddp_full_sca.mu_dynamic = -1  # Nocedal's L1 merit function
             # self.fddp_full_sca.lag_mul_inf_norm_coef = 10
         else:
             print("[SCA-Crocoddyl] Using BoxFDDP solver for SCA refinement")
@@ -348,10 +360,17 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.reg_incFactor = 3
             self.fddp_full_sca.reg_decFactor = 3
 
-        max_iter = 450
+        max_iter = 1000
         # Set initial guess from previous full solve
         xs = copy(self.fddp_full.xs)
         us = StdVec_VectorX.copy(self.fddp_full.us)
+        # xs = copy(self.fddp_full.xs)
+        # idx_removed = 0
+        # for idx in range(len(self.horizon_lst) - 1):
+        #     idx_sum = sum(self.horizon_lst[:idx+1])
+        #     del xs[idx_sum]
+        #     del us[idx_sum]
+        #     idx_removed += 1
         start_ddp_solve_time = time.time()
         print("[SCA-Crocoddyl] Problem solved to convergence:", self.fddp_full_sca.solve(xs, us, max_iter))
         dyn_seg_solve_time = time.time() - start_ddp_solve_time
@@ -361,6 +380,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         print("[SCA-Crocoddyl] Time to solve:", dyn_seg_solve_time)
         print("===============")
         super().update_costs_from_solver(solver_type=self.solver_type, integration_type=integration_type)
+        super().update_constraint_residuals_from_solver()
 
     def reset_default_gains(self, frame_name: str, updated_gains: np.array):
         self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains
