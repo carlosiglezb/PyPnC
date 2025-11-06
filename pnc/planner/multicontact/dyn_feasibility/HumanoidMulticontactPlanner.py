@@ -105,6 +105,8 @@ class HumanoidMulticontactPlanner:
                       'L_knee_goal': [None] * (tot_num_knots + num_contact_phases - 2),
                       'R_knee_goal': [None] * (tot_num_knots + num_contact_phases - 2)}
 
+        self.residuals = {}
+
         # initialize all costs
         for cost_name, cost_lst in self.costs.items():
             for di, ldata in enumerate(self.horizon_lst):
@@ -196,3 +198,35 @@ class HumanoidMulticontactPlanner:
                         costs[cv.key()][fddp_idx][model_idx] = costs_model[cv.key()].weight * costs_vec[cv.key()].cost
                     else:
                         costs[cv.key()][model_idx] = costs_model[cv.key()].weight * costs_vec[cv.key()].cost
+
+    def update_constraint_residuals_from_solver(self, solver_type='seq', integration_type='Euler'):
+        fddp_solver, _ = self.get_solver_and_costs()
+
+        # Check that all constraint names exist. If not, create them (e.g., for SCA constraints)
+        diff_model = fddp_solver[0].problem.runningDatas[0].differential
+        if integration_type != 'Euler':
+            diff_model = fddp_solver[0].problem.runningDatas[0].differential[0]
+        for constraint_entry in diff_model.constraints.constraints:
+            self.residuals[constraint_entry.key()] = [None] * len(fddp_solver[0].problem.runningDatas)
+
+        # populate with values
+        for fddp_idx, fddp in enumerate(fddp_solver):
+            len_datas = fddp.problem.T
+            for model_idx in range(len_datas):
+                runData = list(fddp.problem.runningDatas)[model_idx]
+                if hasattr(runData, 'differential'):
+                    if integration_type != 'Euler':
+                        constraints_vec = runData.differential[0].constraints.constraints
+                    else:
+                        # note: impulse model won't have constraints
+                        if hasattr(runData.differential.constraints, "constraints"):
+                            constraints_vec = runData.differential.constraints.constraints
+                        else:
+                            continue
+                else:
+                    continue
+                for cv in constraints_vec:
+                    if cv.key() in constraints_vec:
+                        self.residuals[cv.key()][model_idx] = constraints_vec[cv.key()].residual.r[0]
+                    else:
+                        self.residuals[cv.key()][model_idx] = np.nan

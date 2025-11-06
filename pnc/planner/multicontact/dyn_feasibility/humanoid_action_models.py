@@ -6,6 +6,7 @@ import pinocchio as pin
 import util.liegroup
 from config.multicontact.planner_config import PlannerConfig
 from pnc.planner.multicontact.crocoddyl_extensions.ActivationModelDistanceQuad import ActivationModelDistanceQuad
+from pnc.planner.multicontact.crocoddyl_extensions.ControlBounds import ControlBounds
 from pnc.planner.multicontact.crocoddyl_extensions.ResidualDistanceCollision import ResidualDistanceCollision
 from util.util import so3_from_vec_to_vec
 
@@ -162,7 +163,8 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     #
     # Adding state and control regularization terms
     #
-    weight_by_ulim = state.pinocchio.effortLimit[-(state.nv - 6):]
+    ulim = state.pinocchio.effortLimit[-(state.nv - 6):]
+    weight_by_ulim = ulim
     weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv - 6):]]
     w_x = np.copy(planner_weights.WBC_WEIGHTED_COSTS['xReg'])
     w_x[-actuation.nu:] *= wx_scale     # penalize more jvel of contact limb
@@ -212,52 +214,63 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         state, actuation.nu
     )
     if b_sca and geom_model is not None:
-        b_soft_col_avoid = False
-        for cp_idx, cp in enumerate(geom_model.collisionPairs):
-            cp_first_name = geom_model.geometryObjects[cp.first].name
-            cp_second_name = geom_model.geometryObjects[cp.second].name
-            if 'link_0' in cp_first_name:
-                cp_first_name = cp_first_name.replace('_link_0', '_joint')
-            elif 'primitive_shape' in cp_first_name:
-                cp_first_name = 'root_joint'
-            elif 'hand' in cp_first_name:
-                cp_first_name = cp_first_name.replace('rubber_hand_0', 'wrist_yaw_joint')
-            else:
-                raise ValueError(f'[SCA] Name parsing of {cp_first_name} not specified.')
-            # get joint id of nearest joint to the collision pair
-            j_id = robot_model.getJointId(cp_first_name)
+        # enforce torque limits as hard constraints
+        control_bounds = ControlBounds(state, actuation.nu)
+        u_bounds_res = crocoddyl.ConstraintModelResidual(state,
+                                          control_bounds,
+                                          -ulim,
+                                          ulim,
+                                          True)
+        runningConstraintModelManager.addConstraint('uBounds',
+                                                    u_bounds_res,
+                                                    True)
+        if True:
+            b_soft_col_avoid = False
+            for cp_idx, cp in enumerate(geom_model.collisionPairs):
+                cp_first_name = geom_model.geometryObjects[cp.first].name
+                cp_second_name = geom_model.geometryObjects[cp.second].name
+                if 'link_0' in cp_first_name:
+                    cp_first_name = cp_first_name.replace('_link_0', '_joint')
+                elif 'primitive_shape' in cp_first_name:
+                    cp_first_name = 'root_joint'
+                elif 'hand' in cp_first_name:
+                    cp_first_name = cp_first_name.replace('rubber_hand_0', 'wrist_yaw_joint')
+                else:
+                    raise ValueError(f'[SCA] Name parsing of {cp_first_name} not specified.')
+                # get joint id of nearest joint to the collision pair
+                j_id = robot_model.getJointId(cp_first_name)
 
-            # add as cost just for torso (debugging purposes -- remove IF condition later)
-            if 'root_joint' in cp_first_name or 'torso' in cp_second_name:
-                sca_alpha = 0.005
-                dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx,{},{})
-                # dist_col = crocoddyl.ResidualModelPairCollision(state, actuation.nu, geom_model, cp_idx, j_id)
-                if b_soft_col_avoid:
-                    activation_sca = ActivationModelDistanceQuad(1, 0.4, 0.2)
-                    # activation_sca = crocoddyl.ActivationModelQuadFlatExp(1, sca_alpha)
-                    # activation_sca = crocoddyl.ActivationModelQuadFlatExp(3, sca_alpha)
-                    # activation_sca = crocoddyl.ActivationModelQuadraticBarrier(
-                    #     crocoddyl.ActivationBounds(np.array([0.08, 0.08, 0.08]),
-                    #                                np.array([1.5, 1.5, 1.5]))
-                    # )
-                    sca_cost = crocoddyl.CostModelResidual(
-                        state,
-                        activation_sca,
-                        dist_col,
-                    )
-                    costs.addCost(cp_first_name + '_to_' + cp_second_name + "_sca",
-                                  sca_cost,
-                              planner_weights.WBC_COST_WEIGHTS['sca'])
-                else:   # use as hard inequality constraint
-                    # False to deactivate at terminal step
-                    col_avoid_constr = crocoddyl.ConstraintModelResidual(state,
-                                                                         dist_col,
-                                                                         np.array([0.0]),
-                                                                         np.array([np.inf]),
-                                                                         True)
-                    runningConstraintModelManager.addConstraint(cp_first_name + '_to_' + cp_second_name + "_sca",
-                                                                col_avoid_constr,
-                                                                True)
+                # add as cost just for torso (debugging purposes -- remove IF condition later)
+                if 'root_joint' in cp_first_name or 'torso' in cp_second_name:
+                    sca_alpha = 0.005
+                    dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx,{},{})
+                    # dist_col = crocoddyl.ResidualModelPairCollision(state, actuation.nu, geom_model, cp_idx, j_id)
+                    if b_soft_col_avoid:
+                        activation_sca = ActivationModelDistanceQuad(1, 0.4, 0.2)
+                        # activation_sca = crocoddyl.ActivationModelQuadFlatExp(1, sca_alpha)
+                        # activation_sca = crocoddyl.ActivationModelQuadFlatExp(3, sca_alpha)
+                        # activation_sca = crocoddyl.ActivationModelQuadraticBarrier(
+                        #     crocoddyl.ActivationBounds(np.array([0.08, 0.08, 0.08]),
+                        #                                np.array([1.5, 1.5, 1.5]))
+                        # )
+                        sca_cost = crocoddyl.CostModelResidual(
+                            state,
+                            activation_sca,
+                            dist_col,
+                        )
+                        costs.addCost(cp_first_name + '_to_' + cp_second_name + "_sca",
+                                      sca_cost,
+                                  planner_weights.WBC_COST_WEIGHTS['sca'])
+                    else:   # use as hard inequality constraint
+                        # False to deactivate at terminal step
+                        col_avoid_constr = crocoddyl.ConstraintModelResidual(state,
+                                                                             dist_col,
+                                                                             np.array([0.05]),
+                                                                             np.array([np.inf]),
+                                                                             True)
+                        runningConstraintModelManager.addConstraint(cp_first_name + '_to_' + cp_second_name + "_sca",
+                                                                    col_avoid_constr,
+                                                                    True)
 
 
     # Creating the action model
@@ -407,7 +420,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
     weight_by_mass = [i.mass for i in state.pinocchio.inertias.tolist()[-(state.nv-6):]]
 
     # Adding state and control regularization terms
-    w_x = np.copy(planner_weights.WBC_FINAL_WEIGHTED_COSTS['xReg'])
+    w_x = np.copy(planner_weights.WBC_PHASE_END_WEIGHTED_COSTS['xReg'])
     w_x[-actuation.nu:] *= wx_scale     # penalize more jvel of contact limb
     w_x[6:state.nq-1] *= wx_scale    # penalize more jpos of contact limb
 

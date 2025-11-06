@@ -9,6 +9,7 @@ class PlannerConfig(ABC):
     WBC_FRAME_TRACKING_GAINS : dict[str: np.ndarray] = {}  # gains for the whole-body planner frame tracking tasks
     WBC_FINAL_FRAME_TRACKING_GAINS : dict[str: np.ndarray] = {}  # gains for the terminal state of whole-body planner frame tracking tasks
     WBC_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for the whole-body planner frame tracking tasks
+    WBC_PHASE_END_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for WBP at end of each contact phase
     WBC_FINAL_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for the whole-body planner frame regularization task
     # ------ seq 0
     # WBP_CONTACT_JVEL_SCALE : float = 4.0   # weight on joint velocity scale of contact limb in the whole-body planner
@@ -29,19 +30,19 @@ class PlannerConfig(ABC):
         # 'frame_goal': 2e4,  # ergo (stairs):
         # 'frame_goal': 1e2,  # step on
         'xReg': 5e-1,
-        'uReg': 1e-1,
+        'uReg': 5e0,
         'xBounds': 1e4,   # step on, step over, on_balanced
         # 'xBounds': 1e3,   # ergoCub (stairs):
         'sca': 5e3     # using Exponential activation
         # 'sca': -1e2   # using QuadFlatExp activation
     }
     WBC_FINAL_COST_WEIGHTS = {
-        'friction': 1e0,   # step_over, on_balanced, step_on
+        'friction': 1e-2,   # step_over, on_balanced, step_on
         # 'frame_goal': 3e3,
         'frame_goal': 4e4,  # ergo (stairs):
         # 'xReg': 2e0,
         'xReg': 5e-1,    # step over, on_balanced
-        'uReg': 1e-1,
+        'uReg': 5e0,
         'xBounds': 6e3,     # step on, step over, on_balanced
         # 'xBounds': 1e3,     # ergoCub (stairs)
     }

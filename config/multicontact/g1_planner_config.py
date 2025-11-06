@@ -19,8 +19,8 @@ class MultiContactDoorConfig(PlannerConfig):
     # ALPHA = [1, 0., 0.005]        # option 4: roll shins high
     # W_RIGID_LINK = [10, 0., 30.]    # option 5: roll shins w/ knee on right side
     # ALPHA = [1, 0.0, {0.0, 0.001}]           # option 5: roll shins w/ knee on right side
-    # W_RIGID_LINK = [10, 0., 30.]    # option 6: high knees
-    # ALPHA = [0.1, 0.01, 0.]         # option 6: high knees
+    # W_RIGID_LINK = [1, 0., 8.]    # option 6: high knees
+    # ALPHA = [0.0, 0.0, 0.1]         # option 6: high knees
     # W_RIGID_LINK = [5, 0., 2]       # option 7: roll shins outwards
     # ALPHA = [0.5, 0.0, 0.1]         # option 7: roll shins outwards
     # N_HORIZON_LST = [180, 240, 280, 250, 250]
@@ -78,6 +78,10 @@ class MultiContactDoorConfig(PlannerConfig):
         # 'xReg': np.array([0] * 3 + [3.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [0.8] * (N_V - 6)), # step on balanced
         # 'uReg': np.array([0.4] * N_U),
         'uReg': np.array([0.5] * N_U),  # over, on
+    }
+    WBC_PHASE_END_WEIGHTED_COSTS = {
+        # 'xReg': np.array([0] * 3 + [6.0] * 3 + [4.] * (N_V - 6) + [5.] * N_V),    # step on balanced
+        'xReg': np.array([0] * 3 + [30.0] * 3 + [5.] * (N_V - 6) + [40.] * N_V),    # step on balanced
     }
     WBC_FINAL_WEIGHTED_COSTS = {
         # 'xReg': np.array([0] * 3 + [30.0] * 3 + [5.] * (N_V - 6) + [20.] * N_V),    # step on, over

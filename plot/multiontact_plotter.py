@@ -363,6 +363,40 @@ class MulticontactPlotter:
                         all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][curr_full_idx:next_full_idx]
         return all_costs
 
+    def plot_constraint_violations(self, constraintNames=None):
+        T = self._robot_planner.T
+        horizon_lst = self._robot_planner.horizon_lst
+        time = np.zeros((sum(horizon_lst) - 1, ))
+        phase = np.zeros((sum(horizon_lst) - 1, ), dtype=int)
+        residuals = self._robot_planner.residuals
+
+        # create time vector (same for all constraints)
+        for contact_phase in range(len(horizon_lst)):
+            # get current and next index
+            curr_idx = sum(horizon_lst[:contact_phase])
+            if contact_phase == (len(horizon_lst) - 1):
+                next_idx = curr_idx + horizon_lst[contact_phase] - 1
+                time[curr_idx:next_idx] = np.linspace(T * contact_phase, T * (contact_phase + 1),
+                                                      horizon_lst[contact_phase] - 1)
+            else:
+                next_idx = curr_idx + horizon_lst[contact_phase]
+                time[curr_idx:next_idx] = np.linspace(T * contact_phase, T * (contact_phase + 1), horizon_lst[contact_phase])
+            phase[curr_idx:next_idx] = contact_phase
+
+        # parse and plot all constraints
+        all_residuals = self.parse_costs(residuals, 'sca', horizon_lst)
+        plot_hold_vector_traj(time, all_residuals, 'Constraints Residuals', legends=list(residuals.keys()))
+
+        # plot only specific constraints of interest
+        if constraintNames is not None:
+            target_constraints = np.zeros((sum(horizon_lst) - 1, len(constraintNames)))
+            for t_idx, cn in enumerate(constraintNames):
+                if cn in residuals.keys():
+                    idx = list(residuals.keys()).index(cn)
+                    target_constraints[:, t_idx] = all_residuals[:, idx]
+
+            plot_hold_vector_traj(time, target_constraints, 'Specified Constraints Violations', legends=constraintNames)
+
     def _get_lleg_joint_ids(self):
         lleg_j_ids = []
         robot_model = self._robot_planner.robot_model

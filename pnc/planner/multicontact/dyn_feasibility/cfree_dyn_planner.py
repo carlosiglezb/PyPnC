@@ -1213,8 +1213,9 @@ def main(args):
             plan_plotter.plot_reduced_xs_us()
         if B_SHOW_COST_PLOTS:
             # plan_plotter.plot_costs('seq')
-            plan_plotter.plot_costs()
             # plan_plotter.plot_costs('full', ['right_hip_roll_joint_to_torso_primitive_shape_0_sca'])
+            plan_plotter.plot_costs()
+            plan_plotter.plot_constraint_violations()
         if B_SHOW_JOINT_LIM_PLOTS:
             plan_plotter.plot_joint_limit_margins()
         plt.show()
