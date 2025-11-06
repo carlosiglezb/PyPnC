@@ -114,7 +114,7 @@ class MulticontactPlotter:
     def get_full_to_trajectories(self):
         fddp, _ = self._robot_planner.get_solver_and_costs()
         # get xs and us from their logs or solver
-        if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ == "SolverSQP":
+        if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ in {"SolverSQP", "SolverCSQP"}:
             xs =  fddp[0].xs
             us = fddp[0].us
         else:
@@ -192,7 +192,7 @@ class MulticontactPlotter:
         elif to_type == 'sca':
             fddp = [self._robot_planner.fddp_full_sca]
             # get xs and us from their logs or solver
-            if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ == "SolverSQP":
+            if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ in {"SolverSQP", "SolverCSQP"}:
                 xs = fddp[0].xs
                 us = fddp[0].us
             else:

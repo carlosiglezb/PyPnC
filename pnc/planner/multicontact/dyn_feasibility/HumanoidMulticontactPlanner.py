@@ -207,6 +207,8 @@ class HumanoidMulticontactPlanner:
         if integration_type != 'Euler':
             diff_model = fddp_solver[0].problem.runningDatas[0].differential[0]
         for constraint_entry in diff_model.constraints.constraints:
+            if len(diff_model.constraints.constraints[constraint_entry.key()].residual.r) > 1:
+                continue  # only store scalar residuals for now
             self.residuals[constraint_entry.key()] = [None] * len(fddp_solver[0].problem.runningDatas)
 
         # populate with values
@@ -227,6 +229,8 @@ class HumanoidMulticontactPlanner:
                     continue
                 for cv in constraints_vec:
                     if cv.key() in constraints_vec:
+                        if len(constraints_vec[cv.key()].residual.r) > 1:
+                            continue  # only store scalar residuals for now
                         self.residuals[cv.key()][model_idx] = constraints_vec[cv.key()].residual.r[0]
                     else:
                         self.residuals[cv.key()][model_idx] = np.nan

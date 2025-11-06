@@ -265,7 +265,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                         # False to deactivate at terminal step
                         col_avoid_constr = crocoddyl.ConstraintModelResidual(state,
                                                                              dist_col,
-                                                                             np.array([0.05]),
+                                                                             np.array([0.0]),
                                                                              np.array([np.inf]),
                                                                              True)
                         runningConstraintModelManager.addConstraint(cp_first_name + '_to_' + cp_second_name + "_sca",

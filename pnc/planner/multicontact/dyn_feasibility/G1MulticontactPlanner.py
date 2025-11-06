@@ -337,8 +337,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
         problem = crocoddyl.ShootingProblem(x0, sum(np.vstack(model_seqs).tolist(), [])[:-1], model_seqs[-1][-1])
         if solver_type == 'SQP':
-            print("[SCA-Crocoddyl] Using SQP solver for SCA refinement")
-            self.fddp_full_sca = mim_solvers.SolverSQP(problem)
+            print("[SCA-Crocoddyl] Using CSQP solver for SCA refinement")
+            self.fddp_full_sca = mim_solvers.SolverCSQP(problem)
             self.fddp_full_sca.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose()])
             self.fddp_full_sca.termination_tolerance = 1e-1
             self.fddp_full_sca.eps_abs = 1e-1
