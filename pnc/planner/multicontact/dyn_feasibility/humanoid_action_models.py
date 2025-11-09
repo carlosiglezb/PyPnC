@@ -119,6 +119,10 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
 
     # Add frame-placement cost
     for fr_name, fr_id in plan_to_model_ids.items():
+        # skip if no target is provided for this frame (used mostly for baseline planner)
+        if fr_name not in frame_targets_dict.keys():
+            continue
+
         # set higher tracking cost on feet
         if 'F' in fr_name:
             w_fr = planner_weights.WBC_FRAME_TRACKING_GAINS['feet']
@@ -292,7 +296,7 @@ def createMultiFrameFinalActionModel(state: crocoddyl.StateMultibody,
                                 zero_config: np.array = None,
                                 v_ref: np.array = None,
                                 terminal_step: bool = False,
-                                robot_model: pinocchio.Model = None):
+                                robot_model: pinocchio.Model = None) -> crocoddyl.DifferentialActionModelContactFwdDynamics:
     desired_config = np.copy(x0)
 
     # Define the cost sum (cost manager)
@@ -493,7 +497,7 @@ def createMultiFrameFinalImpulseModel(state: crocoddyl.StateMultibody,
                                       frame_targets_dict: dict[str, np.array],
                                       planner_weights: PlannerConfig = None,
                                       zero_config: np.array = None,
-                                      v_ref: np.array = None):
+                                      v_ref: np.array = None) -> crocoddyl.ActionModelImpulseFwdDynamics:
     desired_config = np.copy(x0)
 
     # Creating a 6D multi-contact model, and then including the supporting foot

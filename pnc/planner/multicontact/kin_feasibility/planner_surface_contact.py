@@ -59,7 +59,7 @@ class MotionFrameSequencer:
     def get_contact_surfaces(self):
         return self.contact_frame_lst
 
-def get_contact_seq_from_fixed_frames_seq(fixed_frames_seq: list[list[str]]):
+def get_contact_seq_from_fixed_frames_seq(fixed_frames_seq: list[list[str]]) -> list[list[str]]:
     contact_frames = ['LF', 'RF', 'LH', 'RH']
     contact_frames_seq = []
     for seq in fixed_frames_seq:
