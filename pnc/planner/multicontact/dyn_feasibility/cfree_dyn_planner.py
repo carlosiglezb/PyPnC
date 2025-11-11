@@ -4,9 +4,11 @@ import sys
 from collections import OrderedDict
 
 import config.multicontact.g1_planner_config as g1_params
+import config.multicontact.g1_baseline_planner_config as g1_baseline_params
 import config.multicontact.ergoCub_planner_config as ergoCub_params
 import config.multicontact.valkyrie_planner_config as valkyrie_params
 from pnc.planner.multicontact.kin_feasibility import SCARobotGeometry
+
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 from util.environment_creator import TiltedStairs
 import pnc.planner.multicontact.contact_sequence_plans.tilted_stairs_plans as stairs_plan
@@ -32,6 +34,9 @@ from pnc.planner.multicontact.dyn_feasibility.ErgoCubMulticontactPlanner import 
 from pnc.planner.multicontact.dyn_feasibility.ValkyrieMulticontactPlanner import ValkyrieMulticontactPlanner
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import ContactSequence
 
+# Baseline planner
+from pnc.planner.multicontact.kin_feasibility.baseline_frame_planner import BaselineFramePlanner
+
 # Visualization tools
 import matplotlib.pyplot as plt
 from plot.helper import plot_vector_traj, Fxyz_labels
@@ -41,18 +46,29 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 # Save data
 from plot.data_saver import *
 
-B_SHOW_JOINT_PLOTS = False
+# Plots visuals
+B_SHOW_JOINT_PLOTS = True
 B_SHOW_JOINT_LIM_PLOTS = True
-B_SHOW_COST_PLOTS = False
-B_SHOW_GRF_PLOTS = False
-B_VISUALIZE = False
-B_SAVE_KIN_DATA = False
-B_SAVE_DYN_DATA = False
-B_VERBOSE = False
+B_SHOW_COST_PLOTS = True
+B_SHOW_GRF_PLOTS = True
+
+# Meshcat visuals
+B_VISUALIZE_KIN = False
+B_VISUALIZE_DYN = True
 B_SAVE_HTML = False
+
+# Planner options
+B_SCA_REFINEMENT = False
+B_SOLVE_HYBRID = False
+B_BASELINE = True
+B_VERBOSE = False
 B_USE_SELF_COLLISION_AVOIDANCE = True
 B_USE_KNEES = True
 B_USE_KNEES_IN_SMOOTH_PLAN = False   # set to False when crossing door in single step (i.e., mode 0)
+
+# Data recording
+B_SAVE_KIN_DATA = False
+B_SAVE_DYN_DATA = False
 
 
 def get_g1_default_initial_pose(n_joints:int, env: str = 'door'):
@@ -875,7 +891,12 @@ def main(args):
             q0 = get_g1_default_initial_pose(rob_model.nq - 7)
             door_pos = np.array([0.32, 0., 0.])
             step_length = 0.46
+            # TODO fix/customize planner parameter selection
             planner_params = g1_params.MultiContactDoorConfig()
+            # if B_BASELINE:
+            #     planner_params = g1_baseline_params.MultiContactDoorConfig()
+            # else:
+            #     planner_params = g1_params.MultiContactDoorConfig()
         elif robot_name == 'valkyrie':
             q0 = get_val_default_initial_pose(rob_model.nq - 7)
             door_pos = np.array([0.34, 0., 0.])
@@ -909,6 +930,10 @@ def main(args):
     else:
         raise NotImplementedError('Specified environment cannot be loaded')
 
+    if B_BASELINE:
+        base_str = '_baseline'
+    else:
+        base_str = '_guided'
     if kin_plan_path is None:
 
         # Update Pinocchio model
@@ -958,7 +983,7 @@ def main(args):
         else:
             raise NotImplementedError(f'Assign a method to compute IRIS regions for env {env}')
 
-        if B_VISUALIZE:
+        if B_VISUALIZE_KIN:
             if env == 'door':
                 visualizer, door_model, door_collision_model, door_visual_model \
                     = visualize_env(rob_model, col_model, vis_model, q0, door_pose)
@@ -977,14 +1002,14 @@ def main(args):
         for fr in plan_to_model_frames.keys():
             if fr == 'torso':
                 traversable_regions_dict[fr] = FrameTraversableRegion(fr,
-                                                                      b_visualize_reach=B_VISUALIZE,
-                                                                      b_visualize_safe=B_VISUALIZE,
+                                                                      b_visualize_reach=B_VISUALIZE_KIN,
+                                                                      b_visualize_safe=B_VISUALIZE_KIN,
                                                                       visualizer=visualizer)
             else:
                 traversable_regions_dict[fr] = FrameTraversableRegion(fr,
                                                                       ee_halfspace_params[fr],
-                                                                      b_visualize_reach=B_VISUALIZE,
-                                                                      b_visualize_safe=B_VISUALIZE,
+                                                                      b_visualize_reach=B_VISUALIZE_KIN,
+                                                                      b_visualize_safe=B_VISUALIZE_KIN,
                                                                       visualizer=visualizer,
                                                                       root_to_torso_pos=root_to_torso_offset)
                 traversable_regions_dict[fr].update_origin_pose(standing_pos)
@@ -1008,56 +1033,62 @@ def main(args):
         contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames_seq)
         contact_seq_planes = get_contact_planes_from_motion_frames_seq(contact_seqs, motion_frames_seq)
 
+        sca_str = '_'
         # planner parameters
         T = 3
+        if not B_BASELINE:
+            # use self-collision avoidance
+            sca_geometry = None
+            if B_USE_SELF_COLLISION_AVOIDANCE:
+                sca_str = '_sca_'
+                sca_geometry = SCARobotGeometry(package_dir, robot_urdf_file, plan_to_model_frames)
+            traversable_regions = [traversable_regions_dict['torso'],
+                                   traversable_regions_dict['LF'],
+                                   traversable_regions_dict['RF'],
+                                   traversable_regions_dict['L_knee'],
+                                   traversable_regions_dict['R_knee'],
+                                   traversable_regions_dict['LH'],
+                                   traversable_regions_dict['RH']]
+            frame_planner = LocomanipulationFramePlanner(traversable_regions,
+                                                         aux_frames_path=aux_frames_path,
+                                                         fixed_frames=fixed_frames_seq,
+                                                         motion_frames_seq=motion_frames_seq,
+                                                         sca_robot_geom=sca_geometry,
+                                                         b_use_knees_in_smooth_plan=B_USE_KNEES_IN_SMOOTH_PLAN)
 
-        # use self-collision avoidance
-        sca_geometry = None
-        sca_str = '_'
-        if B_USE_SELF_COLLISION_AVOIDANCE:
-            sca_str = '_sca_'
-            sca_geometry = SCARobotGeometry(package_dir, robot_urdf_file, plan_to_model_frames)
-        traversable_regions = [traversable_regions_dict['torso'],
-                               traversable_regions_dict['LF'],
-                               traversable_regions_dict['RF'],
-                               traversable_regions_dict['L_knee'],
-                               traversable_regions_dict['R_knee'],
-                               traversable_regions_dict['LH'],
-                               traversable_regions_dict['RH']]
-        frame_planner = LocomanipulationFramePlanner(traversable_regions,
-                                                     aux_frames_path=aux_frames_path,
-                                                     fixed_frames=fixed_frames_seq,
-                                                     motion_frames_seq=motion_frames_seq,
-                                                     sca_robot_geom=sca_geometry,
-                                                     b_use_knees_in_smooth_plan=B_USE_KNEES_IN_SMOOTH_PLAN)
+            # compute paths and create targets
+            ik_cfree_planner.set_planner(frame_planner)
+            ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
+            ik_cfree_planner.plan(p_init, T, planner_params, visualizer, B_VERBOSE)
 
-        # compute paths and create targets
-        ik_cfree_planner.set_planner(frame_planner)
-        ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
-        ik_cfree_planner.plan(p_init, T, planner_params, visualizer, B_VERBOSE)
+            if B_SAVE_KIN_DATA:
+                # save the solution parameters needed to reconstruct the Bezier curves
+                if env == 'door':
+                    save_filename = robot_name + sca_str + 'step_' + seq_str + '_knee_knocker_kin.pkl'
+                elif env == 'stairs':
+                    save_filename = robot_name + sca_str + 'tilted_stairs_kin.pkl'
+                else:
+                    raise NotImplementedError(f"Filename to save data for environment {env} not implemented")
+                transition_times = []
+                n_frames = len(ik_cfree_planner.planner.path)
+                kin_data_saver = DataSaver(save_filename)
+                kin_data_saver.add('bez_points', ik_cfree_planner.planner.points)
+                for i in range(n_frames):
+                    transition_times.append(ik_cfree_planner.planner.path[i].transition_times)
+                kin_data_saver.add('bez_points_transition_times', transition_times)
+                kin_data_saver.add('n_frames', n_frames)
+                kin_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
+                kin_data_saver.add('bez_path', ik_cfree_planner.planner.path)
+                kin_data_saver.add('fixed_frames', fixed_frames_seq)
+                kin_data_saver.add('contact_seq_planes', contact_seq_planes)
+                kin_data_saver.advance()
+                kin_data_saver.close()
+        else:
+            # create target dictionaries for baseline planner
 
-        if B_SAVE_KIN_DATA:
-            # save the solution parameters needed to reconstruct the Bezier curves
-            if env == 'door':
-                save_filename = robot_name + sca_str + 'step_' + seq_str + '_knee_knocker_kin.pkl'
-            elif env == 'stairs':
-                save_filename = robot_name + sca_str + 'tilted_stairs_kin.pkl'
-            else:
-                raise NotImplementedError(f"Filename to save data for environment {env} not implemented")
-            transition_times = []
-            n_frames = len(ik_cfree_planner.planner.path)
-            kin_data_saver = DataSaver(save_filename)
-            kin_data_saver.add('bez_points', ik_cfree_planner.planner.points)
-            for i in range(n_frames):
-                transition_times.append(ik_cfree_planner.planner.path[i].transition_times)
-            kin_data_saver.add('bez_points_transition_times', transition_times)
-            kin_data_saver.add('n_frames', n_frames)
-            kin_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
-            kin_data_saver.add('bez_path', ik_cfree_planner.planner.path)
-            kin_data_saver.add('fixed_frames', fixed_frames_seq)
-            kin_data_saver.add('contact_seq_planes', contact_seq_planes)
-            kin_data_saver.advance()
-            kin_data_saver.close()
+            # override kinematic planner with baseline planner
+            frame_planner = BaselineFramePlanner(rob_data, plan_to_model_ids, motion_frames_seq, fixed_frames_seq)
+            ik_cfree_planner.set_planner(frame_planner)
 
     else:
         print(f' {"*" * 8} Loading solution from {kin_plan_path} {"*" * 8}')
@@ -1076,8 +1107,10 @@ def main(args):
         # contact_seqs[-1].remove('RH')
         T = ik_cfree_planner[0].beziers[0].b
 
-        # load knee knocker visualization and collision models
-        door_model, door_collision_model, door_visual_model = load_navy_door_models()
+    if B_VISUALIZE_KIN or B_VISUALIZE_DYN:
+        if env == 'door':
+            # load knee knocker visualization and collision models
+            door_model, door_collision_model, door_visual_model = load_navy_door_models()
 
     #
     # Start Dynamic Feasibility Check
@@ -1100,7 +1133,7 @@ def main(args):
         raise NotImplementedError(f"Matching multicontact planner for {robot_name} not found")
 
     # visualize kinematic plan
-    if B_VISUALIZE:
+    if B_VISUALIZE_KIN:
         N_knots = len(robot_dyn_plan.lf_targets)
         n_contacts = len(N_horizon_lst)
         save_freq = 10
@@ -1158,7 +1191,7 @@ def main(args):
 
     robot_dyn_plan.set_plan_to_model_params(plan_to_model_ids)
     robot_dyn_plan.set_initial_configuration(x0)
-    robot_dyn_plan.plan(b_solve_hybrid=True, integration_type='Euler', sca_refinement=True)
+    robot_dyn_plan.plan(b_solve_hybrid=B_SOLVE_HYBRID, integration_type='Euler', sca_refinement=B_SCA_REFINEMENT)
 
     # strings for saving data
     if kin_plan_path is not None:
@@ -1170,7 +1203,7 @@ def main(args):
         action_str = 'step_' if env == 'door' else '_'
 
     # Creating display
-    if B_VISUALIZE:
+    if B_VISUALIZE_DYN:
         save_freq = 10
         display_idx = np.arange(0, len(robot_dyn_plan.lf_targets), save_freq)
         display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
@@ -1179,13 +1212,14 @@ def main(args):
             display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
         elif 'stairs' in env:
             display.add_shapes_from(stairs.obstacles_vis)
-        display.display_targets("lfoot_target", robot_dyn_plan.lf_targets[display_idx], [1, 1, 0])
-        display.display_targets("lknee_target", robot_dyn_plan.lkn_targets[display_idx], [0, 0, 1])
-        display.display_targets("rfoot_target", robot_dyn_plan.rf_targets[display_idx], [1, 1, 0])
-        display.display_targets("rknee_target", robot_dyn_plan.rkn_targets[display_idx], [0, 0, 1])
-        display.display_targets("lhand_target", robot_dyn_plan.lh_targets[display_idx], [0.5, 0, 0])
-        display.display_targets("rhand_target", robot_dyn_plan.rh_targets[display_idx], [0.5, 0, 0])
-        display.display_targets("base_target", robot_dyn_plan.base_targets[display_idx], [0, 0.5, 0])
+        if not B_BASELINE:
+            display.display_targets("lfoot_target", robot_dyn_plan.lf_targets[display_idx], [1, 1, 0])
+            display.display_targets("lknee_target", robot_dyn_plan.lkn_targets[display_idx], [0, 0, 1])
+            display.display_targets("rfoot_target", robot_dyn_plan.rf_targets[display_idx], [1, 1, 0])
+            display.display_targets("rknee_target", robot_dyn_plan.rkn_targets[display_idx], [0, 0, 1])
+            display.display_targets("lhand_target", robot_dyn_plan.lh_targets[display_idx], [0.5, 0, 0])
+            display.display_targets("rhand_target", robot_dyn_plan.rh_targets[display_idx], [0.5, 0, 0])
+            display.display_targets("base_target", robot_dyn_plan.base_targets[display_idx], [0, 0.5, 0])
         display.add_arrow("forces/" + force_joint_frames['LF'], color=[1, 0, 0])
         display.add_arrow("forces/" + force_joint_frames['RF'], color=[0, 0, 1])
         display.add_arrow("forces/" + force_joint_frames['LH'], color=[0, 1, 0])
@@ -1218,7 +1252,7 @@ def main(args):
             plan_plotter.plot_constraint_violations()
         if B_SHOW_JOINT_LIM_PLOTS:
             plan_plotter.plot_joint_limit_margins()
-        plt.show()
+        # plt.show()
 
     if B_SHOW_GRF_PLOTS or B_SAVE_DYN_DATA:
         if robot_dyn_plan.solver_type == 'sca':
@@ -1272,7 +1306,7 @@ def main(args):
 
     if B_SAVE_DYN_DATA:
         # Saving data tools
-        dyn_data_saver = DataSaver(robot_name + sca_str + action_str + seq_str + env +'.pkl')
+        dyn_data_saver = DataSaver(robot_name + base_str + sca_str + action_str + seq_str + env +'.pkl')
         # save kinematic TO solution
         if hasattr(ik_cfree_planner, 'planner'):
             dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)

@@ -10,6 +10,7 @@ import numpy as np
 from config.multicontact.planner_config import PlannerConfig
 from util.path_parameterization import CompositeBezierCurve, get_bez_segment, get_frame_des_pos
 from util import util
+from .baseline_frame_planner import BaselineFramePlanner
 # Planner
 from .locomanipulation_frame_planner import LocomanipulationFramePlanner
 
@@ -156,7 +157,7 @@ class IKCFreePlanner:
                     left_hand_task, right_hand_task] #, posture_task,
                     # l_knee_holonomic_task, r_knee_holonomic_task]
 
-    def set_planner(self, planner: LocomanipulationFramePlanner):
+    def set_planner(self, planner: LocomanipulationFramePlanner | BaselineFramePlanner):
         self.planner = planner
 
     def plan(self, p_init: np.array,

@@ -105,7 +105,12 @@ class HumanoidMulticontactPlanner:
                       'L_knee_goal': [None] * (tot_num_knots + num_contact_phases - 2),
                       'R_knee_goal': [None] * (tot_num_knots + num_contact_phases - 2)}
 
-        self.residuals = {}
+        self.residuals = {
+            'LF_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+            'RF_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+            'LH_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+            'RH_friction': [None] * (tot_num_knots + num_contact_phases - 2),
+        }
 
         # initialize all costs
         for cost_name, cost_lst in self.costs.items():
@@ -121,29 +126,11 @@ class HumanoidMulticontactPlanner:
         self.plan_to_model_ids = plan_to_model_ids
 
     def pack_current_targets(self, t):
-        idx_LF = self.frame_names_lst.index('LF')
-        idx_L_knee = self.frame_names_lst.index('L_knee')
-        idx_RF = self.frame_names_lst.index('RF')
-        idx_R_knee = self.frame_names_lst.index('R_knee')
-        idx_LH = self.frame_names_lst.index('LH')
-        idx_RH = self.frame_names_lst.index('RH')
-        idx_torso = self.frame_names_lst.index('torso')
-        lfoot_t = get_frame_des_pos(self.ik_cfree_planner[idx_LF], t)
-        lknee_t = get_frame_des_pos(self.ik_cfree_planner[idx_L_knee], t)
-        rfoot_t = get_frame_des_pos(self.ik_cfree_planner[idx_RF], t)
-        rknee_t = get_frame_des_pos(self.ik_cfree_planner[idx_R_knee], t)
-        lhand_t = get_frame_des_pos(self.ik_cfree_planner[idx_LH], t)
-        rhand_t = get_frame_des_pos(self.ik_cfree_planner[idx_RH], t)
-        base_t = get_frame_des_pos(self.ik_cfree_planner[idx_torso], t)
-        frame_targets_dict = {
-            'torso': base_t,
-            'LF': lfoot_t,
-            'RF': rfoot_t,
-            'L_knee': lknee_t,
-            'R_knee': rknee_t,
-            'LH': lhand_t,
-            'RH': rhand_t
-        }
+        frame_targets_dict = {}
+        for name in ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']:
+            if name in self.frame_names_lst:
+                idx = self.frame_names_lst.index(name)
+                frame_targets_dict[name] = get_frame_des_pos(self.ik_cfree_planner[idx], t)
         return frame_targets_dict
 
     def get_solver_and_costs(self):

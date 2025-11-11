@@ -15,10 +15,6 @@ from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (cre
                                                                              quasi_static_ocp)
 
 
-def get_terminal_feet_gains():
-    return np.array([12.] * 3 + [4.5] * 3)
-
-
 class G1MulticontactPlanner(HumanoidMulticontactPlanner):
     def __init__(self, robot_model,
                  contact_seqs,
@@ -69,7 +65,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             DT = T / (N_current - 1)
             for t in np.linspace(i * T, (i + 1) * T, N_current):
                 if hasattr(self.ik_cfree_planner, "planner"):
-                    frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
+                    if self.ik_cfree_planner.planner.__class__.__name__ == "LocomanipulationFramePlanner":
+                        frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
+                    elif self.ik_cfree_planner.planner.__class__.__name__ == "BaselineFramePlanner":
+                        frame_targets_dict = self.ik_cfree_planner.planner.get_phase_targets(i + 1)
+                    else:
+                        raise ValueError("Unknown planner type in ik_cfree_planner")
                 else:
                     frame_targets_dict = self.pack_current_targets(t)   # used for data reload
                 if t < (i + 1) * T:
@@ -115,13 +116,20 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                     print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
 
                 # save targets
-                self.base_targets[self.knot_idx] = frame_targets_dict['torso']
-                self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
-                self.rf_targets[self.knot_idx] = frame_targets_dict['RF']
-                self.lh_targets[self.knot_idx] = frame_targets_dict['LH']
-                self.rh_targets[self.knot_idx] = frame_targets_dict['RH']
-                self.rkn_targets[self.knot_idx] = frame_targets_dict['R_knee']
-                self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
+                if 'torso' in frame_targets_dict:
+                    self.base_targets[self.knot_idx] = frame_targets_dict['torso']
+                if 'LF' in frame_targets_dict:
+                    self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
+                if 'RF' in frame_targets_dict:
+                    self.rf_targets[self.knot_idx] = frame_targets_dict['RF']
+                if 'LH' in frame_targets_dict:
+                    self.lh_targets[self.knot_idx] = frame_targets_dict['LH']
+                if 'RH' in frame_targets_dict:
+                    self.rh_targets[self.knot_idx] = frame_targets_dict['RH']
+                if 'R_knee' in frame_targets_dict:
+                    self.rkn_targets[self.knot_idx] = frame_targets_dict['R_knee']
+                if 'L_knee' in frame_targets_dict:
+                    self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
                 self.knot_idx += 1
 
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
@@ -141,6 +149,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             if i == 1 or i == 2 or i == 3:   # harder to solve, needs more iterations
                 fddp[i].reg_incFactor = 2         # default is 10 (smaller works for tight guess)
                 fddp[i].reg_decFactor = 2         # default is 10 (smaller works for tight guess)
+
             #     fddp[i].th_acceptStep = 0.01        # default is 0.1
             # fddp[i].th_acceptStep = 0.01     # default is 0.1
             # fddp[i].reg_min = 1e-3             # default is 1e-9
@@ -189,7 +198,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 frames_in_contact = self.contact_planes_seq[i]
                 next_frames_in_contact = self.contact_planes_seq[i + 1]
                 if hasattr(self.ik_cfree_planner, "planner"):
-                    frame_targets_dict = self.ik_cfree_planner.pack_current_targets((i + 1) * T)
+                    if self.ik_cfree_planner.planner.__class__.__name__ == "LocomanipulationFramePlanner":
+                        frame_targets_dict = self.ik_cfree_planner.pack_current_targets((i + 1) * T)
+                    elif self.ik_cfree_planner.planner.__class__.__name__ == "BaselineFramePlanner":
+                        frame_targets_dict = self.ik_cfree_planner.planner.get_phase_targets(i + 1)
+                    else:
+                        raise ValueError("Unknown planner type in ik_cfree_planner")
                 else:
                     frame_targets_dict = self.pack_current_targets((i + 1) * T)  # used for data reload
                 x_last = copy(fddp[i].xs[-1])
@@ -262,7 +276,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             DT = T / (N_current - 1)
             for t in np.linspace(i * T, (i + 1) * T, N_current):
                 if hasattr(self.ik_cfree_planner, "planner"):
-                    frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
+                    if self.ik_cfree_planner.planner.__class__.__name__ == "LocomanipulationFramePlanner":
+                        frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
+                    elif self.ik_cfree_planner.planner.__class__.__name__ == "BaselineFramePlanner":
+                        frame_targets_dict = self.ik_cfree_planner.planner.get_phase_targets(i + 1)
+                    else:
+                        raise ValueError("Unknown planner type in ik_cfree_planner")
                 else:
                     frame_targets_dict = self.pack_current_targets(t)   # used for data reload
                 if t < (i + 1) * T:
@@ -344,9 +363,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.eps_abs = 1e-1
             self.fddp_full_sca.eps_rel = 1e-1
             self.fddp_full_sca.filter_size = 10
+            self.fddp_full_sca.update_rho_with_heuristic = True
+            self.fddp_full_sca.max_qp_iters = 500
             # self.fddp_full_sca.use_filter_line_search = False   # (default: True)
             # self.fddp_full_sca.mu_dynamic = -1  # Nocedal's L1 merit function
             # self.fddp_full_sca.lag_mul_inf_norm_coef = 10
+            # self.fddp_full_sca.max_qp_iters = 50
         else:
             print("[SCA-Crocoddyl] Using BoxFDDP solver for SCA refinement")
             self.fddp_full_sca = crocoddyl.SolverBoxFDDP(problem)
@@ -364,13 +386,14 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         # Set initial guess from previous full solve
         xs = copy(self.fddp_full.xs)
         us = StdVec_VectorX.copy(self.fddp_full.us)
-        # xs = copy(self.fddp_full.xs)
+        # uncomment below when removing impulse models from the guess
         # idx_removed = 0
         # for idx in range(len(self.horizon_lst) - 1):
         #     idx_sum = sum(self.horizon_lst[:idx+1])
         #     del xs[idx_sum]
         #     del us[idx_sum]
         #     idx_removed += 1
+
         start_ddp_solve_time = time.time()
         print("[SCA-Crocoddyl] Problem solved to convergence:", self.fddp_full_sca.solve(xs, us, max_iter))
         dyn_seg_solve_time = time.time() - start_ddp_solve_time
