@@ -36,7 +36,8 @@ class HumanoidMulticontactPlanner:
         self.ee_rpy = {'LH': [0., 0., 0.], 'RH': [0., 0., 0.]}
 
         self.contact_phases = num_contact_phases = len(contact_seqs.phases_knots)
-        self.fddp = [crocoddyl.SolverFDDP] * num_contact_phases
+        self.fddp = [crocoddyl.SolverFDDP] * num_contact_phases   # if solving by sections
+        self.fddp_single = crocoddyl.SolverFDDP
         self.fddp_full = crocoddyl.SolverFDDP
         self.fddp_full_sca = crocoddyl.SolverFDDP
         self.T = contact_seqs.phases_durations  # time_per_phase
@@ -138,6 +139,9 @@ class HumanoidMulticontactPlanner:
         if solver_type == 'seq':
             fddp_solver = self.fddp
             costs = self.costs
+        elif solver_type == 'single':
+            fddp_solver = [self.fddp_single]
+            costs = self.costs_full
         elif solver_type == 'full':
             fddp_solver = [self.fddp_full]
             costs = self.costs_full

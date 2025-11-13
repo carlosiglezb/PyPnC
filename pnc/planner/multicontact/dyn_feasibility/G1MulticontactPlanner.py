@@ -45,7 +45,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
     def plan(self, b_solve_hybrid: bool=True,
              integration_type: str='Euler',
-             sca_refinement: bool=False):
+             sca_refinement: bool=False,
+             b_solve_by_sections: bool=False):
         dyn_seg_solve_time = []
 
         state = self.state
@@ -56,30 +57,141 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         planner_params = self.planner_params
         zero_config = self._zero_config
 
-        fddp = self.fddp
         model_seq_all = []
-        for i in range(self.contact_phases):
+        if b_solve_by_sections:
+            self.solver_type = 'seq'
+            fddp = self.fddp
+            for i in range(self.contact_phases):
+                model_seqs = []
+                frames_in_contact = self.contact_planes_seq[i]
+                N_current = self.horizon_lst[i]
+                DT = T / (N_current - 1)
+                for t in np.linspace(i * T, (i + 1) * T, N_current):
+                    frame_targets_dict = self.get_targets_from_planner(i, t)
+                    if t < (i + 1) * T:
+                        # get upcoming frames in contact (unless in last contact phase)
+                        if i != (self.contact_phases - 1):
+                            next_frames_in_contact = self.contact_planes_seq[i + 1]
+                        else:
+                            # last contact phase
+                            next_frames_in_contact = frames_in_contact
+                        dmodel = createMultiFrameActionModel(state,
+                                                             actuation,
+                                                             x0,
+                                                             plan_to_model_ids,
+                                                             frames_in_contact,
+                                                             next_frames_in_contact,
+                                                             frame_targets_dict,
+                                                             joint_names_dict=self.joint_names_dict,
+                                                             planner_weights=planner_params,
+                                                             geom_model=self.geom_model,
+                                                             robot_model=self.robot_model)
+                        model_seqs += createSequence([dmodel], DT, 1, integration_type)
+                    else:   # last time knot in current contact phase
+                        if i != (self.contact_phases - 1):
+                            next_frames_in_contact = self.contact_planes_seq[i + 1]
+                            terminal_step = False   # only set desired joint velocities to zero
+                        else:
+                            next_frames_in_contact = frames_in_contact
+                            terminal_step = True    # sets desired pose to zero config and zero joint velocities
+                        # in the last time step, we use higher weights on frame orientations
+                        dmodel = createMultiFrameFinalActionModel(state,
+                                                                  actuation,
+                                                                  x0,
+                                                                  plan_to_model_ids,
+                                                                  frames_in_contact,
+                                                                  next_frames_in_contact,
+                                                                  frame_targets_dict,
+                                                                  joint_names_dict=self.joint_names_dict,
+                                                                  planner_weights=planner_params,
+                                                                  zero_config=zero_config,
+                                                                  terminal_step=terminal_step,
+                                                                  robot_model=self.robot_model)
+                        model_seqs += createFinalSequence([dmodel], integration_type)
+                        print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
+
+                    # save targets
+                    if 'torso' in frame_targets_dict:
+                        self.base_targets[self.knot_idx] = frame_targets_dict['torso']
+                    if 'LF' in frame_targets_dict:
+                        self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
+                    if 'RF' in frame_targets_dict:
+                        self.rf_targets[self.knot_idx] = frame_targets_dict['RF']
+                    if 'LH' in frame_targets_dict:
+                        self.lh_targets[self.knot_idx] = frame_targets_dict['LH']
+                    if 'RH' in frame_targets_dict:
+                        self.rh_targets[self.knot_idx] = frame_targets_dict['RH']
+                    if 'R_knee' in frame_targets_dict:
+                        self.rkn_targets[self.knot_idx] = frame_targets_dict['R_knee']
+                    if 'L_knee' in frame_targets_dict:
+                        self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
+                    self.knot_idx += 1
+
+                problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
+                fddp[i] = crocoddyl.SolverBoxFDDP(problem)
+
+                # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
+                # fddp[i].setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
+                fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
+
+                # Solver settings
+                max_iter = 250
+                fddp[i].th_stop = 1e-3
+                fddp[i].th_gapTol = 1e-2
+                fddp[i].reg_max = 1e4
+                fddp[i].reg_incFactor = 3
+                fddp[i].reg_decFactor = 3
+                if i == 1 or i == 2 or i == 3:   # harder to solve, needs more iterations
+                    fddp[i].reg_incFactor = 2         # default is 10 (smaller works for tight guess)
+                    fddp[i].reg_decFactor = 2         # default is 10 (smaller works for tight guess)
+                #     fddp[i].th_acceptStep = 0.01        # default is 0.1
+                # fddp[i].th_acceptStep = 0.01     # default is 0.1
+                # fddp[i].reg_min = 1e-3             # default is 1e-9
+                # fddp[i].reg_max = 1e3
+                # fddp[i].th_gaptol(1e-12); // default is 1e-16
+                # fddp[i].th_grad = 1e-2
+                # fddp[i].th_feas = 1e-3
+                # fddp[i].th_stop(1e-2)
+
+                # Set initial guess
+                xs = [x0] * (fddp[i].problem.T + 1)
+                us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0)
+                if integration_type == 'RK2':
+                    us_static = np.concatenate((us_static, us_static))
+                us = [us_static] * fddp[i].problem.T
+                start_ddp_solve_time = time.time()
+                print("Problem solved to convergence:", fddp[i].solve(xs, us, max_iter))
+                dyn_seg_solve_time.append(time.time() - start_ddp_solve_time)
+                print(f"Is feasible: {fddp[i].isFeasible}")
+                print("Number of iterations:", fddp[i].iter)
+                print("Total cost:", fddp[i].cost)
+                print("Gradient norm:", fddp[i].stoppingCriteria())
+                print("Time to solve:", dyn_seg_solve_time[-1])
+                print("===============")
+
+                # Set final state as initial state of next phase
+                x0 = copy(fddp[i].xs[-1])
+                model_seq_all.append(np.copy([*model_seqs]))
+
+            super().update_costs_from_solver(solver_type='seq', integration_type=integration_type)
+            self.solver_stats['contacts_phases_solve_times'] = dyn_seg_solve_time
+            print("[Compute Time] Dynamic feasibility check: ", sum(dyn_seg_solve_time))
+        else:
+            self.solver_type = 'single'
             model_seqs = []
-            frames_in_contact = self.contact_planes_seq[i]
-            N_current = self.horizon_lst[i]
-            DT = T / (N_current - 1)
-            for t in np.linspace(i * T, (i + 1) * T, N_current):
-                if hasattr(self.ik_cfree_planner, "planner"):
-                    if self.ik_cfree_planner.planner.__class__.__name__ == "LocomanipulationFramePlanner":
-                        frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
-                    elif self.ik_cfree_planner.planner.__class__.__name__ == "BaselineFramePlanner":
-                        frame_targets_dict = self.ik_cfree_planner.planner.get_phase_targets(i + 1)
-                    else:
-                        raise ValueError("Unknown planner type in ik_cfree_planner")
-                else:
-                    frame_targets_dict = self.pack_current_targets(t)   # used for data reload
-                if t < (i + 1) * T:
+            for i in range(self.contact_phases):
+                frames_in_contact = self.contact_planes_seq[i]
+                N_current = self.horizon_lst[i]
+                DT = T / (N_current - 1)
+                for t in np.linspace(i * T, (i + 1) * T, N_current):
+                    frame_targets_dict = self.get_targets_from_planner(i, t)
+
                     # get upcoming frames in contact (unless in last contact phase)
                     if i != (self.contact_phases - 1):
                         next_frames_in_contact = self.contact_planes_seq[i + 1]
                     else:
                         # last contact phase
-                        next_frames_in_contact = frames_in_contact
+                        next_frames_in_contact = self.contact_planes_seq[i]
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
                                                          x0,
@@ -92,98 +204,78 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                          geom_model=self.geom_model,
                                                          robot_model=self.robot_model)
                     model_seqs += createSequence([dmodel], DT, 1, integration_type)
-                else:   # last time knot in current contact phase
-                    if i != (self.contact_phases - 1):
-                        next_frames_in_contact = self.contact_planes_seq[i + 1]
-                        terminal_step = False   # only set desired joint velocities to zero
-                    else:
-                        next_frames_in_contact = frames_in_contact
-                        terminal_step = True    # sets desired pose to zero config and zero joint velocities
-                    # in the last time step, we use higher weights on frame orientations
-                    dmodel = createMultiFrameFinalActionModel(state,
-                                                              actuation,
-                                                              x0,
-                                                              plan_to_model_ids,
-                                                              frames_in_contact,
-                                                              next_frames_in_contact,
-                                                              frame_targets_dict,
-                                                              joint_names_dict=self.joint_names_dict,
-                                                              planner_weights=planner_params,
-                                                              zero_config=zero_config,
-                                                              terminal_step=terminal_step,
-                                                              robot_model=self.robot_model)
-                    model_seqs += createFinalSequence([dmodel], integration_type)
-                    print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
 
-                # save targets
-                if 'torso' in frame_targets_dict:
-                    self.base_targets[self.knot_idx] = frame_targets_dict['torso']
-                if 'LF' in frame_targets_dict:
-                    self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
-                if 'RF' in frame_targets_dict:
-                    self.rf_targets[self.knot_idx] = frame_targets_dict['RF']
-                if 'LH' in frame_targets_dict:
-                    self.lh_targets[self.knot_idx] = frame_targets_dict['LH']
-                if 'RH' in frame_targets_dict:
-                    self.rh_targets[self.knot_idx] = frame_targets_dict['RH']
-                if 'R_knee' in frame_targets_dict:
-                    self.rkn_targets[self.knot_idx] = frame_targets_dict['R_knee']
-                if 'L_knee' in frame_targets_dict:
-                    self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
-                self.knot_idx += 1
+                    # save targets
+                    if 'torso' in frame_targets_dict:
+                        self.base_targets[self.knot_idx] = frame_targets_dict['torso']
+                    if 'LF' in frame_targets_dict:
+                        self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
+                    if 'RF' in frame_targets_dict:
+                        self.rf_targets[self.knot_idx] = frame_targets_dict['RF']
+                    if 'LH' in frame_targets_dict:
+                        self.lh_targets[self.knot_idx] = frame_targets_dict['LH']
+                    if 'RH' in frame_targets_dict:
+                        self.rh_targets[self.knot_idx] = frame_targets_dict['RH']
+                    if 'R_knee' in frame_targets_dict:
+                        self.rkn_targets[self.knot_idx] = frame_targets_dict['R_knee']
+                    if 'L_knee' in frame_targets_dict:
+                        self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
+                    self.knot_idx += 1
+
+            frame_targets_dict = self.get_targets_from_planner(i, self.contact_phases*T)
+            terminal_step = True    # sets desired pose to zero config and zero joint velocities
+            # in the last time step, we use higher weights on frame orientations
+            dmodel = createMultiFrameFinalActionModel(state,
+                                                      actuation,
+                                                      x0,
+                                                      plan_to_model_ids,
+                                                      frames_in_contact,
+                                                      frames_in_contact,
+                                                      frame_targets_dict,
+                                                      joint_names_dict=self.joint_names_dict,
+                                                      planner_weights=planner_params,
+                                                      zero_config=zero_config,
+                                                      terminal_step=terminal_step,
+                                                      robot_model=self.robot_model)
+            model_seqs += createFinalSequence([dmodel], integration_type)
+            print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
 
             problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
-            fddp[i] = crocoddyl.SolverBoxFDDP(problem)
+            fddp = crocoddyl.SolverBoxFDDP(problem)
 
             # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
-            # fddp[i].setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
-            fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
+            fddp.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
+            # fddp.setCallbacks([crocoddyl.CallbackLogger()])
 
             # Solver settings
-            max_iter = 250
-            fddp[i].th_stop = 1e-3
-            fddp[i].th_gapTol = 1e-2
-            fddp[i].reg_max = 1e4
-            fddp[i].reg_incFactor = 3
-            fddp[i].reg_decFactor = 3
-            if i == 1 or i == 2 or i == 3:   # harder to solve, needs more iterations
-                fddp[i].reg_incFactor = 2         # default is 10 (smaller works for tight guess)
-                fddp[i].reg_decFactor = 2         # default is 10 (smaller works for tight guess)
-
-            #     fddp[i].th_acceptStep = 0.01        # default is 0.1
-            # fddp[i].th_acceptStep = 0.01     # default is 0.1
-            # fddp[i].reg_min = 1e-3             # default is 1e-9
-            # fddp[i].reg_max = 1e3
-            # fddp[i].th_gaptol(1e-12); // default is 1e-16
-            # fddp[i].th_grad = 1e-2
-            # fddp[i].th_feas = 1e-3
-            # fddp[i].th_stop(1e-2)
+            max_iter = 500
+            fddp.th_stop = 1e-2
+            fddp.th_gapTol = 1e-2
+            # fddp.reg_max = 1e4
+            fddp.reg_incFactor = 3
+            fddp.reg_decFactor = 3
 
             # Set initial guess
-            xs = [x0] * (fddp[i].problem.T + 1)
+            xs = [x0] * (fddp.problem.T + 1)
             us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0)
             if integration_type == 'RK2':
                 us_static = np.concatenate((us_static, us_static))
-            us = [us_static] * fddp[i].problem.T
+            us = [us_static] * fddp.problem.T
             start_ddp_solve_time = time.time()
-            print("Problem solved to convergence:", fddp[i].solve(xs, us, max_iter))
+            print("Problem solved to convergence:", fddp.solve(xs, us, max_iter))
             dyn_seg_solve_time.append(time.time() - start_ddp_solve_time)
-            print(f"Is feasible: {fddp[i].isFeasible}")
-            print("Number of iterations:", fddp[i].iter)
-            print("Total cost:", fddp[i].cost)
-            print("Gradient norm:", fddp[i].stoppingCriteria())
+            print(f"Is feasible: {fddp.isFeasible}")
+            print("Number of iterations:", fddp.iter)
+            print("Total cost:", fddp.cost)
+            print("Gradient norm:", fddp.stoppingCriteria())
             print("Time to solve:", dyn_seg_solve_time[-1])
             print("===============")
 
             # Set final state as initial state of next phase
-            x0 = copy(fddp[i].xs[-1])
             model_seq_all.append(np.copy([*model_seqs]))
+            self.fddp_single = fddp
+            super().update_costs_from_solver(solver_type='single', integration_type=integration_type)
 
-        super().update_costs_from_solver(solver_type='seq', integration_type=integration_type)
-        self.solver_stats['contacts_phases_solve_times'] = dyn_seg_solve_time
-        print("[Compute Time] Dynamic feasibility check: ", sum(dyn_seg_solve_time))
-
-        self.solver_type = 'seq'
         if b_solve_hybrid:
             self.solver_type = 'full'
             #
@@ -197,15 +289,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             for i in range(self.contact_phases - 1):
                 frames_in_contact = self.contact_planes_seq[i]
                 next_frames_in_contact = self.contact_planes_seq[i + 1]
-                if hasattr(self.ik_cfree_planner, "planner"):
-                    if self.ik_cfree_planner.planner.__class__.__name__ == "LocomanipulationFramePlanner":
-                        frame_targets_dict = self.ik_cfree_planner.pack_current_targets((i + 1) * T)
-                    elif self.ik_cfree_planner.planner.__class__.__name__ == "BaselineFramePlanner":
-                        frame_targets_dict = self.ik_cfree_planner.planner.get_phase_targets(i + 1)
-                    else:
-                        raise ValueError("Unknown planner type in ik_cfree_planner")
-                else:
-                    frame_targets_dict = self.pack_current_targets((i + 1) * T)  # used for data reload
+                frame_targets_dict = self.get_targets_from_planner(i, (i + 1) * T)
                 x_last = copy(fddp[i].xs[-1])
                 # add impulse model on frames in contact at the end of every contact phase
                 imp_model = createMultiFrameFinalImpulseModel(state,
@@ -258,6 +342,18 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.solver_type = 'sca'
             self.plan_sca(solver_type='SQP')
 
+    def get_targets_from_planner(self, phase: int, t:float) -> dict[str, np.array]:
+        if hasattr(self.ik_cfree_planner, "planner"):
+            if self.ik_cfree_planner.planner.__class__.__name__ == "LocomanipulationFramePlanner":
+                frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
+            elif self.ik_cfree_planner.planner.__class__.__name__ == "BaselineFramePlanner":
+                frame_targets_dict = self.ik_cfree_planner.planner.get_phase_targets(phase + 1)
+            else:
+                raise ValueError("Unknown planner type in ik_cfree_planner")
+        else:
+            frame_targets_dict = self.pack_current_targets(t)  # used for data reload
+        return frame_targets_dict
+
     def plan_sca(self, integration_type: str='Euler',
                  solver_type: str ='FDDP'):
         T = self.T
@@ -275,15 +371,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             N_current = self.horizon_lst[i]
             DT = T / (N_current - 1)
             for t in np.linspace(i * T, (i + 1) * T, N_current):
-                if hasattr(self.ik_cfree_planner, "planner"):
-                    if self.ik_cfree_planner.planner.__class__.__name__ == "LocomanipulationFramePlanner":
-                        frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
-                    elif self.ik_cfree_planner.planner.__class__.__name__ == "BaselineFramePlanner":
-                        frame_targets_dict = self.ik_cfree_planner.planner.get_phase_targets(i + 1)
-                    else:
-                        raise ValueError("Unknown planner type in ik_cfree_planner")
-                else:
-                    frame_targets_dict = self.pack_current_targets(t)   # used for data reload
+                frame_targets_dict = self.get_targets_from_planner(i, t)
                 if t < (i + 1) * T:
                     # get upcoming frames in contact (unless in last contact phase)
                     if i != (self.contact_phases - 1):
@@ -405,9 +493,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         super().update_costs_from_solver(solver_type=self.solver_type, integration_type=integration_type)
         super().update_constraint_residuals_from_solver()
 
-    def reset_default_gains(self, frame_name: str, updated_gains: np.array):
-        self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains
-        # self._default_gains[frame_name] = updated_gains
+    # def reset_default_gains(self, frame_name: str, updated_gains: np.array):
+    #     self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains
+    #     # self._default_gains[frame_name] = updated_gains
 
     def set_zero_configuration(self, joint_configuration):
         self._zero_config = joint_configuration

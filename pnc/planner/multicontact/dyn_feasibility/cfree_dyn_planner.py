@@ -53,22 +53,24 @@ B_SHOW_COST_PLOTS = True
 B_SHOW_GRF_PLOTS = True
 
 # Meshcat visuals
-B_VISUALIZE_KIN = False
+B_VISUALIZE_KIN = True
 B_VISUALIZE_DYN = True
-B_SAVE_HTML = False
 
 # Planner options
-B_SCA_REFINEMENT = False
+B_BASELINE = False
+B_SOLVE_BY_SECTIONS = False
 B_SOLVE_HYBRID = False
-B_BASELINE = True
+B_SCA_REFINEMENT = False
 B_VERBOSE = False
-B_USE_SELF_COLLISION_AVOIDANCE = True
+B_USE_SELF_COLLISION_AVOIDANCE = False
 B_USE_KNEES = True
-B_USE_KNEES_IN_SMOOTH_PLAN = False   # set to False when crossing door in single step (i.e., mode 0)
+B_USE_KNEES_IN_SMOOTH_PLAN = True   # set to False when crossing door in single step (i.e., mode 0)
 
 # Data recording
 B_SAVE_KIN_DATA = False
 B_SAVE_DYN_DATA = False
+B_SAVE_HTML = True
+
 
 
 def get_g1_default_initial_pose(n_joints:int, env: str = 'door'):
@@ -561,7 +563,7 @@ def get_five_stage_on_knocker_contact_sequence(robot_name: str,
     final_lf_pos = safe_regions_mgr_dict['LF'].iris_list[1].seed_pos
     final_lkn_pos = safe_regions_mgr_dict['L_knee'].iris_list[1].seed_pos
     final_rf_pos = safe_regions_mgr_dict['RF'].iris_list[1].seed_pos
-    final_torso_pos = safe_regions_mgr_dict['torso'].iris_list[1].seed_pos + np.array([0.04, 0., 0.0])
+    final_torso_pos = safe_regions_mgr_dict['torso'].iris_list[1].seed_pos #+ np.array([0.04, 0., 0.0])
     final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
     final_rh_pos = safe_regions_mgr_dict['RH'].iris_list[1].seed_pos
     final_lh_pos = safe_regions_mgr_dict['LH'].iris_list[1].seed_pos
@@ -859,10 +861,11 @@ def main(args):
                                        robot_urdf_file,
                                        pin.GeometryType.COLLISION)
     geom_model.addAllCollisionPairs()
-    if B_USE_SELF_COLLISION_AVOIDANCE:
-        root_to_torso_offset = get_root_to_torso_offset(geom_model)
-    else:
-        root_to_torso_offset = np.array([0., 0., 0.])
+    root_to_torso_offset = get_root_to_torso_offset(geom_model)
+    # if B_USE_SELF_COLLISION_AVOIDANCE:
+    #     root_to_torso_offset = get_root_to_torso_offset(geom_model)
+    # else:
+    #     root_to_torso_offset = np.array([0., 0., 0.])
 
     # Getting the frame ids
     plan_to_model_ids = {}
@@ -930,10 +933,6 @@ def main(args):
     else:
         raise NotImplementedError('Specified environment cannot be loaded')
 
-    if B_BASELINE:
-        base_str = '_baseline'
-    else:
-        base_str = '_guided'
     if kin_plan_path is None:
 
         # Update Pinocchio model
@@ -1122,7 +1121,7 @@ def main(args):
         robot_dyn_plan.set_zero_configuration(q0)   # TODO: check if this is needed in all scenarios
         if env == 'door':
             if contact_seq == 1:    # step on knee knocker
-                robot_dyn_plan.reset_default_gains('torso', np.array([2.5, 3.5, 1.5] + [0.5, 0.5, 0.001]))
+                # robot_dyn_plan.reset_default_gains('torso', np.array([2.5, 3.5, 1.5] + [0.5, 0.5, 0.001]))
                 robot_dyn_plan.set_zero_configuration(q0)
     elif robot_name == 'ergoCub':
         robot_dyn_plan = ErgoCubMulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params)
@@ -1191,7 +1190,10 @@ def main(args):
 
     robot_dyn_plan.set_plan_to_model_params(plan_to_model_ids)
     robot_dyn_plan.set_initial_configuration(x0)
-    robot_dyn_plan.plan(b_solve_hybrid=B_SOLVE_HYBRID, integration_type='Euler', sca_refinement=B_SCA_REFINEMENT)
+    robot_dyn_plan.plan(b_solve_hybrid=B_SOLVE_HYBRID,
+                        integration_type='Euler',
+                        sca_refinement=B_SCA_REFINEMENT,
+                        b_solve_by_sections=B_SOLVE_BY_SECTIONS,)
 
     # strings for saving data
     if kin_plan_path is not None:
@@ -1201,6 +1203,14 @@ def main(args):
         env = '_door' if 'door' in kin_plan_path else '_stairs'
     else:
         action_str = 'step_' if env == 'door' else '_'
+    if B_BASELINE:
+        base_str = '_baseline'
+    else:
+        base_str = '_guided'
+    TO_type = robot_dyn_plan.solver_type
+    impact_str = '_imp' if B_SOLVE_HYBRID else '_no_imp'
+    sca_refine_str = '_sca_refine' if B_SCA_REFINEMENT else '_no_sca_refine'
+    soln_str = robot_name + base_str + TO_type + impact_str + sca_str + sca_refine_str + action_str + seq_str + env + '.pkl'
 
     # Creating display
     if B_VISUALIZE_DYN:
@@ -1231,15 +1241,20 @@ def main(args):
             print('Displaying full dynamics solution')
             display.displayFromCrocoddylSolver([robot_dyn_plan.fddp_full])
         else:
-            print('Displaying per-phase dynamics solution')
-            display.displayFromCrocoddylSolver(robot_dyn_plan.fddp)
+            if robot_dyn_plan.solver_type == 'single':
+                display.displayFromCrocoddylSolver([robot_dyn_plan.fddp_single])
+                print('Displaying single trajectory (no impacts) dynamics solution')
+            else:
+                display.displayFromCrocoddylSolver(robot_dyn_plan.fddp)
+                print('Displaying per-phase dynamics solution')
+
         # viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
         #                     "lfoot_target", "lknee_target",
         #                     "rfoot_target", "rknee_target"))
         display.hide_visuals(["env/2"])
         display.hide_visuals(["g1_29dof_lock_waist/collisions"])
         if B_SAVE_HTML:
-            display.save_html(cwd + "/experiment_data/RAL/", robot_name + sca_str + action_str + seq_str + env + "_DYN_anim.html")
+            display.save_html(cwd + "/experiment_data/RAL/", soln_str + "_DYN_anim.html")
 
     if B_SHOW_JOINT_PLOTS or B_SHOW_COST_PLOTS or B_SHOW_JOINT_LIM_PLOTS:
         plan_plotter = MulticontactPlotter(robot_dyn_plan)
@@ -1259,8 +1274,12 @@ def main(args):
             fddp = [robot_dyn_plan.fddp_full_sca]
         elif robot_dyn_plan.solver_type == 'full':
             fddp = [robot_dyn_plan.fddp_full]
-        else:
+        elif robot_dyn_plan.solver_type == 'single':
+            fddp = [robot_dyn_plan.fddp_single]
+        elif robot_dyn_plan.solver_type == 'seq':
             fddp = robot_dyn_plan.fddp
+        else:
+            raise NotImplementedError('Unknown solver type for GRF extraction')
         # Note: contact_links are l_ankle_ie, r_ankle_ie, l_wrist_pitch, r_wrist_pitch
         sim_steps_list = [len(fddp[i].us) for i in range(len(fddp))]
         sim_steps = np.sum(sim_steps_list)
@@ -1306,7 +1325,7 @@ def main(args):
 
     if B_SAVE_DYN_DATA:
         # Saving data tools
-        dyn_data_saver = DataSaver(robot_name + base_str + sca_str + action_str + seq_str + env +'.pkl')
+        dyn_data_saver = DataSaver(soln_str)
         # save kinematic TO solution
         if hasattr(ik_cfree_planner, 'planner'):
             dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
