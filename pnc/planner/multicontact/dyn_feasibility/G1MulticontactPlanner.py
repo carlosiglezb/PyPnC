@@ -58,6 +58,11 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         zero_config = self._zero_config
 
         model_seq_all = []
+        #
+        # First, solve without impacts.
+        # * Option 1 (seq): solve by sections, one contact phase at a time
+        # * Option 2 (single): solve as single TO
+        #
         if b_solve_by_sections:
             self.solver_type = 'seq'
             fddp = self.fddp
@@ -339,7 +344,6 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             super().update_costs_from_solver(solver_type=self.solver_type, integration_type=integration_type)
 
         if sca_refinement:
-            self.solver_type = 'sca'
             self.plan_sca(solver_type='SQP')
 
     def get_targets_from_planner(self, phase: int, t:float) -> dict[str, np.array]:
@@ -355,7 +359,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         return frame_targets_dict
 
     def plan_sca(self, integration_type: str='Euler',
-                 solver_type: str ='FDDP'):
+                 solver_type: str ='FDDP',
+                 b_impulse: bool=False):
         T = self.T
         state = self.state
         actuation = self.actuation
@@ -363,6 +368,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         plan_to_model_ids = self.plan_to_model_ids
         planner_params = self.planner_params
         zero_config = self._zero_config
+        latest_fddp = self.get_latest_fddp()
 
         knot_idx = 0
         model_seqs = []
@@ -372,75 +378,61 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             DT = T / (N_current - 1)
             for t in np.linspace(i * T, (i + 1) * T, N_current):
                 frame_targets_dict = self.get_targets_from_planner(i, t)
-                if t < (i + 1) * T:
-                    # get upcoming frames in contact (unless in last contact phase)
-                    if i != (self.contact_phases - 1):
-                        next_frames_in_contact = self.contact_planes_seq[i + 1]
-                    else:
-                        # last contact phase
-                        next_frames_in_contact = frames_in_contact
-                    dmodel = createMultiFrameActionModel(state,
-                                                         actuation,
-                                                         x0,
-                                                         plan_to_model_ids,
-                                                         frames_in_contact,
-                                                         next_frames_in_contact,
-                                                         frame_targets_dict,
-                                                         joint_names_dict=self.joint_names_dict,
-                                                         planner_weights=planner_params,
-                                                         geom_model=self.geom_model,
-                                                         robot_model=self.robot_model,
-                                                         b_sca=True)
-                    model_seqs += createSequence([dmodel], DT, 1, integration_type)
-                else:   # last time knot in current contact phase
-                    if i != (self.contact_phases - 1):
-                        next_frames_in_contact = self.contact_planes_seq[i + 1]
-                        terminal_step = False   # only set desired joint velocities to zero
-                        dmodel = createMultiFrameActionModel(state,
-                                                             actuation,
-                                                             x0,
-                                                             plan_to_model_ids,
-                                                             frames_in_contact,
-                                                             next_frames_in_contact,
-                                                             frame_targets_dict,
-                                                             joint_names_dict=self.joint_names_dict,
-                                                             planner_weights=planner_params,
-                                                             geom_model=self.geom_model,
-                                                             robot_model=self.robot_model)
-                        model_seqs += createSequence([dmodel], DT, 1, integration_type)
-                    else:
-                        next_frames_in_contact = frames_in_contact
-                        terminal_step = True    # sets desired pose to zero config and zero joint velocities
-                        # in the last time step, we use higher weights on frame orientations
-                        dmodel = createMultiFrameFinalActionModel(state,
-                                                                  actuation,
-                                                                  x0,
-                                                                  plan_to_model_ids,
-                                                                  frames_in_contact,
-                                                                  next_frames_in_contact,
-                                                                  frame_targets_dict,
-                                                                  joint_names_dict=self.joint_names_dict,
-                                                                  planner_weights=planner_params,
-                                                                  zero_config=zero_config,
-                                                                  terminal_step=terminal_step,
-                                                                  robot_model=self.robot_model)
-                        model_seqs += createFinalSequence([dmodel], integration_type)
-                        print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
+                # get upcoming frames in contact (unless in last contact phase)
+                if i != (self.contact_phases - 1):
+                    next_frames_in_contact = self.contact_planes_seq[i + 1]
+                else:
+                    # last contact phase
+                    next_frames_in_contact = self.contact_planes_seq[i]
+                dmodel = createMultiFrameActionModel(state,
+                                                     actuation,
+                                                     x0,
+                                                     plan_to_model_ids,
+                                                     frames_in_contact,
+                                                     next_frames_in_contact,
+                                                     frame_targets_dict,
+                                                     joint_names_dict=self.joint_names_dict,
+                                                     planner_weights=planner_params,
+                                                     geom_model=self.geom_model,
+                                                     robot_model=self.robot_model,
+                                                     b_sca=True)
+                model_seqs += createSequence([dmodel], DT, 1, integration_type)
 
                 # save targets again?
                 knot_idx += 1
 
-            # apply impulse model, except at end of last contact phase
-            if i != (self.contact_phases - 1):
-                x_last = copy(self.fddp_full.xs[knot_idx])
-                imp_model = createMultiFrameFinalImpulseModel(state,
-                                                              x_last,
-                                                              plan_to_model_ids,
-                                                              frames_in_contact,
-                                                              next_frames_in_contact,
-                                                              frame_targets_dict,
-                                                              planner_weights=planner_params)
-                model_seqs += [imp_model]
+            # Apply impulse model, except at end of last contact phase
+            # Note: currently, this implementation assumes a TO has already been solved
+            if b_impulse:
+                if i != (self.contact_phases - 1):
+                    x_last = copy(latest_fddp.xs[knot_idx])
+                    imp_model = createMultiFrameFinalImpulseModel(state,
+                                                                  x_last,
+                                                                  plan_to_model_ids,
+                                                                  frames_in_contact,
+                                                                  next_frames_in_contact,
+                                                                  frame_targets_dict,
+                                                                  planner_weights=planner_params)
+                    model_seqs += [imp_model]
+
+        # last time knot in current contact phase
+        frame_targets_dict = self.get_targets_from_planner(i, self.contact_phases * T)
+        terminal_step = True    # sets desired pose to zero config and zero joint velocities
+        # in the last time step, we use higher weights on frame orientations
+        dmodel = createMultiFrameFinalActionModel(state,
+                                                  actuation,
+                                                  x0,
+                                                  plan_to_model_ids,
+                                                  frames_in_contact,
+                                                  frames_in_contact,
+                                                  frame_targets_dict,
+                                                  joint_names_dict=self.joint_names_dict,
+                                                  planner_weights=planner_params,
+                                                  zero_config=zero_config,
+                                                  terminal_step=terminal_step,
+                                                  robot_model=self.robot_model)
+        model_seqs += createFinalSequence([dmodel], integration_type)
+        print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
 
         problem = crocoddyl.ShootingProblem(x0, sum(np.vstack(model_seqs).tolist(), [])[:-1], model_seqs[-1][-1])
         if solver_type == 'SQP':
@@ -450,8 +442,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.termination_tolerance = 1e-1
             self.fddp_full_sca.eps_abs = 1e-1
             self.fddp_full_sca.eps_rel = 1e-1
-            self.fddp_full_sca.filter_size = 10
-            self.fddp_full_sca.update_rho_with_heuristic = True
+            self.fddp_full_sca.filter_size = 5
+            # self.fddp_full_sca.update_rho_with_heuristic = True
             self.fddp_full_sca.max_qp_iters = 500
             # self.fddp_full_sca.use_filter_line_search = False   # (default: True)
             # self.fddp_full_sca.mu_dynamic = -1  # Nocedal's L1 merit function
@@ -471,9 +463,11 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.reg_decFactor = 3
 
         max_iter = 1000
-        # Set initial guess from previous full solve
-        xs = copy(self.fddp_full.xs)
-        us = StdVec_VectorX.copy(self.fddp_full.us)
+        # Set initial guess from latest solve
+        # TODO check dimensions and/or adjust
+        xs = copy(latest_fddp.xs)
+        us = StdVec_VectorX.copy(latest_fddp.us)
+
         # uncomment below when removing impulse models from the guess
         # idx_removed = 0
         # for idx in range(len(self.horizon_lst) - 1):
@@ -490,12 +484,25 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         print("[SCA-Crocoddyl] Total cost:", self.fddp_full_sca.cost)
         print("[SCA-Crocoddyl] Time to solve:", dyn_seg_solve_time)
         print("===============")
-        super().update_costs_from_solver(solver_type=self.solver_type, integration_type=integration_type)
+        self.solver_type = 'sca'
+        super().update_costs_from_solver(solver_type='sca', integration_type=integration_type)
         super().update_constraint_residuals_from_solver()
 
     # def reset_default_gains(self, frame_name: str, updated_gains: np.array):
     #     self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains
     #     # self._default_gains[frame_name] = updated_gains
+
+    def get_latest_fddp(self) -> crocoddyl.SolverFDDP:
+        if self.solver_type == 'full':
+            latest_fddp = self.fddp_full
+        elif self.solver_type == 'single':
+            latest_fddp = self.fddp_single
+        elif self.solver_type == 'seq':
+            # TODO construct full trajectory from segments
+            raise NotImplementedError
+        else:
+            latest_fddp = None
+        return latest_fddp
 
     def set_zero_configuration(self, joint_configuration):
         self._zero_config = joint_configuration

@@ -1114,10 +1114,16 @@ def main(args):
     #
     # Start Dynamic Feasibility Check
     #
+    # pass more-refined collision model to dynamic planner
+    if refined_collisions_urdf_file is not None:
+        refined_geom_model = pin.buildGeomFromUrdf(rob_model,
+                                           refined_collisions_urdf_file,
+                                           pin.GeometryType.COLLISION)
+        refined_geom_model.addAllCollisionPairs()
     N_horizon_lst = planner_params.N_HORIZON_LST
     contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
     if robot_name == 'g1':
-        robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params, geom_model)
+        robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params, refined_geom_model)
         robot_dyn_plan.set_zero_configuration(q0)   # TODO: check if this is needed in all scenarios
         if env == 'door':
             if contact_seq == 1:    # step on knee knocker
@@ -1197,20 +1203,20 @@ def main(args):
 
     # strings for saving data
     if kin_plan_path is not None:
-        sca_str = '_sca' if 'sca' in kin_plan_path else '_'
+        sca_str = '_kin_sca' if 'sca' in kin_plan_path else '_no_kin_sca'
         action_str = '_step_' if 'knocker' in kin_plan_path else '_'
         seq_str = next((s for s in ['over', 'on_balanced', 'on'] if s in kin_plan_path), '')
         env = '_door' if 'door' in kin_plan_path else '_stairs'
     else:
         action_str = 'step_' if env == 'door' else '_'
     if B_BASELINE:
-        base_str = '_baseline'
+        base_str = '_baseline_'
     else:
-        base_str = '_guided'
+        base_str = '_guided_'
     TO_type = robot_dyn_plan.solver_type
     impact_str = '_imp' if B_SOLVE_HYBRID else '_no_imp'
-    sca_refine_str = '_sca_refine' if B_SCA_REFINEMENT else '_no_sca_refine'
-    soln_str = robot_name + base_str + TO_type + impact_str + sca_str + sca_refine_str + action_str + seq_str + env + '.pkl'
+    sca_refine_str = '_sca_refine_' if B_SCA_REFINEMENT else '_no_sca_refine_'
+    soln_str = robot_name + base_str + TO_type + impact_str + sca_str + sca_refine_str + action_str + seq_str + env
 
     # Creating display
     if B_VISUALIZE_DYN:
@@ -1325,7 +1331,7 @@ def main(args):
 
     if B_SAVE_DYN_DATA:
         # Saving data tools
-        dyn_data_saver = DataSaver(soln_str)
+        dyn_data_saver = DataSaver(soln_str + '.pkl')
         # save kinematic TO solution
         if hasattr(ik_cfree_planner, 'planner'):
             dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)

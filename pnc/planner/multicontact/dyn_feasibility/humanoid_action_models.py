@@ -638,6 +638,10 @@ def createFinalSequence(dmodels, integration_type='Euler'):
         raise ValueError(f"Integration type {integration_type} not recognized.")
 
 
+
+# --------
+# Utilities
+# --------
 def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
                      plan_to_model_ids: dict[str: int],
                      pin_model: pinocchio.Model,

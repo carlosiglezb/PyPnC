@@ -138,25 +138,38 @@ class MulticontactPlotter:
         rarm_jid_fb = [7 + ji for ji in rarm_jids]
 
         # initialize dimensions by contact phase
-        xs_l_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), xr_dim))
-        us_l_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), ur_dim))
-        xs_r_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), xr_dim))
-        us_r_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), ur_dim))
-        xs_larm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), xrarm_dim))
-        us_larm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), urarm_dim))
-        xs_rarm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), xrarm_dim))
-        us_rarm_reduced = np.zeros((sum(horizon_lst) - len(horizon_lst), urarm_dim))
-        time = np.zeros(sum(horizon_lst) - len(horizon_lst))
-        phase = np.zeros(sum(horizon_lst) - len(horizon_lst), dtype=int)
+        empty_knots = 0
+        # if self._robot_planner.solver_type != 'single':
+        if len(us) != sum(horizon_lst):
+            empty_knots = len(horizon_lst)
+        xs_l_reduced = np.zeros((sum(horizon_lst) - empty_knots, xr_dim))
+        us_l_reduced = np.zeros((sum(horizon_lst) - empty_knots, ur_dim))
+        xs_r_reduced = np.zeros((sum(horizon_lst) - empty_knots, xr_dim))
+        us_r_reduced = np.zeros((sum(horizon_lst) - empty_knots, ur_dim))
+        xs_larm_reduced = np.zeros((sum(horizon_lst) - empty_knots, xrarm_dim))
+        us_larm_reduced = np.zeros((sum(horizon_lst) - empty_knots, urarm_dim))
+        xs_rarm_reduced = np.zeros((sum(horizon_lst) - empty_knots, xrarm_dim))
+        us_rarm_reduced = np.zeros((sum(horizon_lst) - empty_knots, urarm_dim))
+        time = np.zeros(sum(horizon_lst) - empty_knots)
+        phase = np.zeros(sum(horizon_lst) - empty_knots, dtype=int)
         curr_idx, curr_cont_idx = 0, 0
         for it_num in range(len(horizon_lst)):
-            next_cont_idx = curr_cont_idx + horizon_lst[it_num] - 1 # next index on continuous variables
-            dt = fddp[0].problem.runningModels[curr_idx].dt
-            time[curr_cont_idx:next_cont_idx] = np.arange(it_num * T, (it_num + 1) * T, dt)
-            if it_num == (len(horizon_lst) - 1):
-                next_idx = curr_idx + horizon_lst[it_num] - 1  # last phase does not have impulse model
+            if len(us) == sum(horizon_lst):
+                next_cont_idx = curr_cont_idx + horizon_lst[it_num] # next index on continuous variables
             else:
-                next_idx = curr_idx + horizon_lst[it_num] - 1# without impulse model
+                next_cont_idx = curr_cont_idx + horizon_lst[it_num] - 1 # next index on continuous variables
+            dt = fddp[0].problem.runningModels[curr_idx].dt
+            if len(us) == sum(horizon_lst):
+                time[curr_cont_idx:next_cont_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num])
+            else:
+                time[curr_cont_idx:next_cont_idx] = np.arange(it_num * T, (it_num + 1) * T, dt)
+
+            if it_num == (len(horizon_lst) - 1):
+                # next_idx = curr_idx + horizon_lst[it_num] - 1   # last phase does not have impulse model
+                next_idx = curr_idx + horizon_lst[it_num]   # last phase does not have impulse model
+            else:
+                # next_idx = curr_idx + horizon_lst[it_num] - 1   # without impulse model
+                next_idx = curr_idx + horizon_lst[it_num]# solution does not have impulse model
 
             xs_l_reduced[curr_cont_idx:next_cont_idx, :] = np.array(xs[curr_idx:next_idx])[:, lleg_jid_fb]
             us_l_reduced[curr_cont_idx:next_cont_idx, :] = np.array(us[curr_idx:next_idx])[:, lleg_jids]
@@ -167,8 +180,14 @@ class MulticontactPlotter:
             xs_rarm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(xs[curr_idx:next_idx])[:, rarm_jid_fb]
             us_rarm_reduced[curr_cont_idx:next_cont_idx, :] = np.array(us[curr_idx:next_idx])[:, rarm_jids]
             phase[curr_idx:next_idx] = int(it_num)
-            curr_idx += horizon_lst[it_num] + 1
-            curr_cont_idx += horizon_lst[it_num] - 1
+            # if self._robot_planner.solver_type == 'single':
+            if len(us) == sum(horizon_lst):
+                curr_idx += horizon_lst[it_num]
+                curr_cont_idx += horizon_lst[it_num]
+            else:
+                curr_idx += horizon_lst[it_num] + 1
+                # curr_idx += horizon_lst[it_num]     # when not adding impulse model
+                curr_cont_idx += horizon_lst[it_num] - 1
         return phase, time, us_l_reduced, us_larm_reduced, us_r_reduced, us_rarm_reduced, xs_l_reduced, xs_larm_reduced, xs_r_reduced, xs_rarm_reduced
 
     def plot_joint_limit_margins(self, to_type=None, integration_type='Euler'):
@@ -184,6 +203,11 @@ class MulticontactPlotter:
             fddp = self._robot_planner.fddp
             # xs and us need to be updated from each fddp instance
             b_update_xs = True
+        elif to_type == 'single':
+            fddp = [self._robot_planner.fddp_single]
+            log = fddp[0].getCallbacks()[0]
+            xs = log.xs
+            us = log.us
         elif to_type == 'full':
             fddp = [self._robot_planner.fddp_full]
             log = fddp[0].getCallbacks()[0]
@@ -203,7 +227,11 @@ class MulticontactPlotter:
             raise ValueError("[Multi-contact Plotter] Unknown solver type: {}".format(to_type))
 
         horizon_lst = self._robot_planner.horizon_lst
-        tot_knots = sum(horizon_lst) - len(horizon_lst)
+        empty_knots = 0
+        # if to_type != 'single':
+        if len(us) != sum(horizon_lst):
+            empty_knots = len(horizon_lst)
+        tot_knots = sum(horizon_lst) - empty_knots
         time = np.zeros(tot_knots)
         T = self._robot_planner.T
         phase = np.zeros(tot_knots, dtype=int)
@@ -226,9 +254,16 @@ class MulticontactPlotter:
                 curr_dt = fddp[it_num].problem.runningModels[curr_idx].dt
             else:
                 curr_dt = fddp[0].problem.runningModels[curr_idx].dt
-            next_cont_idx = curr_cont_idx + horizon_lst[it_num] - 1
-            next_idx = curr_idx + horizon_lst[it_num] - 1
-            time[curr_cont_idx:next_cont_idx] = np.arange(it_num * T,  (it_num + 1) * T, curr_dt)
+            if len(us) == sum(horizon_lst):
+                next_cont_idx = curr_cont_idx + horizon_lst[it_num] # next index on continuous variables
+                next_idx = curr_idx + horizon_lst[it_num]
+            else:
+                next_cont_idx = curr_cont_idx + horizon_lst[it_num] - 1 # next index on continuous variables
+                next_idx = curr_idx + horizon_lst[it_num] - 1
+            if len(us) == sum(horizon_lst):
+                time[curr_cont_idx:next_cont_idx] = np.linspace(it_num * T, (it_num + 1) * T, horizon_lst[it_num])
+            else:
+                time[curr_cont_idx:next_cont_idx] = np.arange(it_num * T, (it_num + 1) * T, curr_dt)
 
             # update xs and us from each fddp instance
             if b_update_xs:
@@ -267,9 +302,15 @@ class MulticontactPlotter:
 
             if b_update_xs:
                 curr_idx = 0
+                curr_cont_idx += horizon_lst[it_num] - 1
             else:
-                curr_idx += horizon_lst[it_num] + 1
-            curr_cont_idx += horizon_lst[it_num] - 1
+                # if to_type == 'single':
+                if len(us) == sum(horizon_lst):
+                    curr_idx += horizon_lst[it_num]
+                    curr_cont_idx += horizon_lst[it_num]
+                else:
+                    curr_idx += horizon_lst[it_num] + 1
+                    curr_cont_idx += horizon_lst[it_num] - 1
 
         # crate margin plots
         jp_names = [None] * njoints
@@ -294,13 +335,13 @@ class MulticontactPlotter:
     def plot_costs(self, costs_type=None, costNames=None):
         T = self._robot_planner.T
         horizon_lst = self._robot_planner.horizon_lst
-        time = np.zeros((sum(horizon_lst) - 1, ))
-        phase = np.zeros((sum(horizon_lst) - 1, ), dtype=int)
+        time = np.zeros((sum(horizon_lst), ))
+        phase = np.zeros((sum(horizon_lst), ), dtype=int)
         if costs_type is None:
             costs_type = self._robot_planner.solver_type
         if costs_type == 'seq':
             costsDict = self._robot_planner.costs
-        elif costs_type == 'full':
+        elif costs_type == 'full' or costs_type == 'single':
             costsDict = self._robot_planner.costs_full
         elif costs_type == 'sca':
             costsDict = self._robot_planner.costs_full_sca
@@ -312,8 +353,13 @@ class MulticontactPlotter:
             # get current and next index
             curr_idx = sum(horizon_lst[:contact_phase])
             if contact_phase == (len(horizon_lst) - 1):
-                next_idx = curr_idx + horizon_lst[contact_phase] - 1
-                time[curr_idx:next_idx] = np.linspace(T * contact_phase, T * (contact_phase + 1),
+                if costs_type == 'sca':
+                    next_idx = curr_idx + horizon_lst[contact_phase]
+                    time[curr_idx:next_idx] = np.linspace(T * contact_phase, T * (contact_phase + 1),
+                                                      horizon_lst[contact_phase])
+                else:
+                    next_idx = curr_idx + horizon_lst[contact_phase] - 1
+                    time[curr_idx:next_idx] = np.linspace(T * contact_phase, T * (contact_phase + 1),
                                                       horizon_lst[contact_phase] - 1)
             else:
                 next_idx = curr_idx + horizon_lst[contact_phase]
@@ -336,7 +382,7 @@ class MulticontactPlotter:
             plot_hold_vector_traj(time, target_costs, 'Specified Costs', legends=costNames)
 
     def parse_costs(self, costsDict, costs_type, horizon_lst):
-        all_costs = np.zeros((sum(horizon_lst) - 1, len(costsDict.keys())))
+        all_costs = np.zeros((sum(horizon_lst), len(costsDict.keys())))
         for cost_idx, (cost_name, costs_lst) in enumerate(costsDict.items()):
             for contact_phase in range(len(horizon_lst)):
                 # get current and next index and populate current costs vector
@@ -344,7 +390,10 @@ class MulticontactPlotter:
                     curr_idx = sum(horizon_lst[:contact_phase])
                 else:
                     curr_idx = sum(horizon_lst[:contact_phase])
-                    curr_full_idx = sum(horizon_lst[:contact_phase]) + contact_phase
+                    if costs_type == 'sca':
+                        curr_full_idx = sum(horizon_lst[:contact_phase])
+                    else:
+                        curr_full_idx = sum(horizon_lst[:contact_phase]) + contact_phase
                     next_full_idx = curr_full_idx + horizon_lst[contact_phase]
 
                 if contact_phase == (len(horizon_lst) - 1):
@@ -353,10 +402,15 @@ class MulticontactPlotter:
                     if costs_type == 'seq':
                         all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][contact_phase][:-1]
                     else:
+                        if costs_type == 'sca':
+                            next_idx = curr_idx + horizon_lst[contact_phase]
                         all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][curr_full_idx:next_full_idx]
+                        # all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][curr_idx:next_idx]
                 else:
-                    # next_idx = curr_idx + horizon_lst[contact_phase]
-                    next_idx = sum(horizon_lst[:contact_phase + 1])
+                    if costs_type == 'sca':
+                        next_idx = curr_idx + horizon_lst[contact_phase]
+                    else:
+                        next_idx = sum(horizon_lst[:contact_phase + 1])
                     if costs_type == 'seq':
                         all_costs[curr_idx:next_idx, cost_idx] = costsDict[cost_name][contact_phase]
                     else:
@@ -366,8 +420,8 @@ class MulticontactPlotter:
     def plot_constraint_violations(self, constraintNames=None):
         T = self._robot_planner.T
         horizon_lst = self._robot_planner.horizon_lst
-        time = np.zeros((sum(horizon_lst) - 1, ))
-        phase = np.zeros((sum(horizon_lst) - 1, ), dtype=int)
+        time = np.zeros((sum(horizon_lst), ))
+        phase = np.zeros((sum(horizon_lst), ), dtype=int)
         residuals = self._robot_planner.residuals
 
         # create time vector (same for all constraints)
@@ -375,8 +429,13 @@ class MulticontactPlotter:
             # get current and next index
             curr_idx = sum(horizon_lst[:contact_phase])
             if contact_phase == (len(horizon_lst) - 1):
-                next_idx = curr_idx + horizon_lst[contact_phase] - 1
-                time[curr_idx:next_idx] = np.linspace(T * contact_phase, T * (contact_phase + 1),
+                if self.solver_type == 'sca':
+                    next_idx = curr_idx + horizon_lst[contact_phase]
+                    time[curr_idx:next_idx] = np.linspace(T * contact_phase, T * (contact_phase + 1),
+                                                          horizon_lst[contact_phase])
+                else:
+                    next_idx = curr_idx + horizon_lst[contact_phase] - 1
+                    time[curr_idx:next_idx] = np.linspace(T * contact_phase, T * (contact_phase + 1),
                                                       horizon_lst[contact_phase] - 1)
             else:
                 next_idx = curr_idx + horizon_lst[contact_phase]
