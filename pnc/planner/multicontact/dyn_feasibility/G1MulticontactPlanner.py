@@ -70,7 +70,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 model_seqs = []
                 frames_in_contact = self.contact_planes_seq[i]
                 N_current = self.horizon_lst[i]
-                DT = T / (N_current - 1)
+                DT = T / N_current
                 for t in np.linspace(i * T, (i + 1) * T, N_current):
                     frame_targets_dict = self.get_targets_from_planner(i, t)
                     if t < (i + 1) * T:
@@ -183,12 +183,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print("[Compute Time] Dynamic feasibility check: ", sum(dyn_seg_solve_time))
         else:
             self.solver_type = 'single'
-            model_seqs = []
             for i in range(self.contact_phases):
+                model_seqs = []
                 frames_in_contact = self.contact_planes_seq[i]
                 N_current = self.horizon_lst[i]
-                DT = T / (N_current - 1)
-                for t in np.linspace(i * T, (i + 1) * T, N_current):
+                DT = T / N_current
+                for t in np.arange(i * T, (i + 1) * T, DT):
                     frame_targets_dict = self.get_targets_from_planner(i, t)
 
                     # get upcoming frames in contact (unless in last contact phase)
@@ -227,6 +227,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                         self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
                     self.knot_idx += 1
 
+                model_seq_all.append(np.copy([*model_seqs]))
+
             frame_targets_dict = self.get_targets_from_planner(i, self.contact_phases*T)
             terminal_step = True    # sets desired pose to zero config and zero joint velocities
             # in the last time step, we use higher weights on frame orientations
@@ -242,10 +244,10 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                       zero_config=zero_config,
                                                       terminal_step=terminal_step,
                                                       robot_model=self.robot_model)
-            model_seqs += createFinalSequence([dmodel], integration_type)
+            model_seq_all += createFinalSequence([dmodel], integration_type)
             print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
 
-            problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
+            problem = crocoddyl.ShootingProblem(x0, sum(np.vstack(model_seq_all).tolist(),[])[:-1], model_seq_all[-1][-1])
             fddp = crocoddyl.SolverBoxFDDP(problem)
 
             # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
@@ -277,25 +279,27 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print("===============")
 
             # Set final state as initial state of next phase
-            model_seq_all.append(np.copy([*model_seqs]))
             self.fddp_single = fddp
             super().update_costs_from_solver(solver_type='single', integration_type=integration_type)
 
         if b_solve_hybrid:
-            self.solver_type = 'full'
             #
             # Full trajectory with Impulse models
             #
-            # Add Impulse model into previous phases
+            # Add Impulse model into previous solution (either single or by seq)
             x_guess = []
-            u_guess = StdVec_VectorX.copy(fddp[0].us)
-            u_guess.append(fddp[0].us[-1])  # add for last step
-            u_guess.append(np.array([]))  # add for impulse
+            latest_fddp = self.get_latest_fddp()
+            u_guess = StdVec_VectorX()
+            # u_guess = StdVec_VectorX.copy(latest_fddp.us)
+            # u_guess.append(u_guess[-1])  # add for last step
+            # u_guess.append(np.array([]))  # add for impulse
+            startIdx =  0
             for i in range(self.contact_phases - 1):
                 frames_in_contact = self.contact_planes_seq[i]
                 next_frames_in_contact = self.contact_planes_seq[i + 1]
                 frame_targets_dict = self.get_targets_from_planner(i, (i + 1) * T)
-                x_last = copy(fddp[i].xs[-1])
+                last_idx_before_impact = startIdx + self.horizon_lst[i] - 1
+                x_last = copy(latest_fddp.xs[last_idx_before_impact])
                 # add impulse model on frames in contact at the end of every contact phase
                 imp_model = createMultiFrameFinalImpulseModel(state,
                                                               x_last,
@@ -313,20 +317,29 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                     (model_seq_all[2 * i], np.reshape(np.array([last_entry]), (-1, 1))))
 
                 # re-construct initial guess trajectory
-                x_guess += fddp[i].xs.tolist()  # for full trajectory
-                x_guess += [fddp[i].xs[-1]]  # add for impulse
-                if i > 0:
-                    for j in range(len(fddp[i].us)):
-                        u_guess.append(fddp[i].us[j])
-                    u_guess.append(fddp[i].us[-1])
-                    u_guess.append(np.array([]))
+                # x_guess += fddp[i].xs.tolist()  # for full trajectory
+                endIdx = startIdx + self.horizon_lst[i]
+                x_guess += latest_fddp.xs[startIdx:endIdx].tolist()  # for full trajectory
+                x_guess += [x_guess[-1]]  # add for impulse
+                StdVec_VectorX.extend(u_guess, StdVec_VectorX.copy(latest_fddp.us[startIdx:endIdx]))   # values from current phase
+                StdVec_VectorX.append(u_guess, np.array([]))            # impact has no control
+                # if i > 0:
+                #     for j in range(len(latest_fddp.us[startIdx:endIdx])):
+                #         u_guess.append(latest_fddp.us[j])
+                #     u_guess.append(latest_fddp.us[-1])
+                #     u_guess.append(np.array([]))
+                startIdx += self.horizon_lst[i]
 
-            x_guess += fddp[i+1].xs.tolist()  # include last contact phase for full trajectory
-            for j in range(len(fddp[i+1].us)):
-                u_guess.append(fddp[i+1].us[j])
+            startIdx = sum(self.horizon_lst[:-1])
+            endIdx = startIdx + self.horizon_lst[-1]
+            x_guess += latest_fddp.xs[startIdx:].tolist()  # include last contact phase for full trajectory
+            StdVec_VectorX.extend(u_guess,
+                                  StdVec_VectorX.copy(latest_fddp.us[startIdx:endIdx]))  # values from current phase
+            # for j in range(len(latest_fddp.us[startIdx:endIdx])):
+            #     u_guess.append(latest_fddp.us[j])
 
             # Re-compute as full hybrid trajectory with Impulse model
-            problem_full = crocoddyl.ShootingProblem(fddp[0].xs[0], sum(np.vstack(model_seq_all).tolist(),[])[:-1], model_seq_all[-1][-1].tolist()[0])
+            problem_full = crocoddyl.ShootingProblem(latest_fddp.xs[0], sum(np.vstack(model_seq_all).tolist(),[])[:-1], model_seq_all[-1][0])
             # self.fddp_full = crocoddyl.SolverFDDP(problem_full)
             self.fddp_full = crocoddyl.SolverBoxFDDP(problem_full)
             self.fddp_full.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
@@ -341,6 +354,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             full_dyn_solve_time = time.time() - start_full_fddp_solve_time
             print("Is feasible:", self.fddp_full.isFeasible)
             print(f"Full hybrid TO solve time: {full_dyn_solve_time}")
+            self.solver_type = 'full'
             super().update_costs_from_solver(solver_type=self.solver_type, integration_type=integration_type)
 
         if sca_refinement:
@@ -442,7 +456,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.termination_tolerance = 1e-1
             self.fddp_full_sca.eps_abs = 1e-1
             self.fddp_full_sca.eps_rel = 1e-1
-            self.fddp_full_sca.filter_size = 5
+            self.fddp_full_sca.filter_size = 10
             # self.fddp_full_sca.update_rho_with_heuristic = True
             self.fddp_full_sca.max_qp_iters = 500
             # self.fddp_full_sca.use_filter_line_search = False   # (default: True)
