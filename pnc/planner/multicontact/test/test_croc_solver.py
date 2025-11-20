@@ -9,6 +9,7 @@ from plot.multiontact_plotter import MulticontactPlotter
 from pnc.planner.multicontact.dyn_feasibility.G1MulticontactPlanner import G1MulticontactPlanner
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import ContactSequence
 import plot.meshcat_utils as vis_tools
+from pnc.planner.multicontact.kin_feasibility import IKCFreePlanner, BaselineFramePlanner, MotionFrameSequencer
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -16,9 +17,10 @@ sys.path.append(cwd)
 import pinocchio as pin
 import numpy as np
 import config.multicontact.g1_planner_config as g1_params
+import config.multicontact.g1_baseline_planner_config as g1_baseline_params
 
 B_VISUALIZE = False
-B_SHOW_GRF_PLOTS = True
+B_SHOW_GRF_PLOTS = False
 B_SHOW_COST_PLOTS = True
 
 
@@ -56,6 +58,7 @@ def get_g1_default_initial_pose(n_joints):
     # q0[15] = np.pi / 2  # left_shoulder_yaw_joint
     # q0[16] = np.pi / 4   # left_elbow_joint
     # q0[17] = np.pi / 2   # left_wrist_roll_joint
+    q0[21] = -np.pi / 6  # r_shoulder_aa
     floating_base = np.array([0., 0., 0.7, 0., 0., 0., 1.])
     return np.concatenate((floating_base, q0))
 
@@ -77,12 +80,18 @@ class TestG1Planner(unittest.TestCase):
         force_joint_frames['LH'] = "left_wrist_yaw_joint"
         force_joint_frames['RH'] = "right_wrist_yaw_joint"
         package_dir = cwd + "/robot_model/g1_description"
-        robot_urdf_file = package_dir + "/g1_29dof_lock_waist_modified.urdf"
+        # robot_urdf_file = package_dir + "/g1_29dof_lock_waist_modified.urdf"
+        robot_urdf_file = package_dir + "/g1_29dof_simple_collisions.urdf"
         self.plan_to_model_frames = plan_to_model_frames
         self.force_joint_frames = force_joint_frames
 
         # load robot model and corresponding robot data
         rob_model, col_model, vis_model, rob_data, col_data, vis_data = load_robot_model(package_dir, robot_urdf_file)
+        self.refined_geom_model = pin.buildGeomFromUrdf(rob_model,
+                                           robot_urdf_file,
+                                           pin.GeometryType.COLLISION)
+        self.refined_geom_model.addAllCollisionPairs()
+
         self.rob_model = rob_model
         self.col_model = col_model
         self.vis_model = vis_model
@@ -116,6 +125,7 @@ class TestG1Planner(unittest.TestCase):
             starting_frame_pos[fr_name] = rob_data.oMf[plan_to_model_ids[fr_name]].translation
         self.starting_frame_pos = starting_frame_pos
         self.planner_params = g1_params.MultiContactDoorConfig()
+        self.baseline_planner_params = g1_baseline_params.MultiContactDoorConfig()
 
     def test_lean_on_left_wall(self):
         planner_params = self.planner_params
@@ -204,6 +214,64 @@ class TestG1Planner(unittest.TestCase):
             plan_plotter = MulticontactPlotter(robot_dyn_plan)
             plan_plotter.plot_costs()
             plt.show()
+
+
+    def test_lean_on_left_wall_high_knees(self):
+        planner_params = self.baseline_planner_params
+        rob_model = self.rob_model
+        force_joint_frames = self.force_joint_frames
+        contact_seq_planes = [{'RF': np.array([0, 0, 1]),
+                               'LH': np.array([0, -1 , 0])}
+                              ]
+
+        # set motion
+        fixed_frames_seq, motion_frames_seq = [], MotionFrameSequencer()
+        fixed_frames_seq.append(['torso', 'RF', 'R_knee', 'LH', 'RH'])  # phase 0
+        motion_frames_seq.add_motion_frame({'LF': self.starting_frame_pos['LF'] + np.array([0.0, 0.0, 0.38]),
+                                            'L_knee': self.starting_frame_pos['L_knee'] + np.array([0.0, 0.0, 0.38])})
+
+        # create a very baseline IK planner w/ constant targets
+        ik_cfree_planner = IKCFreePlanner(rob_model, self.rob_data, self.plan_to_model_frames,
+                                          self.x0[:self.rob_model.nq], self.planner_params)
+        frame_planner = BaselineFramePlanner(self.rob_data, self.plan_to_model_ids,
+                                             motion_frames_seq, fixed_frames_seq, "linear")
+        ik_cfree_planner.set_planner(frame_planner)
+
+        N_horizon_lst = [150]
+        T = 3
+        contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
+        robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params, self.refined_geom_model)
+        robot_dyn_plan.set_plan_to_model_params(self.plan_to_model_ids)
+        robot_dyn_plan.set_initial_configuration(self.x0)
+        robot_dyn_plan.set_zero_configuration(self.x0[:rob_model.nq])
+        robot_dyn_plan.plan(False, sca_refinement=True)
+        self.assertEqual(True, True)
+
+        if B_VISUALIZE:
+            save_freq = 10
+            display_idx = np.arange(0, len(robot_dyn_plan.lf_targets), save_freq)
+            display = vis_tools.MeshcatPinocchioAnimation(rob_model, self.col_model, self.vis_model,
+                                                          self.rob_data, self.vis_data, self.col_data,
+                                                          ctrl_freq=np.average(N_horizon_lst) / T, save_freq=save_freq)
+            display.display_targets("lfoot_target", robot_dyn_plan.lf_targets[display_idx], [1, 1, 0])
+            display.display_targets("lknee_target", robot_dyn_plan.lkn_targets[display_idx], [0, 0, 1])
+            display.display_targets("rfoot_target", robot_dyn_plan.rf_targets[display_idx], [1, 1, 0])
+            display.display_targets("rknee_target", robot_dyn_plan.rkn_targets[display_idx], [0, 0, 1])
+            display.display_targets("lhand_target", robot_dyn_plan.lh_targets[display_idx], [0.5, 0, 0])
+            display.display_targets("rhand_target", robot_dyn_plan.rh_targets[display_idx], [0.5, 0, 0])
+            display.display_targets("base_target", robot_dyn_plan.base_targets[display_idx], [0, 0.5, 0])
+            display.add_arrow("forces/" + force_joint_frames['RF'], color=[0, 0, 1])
+            display.add_arrow("forces/" + force_joint_frames['LH'], color=[0, 1, 0])
+            fddp = robot_dyn_plan.get_latest_fddp()
+            display.displayFromCrocoddylSolver([fddp])
+
+        if B_SHOW_COST_PLOTS:
+            plan_plotter = MulticontactPlotter(robot_dyn_plan)
+            plan_plotter.plot_costs()
+            plan_plotter.plot_constraint_violations()
+            plan_plotter.plot_joint_limit_margins()
+            plt.show()
+
 
 if __name__ == '__main__':
     unittest.main()

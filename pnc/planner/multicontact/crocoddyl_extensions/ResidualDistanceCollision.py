@@ -43,7 +43,7 @@ class ResidualDataDistanceCollision(ResidualDataAbstract):
         raise NotImplementedError("[ResidualDataDistanceCollision] Reduce is not implemented in Python")
 
 class ResidualDistanceCollision(ResidualModelAbstract):
-    def __init__(self, state: StateMultibody, nu: int, geom_model: pin.GeometryModel, pair_id: int, args, kwargs):
+    def __init__(self, state: StateMultibody, nu: int, geom_model: pin.GeometryModel, pair_id: int, args=None, kwargs=None):
         # We assume Base is a class like ResidualAbstract
         super().__init__(state, 1, nu, True, False, False)
         # self.state = state
@@ -102,20 +102,15 @@ class ResidualDistanceCollision(ResidualModelAbstract):
 
         # hppfcl distance calculation
         # .geometry is assumed to be an HPP-FCL object
-        data.r[0] = hppfcl.distance(
+        hppfcl.distance(
             geom_1.geometry, to_fcl_transform3f(data.oMg_id_1),
             geom_2.geometry, to_fcl_transform3f(data.oMg_id_2),
             self.hppfcl_dreq, self.hppfcl_dres
         )
-
-        # check if in collision to use as signed distance
-        self.hppfcl_creq = hppfcl.CollisionRequest()
-        self.hppfcl_cres = hppfcl.CollisionResult()
-        hppfcl.collide(geom_1.geometry, to_fcl_transform3f(data.oMg_id_1), geom_2.geometry,
-                       to_fcl_transform3f(data.oMg_id_2),
-                       self.hppfcl_creq, self.hppfcl_cres)
-        if self.hppfcl_cres.isCollision():
-            data.r[0] = -data.r[0]
+        geom_data = self.geometry.createData()
+        pin.updateGeometryPlacements(self.pin_model_, pin_data, self.geometry, geom_data)
+        dis_res = pin.computeDistance(self.geometry, geom_data, self.pair_id)
+        data.r[0] = dis_res.min_distance
 
     def calcDiff(self, data: ResidualModelAbstract, x: np.ndarray, u: Optional[np.ndarray] = None):
         # Using type hinting for clarity
@@ -159,8 +154,6 @@ class ResidualDistanceCollision(ResidualModelAbstract):
         # -d->res.normal.transpose() becomes -data.res.normal.T
         # topRows<3>() becomes a slice [0:3, :]
         data.Rx[:nv] = -self.hppfcl_dres.normal.reshape(-1, 1).T @ (J1[:3, :] - J2[:3, :])
-        if self.hppfcl_cres.isCollision():
-            data.Rx[:nv] = -data.Rx[:nv]
 
     @property
     def pair_id(self) -> int:

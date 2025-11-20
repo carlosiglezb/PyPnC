@@ -280,6 +280,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
             # Set final state as initial state of next phase
             self.fddp_single = fddp
+            self.solver_type = 'single'
             super().update_costs_from_solver(solver_type='single', integration_type=integration_type)
 
         if b_solve_hybrid:
@@ -365,7 +366,10 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             if self.ik_cfree_planner.planner.__class__.__name__ == "LocomanipulationFramePlanner":
                 frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
             elif self.ik_cfree_planner.planner.__class__.__name__ == "BaselineFramePlanner":
-                frame_targets_dict = self.ik_cfree_planner.planner.get_phase_targets(phase + 1)
+                if self.ik_cfree_planner.planner.interpolation == "constant":
+                    frame_targets_dict = self.ik_cfree_planner.planner.get_phase_targets(phase + 1)
+                elif self.ik_cfree_planner.planner.interpolation == "linear":
+                    frame_targets_dict = self.ik_cfree_planner.planner.get_linear_targets(phase, t, (phase + 1) * self.T)
             else:
                 raise ValueError("Unknown planner type in ik_cfree_planner")
         else:
@@ -511,10 +515,13 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             latest_fddp = self.fddp_full
         elif self.solver_type == 'single':
             latest_fddp = self.fddp_single
+        elif self.solver_type == 'sca':
+            latest_fddp = self.fddp_full_sca
         elif self.solver_type == 'seq':
             # TODO construct full trajectory from segments
             raise NotImplementedError
         else:
+            raise ValueError("Unknown solver type for getting latest fddp")
             latest_fddp = None
         return latest_fddp
 

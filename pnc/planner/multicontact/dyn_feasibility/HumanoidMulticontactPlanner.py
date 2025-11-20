@@ -19,7 +19,7 @@ class HumanoidMulticontactPlanner:
                  ik_cfree_planner,
                  planner_params,
                  geom_model=None):
-        self.solver_type = 'seq'
+        self.solver_type = 'None'
         self.geom_model = geom_model
         self.solver_stats = {}
         self.frame_names_lst = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
@@ -150,6 +150,7 @@ class HumanoidMulticontactPlanner:
             costs = self.costs_full_sca
         else:
             raise ValueError("Unknown solver type: {}".format(solver_type))
+        print("[get_solver_and_costs] Using solver type: {}".format(solver_type))
         return fddp_solver, costs
 
     def update_costs_from_solver(self, solver_type='seq', integration_type='Euler'):

@@ -13,11 +13,11 @@ class BaselineFramePlanner:
                  plan_to_model_ids: dict[str: int],
                  motion_frames_seq: MotionFrameSequencer,
                  fixed_frames: list[list[str]],
-                 ):
+                 interpolation:str = "constant",):
         self.robot_data = robot_data
         self.plan_to_model_ids = plan_to_model_ids
         self.all_frame_targets = self.create_frame_targets_dict(motion_frames_seq, fixed_frames)
-
+        self.interpolation = interpolation
 
     def create_frame_targets_dict(self,
                                   motion_frames_seq: MotionFrameSequencer,
@@ -55,3 +55,22 @@ class BaselineFramePlanner:
 
     def get_phase_targets(self, phase: int) -> dict[str, np.array]:
         return self.all_frame_targets[phase]
+
+    def get_linear_targets(self, phase: int,
+                           time: float,
+                           final_t: float) -> dict[str, np.array]:
+        s = np.clip(time / final_t, 0.0, 1.0)
+
+        current_phase_targets = self.get_phase_targets(phase)
+        next_phase_targets = self.get_phase_targets(phase + 1)
+
+        # generate intermediate frames (exclude previous, include final)
+        interp_targets = {}
+        for fr_name in frame_names_lst:
+            if fr_name in current_phase_targets.keys() and fr_name in next_phase_targets.keys():
+                start = np.array(current_phase_targets[fr_name], dtype=float)
+                end = np.array(next_phase_targets[fr_name], dtype=float)
+                interp_targets[fr_name] = (1.0 - s) * start + s * end
+            elif fr_name in current_phase_targets.keys() and fr_name not in next_phase_targets.keys():
+                interp_targets[fr_name] = current_phase_targets[fr_name]
+        return interp_targets
