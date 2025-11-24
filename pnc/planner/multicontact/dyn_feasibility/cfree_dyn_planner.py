@@ -1199,12 +1199,12 @@ def main(args):
     robot_dyn_plan.plan(b_solve_hybrid=B_SOLVE_HYBRID,
                         integration_type='Euler',
                         sca_refinement=B_SCA_REFINEMENT,
-                        b_solve_by_sections=B_SOLVE_BY_SECTIONS,)
+                        b_solve_by_sections='None',)
 
     # strings for saving data
     if kin_plan_path is not None:
         sca_str = '_kin_sca' if 'sca' in kin_plan_path else '_no_kin_sca'
-        action_str = '_step_' if 'knocker' in kin_plan_path else '_'
+        action_str = '_step_' if 'door' in kin_plan_path else '_'
         seq_str = next((s for s in ['over', 'on_balanced', 'on'] if s in kin_plan_path), '')
         env = '_door' if 'door' in kin_plan_path else '_stairs'
     else:
@@ -1213,10 +1213,9 @@ def main(args):
         base_str = '_baseline_'
     else:
         base_str = '_guided_'
-    TO_type = robot_dyn_plan.solver_type
     impact_str = '_imp' if B_SOLVE_HYBRID else '_no_imp'
     sca_refine_str = '_sca_refine_' if B_SCA_REFINEMENT else '_no_sca_refine_'
-    soln_str = robot_name + base_str + TO_type + impact_str + sca_str + sca_refine_str + action_str + seq_str + env
+    soln_str = robot_name + base_str + impact_str + sca_str + sca_refine_str + action_str + seq_str + env
 
     # Creating display
     if B_VISUALIZE_DYN:
@@ -1342,21 +1341,29 @@ def main(args):
             dyn_data_saver.add('bez_path', ik_cfree_planner)
             dyn_data_saver.add('fixed_frames', fixed_frames)
         dyn_data_saver.add('contact_seq_planes', contact_seq_planes)
-        for (i, fp) in enumerate([robot_dyn_plan.fddp_full]):
+        for (i, fp) in enumerate(fddp):
             com_lst = []
             torso_pos, lf_pos, rf_pos, lkn_pos, rkn_pos, lh_pos, rh_pos = [], [], [], [], [], [], []
-            if i == len([robot_dyn_plan.fddp_full])-1:      # variables that need to be logged only once
+            if i == len(fddp)-1:      # variables that need to be logged only once
                 dyn_data_saver.add('w_grf_lfoot', w_rf_lfoot.tolist())
                 dyn_data_saver.add('w_grf_rfoot', w_rf_rfoot.tolist())
                 dyn_data_saver.add('w_grf_lhand', w_rf_lwrist.tolist())
                 dyn_data_saver.add('w_grf_rhand', w_rf_rwrist.tolist())
                 dyn_data_saver.add('time', sim_time.tolist())
-            log = fp.getCallbacks()[0]
-            q = np.array(log.xs)[:, :rob_model.nq]
-            qd = np.array(log.xs)[:, rob_model.nq:]
+
+            # get xs and us from their logs or solver
+            if hasattr(fp, "__class__") and fp.__class__.__name__ in {"SolverSQP", "SolverCSQP"}:
+                xs = fp.xs
+                us = fp.us
+            else:
+                log = fp.getCallbacks()[0]
+                xs = log.xs
+                us = log.us
+            q = np.array(xs)[:, :rob_model.nq]
+            qd = np.array(xs)[:, rob_model.nq:]
             dyn_data_saver.add('joint_pos', q.tolist())
             dyn_data_saver.add('joint_vel', qd.tolist())
-            dyn_data_saver.add('joint_torque', [vec.tolist() for vec in log.us.tolist()])
+            dyn_data_saver.add('joint_torque', [vec.tolist() for vec in us.tolist()])
             for (qi, qdi) in zip(q, qd):
                 com_lst.append(pin.centerOfMass(rob_model, rob_data, qi, qdi))
                 pin.forwardKinematics(rob_model, rob_data, qi, qdi)

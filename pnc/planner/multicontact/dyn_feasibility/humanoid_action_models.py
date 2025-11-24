@@ -9,10 +9,12 @@ from config.multicontact.planner_config import PlannerConfig
 from pnc.planner.multicontact.crocoddyl_extensions.ActivationModelDistanceQuad import ActivationModelDistanceQuad
 from pnc.planner.multicontact.crocoddyl_extensions.ControlBounds import ControlBounds
 from pnc.planner.multicontact.crocoddyl_extensions.ResidualDistanceCollision import ResidualDistanceCollision
+from pnc.planner.multicontact.crocoddyl_extensions.ResidualFrictionCone import ResidualFrictionCone
+from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import ContactSequence
 from util.util import so3_from_vec_to_vec
 
 Z_UP =  np.array([0., 0., 1])
-mu = 0.7
+mu = 0.9
 
 
 def get_limb_joint_idx(limb_joint_names: list[str],
@@ -229,6 +231,27 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         runningConstraintModelManager.addConstraint('uBounds',
                                                     u_bounds_res,
                                                     True)
+
+        # remove friction from costs and enforce as hard constraint
+        for fr_name, fr_plane in frames_in_contact.items():
+            # costs.removeCost(fr_name + "_friction") # TODO add back
+
+            r, p = util.util.vec_to_roll_pitch(fr_plane)
+            plane_rot = util.util.euler_to_rot([r, p, 0])
+            friction_cone = ResidualFrictionCone(state,
+                                                 fr_name + "_contact",
+                                                 mu,
+                                                 actuation.nu,
+                                                 plane_rot)
+            constr_friction = crocoddyl.ConstraintModelResidual(state,
+                                                                friction_cone,
+                                                                np.array([0.0]),
+                                                                np.array([np.inf]),
+                                                                True)
+            # runningConstraintModelManager.addConstraint(fr_name + "_friction",
+            #                                             constr_friction,
+            #                                             True)
+
         if True:
             b_soft_col_avoid = False
             for cp_idx, cp in enumerate(geom_model.collisionPairs):
@@ -248,7 +271,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                 # add as cost just for torso (debugging purposes -- remove IF condition later)
                 if 'root_joint' in cp_first_name or 'torso' in cp_second_name:
                     sca_alpha = 0.005
-                    dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx,{},{})
+                    dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx)
                     # dist_col = crocoddyl.ResidualModelPairCollision(state, actuation.nu, geom_model, cp_idx, j_id)
                     if b_soft_col_avoid:
                         activation_sca = ActivationModelDistanceQuad(1, 0.4, 0.2)
@@ -273,6 +296,11 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                                                              np.array([0.0]),
                                                                              np.array([np.inf]),
                                                                              True)
+                        # col_avoid_constr = crocoddyl.ConstraintModelResidual(state,
+                        #                                                      dist_col,
+                        #                                                      np.array([0.02, 0.02, 0.02]),
+                        #                                                      np.array([np.inf, np.inf, np.inf]),
+                        #                                                      True)
                         runningConstraintModelManager.addConstraint(cp_first_name + '_to_' + cp_second_name + "_sca",
                                                                     col_avoid_constr,
                                                                     True)

@@ -46,7 +46,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
     def plan(self, b_solve_hybrid: bool=True,
              integration_type: str='Euler',
              sca_refinement: bool=False,
-             b_solve_by_sections: bool=False):
+             b_solve_by_sections: str='None'):
         dyn_seg_solve_time = []
 
         state = self.state
@@ -63,7 +63,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         # * Option 1 (seq): solve by sections, one contact phase at a time
         # * Option 2 (single): solve as single TO
         #
-        if b_solve_by_sections:
+        if b_solve_by_sections == 'seq':
             self.solver_type = 'seq'
             fddp = self.fddp
             for i in range(self.contact_phases):
@@ -181,7 +181,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             super().update_costs_from_solver(solver_type='seq', integration_type=integration_type)
             self.solver_stats['contacts_phases_solve_times'] = dyn_seg_solve_time
             print("[Compute Time] Dynamic feasibility check: ", sum(dyn_seg_solve_time))
-        else:
+        elif b_solve_by_sections == 'single':
             self.solver_type = 'single'
             for i in range(self.contact_phases):
                 model_seqs = []
@@ -251,8 +251,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             fddp = crocoddyl.SolverBoxFDDP(problem)
 
             # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
-            fddp.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
-            # fddp.setCallbacks([crocoddyl.CallbackLogger()])
+            # fddp.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
+            fddp.setCallbacks([crocoddyl.CallbackLogger()])
 
             # Solver settings
             max_iter = 500
@@ -282,6 +282,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_single = fddp
             self.solver_type = 'single'
             super().update_costs_from_solver(solver_type='single', integration_type=integration_type)
+
+        else:
+            print(f"b_solve_by_sections set to {b_solve_by_sections}. Skipping 'seq' and 'single' step.")
 
         if b_solve_hybrid:
             #
@@ -393,8 +396,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         for i in range(self.contact_phases):
             frames_in_contact = self.contact_planes_seq[i]
             N_current = self.horizon_lst[i]
-            DT = T / (N_current - 1)
-            for t in np.linspace(i * T, (i + 1) * T, N_current):
+            DT = T / N_current
+            for t in np.arange(i * T, (i + 1) * T, DT):
                 frame_targets_dict = self.get_targets_from_planner(i, t)
                 # get upcoming frames in contact (unless in last contact phase)
                 if i != (self.contact_phases - 1):
@@ -460,7 +463,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.termination_tolerance = 1e-1
             self.fddp_full_sca.eps_abs = 1e-1
             self.fddp_full_sca.eps_rel = 1e-1
-            self.fddp_full_sca.filter_size = 10
+            self.fddp_full_sca.filter_size = 5
             # self.fddp_full_sca.update_rho_with_heuristic = True
             self.fddp_full_sca.max_qp_iters = 500
             # self.fddp_full_sca.use_filter_line_search = False   # (default: True)
@@ -483,8 +486,14 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         max_iter = 1000
         # Set initial guess from latest solve
         # TODO check dimensions and/or adjust
-        xs = copy(latest_fddp.xs)
-        us = StdVec_VectorX.copy(latest_fddp.us)
+        if latest_fddp is not None:
+            xs = copy(latest_fddp.xs)
+            us = StdVec_VectorX.copy(latest_fddp.us)
+        else:
+            xs = [x0] * (self.fddp_full_sca.problem.T + 1)
+            us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0)
+            us = [us_static] * self.fddp_full_sca.problem.T
+            # us = self.fddp_full_sca.problem.quasiStatic([x0] * self.fddp_full_sca.problem.T)
 
         # uncomment below when removing impulse models from the guess
         # idx_removed = 0
@@ -521,7 +530,6 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             # TODO construct full trajectory from segments
             raise NotImplementedError
         else:
-            raise ValueError("Unknown solver type for getting latest fddp")
             latest_fddp = None
         return latest_fddp
 
