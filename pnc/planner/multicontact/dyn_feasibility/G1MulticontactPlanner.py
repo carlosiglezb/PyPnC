@@ -46,7 +46,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
     def plan(self, b_solve_hybrid: bool=True,
              integration_type: str='Euler',
              sca_refinement: bool=False,
-             b_solve_by_sections: str='None'):
+             b_solve_by_sections: str='None',
+             solver_type: str='FDDP'):
         dyn_seg_solve_time = []
 
         state = self.state
@@ -133,14 +134,30 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                     self.knot_idx += 1
 
                 problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
-                fddp[i] = crocoddyl.SolverBoxFDDP(problem)
+                if solver_type == 'SQP':
+                    print("[SCA-Crocoddyl] Using CSQP solver for sequential TO")
+                    fddp[i] = mim_solvers.SolverCSQP(problem)
+                    fddp[i].setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose()])
+                    fddp[i].termination_tolerance = 1e-1
+                    fddp[i].eps_abs = 1e-1
+                    fddp[i].eps_rel = 1e-1
+                    fddp[i].filter_size = 5
+                    # fddp[i].update_rho_with_heuristic = True
+                    fddp[i].max_qp_iters = 500
+                    # fddp[i].use_filter_line_search = False   # (default: True)
+                    # fddp[i].mu_dynamic = -1  # Nocedal's L1 merit function
+                    # fddp[i].lag_mul_inf_norm_coef = 10
+                    # fddp[i].max_qp_iters = 50
+                else:
+                    print("[SCA-Crocoddyl] Using BoxFDDP solver for sequential TO")
+                    fddp[i] = crocoddyl.SolverBoxFDDP(problem)
 
-                # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
-                # fddp[i].setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
-                fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
+                    # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
+                    # fddp[i].setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
+                    fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
 
                 # Solver settings
-                max_iter = 250
+                max_iter = 500
                 fddp[i].th_stop = 1e-3
                 fddp[i].th_gapTol = 1e-2
                 fddp[i].reg_max = 1e4
@@ -248,11 +265,27 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
 
             problem = crocoddyl.ShootingProblem(x0, sum(np.vstack(model_seq_all).tolist(),[])[:-1], model_seq_all[-1][-1])
-            fddp = crocoddyl.SolverBoxFDDP(problem)
+            if solver_type == 'SQP':
+                print("[SCA-Crocoddyl] Using CSQP solver for single TO")
+                fddp = mim_solvers.SolverCSQP(problem)
+                fddp.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose()])
+                fddp.termination_tolerance = 1e-1
+                fddp.eps_abs = 1e-1
+                fddp.eps_rel = 1e-1
+                fddp.filter_size = 5
+                # fddp.update_rho_with_heuristic = True
+                fddp.max_qp_iters = 500
+                # fddp.use_filter_line_search = False   # (default: True)
+                # fddp.mu_dynamic = -1  # Nocedal's L1 merit function
+                # fddp.lag_mul_inf_norm_coef = 10
+                # fddp.max_qp_iters = 50
+            else:
+                print("[SCA-Crocoddyl] Using BoxFDDP solver for single TO")
+                fddp = crocoddyl.SolverBoxFDDP(problem)
 
-            # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
-            # fddp.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
-            fddp.setCallbacks([crocoddyl.CallbackLogger()])
+                # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
+                # fddp.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
+                fddp.setCallbacks([crocoddyl.CallbackLogger()])
 
             # Solver settings
             max_iter = 500
@@ -284,6 +317,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             super().update_costs_from_solver(solver_type='single', integration_type=integration_type)
 
         else:
+            self.solver_type = 'None'
             print(f"b_solve_by_sections set to {b_solve_by_sections}. Skipping 'seq' and 'single' step.")
 
         if b_solve_hybrid:
@@ -389,7 +423,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         plan_to_model_ids = self.plan_to_model_ids
         planner_params = self.planner_params
         zero_config = self._zero_config
-        latest_fddp = self.get_latest_fddp()
+        latest_fddp_xs, latest_fddp_us = self.get_latest_fddp_xs_us()
 
         knot_idx = 0
         model_seqs = []
@@ -426,7 +460,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             # Note: currently, this implementation assumes a TO has already been solved
             if b_impulse:
                 if i != (self.contact_phases - 1):
-                    x_last = copy(latest_fddp.xs[knot_idx])
+                    x_last = copy(latest_fddp_xs[knot_idx])
                     imp_model = createMultiFrameFinalImpulseModel(state,
                                                                   x_last,
                                                                   plan_to_model_ids,
@@ -486,9 +520,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         max_iter = 1000
         # Set initial guess from latest solve
         # TODO check dimensions and/or adjust
-        if latest_fddp is not None:
-            xs = copy(latest_fddp.xs)
-            us = StdVec_VectorX.copy(latest_fddp.us)
+        if self.solver_type is not None:
+            xs = copy(latest_fddp_xs)
+            us = StdVec_VectorX.copy(latest_fddp_us)
         else:
             xs = [x0] * (self.fddp_full_sca.problem.T + 1)
             us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0)
@@ -532,6 +566,36 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         else:
             latest_fddp = None
         return latest_fddp
+
+    def get_latest_fddp_xs_us(self) -> (StdVec_VectorX, StdVec_VectorX):
+        if self.solver_type == 'full':
+            xs_all = self.fddp_full.xs
+            us_all = self.fddp_full.us
+        elif self.solver_type == 'single':
+            xs_all = self.fddp_single.xs
+            us_all = self.fddp_single.us
+        elif self.solver_type == 'sca':
+            xs_all = self.fddp_full_sca.xs
+            us_all = self.fddp_full_sca.us
+        elif self.solver_type == 'seq':
+            # construct full trajectory from segments
+            xs_all = StdVec_VectorX()
+            us_all = StdVec_VectorX()
+            StdVec_VectorX.extend(xs_all, self.fddp[0].xs)
+            StdVec_VectorX.extend(us_all, StdVec_VectorX.copy(self.fddp[0].us))
+
+            # copy all segments into the first one
+            for i in range(1, len(self.fddp)):
+                StdVec_VectorX.extend(xs_all, self.fddp[i].xs)
+                StdVec_VectorX.extend(us_all, StdVec_VectorX.copy(self.fddp[i].us))
+                StdVec_VectorX.extend(us_all, StdVec_VectorX(1, self.fddp[i].us[-1]))
+            # add for terminal state
+            StdVec_VectorX.extend(xs_all, StdVec_VectorX(1, self.fddp[-1].xs[-1]))
+            StdVec_VectorX.extend(us_all, StdVec_VectorX(1, self.fddp[-1].us[-1]))
+        else:
+            raise NotImplementedError("No latest fddp available.")
+        return xs_all, us_all
+
 
     def set_zero_configuration(self, joint_configuration):
         self._zero_config = joint_configuration
