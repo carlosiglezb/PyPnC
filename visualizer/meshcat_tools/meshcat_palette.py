@@ -1,4 +1,5 @@
-from meshcat.geometry import (MeshLambertMaterial, Sphere)
+from meshcat.geometry import MeshLambertMaterial
+
 
 #
 # Color definitions
@@ -11,6 +12,7 @@ WHITE = 0xffffff
 BLACK = 0x000000
 CYAN = 0x00ffff
 PURPLE = 0x800080
+YELLOW = 0xFFFF00
 
 #
 # Commonly used object colors and opacities

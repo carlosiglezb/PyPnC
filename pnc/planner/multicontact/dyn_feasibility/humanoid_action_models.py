@@ -269,7 +269,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                 j_id = robot_model.getJointId(cp_first_name)
 
                 # add as cost just for torso (debugging purposes -- remove IF condition later)
-                if 'root_joint' in cp_first_name or 'torso' in cp_second_name:
+                if 'root_joint' in cp_first_name or 'torso' in cp_second_name or 'door' in cp_second_name or 'door' in cp_first_name:
                     sca_alpha = 0.005
                     dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx)
                     # dist_col = crocoddyl.ResidualModelPairCollision(state, actuation.nu, geom_model, cp_idx, j_id)

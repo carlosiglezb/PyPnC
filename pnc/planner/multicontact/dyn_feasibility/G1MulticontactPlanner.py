@@ -317,7 +317,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             super().update_costs_from_solver(solver_type='single', integration_type=integration_type)
 
         else:
-            self.solver_type = 'None'
+            self.solver_type = None
             print(f"b_solve_by_sections set to {b_solve_by_sections}. Skipping 'seq' and 'single' step.")
 
         if b_solve_hybrid:
@@ -423,7 +423,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         plan_to_model_ids = self.plan_to_model_ids
         planner_params = self.planner_params
         zero_config = self._zero_config
-        latest_fddp_xs, latest_fddp_us = self.get_latest_fddp_xs_us()
+        if self.solver_type is not None:
+            latest_fddp_xs, latest_fddp_us = self.get_latest_fddp_xs_us()
 
         knot_idx = 0
         model_seqs = []

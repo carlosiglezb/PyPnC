@@ -19,7 +19,7 @@ class HumanoidMulticontactPlanner:
                  ik_cfree_planner,
                  planner_params,
                  geom_model=None):
-        self.solver_type = 'None'
+        self.solver_type = None
         self.geom_model = geom_model
         self.solver_stats = {}
         self.frame_names_lst = ['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH']
