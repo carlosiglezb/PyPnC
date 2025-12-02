@@ -1,6 +1,8 @@
 import pydrake.geometry.optimization as mut
 
 import meshcat.transformations as tf
+from meshcat.geometry import Sphere
+
 from visualizer.meshcat_tools.meshcat_palette import *
 from util.pydrake_meshcat_interface import pydrake_geom_to_meshcat
 
