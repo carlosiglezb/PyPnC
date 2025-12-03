@@ -1,12 +1,15 @@
-name: pypnc-multicontact
+name: pypnc-multicontact3
 channels:
   - anaconda
   - conda-forge
 dependencies:
   - crocoddyl=3.0.1
-  - pinocchio=3.6.0
+  - pinocchio=3.7.0
   - sqlite=3.50.2
   - python=3.12
+  - cxx-compiler
+  - cddlib
+  - gmp
   - pip
   - pip:
       - casadi==3.7.0
