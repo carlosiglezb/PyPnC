@@ -3,6 +3,7 @@ import sys
 from typing import List
 
 import numpy as np
+import coal
 import pinocchio as pin
 from meshcat.geometry import TriangularMeshGeometry
 
@@ -22,7 +23,7 @@ from pydrake.geometry.optimization import HPolyhedron
 from util.pydrake_meshcat_interface import pydrake_geom_to_meshcat
 from util.util import vec_to_roll_pitch
 from visualizer.meshcat_tools.meshcat_palette import meshcat_iris_obj, meshcat_obstacle_obj, meshcat_domain_obj, \
-    meshcat_point_obj, PURPLE, GREEN, GREY, BLUE
+    meshcat_point_obj, PURPLE, GREEN, GREY, BLUE, YELLOW
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -435,3 +436,24 @@ class MeshcatPinocchioAnimation:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path + filename, "w") as f:
             f.write(viewer_html)
+
+
+def coal_geom_to_meshcat(geom: pin.GeometryObject):
+    """Convert a pinocchio collision geometry to a meshcat geometry."""
+    if isinstance(geom, coal.Sphere):
+        radius = geom.radius
+        sphere = g.Sphere(radius=radius)
+        return sphere
+    elif isinstance(geom, coal.Cylinder):
+        # Note: Meshcat Cylinders are aligned with the y-axis while
+        # Pinocchio Cylinders are aligned with the z-axis.
+        return g.Cylinder(
+            radiusTop=geom.radius,
+            radiusBottom=geom.radius,
+            height=2*geom.halfLength,
+        )
+    elif isinstance(geom, coal.Box):
+        return g.Box(2*geom.halfSide)
+    else:
+        raise NotImplementedError(
+            f"Geometry type {geom.__class__} conversion to Meshcat not defined.")

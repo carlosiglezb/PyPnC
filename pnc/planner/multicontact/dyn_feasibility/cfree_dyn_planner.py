@@ -3,6 +3,9 @@ import pickle
 import sys
 from collections import OrderedDict
 
+cwd = os.getcwd()
+sys.path.append(cwd)
+
 import config.multicontact.g1_planner_config as g1_params
 import config.multicontact.g1_baseline_planner_config as g1_baseline_params
 import config.multicontact.ergoCub_planner_config as ergoCub_params
@@ -12,9 +15,6 @@ from pnc.planner.multicontact.kin_feasibility import SCARobotGeometry
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
 from util.environment_creator import TiltedStairs
 import pnc.planner.multicontact.contact_sequence_plans.tilted_stairs_plans as stairs_plan
-
-cwd = os.getcwd()
-sys.path.append(cwd)
 
 import crocoddyl
 import numpy as np
@@ -72,6 +72,7 @@ B_SAVE_DYN_DATA = False
 B_SAVE_HTML = True
 
 
+env_urdf_path = cwd + "/robot_model/ground/navy_door_fixed.urdf"
 
 def get_g1_default_initial_pose(n_joints:int, env: str = 'door'):
     if env == 'door':
@@ -299,8 +300,9 @@ def load_robot_model(package_dir, urdf_file):
 
 def load_navy_door_models():
     return pin.buildModelsFromUrdf(
-        cwd + "/robot_model/ground/navy_door.urdf",
-        cwd + "/robot_model/ground", pin.JointModelFreeFlyer())
+        cwd + "/robot_model/ground/navy_door_fixed.urdf",
+        cwd + "/robot_model/ground")
+
 
 def compute_iris_regions_mgr(obstacles,
                              domain_ubody,
@@ -777,8 +779,8 @@ def visualize_env(rob_model, rob_collision_model, rob_visual_model, q0, door_pos
         door_vis = MeshcatVisualizer(door_model, door_collision_model, door_visual_model)
         door_vis.initViewer(visualizer.viewer)
         door_vis.loadViewerModel(rootNodeName="door")
-        door_vis_q = door_pose
-        door_vis.display(door_vis_q)
+        # door_vis_q = door_pose
+        # door_vis.display(door_vis_q)
     else:
         door_model, door_collision_model, door_visual_model = None, None, None
 
@@ -795,6 +797,7 @@ def main(args):
     #
     plan_to_model_frames = OrderedDict()
     force_joint_frames = OrderedDict()
+    refined_collisions_urdf_file = None
     if robot_name == 'g1':
         plan_to_model_frames['torso'] = 'torso_primitive_shape'
         plan_to_model_frames['LF'] = 'left_ankle_roll_link'
@@ -810,6 +813,7 @@ def main(args):
         force_joint_frames['LH'] = "left_wrist_yaw_joint"
         force_joint_frames['RH'] = "right_wrist_yaw_joint"
         package_dir = cwd + "/robot_model/g1_description"
+        refined_collisions_urdf_file = package_dir + "/g1_29dof_simple_collisions.urdf"
         # robot_urdf_file = package_dir + "/g1_29dof_simple_collisions.urdf"
         robot_urdf_file = package_dir + "/g1_29dof_lock_waist_modified.urdf"
     elif robot_name == 'valkyrie':
@@ -1083,10 +1087,10 @@ def main(args):
                 kin_data_saver.advance()
                 kin_data_saver.close()
         else:
-            # create target dictionaries for baseline planner
-
             # override kinematic planner with baseline planner
-            frame_planner = BaselineFramePlanner(rob_data, plan_to_model_ids, motion_frames_seq, fixed_frames_seq)
+            frame_planner = BaselineFramePlanner(rob_data, plan_to_model_ids,
+                                                 motion_frames_seq, fixed_frames_seq, T,
+                                                 "linear")
             ik_cfree_planner.set_planner(frame_planner)
 
     else:
@@ -1109,17 +1113,27 @@ def main(args):
     if B_VISUALIZE_KIN or B_VISUALIZE_DYN:
         if env == 'door':
             # load knee knocker visualization and collision models
-            door_model, door_collision_model, door_visual_model = load_navy_door_models()
+            # TODO see if we can simply replace with navy_door_fixed
+            door_model, _, door_visual_model = load_navy_door_models()
+            door_collision_model = pin.buildGeomFromUrdf(door_model, env_urdf_path, pin.GeometryType.COLLISION)
 
     #
     # Start Dynamic Feasibility Check
     #
-    # pass more-refined collision model to dynamic planner
+    # pass more-refined collision model to dynamic planner and merge with environment
     if refined_collisions_urdf_file is not None:
         refined_geom_model = pin.buildGeomFromUrdf(rob_model,
                                            refined_collisions_urdf_file,
                                            pin.GeometryType.COLLISION)
         refined_geom_model.addAllCollisionPairs()
+        if env == 'door':
+            for g in range(door_collision_model.ngeoms):
+                refined_geom_model.addGeometryObject(door_collision_model.geometryObjects[g])
+        elif env == 'stairs':
+            for col_obj in stairs.obstacles_col:
+                refined_geom_model.addCollisionObject(col_obj)
+        refined_geom_model.addAllCollisionPairs()
+
     N_horizon_lst = planner_params.N_HORIZON_LST
     contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
     if robot_name == 'g1':
@@ -1199,7 +1213,7 @@ def main(args):
     robot_dyn_plan.plan(b_solve_hybrid=B_SOLVE_HYBRID,
                         integration_type='Euler',
                         sca_refinement=B_SCA_REFINEMENT,
-                        b_solve_by_sections='None',)
+                        b_solve_by_sections='none',)
 
     # strings for saving data
     if kin_plan_path is not None:
@@ -1215,16 +1229,17 @@ def main(args):
         base_str = '_guided_'
     impact_str = '_imp' if B_SOLVE_HYBRID else '_no_imp'
     sca_refine_str = '_sca_refine_' if B_SCA_REFINEMENT else '_no_sca_refine_'
-    soln_str = robot_name + base_str + impact_str + sca_str + sca_refine_str + action_str + seq_str + env
+    soln_str = robot_name + base_str + impact_str + sca_str + sca_refine_str + action_str + seq_str + env + '_all_cols'
 
     # Creating display
     if B_VISUALIZE_DYN:
+        col_data = refined_geom_model.createData()
         save_freq = 10
         display_idx = np.arange(0, len(robot_dyn_plan.lf_targets), save_freq)
-        display = vis_tools.MeshcatPinocchioAnimation(rob_model, col_model, vis_model,
+        display = vis_tools.MeshcatPinocchioAnimation(rob_model, refined_geom_model, vis_model,
                           rob_data, vis_data, col_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
         if 'door' in env:
-            display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
+            display.add_robot("door", door_model, door_collision_model, door_visual_model)
         elif 'stairs' in env:
             display.add_shapes_from(stairs.obstacles_vis)
         if not B_BASELINE:

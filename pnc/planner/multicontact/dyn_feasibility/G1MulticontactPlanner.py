@@ -400,15 +400,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
     def get_targets_from_planner(self, phase: int, t:float) -> dict[str, np.array]:
         if hasattr(self.ik_cfree_planner, "planner"):
-            if self.ik_cfree_planner.planner.__class__.__name__ == "LocomanipulationFramePlanner":
-                frame_targets_dict = self.ik_cfree_planner.pack_current_targets(t)
-            elif self.ik_cfree_planner.planner.__class__.__name__ == "BaselineFramePlanner":
-                if self.ik_cfree_planner.planner.interpolation == "constant":
-                    frame_targets_dict = self.ik_cfree_planner.planner.get_phase_targets(phase + 1)
-                elif self.ik_cfree_planner.planner.interpolation == "linear":
-                    frame_targets_dict = self.ik_cfree_planner.planner.get_linear_targets(phase, t, (phase + 1) * self.T)
-            else:
-                raise ValueError("Unknown planner type in ik_cfree_planner")
+            frame_targets_dict = self.ik_cfree_planner.get_frame_targets_from_kin_planner(phase, t)
         else:
             frame_targets_dict = self.pack_current_targets(t)  # used for data reload
         return frame_targets_dict

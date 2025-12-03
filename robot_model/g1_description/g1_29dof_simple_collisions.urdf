@@ -105,9 +105,9 @@
 <!--      </geometry>-->
 <!--    </collision>-->
     <collision>
-      <origin xyz="0.02 0.0 -0.11" rpy="0 0 0"/>
+      <origin xyz="0.02 0.0 -0.12" rpy="0 0 0"/>
       <geometry>
-        <cylinder radius="0.05" length="0.22"/>
+        <cylinder radius="0.06" length="0.28"/>
       </geometry>
     </collision>
 <!--    <collision>-->
@@ -187,9 +187,9 @@
 <!--      </geometry>-->
 <!--    </collision>-->
     <collision>
-      <origin xyz="0.007 0.005 -0.13" rpy="0 0 0"/>
+      <origin xyz="0.007 0.005 -0.12" rpy="0 0 0"/>
       <geometry>
-        <cylinder radius="0.05" length="0.26"/>
+        <cylinder radius="0.06" length="0.3"/>
       </geometry>
     </collision>
 <!--    <collision>-->
@@ -251,11 +251,17 @@
       </material>
     </visual>
     <collision>
-      <origin xyz="0.0 0.0 -0.03" rpy="0 0 0"/>
+      <origin xyz="0.04 0.0 -0.01" rpy="0 1.57079632679 0"/>
       <geometry>
-        <sphere radius="0.04"/>
+        <cylinder radius="0.04" length="0.21"/>
       </geometry>
     </collision>
+<!--    <collision>-->
+<!--      <origin xyz="0.0 0.0 -0.0" rpy="0 0 0"/>-->
+<!--      <geometry>-->
+<!--        <sphere radius="0.04"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
 <!--    <collision>-->
 <!--      <origin xyz="-0.05 0.025 -0.03" rpy="0 0 0"/>-->
 <!--      <geometry>-->
@@ -340,9 +346,9 @@
 <!--      </geometry>-->
 <!--    </collision>-->
     <collision>
-      <origin xyz="0.02 -0.0 -0.11" rpy="0 0 0"/>
+      <origin xyz="0.02 -0.0 -0.12" rpy="0 0 0"/>
       <geometry>
-        <cylinder radius="0.05" length="0.22"/>
+        <cylinder radius="0.06" length="0.28"/>
       </geometry>
     </collision>
 <!--    <collision>-->
@@ -422,9 +428,9 @@
 <!--      </geometry>-->
 <!--    </collision>-->
     <collision>
-      <origin xyz="0.007 -0.005 -0.13" rpy="0 0 0"/>
+      <origin xyz="0.007 -0.005 -0.12" rpy="0 0 0"/>
       <geometry>
-        <cylinder radius="0.05" length="0.26"/>
+        <cylinder radius="0.06" length="0.3"/>
       </geometry>
     </collision>
 <!--    <collision>-->
@@ -486,11 +492,17 @@
       </material>
     </visual>
     <collision>
-      <origin xyz="0.0 0.0 -0.03" rpy="0 0 0"/>
+      <origin xyz="0.04 0.0 -0.01" rpy="0 1.57079632679 0"/>
       <geometry>
-        <sphere radius="0.04"/>
+        <cylinder radius="0.04" length="0.21"/>
       </geometry>
     </collision>
+<!--    <collision>-->
+<!--      <origin xyz="0.0 0.0 -0.0" rpy="0 0 0"/>-->
+<!--      <geometry>-->
+<!--        <sphere radius="0.04"/>-->
+<!--      </geometry>-->
+<!--    </collision>-->
 <!--    <collision>-->
 <!--      <origin xyz="-0.05 0.025 -0.03" rpy="0 0 0"/>-->
 <!--      <geometry>-->
@@ -595,7 +607,7 @@
   </link>
 <joint name="torso_primitive_shape_joint" type="fixed">
 <!-- <origin xyz="-0.0013625 0.000257 0.055" rpy="0 0 0"/>-->
- <origin xyz="0 0 0.2" rpy="0 0 0"/>
+ <origin xyz="0 0 0.19" rpy="0 0 0"/>
  <parent link="torso_link"/>
  <child link="torso_primitive_shape"/>
  </joint>
@@ -609,7 +621,16 @@
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
 <!--          <box size="0.20 0.31 0.50"/>-->
-        <box size="0.14 0.20 0.45"/>
+<!--        <box size="0.14 0.20 0.5"/>-->
+        <cylinder radius="0.11" length="0.35"/>
+      </geometry>
+  </collision>
+  <collision>
+      <origin xyz="0 0 -0.2" rpy="0 0 0"/>
+      <geometry>
+<!--          <box size="0.20 0.31 0.50"/>-->
+<!--        <box size="0.14 0.20 0.5"/>-->
+        <cylinder radius="0.08" length="0.1"/>
       </geometry>
   </collision>
  </link>
@@ -896,6 +917,12 @@
 <!--        <mesh filename="meshes/left_wrist_roll_link.STL"/>-->
 <!--      </geometry>-->
 <!--    </collision>-->
+    <collision>
+      <origin xyz="0.065 0.0 0.0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.035"/>
+      </geometry>
+    </collision>
   </link>
   <joint name="left_wrist_pitch_joint" type="revolute">
     <origin xyz="0.038 0 0" rpy="0 0 0"/>
@@ -1138,6 +1165,12 @@
 <!--        <mesh filename="meshes/right_wrist_roll_link.STL"/>-->
 <!--      </geometry>-->
 <!--    </collision>-->
+    <collision>
+      <origin xyz="0.065 0.0 0.0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.035"/>
+      </geometry>
+    </collision>
   </link>
   <joint name="right_wrist_pitch_joint" type="revolute">
     <origin xyz="0.038 0 0" rpy="0 0 0"/>

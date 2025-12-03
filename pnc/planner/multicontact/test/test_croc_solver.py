@@ -231,14 +231,14 @@ class TestG1Planner(unittest.TestCase):
                                             'L_knee': self.starting_frame_pos['L_knee'] + np.array([0.0, 0.0, 0.38])})
 
         # create a very baseline IK planner w/ constant targets
+        T = 3
         ik_cfree_planner = IKCFreePlanner(rob_model, self.rob_data, self.plan_to_model_frames,
                                           self.x0[:self.rob_model.nq], self.planner_params)
         frame_planner = BaselineFramePlanner(self.rob_data, self.plan_to_model_ids,
-                                             motion_frames_seq, fixed_frames_seq, "linear")
+                                             motion_frames_seq, fixed_frames_seq, T, "linear")
         ik_cfree_planner.set_planner(frame_planner)
 
         N_horizon_lst = [150]
-        T = 3
         contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
         robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params, self.refined_geom_model)
         robot_dyn_plan.set_plan_to_model_params(self.plan_to_model_ids)

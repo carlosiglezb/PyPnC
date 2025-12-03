@@ -229,3 +229,15 @@ class IKCFreePlanner:
             'RH': rhand_t
         }
         return frame_targets_dict
+
+    def get_frame_targets_from_kin_planner(self, phase, t):
+        if self.planner.__class__.__name__ == "LocomanipulationFramePlanner":
+            frame_targets_dict = self.pack_current_targets(t)
+        elif self.planner.__class__.__name__ == "BaselineFramePlanner":
+            if self.planner.interpolation == "constant":
+                frame_targets_dict = self.planner.get_phase_targets(phase + 1)
+            elif self.planner.interpolation == "linear":
+                frame_targets_dict = self.planner.get_linear_targets(phase, t)
+        else:
+            raise ValueError("Unknown planner type in ik_cfree_planner")
+        return frame_targets_dict
