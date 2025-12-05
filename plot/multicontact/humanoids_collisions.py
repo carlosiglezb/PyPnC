@@ -2,13 +2,13 @@ import os, sys
 
 import coal
 import pinocchio as pin
-from meshcat.geometry import MeshLambertMaterial, Cylinder
+from meshcat.geometry import MeshLambertMaterial, Cylinder, Sphere
 from pinocchio.visualize import MeshcatVisualizer
 
 import numpy as np
 from pinocchio.visualize.meshcat_visualizer import hasMeshFileInfo
 
-from plot.meshcat_utils import MeshcatPinocchioAnimation, coal_geom_to_meshcat
+from plot.meshcat_utils import MeshcatPinocchioAnimation, coal_geom_to_meshcat, MeshcatCapsule
 from util import util
 from visualizer.meshcat_tools.meshcat_palette import meshcat_obstacle_obj, YELLOW
 
@@ -29,8 +29,8 @@ def main():
     #               cwd + "/robot_model/ergoCub/ergoCub.urdf",
     #               cwd + "/robot_model/g1_description/g1.urdf"]
     robots_names = ['g1']
-    # urdf_paths = [cwd + "/robot_model/g1_description/g1_29dof_simple_collisions.urdf"]  # g1.urdf
-    urdf_paths = [cwd + "/robot_model/g1_description/g1_29dof_lock_waist_modified.urdf"]  # g1.urdf
+    urdf_paths = [cwd + "/robot_model/g1_description/g1_29dof_simple_collisions.urdf"]  # g1.urdf
+    # urdf_paths = [cwd + "/robot_model/g1_description/g1_29dof_lock_waist_modified.urdf"]  # g1.urdf
     z_offsets = {'valkyrie': 1.167, 'ergoCub': 0.774, 'g1': 0.75}
 
     # load (real) door to visualizer
@@ -91,9 +91,14 @@ def main():
 
         # set color of collision shapes
         for visual in collision_model.geometryObjects:
-            cylinder_object = coal_geom_to_meshcat(visual.geometry) # cylinder aligned with y-axis
-            rob_viz.viewer[f'{robot_name}/collisions'][visual.name].set_object(cylinder_object,
-                                                               MeshLambertMaterial(color=YELLOW, opacity=0.4))
+            col_object = coal_geom_to_meshcat(visual.geometry) # cylinder aligned with y-axis
+            if isinstance(col_object, MeshcatCapsule):
+                for i, shape in enumerate(col_object.shapes):
+                    rob_viz.viewer[f'{robot_name}/collisions/{visual.name}/{str(i)}'].set_object(shape,
+                                                                                            MeshLambertMaterial(color=YELLOW, opacity=0.4))
+            else:
+                rob_viz.viewer[f'{robot_name}/collisions'][visual.name].set_object(col_object,
+                                                                   MeshLambertMaterial(color=YELLOW, opacity=0.4))
             # rob_viz.viewer[robot_name][visual.name].set_transform(visual.placement.homogeneous)
 
             # Get mesh pose.
@@ -106,18 +111,34 @@ def main():
                 T = np.array(M.homogeneous).dot(S)
             else:
                 T = M.homogeneous
-            if isinstance(cylinder_object, Cylinder):
+            if isinstance(col_object, Cylinder):
                 # Correct cylinder alignment from y-axis to z-axis
-                R_corr = pin.Quaternion(
-                    np.sqrt(2) / 2, -np.sqrt(2) / 2, 0.0, 0.0).toRotationMatrix()
+                R_corr = pin.Quaternion(np.sqrt(2) / 2, -np.sqrt(2) / 2, 0.0, 0.0).toRotationMatrix()
                 T_corr = np.eye(4)
                 T_corr[0:3, 0:3] = R_corr
                 T = T.dot(T_corr)
+            elif isinstance(col_object, MeshcatCapsule):
+                b_top = True
+                for i_c, col_object in enumerate(col_object.shapes):
+                    T_corr = np.eye(4)
+                    # Correct capsule alignment from y-axis to z-axis
+                    R_corr = pin.Quaternion(np.sqrt(2) / 2, -np.sqrt(2) / 2, 0.0, 0.0).toRotationMatrix()
+                    T_corr[0:3, 0:3] = R_corr
+                    if isinstance(col_object, Sphere):
+                        if b_top:
+                            T_corr[2, 3] = visual.geometry.halfLength
+                            b_top = False
+                        else:
+                            T_corr[2, 3] = -visual.geometry.halfLength
+                    rob_viz.viewer[f'{robot_name}/collisions/{visual.name}/{str(i_c)}'].set_transform(T_corr)
+                continue
             # Update viewer configuration.
             rob_viz.viewer[f'{robot_name}/collisions'][visual.name].set_transform(T)
 
         y_offset += 1.5
 
+    rob_viz.viewer[f'{robot_name}/collisions'].set_property("visible", True)
+    rob_viz.viewer[f'{robot_name}/visuals'].set_property("visible", False)
 
 if __name__ == "__main__":
     main()

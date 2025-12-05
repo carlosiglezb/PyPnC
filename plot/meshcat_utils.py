@@ -438,6 +438,24 @@ class MeshcatPinocchioAnimation:
             f.write(viewer_html)
 
 
+class MeshcatCapsule(g.Geometry):
+    """Meshcat Capsule aligned with z-axis."""
+
+    def __init__(self, radius: float, halfLength: float):
+        super(MeshcatCapsule).__init__()
+        # Note: Meshcat Cylinders are aligned with the y-axis while
+        # Pinocchio Capsules are aligned with the z-axis.
+        self.radius = radius
+        self.halfLength = halfLength
+        cylinder = g.Cylinder(
+            radiusTop=radius,
+            radiusBottom=radius,
+            height=2*halfLength,
+        )
+        sphere_top = g.Sphere(radius=radius)
+        sphere_bottom = g.Sphere(radius=radius)
+        self.shapes = [cylinder, sphere_top, sphere_bottom]
+
 def coal_geom_to_meshcat(geom: pin.GeometryObject):
     """Convert a pinocchio collision geometry to a meshcat geometry."""
     if isinstance(geom, coal.Sphere):
@@ -454,6 +472,11 @@ def coal_geom_to_meshcat(geom: pin.GeometryObject):
         )
     elif isinstance(geom, coal.Box):
         return g.Box(2*geom.halfSide)
+    elif isinstance(geom, coal.Capsule):
+        # Note: Meshcat Cylinders are aligned with the y-axis while
+        # Pinocchio Capsules are aligned with the z-axis.
+        capsule = MeshcatCapsule(radius=geom.radius, halfLength=geom.halfLength)
+        return capsule
     else:
         raise NotImplementedError(
             f"Geometry type {geom.__class__} conversion to Meshcat not defined.")
