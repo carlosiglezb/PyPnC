@@ -232,6 +232,18 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                                     u_bounds_res,
                                                     True)
 
+        # enforce joint limits as hard constraints
+        costs.removeCost("xBounds")
+        state_bounds = crocoddyl.ResidualModelState(state, actuation.nu)
+        state_bounds_res = crocoddyl.ConstraintModelResidual(state,
+                                                            state_bounds,
+                                                            x_lb,
+                                                            x_ub,
+                                                            True)
+        runningConstraintModelManager.addConstraint('stateBounds',
+                                                    state_bounds_res,
+                                                    True)
+
         # remove friction from costs and enforce as hard constraint
         for fr_name, fr_plane in frames_in_contact.items():
             # costs.removeCost(fr_name + "_friction") # TODO add back
@@ -269,7 +281,12 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                 j_id = robot_model.getJointId(cp_first_name)
 
                 # add as cost just for torso (debugging purposes -- remove IF condition later)
-                if 'door' not in cp_second_name and 'root_joint' in cp_first_name or 'torso' in cp_second_name: # or 'door' in cp_second_name or 'door' in cp_first_name:
+                if ('root_joint' in cp_first_name or 'torso' in cp_second_name      # torso vs all
+                        or 'door' in cp_second_name or 'door' in cp_first_name      # door vs all
+                        or 'right_ankle' in cp_first_name and 'left_knee' in cp_second_name     # leg cross
+                        or 'left_knee' in cp_first_name and 'right_ankle' in cp_second_name
+                        or 'left_ankle' in cp_first_name and 'right_knee' in cp_second_name
+                        or 'right_knee' in cp_first_name and 'left_ankle' in cp_second_name):
                     sca_alpha = 0.005
                     dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx)
                     # dist_col = crocoddyl.ResidualModelPairCollision(state, actuation.nu, geom_model, cp_idx, j_id)
