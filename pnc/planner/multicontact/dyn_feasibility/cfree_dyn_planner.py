@@ -1110,12 +1110,11 @@ def main(args):
         # contact_seqs[-1].remove('RH')
         T = ik_cfree_planner[0].beziers[0].b
 
-    if B_VISUALIZE_KIN or B_VISUALIZE_DYN:
-        if env == 'door':
-            # load knee knocker visualization and collision models
-            # TODO see if we can simply replace with navy_door_fixed
-            door_model, _, door_visual_model = load_navy_door_models()
-            door_collision_model = pin.buildGeomFromUrdf(door_model, env_urdf_path, pin.GeometryType.COLLISION)
+    if env == 'door':
+        # load knee knocker visualization and collision models
+        # TODO see if we can simply replace with navy_door_fixed
+        door_model, _, door_visual_model = load_navy_door_models()
+        door_collision_model = pin.buildGeomFromUrdf(door_model, env_urdf_path, pin.GeometryType.COLLISION)
 
     #
     # Start Dynamic Feasibility Check
@@ -1160,7 +1159,7 @@ def main(args):
                                                       rob_data, vis_data, col_data,
                                                       ctrl_freq=N_knots / (n_contacts * T), save_freq=save_freq)
         if env == 'door':
-            kin_display.add_robot("door", door_model, door_collision_model, door_visual_model, door_pos, door_pose[3:])
+            kin_display.add_robot("door", door_model, door_collision_model, door_visual_model)
         elif env == 'stairs':
             kin_display.add_shapes_from(stairs.obstacles_vis)
         else:
@@ -1170,7 +1169,7 @@ def main(args):
         kin_display.start_animation()
         for t in np.linspace(0, n_contacts * T, N_knots // save_freq):
             if kin_plan_path is None:
-                frame_targets_dict = ik_cfree_planner.pack_current_targets(t)
+                frame_targets_dict = ik_cfree_planner.get_frame_targets_from_kin_planner(int(t / T), t)
                 kin_display.animate_single_collision(plan_to_model_frames['torso'] + '_0', frame_targets_dict['torso'])
                 kin_display.animate_single_collision(plan_to_model_frames['LH'] + '_0', frame_targets_dict['LH'])
                 kin_display.animate_single_collision(plan_to_model_frames['RH'] + '_0', frame_targets_dict['RH'])

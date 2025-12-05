@@ -117,21 +117,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                         print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
 
                     # save targets
-                    if 'torso' in frame_targets_dict:
-                        self.base_targets[self.knot_idx] = frame_targets_dict['torso']
-                    if 'LF' in frame_targets_dict:
-                        self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
-                    if 'RF' in frame_targets_dict:
-                        self.rf_targets[self.knot_idx] = frame_targets_dict['RF']
-                    if 'LH' in frame_targets_dict:
-                        self.lh_targets[self.knot_idx] = frame_targets_dict['LH']
-                    if 'RH' in frame_targets_dict:
-                        self.rh_targets[self.knot_idx] = frame_targets_dict['RH']
-                    if 'R_knee' in frame_targets_dict:
-                        self.rkn_targets[self.knot_idx] = frame_targets_dict['R_knee']
-                    if 'L_knee' in frame_targets_dict:
-                        self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
-                    self.knot_idx += 1
+                    self.save_targets(frame_targets_dict)
 
                 problem = crocoddyl.ShootingProblem(x0, sum(model_seqs, [])[:-1], model_seqs[-1][-1])
                 if solver_type == 'SQP':
@@ -228,21 +214,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                     model_seqs += createSequence([dmodel], DT, 1, integration_type)
 
                     # save targets
-                    if 'torso' in frame_targets_dict:
-                        self.base_targets[self.knot_idx] = frame_targets_dict['torso']
-                    if 'LF' in frame_targets_dict:
-                        self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
-                    if 'RF' in frame_targets_dict:
-                        self.rf_targets[self.knot_idx] = frame_targets_dict['RF']
-                    if 'LH' in frame_targets_dict:
-                        self.lh_targets[self.knot_idx] = frame_targets_dict['LH']
-                    if 'RH' in frame_targets_dict:
-                        self.rh_targets[self.knot_idx] = frame_targets_dict['RH']
-                    if 'R_knee' in frame_targets_dict:
-                        self.rkn_targets[self.knot_idx] = frame_targets_dict['R_knee']
-                    if 'L_knee' in frame_targets_dict:
-                        self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
-                    self.knot_idx += 1
+                    self.save_targets(frame_targets_dict)
 
                 model_seq_all.append(np.copy([*model_seqs]))
 
@@ -321,6 +293,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print(f"b_solve_by_sections set to {b_solve_by_sections}. Skipping 'seq' and 'single' step.")
 
         if b_solve_hybrid:
+            # TODO refactor into method to apply at different stages
             #
             # Full trajectory with Impulse models
             #
@@ -398,6 +371,23 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         if sca_refinement:
             self.plan_sca(solver_type='SQP')
 
+    def save_targets(self, frame_targets_dict):
+        if 'torso' in frame_targets_dict:
+            self.base_targets[self.knot_idx] = frame_targets_dict['torso']
+        if 'LF' in frame_targets_dict:
+            self.lf_targets[self.knot_idx] = frame_targets_dict['LF']
+        if 'RF' in frame_targets_dict:
+            self.rf_targets[self.knot_idx] = frame_targets_dict['RF']
+        if 'LH' in frame_targets_dict:
+            self.lh_targets[self.knot_idx] = frame_targets_dict['LH']
+        if 'RH' in frame_targets_dict:
+            self.rh_targets[self.knot_idx] = frame_targets_dict['RH']
+        if 'R_knee' in frame_targets_dict:
+            self.rkn_targets[self.knot_idx] = frame_targets_dict['R_knee']
+        if 'L_knee' in frame_targets_dict:
+            self.lkn_targets[self.knot_idx] = frame_targets_dict['L_knee']
+        self.knot_idx += 1
+
     def get_targets_from_planner(self, phase: int, t:float) -> dict[str, np.array]:
         if hasattr(self.ik_cfree_planner, "planner"):
             frame_targets_dict = self.ik_cfree_planner.get_frame_targets_from_kin_planner(phase, t)
@@ -446,8 +436,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                      b_sca=True)
                 model_seqs += createSequence([dmodel], DT, 1, integration_type)
 
-                # save targets again?
-                knot_idx += 1
+                # save targets if not done, yet
+                if self.solver_type is None:
+                    self.save_targets(frame_targets_dict)
 
             # Apply impulse model, except at end of last contact phase
             # Note: currently, this implementation assumes a TO has already been solved
@@ -487,10 +478,10 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print("[SCA-Crocoddyl] Using CSQP solver for SCA refinement")
             self.fddp_full_sca = mim_solvers.SolverCSQP(problem)
             self.fddp_full_sca.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose()])
-            self.fddp_full_sca.termination_tolerance = 1e-1
-            self.fddp_full_sca.eps_abs = 1e-1
-            self.fddp_full_sca.eps_rel = 1e-1
-            self.fddp_full_sca.filter_size = 5
+            self.fddp_full_sca.termination_tolerance = 1e0
+            self.fddp_full_sca.eps_abs = 5e-1
+            self.fddp_full_sca.eps_rel = 5e-1
+            self.fddp_full_sca.filter_size = 20
             # self.fddp_full_sca.update_rho_with_heuristic = True
             self.fddp_full_sca.max_qp_iters = 500
             # self.fddp_full_sca.use_filter_line_search = False   # (default: True)
@@ -510,7 +501,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.reg_incFactor = 3
             self.fddp_full_sca.reg_decFactor = 3
 
-        max_iter = 1000
+        max_iter = 300
         # Set initial guess from latest solve
         # TODO check dimensions and/or adjust
         if self.solver_type is not None:
