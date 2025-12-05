@@ -210,9 +210,14 @@ class MulticontactPlotter:
             b_update_xs = True
         elif to_type == 'single':
             fddp = [self._robot_planner.fddp_single]
-            log = fddp[0].getCallbacks()[0]
-            xs = log.xs
-            us = log.us
+            # get xs and us from their logs or solver
+            if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ in {"SolverSQP", "SolverCSQP"}:
+                xs = fddp[0].xs
+                us = fddp[0].us
+            else:
+                log = fddp[0].getCallbacks()[0]
+                xs = log.xs
+                us = log.us
         elif to_type == 'full':
             fddp = [self._robot_planner.fddp_full]
             log = fddp[0].getCallbacks()[0]

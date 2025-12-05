@@ -5,6 +5,7 @@ channels:
 dependencies:
   - crocoddyl=3.0.1
   - pinocchio=3.7.0
+  - mim-solvers
   - sqlite=3.50.2
   - python=3.12
   - cxx-compiler
@@ -17,13 +18,10 @@ dependencies:
       - drake
       - matplotlib
       - meshcat
-      - opencv-python
       - pybullet
       - pypoman
       - qpsolvers
       - ruamel.yaml
-      - open3d
-      - imageio
       - scipy
       - networkx
       - cvxpy
