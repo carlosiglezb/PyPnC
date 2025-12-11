@@ -66,7 +66,7 @@ B_USE_SELF_COLLISION_AVOIDANCE = False
 B_USE_KNEES = True
 B_USE_KNEES_IN_SMOOTH_PLAN = True   # set to False when crossing door in single step (i.e., mode 0)
 
-# Data recording
+# Data recording (Data currently works only with either KIN or DYN but not both)
 B_SAVE_KIN_DATA = False
 B_SAVE_DYN_DATA = False
 B_SAVE_HTML = True
@@ -1212,7 +1212,8 @@ def main(args):
     robot_dyn_plan.plan(b_solve_hybrid=B_SOLVE_HYBRID,
                         integration_type='Euler',
                         sca_refinement=B_SCA_REFINEMENT,
-                        b_solve_by_sections='none',)
+                        b_solve_by_sections='single',
+                        solver_type='SQP')
 
     # strings for saving data
     if kin_plan_path is not None:

@@ -9,6 +9,8 @@ class MultiContactDoorConfig(PlannerConfig):
     # W_RIGID_LINK_STEP_ON_DOOR = [1000., 0., 0.]
 
     # ----- seq 0 (step over): single hand, step through door
+    W_RIGID_LINK = [10., 0., 2.]  # option 0: knees forward
+    ALPHA = [1., 0., 0.01]           # option 0: knees forward
     # W_RIGID_LINK = [5., 0., 0.]  # option 1: knees forward
     # ALPHA = [1.4, 0., 0.1]           # option 1: knees forward
     # W_RIGID_LINK = [5., 0., 0.]   # option 2: roll shins
@@ -23,10 +25,12 @@ class MultiContactDoorConfig(PlannerConfig):
     # ALPHA = [0.0, 0.0, 0.1]         # option 6: high knees
     # W_RIGID_LINK = [5, 0., 2]       # option 7: roll shins outwards
     # ALPHA = [0.5, 0.0, 0.1]         # option 7: roll shins outwards
+    # W_RIGID_LINK = [5, 0., 2]       # option 8: knees forward
+    # ALPHA = [0.01, 0.1, 0.5]         # option 8: knee forward
     # N_HORIZON_LST = [180, 240, 280, 250, 250]
     # ----- seq 1 (step on): opposite hand-foot pair at each contact
-    W_RIGID_LINK = [1.0, 0., 8.]  # option 1: high knees
-    ALPHA = [0.01, 0.01, 0.]        # option 1: high knees
+    # W_RIGID_LINK = [1.0, 0., 8.]  # option 1: high knees
+    # ALPHA = [0.01, 0.01, 0.]        # option 1: high knees
     # N_HORIZON_LST = [200, 250, 280, 250, 250]
     # ----- seq 2 (step on balanced, also works with on)
     # W_RIGID_LINK = [30.0, 0., 5.]       # option 1: knee forward
@@ -46,10 +50,10 @@ class MultiContactDoorConfig(PlannerConfig):
     #     }
     # ----- seq 1 (step on)
     WBC_FRAME_TRACKING_GAINS = {
-            'torso': np.array([2.0, 2.5, 1.5] + [0.5, 0.5, 0.001]),
-            'feet': np.array([8.] * 3 + [0.001] * 3),  # (lin, ang)
-            'L_knee': np.array([4.] * 3 + [0.00001] * 3),
-            'R_knee': np.array([4.] * 3 + [0.00001] * 3),
+            'torso': np.array([0.5, 0.5, 0.1] + [0.2, 0.2, 0.001]),
+            'feet': np.array([4.] * 3 + [0.001] * 3),  # (lin, ang)
+            'L_knee': np.array([2.] * 3 + [0.00001] * 3),
+            'R_knee': np.array([2.] * 3 + [0.00001] * 3),
             'LH': np.array([4.] * 3 + [0.00001] * 3),
             'RH': np.array([4.] * 3 + [0.00001] * 3)
         }
@@ -73,7 +77,7 @@ class MultiContactDoorConfig(PlannerConfig):
         }
     WBC_WEIGHTED_COSTS = {
         #                 q_b_lin, q_b_ang, q_j, (v_b_lin, v_b_ang), v_j
-        'xReg': np.array([0] * 3 + [3.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [2.0] * (N_V - 6)), # step on
+        'xReg': np.array([0] * 3 + [0.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [2.0] * (N_V - 6)), # step on
         # 'xReg': np.array([0] * 3 + [3.0] * 3 + [2.0] * (N_V - 6) + [0.2] * 6 + [0.8] * (N_V - 6)),  # step over
         # 'xReg': np.array([0] * 3 + [3.0] * 3 + [2.] * (N_V - 6) + [0.2] * 6 + [0.8] * (N_V - 6)), # step on balanced
         # 'uReg': np.array([0.4] * N_U),
