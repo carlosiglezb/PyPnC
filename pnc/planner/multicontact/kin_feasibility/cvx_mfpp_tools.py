@@ -8,7 +8,7 @@ import scipy
 from .constraint_parsers import parse_vec_eq_constr
 from util.path_parameterization import BezierParam
 
-eps_vel_constr = 0.15
+eps_vel_constr = 0.02
 
 
 class Axis(Enum):

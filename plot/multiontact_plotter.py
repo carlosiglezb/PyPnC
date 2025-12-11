@@ -210,26 +210,23 @@ class MulticontactPlotter:
             b_update_xs = True
         elif to_type == 'single':
             fddp = [self._robot_planner.fddp_single]
-            log = fddp[0].getCallbacks()[0]
-            xs = log.xs
-            us = log.us
         elif to_type == 'full':
             fddp = [self._robot_planner.fddp_full]
+        elif to_type == 'sca':
+            fddp = [self._robot_planner.fddp_full_sca]
+        else:
+            raise ValueError("[Multi-contact Plotter] Unknown solver type: {}".format(to_type))
+
+        # get xs and us from their logs or solver
+        if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ in {"SolverSQP", "SolverCSQP"}:
+            xs = fddp[0].xs
+            us = fddp[0].us
+        else:
             log = fddp[0].getCallbacks()[0]
             xs = log.xs
             us = log.us
-        elif to_type == 'sca':
-            fddp = [self._robot_planner.fddp_full_sca]
-            # get xs and us from their logs or solver
-            if hasattr(fddp[0], "__class__") and fddp[0].__class__.__name__ in {"SolverSQP", "SolverCSQP"}:
-                xs = fddp[0].xs
-                us = fddp[0].us
-            else:
-                log = fddp[0].getCallbacks()[0]
-                xs = log.xs
-                us = log.us
-        else:
-            raise ValueError("[Multi-contact Plotter] Unknown solver type: {}".format(to_type))
+
+        print("Plotting joint limit margins for TO type: ", to_type)
 
         horizon_lst = self._robot_planner.horizon_lst
         empty_knots = 0
@@ -342,6 +339,7 @@ class MulticontactPlotter:
             costsDict = self._robot_planner.costs_full_sca
         else:
             raise ValueError("Unknown costs type: {}".format(costs_type))
+        print("Costs type: ", costs_type)
 
         empty_knots = 0
         if b_impulse:

@@ -117,8 +117,12 @@ class MultiContactTiltedStairsConfig(PlannerConfig):
             'RH': np.array([4.0, 4.0, 4.0] + [0.0001] * 3),
         }
     WBC_WEIGHTED_COSTS = {
-        'xReg': np.array([0] * 3 + [10.0] * 3 + [1.] * (N_V - 6) + [4.] * N_V),
+        'xReg': np.array([0] * 3 + [1.0] * 3 + [1.] * (N_V - 6) + [4.] * N_V),
         'uReg': np.array([15.] * N_U),
+    }
+
+    WBC_PHASE_END_WEIGHTED_COSTS = {
+        'xReg': np.array([0] * 3 + [50.0] * 3 + [10.] * (N_V - 6) + [40.] * N_V),
     }
     WBC_FINAL_WEIGHTED_COSTS = {
         'xReg': np.array([0] * 3 + [50.0] * 3 + [10.] * (N_V - 6) + [40.] * N_V),
