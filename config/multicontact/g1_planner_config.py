@@ -101,7 +101,7 @@ class MultiContactTiltedStairsConfig(PlannerConfig):
     N_HORIZON_LST = [180, 250, 250, 250, 280, 250]
 
     WBC_FRAME_TRACKING_GAINS = {
-            'torso': np.array([2.0, 1.5, 1.0, 0.5, 0.5, 0.1]),
+            'torso': np.array([0.5, 0.5, 0.3, 0.5, 0.5, 0.1]),
             'feet': np.array([8.0] * 3 + [0.1, 0.1, 0.1]),
             'L_knee': np.array([6.0] * 3 + [0.0001] * 3),
             'R_knee': np.array([6.0] * 3 + [0.0001] * 3),

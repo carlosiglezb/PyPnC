@@ -24,7 +24,7 @@ class BaselinePlannerConfig(ABC):
     WBC_COST_WEIGHTS = {
         'friction': 3e0,    # step_over, on_balanced, step_on
         # 'friction': 2e0,    # ergoCub (stairs)
-        'frame_goal': 3e3,  # step over
+        'frame_goal': 3e2,  # step over
         # 'frame_goal': 2e4,  # ergo (stairs):
         # 'frame_goal': 1e2,  # step on
         'xReg': 5e-1,
@@ -37,7 +37,7 @@ class BaselinePlannerConfig(ABC):
     WBC_FINAL_COST_WEIGHTS = {
         'friction': 1e-2,   # step_over, on_balanced, step_on
         # 'frame_goal': 3e3,
-        'frame_goal': 4e4,  # ergo (stairs):
+        'frame_goal': 4e2,  # ergo (stairs):
         # 'xReg': 2e0,
         'xReg': 5e-1,    # step over, on_balanced
         'uReg': 5e0,
