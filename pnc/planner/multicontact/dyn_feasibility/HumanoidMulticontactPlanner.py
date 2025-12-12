@@ -107,10 +107,10 @@ class HumanoidMulticontactPlanner:
                       'R_knee_goal': [None] * (tot_num_knots + num_contact_phases - 1)}
 
         self.residuals = {
-            'LF_friction': [None] * (tot_num_knots + num_contact_phases - 1),
-            'RF_friction': [None] * (tot_num_knots + num_contact_phases - 1),
-            'LH_friction': [None] * (tot_num_knots + num_contact_phases - 1),
-            'RH_friction': [None] * (tot_num_knots + num_contact_phases - 1),
+            # 'LF_friction': [None] * (tot_num_knots + num_contact_phases - 1),
+            # 'RF_friction': [None] * (tot_num_knots + num_contact_phases - 1),
+            # 'LH_friction': [None] * (tot_num_knots + num_contact_phases - 1),
+            # 'RH_friction': [None] * (tot_num_knots + num_contact_phases - 1),
         }
 
         # initialize all costs

@@ -59,7 +59,7 @@ B_VISUALIZE_DYN = True
 
 # Planner options
 B_BASELINE = False
-B_SOLVE_BY_SECTIONS = False
+SOLVE_BY_SECTIONS = 'seq'    # {'seq', 'single', 'None'}
 B_SOLVE_HYBRID = False
 B_SCA_REFINEMENT = False
 B_VERBOSE = False
@@ -1222,7 +1222,7 @@ def main(args):
     robot_dyn_plan.plan(b_solve_hybrid=B_SOLVE_HYBRID,
                         integration_type='Euler',
                         sca_refinement=B_SCA_REFINEMENT,
-                        b_solve_by_sections='single',
+                        b_solve_by_sections=SOLVE_BY_SECTIONS,
                         solver_type='SQP')
 
     # strings for saving data

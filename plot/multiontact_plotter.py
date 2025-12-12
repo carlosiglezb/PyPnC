@@ -387,7 +387,7 @@ class MulticontactPlotter:
                 if b_impulse:
                     curr_full_idx = sum(horizon_lst[:contact_phase+1]) + contact_phase + 1
                 else:
-                    curr_full_idx = sum(horizon_lst[:contact_phase])
+                    curr_full_idx = sum(horizon_lst[:contact_phase+1])
                 curr_idx += horizon_lst[contact_phase]
 
         return all_costs

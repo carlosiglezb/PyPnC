@@ -255,8 +255,11 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + reach_constr + soc_constraint)
-    # prob.solve(solver='CLARABEL')
-    prob.solve(solver='SCS')
+    try:
+        prob.solve(solver='CLARABEL')
+    except Exception as e:
+        print("CLARABEL solver failed, falling back to SCS:", e)
+        prob.solve(solver='SCS')
 
     if prob.status == 'infeasible':
         print(f'{"*" * 5} Smooth Problem was infeasible. Retrying with relaxed tolerances.')
