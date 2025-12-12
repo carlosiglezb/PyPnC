@@ -283,6 +283,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                 # add as cost just for torso (debugging purposes -- remove IF condition later)
                 if ('root_joint' in cp_first_name or 'torso' in cp_second_name      # torso vs all
                         or 'door' in cp_second_name or 'door' in cp_first_name      # door vs all
+                        or 'stairs' in cp_second_name or 'stairs' in cp_first_name      # door vs all
                         or 'right_ankle' in cp_first_name and 'left_knee' in cp_second_name     # leg cross
                         or 'left_knee' in cp_first_name and 'right_ankle' in cp_second_name
                         or 'left_ankle' in cp_first_name and 'right_knee' in cp_second_name

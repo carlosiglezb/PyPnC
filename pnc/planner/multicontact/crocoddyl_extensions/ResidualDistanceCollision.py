@@ -56,8 +56,6 @@ class ResidualDistanceCollision(ResidualModelAbstract):
         hppfcl.DistanceResult.__init__(self)
         self.hppfcl_dreq = hppfcl.DistanceRequest()
         self.hppfcl_dres = hppfcl.DistanceResult()
-        self.hppfcl_creq = hppfcl.CollisionRequest()
-        self.hppfcl_cres = hppfcl.CollisionResult()
 
         if pair_id >= len(geom_model.collisionPairs):
             raise ValueError(
@@ -107,10 +105,7 @@ class ResidualDistanceCollision(ResidualModelAbstract):
             geom_2.geometry, to_fcl_transform3f(data.oMg_id_2),
             self.hppfcl_dreq, self.hppfcl_dres
         )
-        geom_data = self.geometry.createData()
-        pin.updateGeometryPlacements(self.pin_model_, pin_data, self.geometry, geom_data)
-        dis_res = pin.computeDistance(self.geometry, geom_data, self.pair_id)
-        data.r[0] = dis_res.min_distance
+        data.r[0] = self.hppfcl_dres.min_distance
 
     def calcDiff(self, data: ResidualModelAbstract, x: np.ndarray, u: Optional[np.ndarray] = None):
         # Using type hinting for clarity

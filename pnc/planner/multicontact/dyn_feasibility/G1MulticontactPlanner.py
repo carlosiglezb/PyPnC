@@ -245,7 +245,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 fddp.eps_abs = 1e-1
                 fddp.eps_rel = 1e-1
                 fddp.filter_size = 5
-                # fddp.update_rho_with_heuristic = True
+                fddp.update_rho_with_heuristic = True
                 fddp.max_qp_iters = 500
                 # fddp.use_filter_line_search = False   # (default: True)
                 # fddp.mu_dynamic = -1  # Nocedal's L1 merit function
@@ -481,8 +481,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.termination_tolerance = 1e0
             self.fddp_full_sca.eps_abs = 5e-1
             self.fddp_full_sca.eps_rel = 5e-1
-            self.fddp_full_sca.filter_size = 20
-            # self.fddp_full_sca.update_rho_with_heuristic = True
+            self.fddp_full_sca.filter_size = 1
+            self.fddp_full_sca.update_rho_with_heuristic = True
             self.fddp_full_sca.max_qp_iters = 500
             # self.fddp_full_sca.use_filter_line_search = False   # (default: True)
             # self.fddp_full_sca.mu_dynamic = -1  # Nocedal's L1 merit function

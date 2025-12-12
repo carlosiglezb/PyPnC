@@ -6,6 +6,7 @@ from collections import OrderedDict
 cwd = os.getcwd()
 sys.path.append(cwd)
 
+from util.pydrake_meshcat_interface import hpoly_to_fcl_collision, create_convex_geom_from_copy
 import config.multicontact.g1_planner_config as g1_params
 import config.multicontact.g1_baseline_planner_config as g1_baseline_params
 import config.multicontact.ergoCub_planner_config as ergoCub_params
@@ -58,7 +59,7 @@ B_VISUALIZE_DYN = True
 
 # Planner options
 B_BASELINE = False
-B_SOLVE_BY_SECTIONS = False
+SOLVE_BY_SECTIONS = 'seq'    # {'seq', 'single', 'None'}
 B_SOLVE_HYBRID = False
 B_SCA_REFINEMENT = False
 B_VERBOSE = False
@@ -66,7 +67,7 @@ B_USE_SELF_COLLISION_AVOIDANCE = False
 B_USE_KNEES = True
 B_USE_KNEES_IN_SMOOTH_PLAN = True   # set to False when crossing door in single step (i.e., mode 0)
 
-# Data recording
+# Data recording (Data currently works only with either KIN or DYN but not both)
 B_SAVE_KIN_DATA = False
 B_SAVE_DYN_DATA = False
 B_SAVE_HTML = True
@@ -1110,11 +1111,11 @@ def main(args):
         # contact_seqs[-1].remove('RH')
         T = ik_cfree_planner[0].beziers[0].b
 
-    if env == 'door':
-        # load knee knocker visualization and collision models
-        # TODO see if we can simply replace with navy_door_fixed
-        door_model, _, door_visual_model = load_navy_door_models()
-        door_collision_model = pin.buildGeomFromUrdf(door_model, env_urdf_path, pin.GeometryType.COLLISION)
+    # if env == 'door':
+    # load knee knocker visualization and collision models
+    # TODO see if we can simply replace with navy_door_fixed
+    door_model, _, door_visual_model = load_navy_door_models()
+    door_collision_model = pin.buildGeomFromUrdf(door_model, env_urdf_path, pin.GeometryType.COLLISION)
 
     #
     # Start Dynamic Feasibility Check
@@ -1129,8 +1130,17 @@ def main(args):
             for g in range(door_collision_model.ngeoms):
                 refined_geom_model.addGeometryObject(door_collision_model.geometryObjects[g])
         elif env == 'stairs':
-            for col_obj in stairs.obstacles_col:
-                refined_geom_model.addCollisionObject(col_obj)
+            for i_col, col_obj in enumerate(stairs.obstacles):
+                if i_col == 0:  # skip floor collisions
+                    continue
+                if isinstance(col_obj, HPolyhedron):
+                    obstacle_geom = hpoly_to_fcl_collision(col_obj)
+                else:
+                    raise NotImplementedError("Only HPolyhedron obstacles are supported for stairs environment")
+                new_geom = create_convex_geom_from_copy(door_collision_model.geometryObjects[0],
+                                                        obstacle_geom,
+                                                        'stairs_obstacle_' + str(i_col))
+                refined_geom_model.addGeometryObject(new_geom)
         refined_geom_model.addAllCollisionPairs()
 
     N_horizon_lst = planner_params.N_HORIZON_LST
@@ -1212,7 +1222,8 @@ def main(args):
     robot_dyn_plan.plan(b_solve_hybrid=B_SOLVE_HYBRID,
                         integration_type='Euler',
                         sca_refinement=B_SCA_REFINEMENT,
-                        b_solve_by_sections='none',)
+                        b_solve_by_sections=SOLVE_BY_SECTIONS,
+                        solver_type='SQP')
 
     # strings for saving data
     if kin_plan_path is not None:
@@ -1416,7 +1427,7 @@ def get_root_to_torso_offset(geom_model):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", type=str, default='door',
+    parser.add_argument("--env", type=str, default='stairs',
                         choices=['door', 'stairs'],
                         help="Environment to load for planning")
     parser.add_argument("--sequence", type=int, default=1,

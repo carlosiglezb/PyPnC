@@ -159,8 +159,8 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 constraints.append(points[k][0][0] == safe_pnt) # pos
                 # ignore if at initial stance
                 # TODO add flag to toggle this or to customize epsilon value
-                # if (k-1) % num_iris_tot != 0:
-                #     add_vel_acc_constr(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, False)
+                if (k-1) % num_iris_tot != 0:
+                    add_vel_acc_constr(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
                 constraints.append(points[k][0][1:] == fixed_frame_pos_mat)
@@ -255,8 +255,11 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
     # Solve problem.
     prob = cp.Problem(cp.Minimize(cost + cost_log_abs_sum), constraints + reach_constr + soc_constraint)
-    prob.solve(solver='CLARABEL')
-    # prob.solve(solver='SCS')
+    try:
+        prob.solve(solver='CLARABEL')
+    except Exception as e:
+        print("CLARABEL solver failed, falling back to SCS:", e)
+        prob.solve(solver='SCS')
 
     if prob.status == 'infeasible':
         print(f'{"*" * 5} Smooth Problem was infeasible. Retrying with relaxed tolerances.')
@@ -533,8 +536,8 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 parse_repvec_eq_constr(np.array([safe_pnt]), points[k][0][0,:], constraints, lbg, ubg)
                 # ignore if at initial stance
                 # TODO add flag to toggle this or to customize epsilon value
-                # if (k-1) % num_iris_tot != 0:
-                #     add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, lbg, ubg, False)
+                if (k-1) % num_iris_tot != 0:
+                    add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, lbg, ubg, False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
 
@@ -630,13 +633,13 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             "print_level": 3,   # {0: none; 1: final compute statistics; 3: num of vars, *5, EXIT; 12: all}
             "hessian_approximation": "limited-memory",   # exact
             "max_iter": 200,
-            "mu_init": 1e-8,    # *0.1 (applicable if monotone strategy)
+            "mu_init": 1e-6,    # *0.1 (applicable if monotone strategy)
             "tol": 1e-2,
             "constr_viol_tol": 1e-2,    # *0.0001
             # "slack_bound_frac": 0.1,          # *0.01
             "mu_strategy":"monotone",   # {monotone, adaptive}
             "nlp_scaling_method": "gradient-based", # {none, user-scaling, *gradient-based, equilibration-based}
-            "jacobian_regularization_value": 1e-6,  # 2e-4  * 1e-8
+            "jacobian_regularization_value": 2e-4,  # 1e-6, 2e-4  * 1e-8
             # "derivative_test": "first-order",
             # "derivative_test_print_all": "no",
             # "derivative_test_perturbation": 1e-6,

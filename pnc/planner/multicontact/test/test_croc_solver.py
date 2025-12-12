@@ -19,7 +19,7 @@ import numpy as np
 import config.multicontact.g1_planner_config as g1_params
 import config.multicontact.g1_baseline_planner_config as g1_baseline_params
 
-B_VISUALIZE = False
+B_VISUALIZE = True
 B_SHOW_GRF_PLOTS = False
 B_SHOW_COST_PLOTS = True
 
@@ -221,7 +221,9 @@ class TestG1Planner(unittest.TestCase):
         rob_model = self.rob_model
         force_joint_frames = self.force_joint_frames
         contact_seq_planes = [{'RF': np.array([0, 0, 1]),
-                               'LH': np.array([0, -1 , 0])}
+                               'LH': np.array([0, -1 , 0])},
+                              {'RF': np.array([0, 0, 1]),
+                               'LH': np.array([0, -1, 0])}
                               ]
 
         # set motion
@@ -229,6 +231,9 @@ class TestG1Planner(unittest.TestCase):
         fixed_frames_seq.append(['torso', 'RF', 'R_knee', 'LH', 'RH'])  # phase 0
         motion_frames_seq.add_motion_frame({'LF': self.starting_frame_pos['LF'] + np.array([0.0, 0.0, 0.38]),
                                             'L_knee': self.starting_frame_pos['L_knee'] + np.array([0.0, 0.0, 0.38])})
+        fixed_frames_seq.append(['torso', 'RF', 'R_knee', 'LH', 'RH'])  # phase 1
+        motion_frames_seq.add_motion_frame({'LF': self.starting_frame_pos['LF'],
+                                            'L_knee': self.starting_frame_pos['L_knee']})
 
         # create a very baseline IK planner w/ constant targets
         T = 3
@@ -238,7 +243,7 @@ class TestG1Planner(unittest.TestCase):
                                              motion_frames_seq, fixed_frames_seq, T, "linear")
         ik_cfree_planner.set_planner(frame_planner)
 
-        N_horizon_lst = [150]
+        N_horizon_lst = [150, 150]
         contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
         robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params, self.refined_geom_model)
         robot_dyn_plan.set_plan_to_model_params(self.plan_to_model_ids)

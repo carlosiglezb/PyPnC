@@ -26,7 +26,7 @@ class PlannerConfig(ABC):
     WBC_COST_WEIGHTS = {
         'friction': 3e0,    # step_over, on_balanced, step_on
         # 'friction': 2e0,    # ergoCub (stairs)
-        'frame_goal': 3e3,  # step over
+        'frame_goal': 8e2,  # step over
         # 'frame_goal': 2e4,  # ergo (stairs):
         # 'frame_goal': 1e2,  # step on
         'xReg': 5e-1,
