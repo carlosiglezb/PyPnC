@@ -172,8 +172,9 @@ class IKCFreePlanner:
         # compute plan
         alpha = planner_params.ALPHA
         w_rigid = np.array(planner_params.W_RIGID_LINK)
+        b_final_vel_constraint = planner_params.B_FINAL_VEL_CONSTRAINT
         ik_all_start_time = time.time()
-        self.planner.plan_iris(p_init, T, alpha, w_rigid, self.w_rigid_poly, verbose)
+        self.planner.plan_iris(p_init, T, alpha, w_rigid, self.w_rigid_poly, b_final_vel_constraint, verbose)
         self.solver_stats = self.planner.solver_stats
         self.solver_stats['ik_plan_total_time'] = time.time() - ik_all_start_time
         if verbose:

@@ -2,6 +2,7 @@ import numpy as np
 from abc import ABC
 
 class PlannerConfig(ABC):
+    B_FINAL_VEL_CONSTRAINT : bool = False      # force final velocity perpendicular to contact
     W_RIGID_LINK : list[float] = None     # weights on rigid link relaxation (wx, wy, wz)
     ALPHA : list[float] = None            # weights on the task cost function (derivatives)
     FOOT_SIZE : list[float] = None        # size of the feet in the form [length, width]
@@ -26,11 +27,14 @@ class PlannerConfig(ABC):
     WBC_COST_WEIGHTS = {
         'friction': 3e0,    # step_over, on_balanced, step_on
         # 'friction': 2e0,    # ergoCub (stairs)
-        'frame_goal': 8e2,  # step over
+        # 'frame_goal': 8e2,  # step over
+        'frame_goal': 8e3,  # stairs seq 1
         # 'frame_goal': 2e4,  # ergo (stairs):
         # 'frame_goal': 1e2,  # step on
-        'xReg': 5e-1,
-        'uReg': 5e0,
+        # 'xReg': 5e-1,
+        'xReg': 5e0,    # stairs
+        # 'uReg': 5e0,
+        'uReg': 2e-1,
         'xBounds': 1e4,   # step on, step over, on_balanced
         # 'xBounds': 1e3,   # ergoCub (stairs):
         'sca': 5e3     # using Exponential activation

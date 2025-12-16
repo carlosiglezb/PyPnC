@@ -72,6 +72,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                                   alpha: dict[int: float],
                                   safe_points_lst: List[dict[str, np.array]],
                                   fixed_frames=None,
+                                  b_final_vel_constr=False,
                                   contact_sequence=None,
                                   surface_normals_lst=None,
                                   weights_rigid_link=None,
@@ -159,7 +160,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 constraints.append(points[k][0][0] == safe_pnt) # pos
                 # ignore if at initial stance
                 # TODO add flag to toggle this or to customize epsilon value
-                if (k-1) % num_iris_tot != 0:
+                if b_final_vel_constr and (k-1) % num_iris_tot != 0:
                     add_vel_acc_constr(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 fixed_frame_pos_mat = np.repeat(np.array([safe_points_lst[seg_idx][f_name]]), n_points-1, axis=0)
@@ -447,6 +448,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                   safe_points_lst: List[dict[str, np.array]],
                                   robot_geom_data: SCARobotGeometry=None,
                                   fixed_frames=None,
+                                  b_final_vel_constr=False,
                                   contact_sequence=None,
                                   surface_normals_lst=None,
                                   initial_guess=None,
@@ -536,7 +538,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 parse_repvec_eq_constr(np.array([safe_pnt]), points[k][0][0,:], constraints, lbg, ubg)
                 # ignore if at initial stance
                 # TODO add flag to toggle this or to customize epsilon value
-                if (k-1) % num_iris_tot != 0:
+                if b_final_vel_constr and (k-1) % num_iris_tot != 0:
                     add_vel_acc_constr_casadi(f_name, surface_normals_lst[seg_idx-1], points[k-1], constraints, lbg, ubg, False)
             if (fixed_frames[seg_idx] is not None) and (f_name in fixed_frames[seg_idx]):
                 parse_repvec_eq_constr(np.array([safe_points_lst[seg_idx][f_name]]), points[k][0][1:, :], constraints, lbg, ubg)
@@ -630,7 +632,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     opts = {
         "ipopt": {
-            "print_level": 3,   # {0: none; 1: final compute statistics; 3: num of vars, *5, EXIT; 12: all}
+            "print_level": 5,   # {0: none; 1: final compute statistics; 3: num of vars, *5, EXIT; 12: all}
             "hessian_approximation": "limited-memory",   # exact
             "max_iter": 200,
             "mu_init": 1e-6,    # *0.1 (applicable if monotone strategy)
@@ -672,7 +674,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
-            sca_bez_points = range(0, num_iris_tot * n_points, 2)
+            sca_bez_points = range(0, num_iris_tot * n_points, 1)
 
             # populate col_pair_geom_data with respective primitive shape pair type information
             ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])
