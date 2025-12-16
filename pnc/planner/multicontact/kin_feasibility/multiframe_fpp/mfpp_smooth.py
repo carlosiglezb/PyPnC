@@ -258,7 +258,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     try:
         prob.solve(solver='CLARABEL')
     except Exception as e:
-        print("CLARABEL solver failed, falling back to SCS:", e)
+        print("[MFPP Smooth WARNING] ", e)
         prob.solve(solver='SCS')
 
     if prob.status == 'infeasible':
