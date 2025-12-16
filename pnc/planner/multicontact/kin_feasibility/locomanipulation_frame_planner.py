@@ -113,6 +113,7 @@ class LocomanipulationFramePlanner:
              alpha: List[np.float64],
              w_rigid: np.array,
              w_rigid_poly: np.array = None,
+             b_final_vel_constraint: bool = False,
              verbose: bool=False):
         S = self.safe_boxes     # dict of IrisRegionsManager
         R = self.reachability_planes
@@ -129,6 +130,7 @@ class LocomanipulationFramePlanner:
                                                                                     w_rigid,
                                                                                     w_rigid_poly,
                                                                                     b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan,
+                                                                                    b_final_vel_constr=b_final_vel_constraint
                                                                                     )
 
     def plot(self, visualizer, static_html=False):

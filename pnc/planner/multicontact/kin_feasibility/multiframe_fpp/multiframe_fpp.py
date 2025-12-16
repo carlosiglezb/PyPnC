@@ -181,7 +181,8 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                   motion_frames_seq=None,
                   sca_robot_geometry: SCARobotGeometry=None,
                   w_rigid=None, w_rigid_poly=None,
-                  b_use_knees_in_smooth_plan =True):
+                  b_use_knees_in_smooth_plan=False,
+                  b_final_vel_constr=False):
     solver_stats = {}
     # Find IRIS sequence and minimize length between safe points
     motion_frames_lst = motion_frames_seq.get_motion_frames()
@@ -238,7 +239,8 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                              surface_normals_lst=surface_normals_lst,
                                                              weights_rigid_link=w_rigid,
                                                              verbose=verbose,
-                                                             b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan)
+                                                             b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan,
+                                                             b_final_vel_constr=b_final_vel_constr)
     solver_stats['multiple_bezier_iris_cvxpy_time'] = sol_stats['runtime']
     if verbose:
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
@@ -261,6 +263,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                                  initial_guess=initial_guess,
                                                                  verbose=verbose,
                                                                  b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan,
+                                                                 b_final_vel_constr=b_final_vel_constr,
                                                                  b_skip_sca=b_skip_sca)
         solver_stats['multiple_bezier_iris_sca_casadi_time'] = sol_stats['runtime']
         if not b_skip_sca:

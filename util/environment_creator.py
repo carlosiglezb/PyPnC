@@ -87,7 +87,7 @@ class TiltedStairs:
         tilted_right_step_vis = tilted_right_box_vis.get_polytope()
 
         # center box
-        box_center_origin = np.array([0.35 + 2.5*box_depth, 0., 0.])
+        box_center_origin = np.array([0.4 + 2.5*box_depth, 0., 0.])
         cbox_lbounds = [box_depth, box_depth, 0.]
         cbox_ubounds = [box_depth, box_depth, 1.0]
         center_box = HPolyhedron.MakeBox(

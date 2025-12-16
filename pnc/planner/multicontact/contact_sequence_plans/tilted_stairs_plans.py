@@ -186,8 +186,8 @@ def get_fully_opposing_limbs_contact_sequence(stairs: TiltedStairs,
         rh3_height = 1.8
         final_ankle_height = 0.03
 
-        lh1_wall = np.array([0.24, 0.32, lh1_height])
-        rh1_wall = np.array([0.34, -0.32, rh1_height])
+        lh1_wall = np.array([0.24, 0.3, lh1_height])
+        rh1_wall = np.array([0.34, -0.3, rh1_height])
     elif robot_name == 'ergoCub':
         # ErgoCub settings
         ankle_height = 0.1
@@ -235,8 +235,8 @@ def get_fully_opposing_limbs_contact_sequence(stairs: TiltedStairs,
 
     # intermediate locations
     lf_step1 = np.array([0.35, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height + 0.04])
-    lh_wall_step_12 = np.array([0.2 + box_depth, box_width - 0.03, lh2_height])
-    rh_wall_final_step = np.array([2 * box_depth + 0.1, -(box_width - 0.03), rh3_height])
+    lh_wall_step_12 = np.array([0.2 + box_depth, box_width - 0.06, lh2_height])
+    rh_wall_final_step = np.array([2 * box_depth + 0.1, -(box_width - 0.06), rh3_height])
     rf_step2 = np.array([0.32+ box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height + 0.01])
 
     # initialize fixed and motion frame sets

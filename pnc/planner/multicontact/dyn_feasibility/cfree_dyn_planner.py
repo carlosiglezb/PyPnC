@@ -59,7 +59,8 @@ B_VISUALIZE_DYN = True
 
 # Planner options
 B_BASELINE = False
-SOLVE_BY_SECTIONS = 'seq'    # {'seq', 'single', 'None'}
+SOLVE_BY_SECTIONS = 'single'    # {'seq', 'single', 'None'}
+SOLVER_TYPE = 'SQP'            # {'SQP', 'FDDP'}
 B_SOLVE_HYBRID = False
 B_SCA_REFINEMENT = False
 B_VERBOSE = False
@@ -1130,8 +1131,8 @@ def main(args):
             for g in range(door_collision_model.ngeoms):
                 refined_geom_model.addGeometryObject(door_collision_model.geometryObjects[g])
         elif env == 'stairs':
-            for i_col, col_obj in enumerate(stairs.obstacles):
-                if i_col == 0:  # skip floor collisions
+            for i_col, col_obj in enumerate(stairs.obstacles_vis):
+                if i_col <= 2:  # skip floor and side walls collisions
                     continue
                 if isinstance(col_obj, HPolyhedron):
                     obstacle_geom = hpoly_to_fcl_collision(col_obj)
@@ -1223,7 +1224,7 @@ def main(args):
                         integration_type='Euler',
                         sca_refinement=B_SCA_REFINEMENT,
                         b_solve_by_sections=SOLVE_BY_SECTIONS,
-                        solver_type='SQP')
+                        solver_type=SOLVER_TYPE)
 
     # strings for saving data
     if kin_plan_path is not None:

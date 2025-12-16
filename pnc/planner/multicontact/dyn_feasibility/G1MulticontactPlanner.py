@@ -127,8 +127,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                     fddp[i].termination_tolerance = 1e-1
                     fddp[i].eps_abs = 1e-1
                     fddp[i].eps_rel = 1e-1
-                    fddp[i].filter_size = 5
-                    # fddp[i].update_rho_with_heuristic = True
+                    fddp[i].filter_size = 10     # documentation says not to change this!
+                    fddp[i].rho_update_interval = 50
+                    fddp[i].update_rho_with_heuristic = True
                     fddp[i].max_qp_iters = 500
                     # fddp[i].use_filter_line_search = False   # (default: True)
                     # fddp[i].mu_dynamic = -1  # Nocedal's L1 merit function
@@ -143,7 +144,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                     fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
 
                 # Solver settings
-                max_iter = 500
+                max_iter = 200
                 fddp[i].th_stop = 1e-3
                 fddp[i].th_gapTol = 1e-2
                 fddp[i].reg_max = 1e4
@@ -241,11 +242,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 print("[SCA-Crocoddyl] Using CSQP solver for single TO")
                 fddp = mim_solvers.SolverCSQP(problem)
                 fddp.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose()])
-                fddp.termination_tolerance = 1e-1
+                fddp.termination_tolerance = 1  # relaxed for single TO used to warm-start
                 fddp.eps_abs = 1e-1
                 fddp.eps_rel = 1e-1
-                fddp.filter_size = 5
+                fddp.filter_size = 10    # documentation says not to change this!
                 fddp.update_rho_with_heuristic = True
+                fddp.rho_update_interval = 100
                 fddp.max_qp_iters = 500
                 # fddp.use_filter_line_search = False   # (default: True)
                 # fddp.mu_dynamic = -1  # Nocedal's L1 merit function
@@ -256,11 +258,11 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 fddp = crocoddyl.SolverBoxFDDP(problem)
 
                 # Adding callbacks to inspect the evolution of the solver (logs are printed in the terminal)
-                # fddp.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
-                fddp.setCallbacks([crocoddyl.CallbackLogger()])
+                fddp.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
+                # fddp.setCallbacks([crocoddyl.CallbackLogger()])
 
             # Solver settings
-            max_iter = 500
+            max_iter = 600
             fddp.th_stop = 1e-2
             fddp.th_gapTol = 1e-2
             # fddp.reg_max = 1e4
@@ -481,9 +483,10 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.termination_tolerance = 1e0
             self.fddp_full_sca.eps_abs = 5e-1
             self.fddp_full_sca.eps_rel = 5e-1
-            self.fddp_full_sca.filter_size = 1
+            self.fddp_full_sca.filter_size = 10  # documentation says not to change this!
             self.fddp_full_sca.update_rho_with_heuristic = True
             self.fddp_full_sca.max_qp_iters = 500
+            self.fddp_full_sca.rho_update_interval = 100
             # self.fddp_full_sca.use_filter_line_search = False   # (default: True)
             # self.fddp_full_sca.mu_dynamic = -1  # Nocedal's L1 merit function
             # self.fddp_full_sca.lag_mul_inf_norm_coef = 10
@@ -501,7 +504,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.reg_incFactor = 3
             self.fddp_full_sca.reg_decFactor = 3
 
-        max_iter = 300
+        max_iter = 100
         # Set initial guess from latest solve
         # TODO check dimensions and/or adjust
         if self.solver_type is not None:
