@@ -159,7 +159,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/left_knee_link.STL"/>
+        <mesh filename="meshes/left_knee_link_chull.STL"/>
       </geometry>
     </collision>
   </link>
@@ -357,7 +357,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/right_knee_link.STL"/>
+        <mesh filename="meshes/right_knee_link_chull.STL"/>
       </geometry>
     </collision>
   </link>

@@ -22,6 +22,8 @@ links_to_make_convex = [
     "right_hip_roll_link",
     "left_hip_yaw_link",
     "right_hip_yaw_link",
+    "right_knee_link",
+    "left_knee_link",
     "left_shoulder_yaw_link",
     "right_shoulder_yaw_link",
     "left_ankle_roll_link",

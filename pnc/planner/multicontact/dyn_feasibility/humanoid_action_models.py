@@ -9,7 +9,7 @@ from config.multicontact.planner_config import PlannerConfig
 from pnc.planner.multicontact.crocoddyl_extensions.ActivationModelDistanceQuad import ActivationModelDistanceQuad
 from pnc.planner.multicontact.crocoddyl_extensions.ControlBounds import ControlBounds
 from pnc.planner.multicontact.crocoddyl_extensions.ResidualDistanceCollision import ResidualDistanceCollision
-from pnc.planner.multicontact.crocoddyl_extensions.ResidualFrictionCone import ResidualFrictionCone
+# from pnc.planner.multicontact.crocoddyl_extensions.ResidualFrictionCone import ResidualFrictionCone
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import ContactSequence
 from util.util import so3_from_vec_to_vec
 
@@ -252,16 +252,16 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
 
                 r, p = util.util.vec_to_roll_pitch(fr_plane)
                 plane_rot = util.util.euler_to_rot([r, p, 0])
-                friction_cone = ResidualFrictionCone(state,
-                                                     fr_name + "_contact",
-                                                     mu,
-                                                     actuation.nu,
-                                                     plane_rot)
-                constr_friction = crocoddyl.ConstraintModelResidual(state,
-                                                                    friction_cone,
-                                                                    np.array([0.0]),
-                                                                    np.array([np.inf]),
-                                                                    True)
+                # friction_cone = ResidualFrictionCone(state,
+                #                                      fr_name + "_contact",
+                #                                      mu,
+                #                                      actuation.nu,
+                #                                      plane_rot)
+                # constr_friction = crocoddyl.ConstraintModelResidual(state,
+                #                                                     friction_cone,
+                #                                                     np.array([0.0]),
+                #                                                     np.array([np.inf]),
+                #                                                     True)
                 # runningConstraintModelManager.addConstraint(fr_name + "_friction",
                 #                                             constr_friction,
                 #                                             True)
