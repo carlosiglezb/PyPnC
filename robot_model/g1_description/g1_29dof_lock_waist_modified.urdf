@@ -535,7 +535,7 @@
   </link>
 <joint name="torso_primitive_shape_joint" type="fixed">
 <!-- <origin xyz="-0.0013625 0.000257 0.055" rpy="0 0 0"/>-->
- <origin xyz="0 0 0.15" rpy="0 0 0"/>
+ <origin xyz="0 0 0.2" rpy="0 0 0"/>
  <parent link="torso_link"/>
  <child link="torso_primitive_shape"/>
  </joint>
