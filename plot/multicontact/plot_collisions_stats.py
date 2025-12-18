@@ -1,26 +1,33 @@
 import copy
 
-import pinocchio as pin
-import numpy as np
 import os, sys
-import pickle
-
-from pinocchio.visualize import MeshcatVisualizer
-import plot.meshcat_utils as vis_tools
-import matplotlib.pyplot as plt
-
 cwd = os.getcwd()
 sys.path.append(cwd)
 
+import pinocchio as pin
+import numpy as np
+import pickle
+
+from pinocchio.visualize import MeshcatVisualizer
+from pydrake.geometry.optimization import HPolyhedron
+
+import plot.meshcat_utils as vis_tools
+import matplotlib.pyplot as plt
+
+from util.environment_creator import TiltedStairs
+from util.pydrake_meshcat_interface import hpoly_to_fcl_collision, create_convex_geom_from_copy
+
+
 # --- Configuration ---
 # ROBOT_URDF = cwd + "/robot_model/g1_description/g1_29dof_simple_collisions.urdf"
-ROBOT_URDF = cwd + "/robot_model/g1_description/g1_29dof_lock_waist.urdf"
+ROBOT_URDF = cwd + "/robot_model/g1_description/g1_29dof_lock_waist_chull.urdf"
 ROBOT_SRDF = cwd + "/robot_model/g1_description/g1_29dof_lock_waist.srdf"
 ROBOT_PACKAGE_DIRS = [cwd + "/robot_model/g1_description"]
 ENV_URDF = cwd + "/robot_model/ground/navy_door_fixed.urdf"
+ENV_NAME = 'stairs'   # {door, stairs} selects either door URDF or Stairs Collision objects
 
 B_VISUALIZE_DOOR = False
-B_ANIMATE = False
+B_ANIMATE = True
 
 def load_simulated_models(robot_urdf_path, env_urdf_path):
     """
@@ -82,10 +89,26 @@ def merge_and_define_collision_pairs(robot_geom_model, env_geom_model):
     combined_geom_model = copy.copy(robot_geom_model)
 
     # --- merge environment collisions into robot model ---
-    for i in range(env_geom_model.ngeoms):
-        combined_geom_model.addGeometryObject(env_geom_model.geometryObjects[i])
-    combined_geom_model.addAllCollisionPairs()
-    pin.removeCollisionPairs(robot_model, combined_geom_model, ROBOT_SRDF)
+    if 'door' in ENV_NAME:
+        for i in range(env_geom_model.ngeoms):
+            combined_geom_model.addGeometryObject(env_geom_model.geometryObjects[i])
+        combined_geom_model.addAllCollisionPairs()
+        pin.removeCollisionPairs(robot_model, combined_geom_model, ROBOT_SRDF)
+    elif 'stairs' in ENV_NAME:
+        stairs = TiltedStairs()
+        for i_col, col_obj in enumerate(stairs.obstacles_vis):
+            if i_col <= 2:  # skip floor and side walls collisions
+                continue
+            if isinstance(col_obj, HPolyhedron):
+                obstacle_geom = hpoly_to_fcl_collision(col_obj)
+            else:
+                raise NotImplementedError("Only HPolyhedron obstacles are supported for stairs environment")
+            # get from door: env_geom_model
+            new_geom = create_convex_geom_from_copy(env_geom_model.geometryObjects[0],
+                                                    obstacle_geom,
+                                                    'stairs_obstacle_' + str(i_col))
+            combined_geom_model.addGeometryObject(new_geom)
+        combined_geom_model.addAllCollisionPairs()
     print(f"\n--- Geometries Merged. Total: {len(combined_geom_model.geometryObjects)} geometries. ---")
 
     return combined_geom_model
@@ -106,7 +129,11 @@ def check_trajectory_collisions(robot_model, robot_geom_model, joint_pos, time):
         rob_data, col_data, vis_data = pin.createDatas(robot_model, robot_col_model, robot_vis_model)
         display = vis_tools.MeshcatPinocchioAnimation(robot_model, robot_col_model, robot_vis_model,
                           robot_data, vis_data, col_data, save_freq=10)
-        display.add_robot("door", door_model, door_col_model, door_vis_model)
+        if ENV_NAME == 'door':
+            display.add_robot("door", door_model, door_col_model, door_vis_model)
+        elif ENV_NAME == 'stairs':
+            stairs = TiltedStairs()
+            display.add_shapes_from(stairs.obstacles_vis)
         display.start_animation()
 
     penetration_depths, sum_penetration_depths = [], []
@@ -201,6 +228,10 @@ def check_trajectory_env_robot_collisions(robot_model, robot_geom_model, joint_p
             idx_offset += 1
             continue
 
+        # Check up until the end of the time vector
+        if i >= len(time):
+            break
+
         # Update robot kinematics
         q = np.array(q)
         pin.forwardKinematics(robot_model, robot_data, q)
@@ -229,8 +260,8 @@ def check_trajectory_env_robot_collisions(robot_model, robot_geom_model, joint_p
                 second_id = robot_geom_model.collisionPairs[k].second
                 collision_from = robot_geom_model.geometryObjects[first_id].name
                 collision_to = robot_geom_model.geometryObjects[second_id].name
-                # update penetration distance only if it involves the "door" environment
-                if res.min_distance < min_distance_overall and (("door" in collision_from) or ("door" in collision_to)):
+                # update penetration distance only if it involves the environment
+                if res.min_distance < min_distance_overall and ((ENV_NAME in collision_from) or (ENV_NAME in collision_to)):
                     collision_pair_from = robot_geom_model.geometryObjects[first_id].name
                     collision_pair_to = robot_geom_model.geometryObjects[second_id].name
                     # Update the deepest penetration among all pairs at this time step
@@ -259,10 +290,10 @@ def check_trajectory_env_robot_collisions(robot_model, robot_geom_model, joint_p
 
 def plot_self_collision_distances():
     plt.figure()
-    plt.plot(time, scol_nom_penetration_depths, 'b:', label='MFPP (max)')
-    plt.plot(time, scol_sum_penetrations, 'r', alpha=0.4, label='MFPP (sum)')
-    plt.plot(time, scol_sca_penetration_depths, 'k:', label='SCA (max)')
-    plt.plot(time, scol_sca_sum_penetrations, 'c', alpha=0.4, label='SCA (sum)')
+    # plt.plot(time, scol_nom_penetration_depths, 'b:', label='MFPP (max)')
+    # plt.plot(time, scol_sum_penetrations, 'r', alpha=0.4, label='MFPP (sum)')
+    plt.plot(sca_time, scol_sca_penetration_depths[:-1], 'k:', label='SCA (max)')
+    plt.plot(sca_time, scol_sca_sum_penetrations[:-1], 'c', alpha=0.4, label='SCA (sum)')
     plt.xlabel('Time (s)')
     plt.ylabel('Penetration Depth (m)')
     plt.title('Penetration Depth Over Time')
@@ -273,11 +304,11 @@ def plot_self_collision_distances():
 
 def plot_results():
     plt.figure()
-    plt.plot(time, penetration_depths, label='MFPP')
-    plt.plot(time, sca_penetration_depths, label='SCA')
+    # plt.plot(sca_time, penetration_depths, label='MFPP')
+    plt.plot(sca_time, sca_penetration_depths, label='full SCA')
     plt.xlabel('Time (s)')
     plt.ylabel('Penetration Depth (m)')
-    plt.title('Penetration Depth Over Time')
+    plt.title('Env Penetration Depth Over Time')
     plt.legend()
     plt.grid()
     plt.show()
@@ -296,23 +327,23 @@ def load_hull_collisions(robot_model, robot_geom_model, ROBOT_SRDF):
 
 
 if __name__ == '__main__':
-    TRAJECTORY_PKL = cwd + "/experiment_data/g1_step_on_door.pkl"
-    SCA_TRAJECTORY_PKL = cwd + "/experiment_data/g1_inflated_sca_step_on_door_boxfddp.pkl"
+    # TRAJECTORY_PKL = cwd + "/experiment_data/g1_step_on_door.pkl"
+    SCA_TRAJECTORY_PKL = cwd + "/experiment_data/g1_guided__no_imp_kin_sca_sca_refine___stairs_all_cols.pkl"
 
     # Load models
     robot_model, robot_col_model, robot_vis_model, robot_geom_model, env_geom_model = load_simulated_models(ROBOT_URDF, ENV_URDF)
 
     # Load trajectories
+    # joint_pos, time = load_trajectory(TRAJECTORY_PKL)
     sca_joint_pos, sca_time = load_trajectory(SCA_TRAJECTORY_PKL)
-    joint_pos, time = load_trajectory(TRAJECTORY_PKL)
 
     # ---------
     # Check self-collisions
     # ---------
-    print("\n--- Replaying MFPP Trajectory and Checking Collisions ---")
-    scol_nom_total_penetration, scol_nom_penetration_depths, scol_sum_penetrations = check_trajectory_collisions(
-        robot_model, robot_geom_model, joint_pos, time
-    )
+    # print("\n--- Replaying MFPP Trajectory and Checking Collisions ---")
+    # scol_nom_total_penetration, scol_nom_penetration_depths, scol_sum_penetrations = check_trajectory_collisions(
+    #     robot_model, robot_geom_model, joint_pos, time
+    # )
     # Replay trajectory and check self-collisions in both nominal and SCA cases
     print("\n--- Replaying SCA Trajectory and Checking Collisions ---")
     scol_sca_total_penetration, scol_sca_penetration_depths, scol_sca_sum_penetrations = check_trajectory_collisions(
@@ -329,9 +360,9 @@ if __name__ == '__main__':
     combined_geom_model = merge_and_define_collision_pairs(robot_geom_model, env_geom_model)
 
     # Replay trajectory and check collisions
-    total_penetration, penetration_depths = check_trajectory_env_robot_collisions(
-        robot_model, combined_geom_model, joint_pos, time
-    )
+    # total_penetration, penetration_depths = check_trajectory_env_robot_collisions(
+    #     robot_model, combined_geom_model, joint_pos, time
+    # )
     sca_total_penetration, sca_penetration_depths = check_trajectory_env_robot_collisions(
         robot_model, combined_geom_model, sca_joint_pos, sca_time
     )
