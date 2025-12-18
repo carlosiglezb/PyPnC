@@ -1,5 +1,5 @@
 import pinocchio as pin
-import hppfcl
+# import hppfcl
 import numpy as np
 from typing import Optional
 from crocoddyl.libcrocoddyl_pywrap import *
@@ -15,8 +15,8 @@ In 2024 21st International Conference on Ubiquitous Robots (UR)
 (pp. 701-706). IEEE.
 """
 
-def to_fcl_transform3f(T: pin.SE3):
-    return hppfcl.Transform3f(T.rotation, T.translation)
+# def to_fcl_transform3f(T: pin.SE3):
+#     return hppfcl.Transform3f(T.rotation, T.translation)
 
 
 class ResidualDataDistanceCollision(ResidualDataAbstract):
@@ -49,13 +49,17 @@ class ResidualDistanceCollision(ResidualModelAbstract):
         # self.state = state
         # self.nu = nu
         self.geometry = geom_model
+        self.geom_data = self.geometry.createData()
         self.pair_id_ = pair_id
+        self.nearestPoint1 = np.zeros(3)
+        self.nearestPoint2 = np.zeros(3)
+        self.normal = np.zeros(3)
 
         self.pin_model_ = state.pinocchio
         self.nv_ = self.pin_model_.nv
-        hppfcl.DistanceResult.__init__(self)
-        self.hppfcl_dreq = hppfcl.DistanceRequest()
-        self.hppfcl_dres = hppfcl.DistanceResult()
+        # hppfcl.DistanceResult.__init__(self)
+        # self.hppfcl_dreq = hppfcl.DistanceRequest()
+        # self.hppfcl_dres = hppfcl.DistanceResult()
 
         if pair_id >= len(geom_model.collisionPairs):
             raise ValueError(
@@ -77,35 +81,44 @@ class ResidualDistanceCollision(ResidualModelAbstract):
         # data.res.clear()
 
         # computes the distance for the collision pair pair_id_
-        cp = self.geometry.collisionPairs[self.pair_id_]
-        geom_1 = self.geometry.geometryObjects[cp.first]
-        geom_2 = self.geometry.geometryObjects[cp.second]
-        joint_id_1 = geom_1.parentJoint
-        joint_id_2 = geom_2.parentJoint
+        # cp = self.geometry.collisionPairs[self.pair_id_]
+        # geom_1 = self.geometry.geometryObjects[cp.first]
+        # geom_2 = self.geometry.geometryObjects[cp.second]
+        # joint_id_1 = geom_1.parentJoint
+        # joint_id_2 = geom_2.parentJoint
 
         # pinocchio.Data object is now inside the custom data class
         pin_data = data.shared.pinocchio
         # pin_data = data
 
         # get oMg for both geometries
-        if joint_id_1 > 0:
-            data.oMg_id_1 = pin_data.oMi[joint_id_1] * geom_1.placement
-        else:
-            data.oMg_id_1 = geom_1.placement
-
-        if joint_id_2 > 0:
-            data.oMg_id_2 = pin_data.oMi[joint_id_2] * geom_2.placement
-        else:
-            data.oMg_id_2 = geom_2.placement
+        # if joint_id_1 > 0:
+        #     data.oMg_id_1 = pin_data.oMi[joint_id_1] * geom_1.placement
+        # else:
+        #     data.oMg_id_1 = geom_1.placement
+        #
+        # if joint_id_2 > 0:
+        #     data.oMg_id_2 = pin_data.oMi[joint_id_2] * geom_2.placement
+        # else:
+        #     data.oMg_id_2 = geom_2.placement
 
         # hppfcl distance calculation
         # .geometry is assumed to be an HPP-FCL object
-        hppfcl.distance(
-            geom_1.geometry, to_fcl_transform3f(data.oMg_id_1),
-            geom_2.geometry, to_fcl_transform3f(data.oMg_id_2),
-            self.hppfcl_dreq, self.hppfcl_dres
-        )
-        data.r[0] = self.hppfcl_dres.min_distance
+        # hppfcl.distance(
+        #     geom_1.geometry, to_fcl_transform3f(data.oMg_id_1),
+        #     geom_2.geometry, to_fcl_transform3f(data.oMg_id_2),
+        #     self.hppfcl_dreq, self.hppfcl_dres
+        # )
+        # data.r[0] = self.hppfcl_dres.min_distance
+
+        # FIXME testing!
+        pin.updateGeometryPlacements(self.pin_model_, pin_data, self.geometry, self.geom_data)
+        dis_res = pin.computeDistance(self.geometry, self.geom_data, self.pair_id)
+
+        self.nearestPoint1 = dis_res.getNearestPoint1()
+        self.nearestPoint2 = dis_res.getNearestPoint2()
+        self.normal = dis_res.normal
+        data.r[0] = dis_res.min_distance
 
     def calcDiff(self, data: ResidualModelAbstract, x: np.ndarray, u: Optional[np.ndarray] = None):
         # Using type hinting for clarity
@@ -123,10 +136,12 @@ class ResidualDistanceCollision(ResidualModelAbstract):
                              pin.LOCAL_WORLD_ALIGNED)
 
         # Getting the nearest points belonging to the collision shapes
-        cp1 = self.hppfcl_dres.getNearestPoint1()
-        cp2 = self.hppfcl_dres.getNearestPoint2()
+        # cp1 = self.hppfcl_dres.getNearestPoint1()
+        # cp2 = self.hppfcl_dres.getNearestPoint2()
         # data.cp1 = cp1
         # data.cp2 = cp2
+        cp1 = self.nearestPoint1
+        cp2 = self.nearestPoint2
 
         # Vector from frame 1 center to p1
         f1p1 = cp1 - data.shared.pinocchio.oMf[geom_1.parentFrame].translation
@@ -148,7 +163,8 @@ class ResidualDistanceCollision(ResidualModelAbstract):
         # calculate the Jacobian, assuming data.Rx is a numpy array
         # -d->res.normal.transpose() becomes -data.res.normal.T
         # topRows<3>() becomes a slice [0:3, :]
-        data.Rx[:nv] = -self.hppfcl_dres.normal.reshape(-1, 1).T @ (J1[:3, :] - J2[:3, :])
+        data.Rx[:nv] = -self.normal.reshape(-1, 1).T @ (J1[:3, :] - J2[:3, :])
+        # data.Rx[:nv] = -self.hppfcl_dres.normal.reshape(-1, 1).T @ (J1[:3, :] - J2[:3, :])
 
     @property
     def pair_id(self) -> int:

@@ -149,7 +149,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                     fddp[i].setCallbacks([crocoddyl.CallbackLogger()])
 
                 # Solver settings
-                max_iter = 200
+                max_iter = 100
                 fddp[i].th_stop = 1e-3
                 fddp[i].th_gapTol = 1e-2
                 fddp[i].reg_max = 1e4
@@ -268,7 +268,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 # fddp.setCallbacks([crocoddyl.CallbackLogger()])
 
             # Solver settings
-            max_iter = 600
+            max_iter = 100
             fddp.th_stop = 1e-2
             fddp.th_gapTol = 1e-2
             # fddp.reg_max = 1e4
