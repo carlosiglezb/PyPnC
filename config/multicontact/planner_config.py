@@ -25,7 +25,7 @@ class PlannerConfig(ABC):
     # WBP_BAUMGARTE_GAINS3D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
     # WBP_BAUMGARTE_GAINS6D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
     WBC_COST_WEIGHTS = {
-        'friction': 3e0,    # step_over, on_balanced, step_on
+        'friction': 3e-2,    # step_over, on_balanced, step_on
         # 'friction': 2e0,    # ergoCub (stairs)
         # 'frame_goal': 8e2,  # step over
         'frame_goal': 8e3,  # stairs seq 1
@@ -41,7 +41,7 @@ class PlannerConfig(ABC):
         # 'sca': -1e2   # using QuadFlatExp activation
     }
     WBC_FINAL_COST_WEIGHTS = {
-        'friction': 1e-2,   # step_over, on_balanced, step_on
+        'friction': 3e-2,   # step_over, on_balanced, step_on
         # 'frame_goal': 3e3,
         'frame_goal': 4e4,  # ergo (stairs):
         # 'xReg': 2e0,
