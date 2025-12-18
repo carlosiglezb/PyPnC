@@ -36,6 +36,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                 terminal_step: bool = False,
                                 geom_model: pinocchio.GeometryModel = None,
                                 robot_model: pinocchio.Model = None,
+                                b_sqp: bool = False,
                                 b_sca: bool = False):
     desired_config = np.copy(x0)
 
@@ -220,7 +221,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
     runningConstraintModelManager = crocoddyl.ConstraintModelManager(
         state, actuation.nu
     )
-    if b_sca and geom_model is not None:
+    if b_sqp or (b_sca and geom_model is not None):
         # enforce torque limits as hard constraints
         control_bounds = ControlBounds(state, actuation.nu)
         u_bounds_res = crocoddyl.ConstraintModelResidual(state,
@@ -244,87 +245,90 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                                     state_bounds_res,
                                                     True)
 
-        # remove friction from costs and enforce as hard constraint
-        for fr_name, fr_plane in frames_in_contact.items():
-            # costs.removeCost(fr_name + "_friction") # TODO add back
+        if b_sca:
+            # remove friction from costs and enforce as hard constraint
+            for fr_name, fr_plane in frames_in_contact.items():
+                # costs.removeCost(fr_name + "_friction") # TODO add back
 
-            r, p = util.util.vec_to_roll_pitch(fr_plane)
-            plane_rot = util.util.euler_to_rot([r, p, 0])
-            # friction_cone = ResidualFrictionCone(state,
-            #                                      fr_name + "_contact",
-            #                                      mu,
-            #                                      actuation.nu,
-            #                                      plane_rot)
-            # constr_friction = crocoddyl.ConstraintModelResidual(state,
-            #                                                     friction_cone,
-            #                                                     np.array([0.0]),
-            #                                                     np.array([np.inf]),
-            #                                                     True)
-            # runningConstraintModelManager.addConstraint(fr_name + "_friction",
-            #                                             constr_friction,
-            #                                             True)
+                r, p = util.util.vec_to_roll_pitch(fr_plane)
+                plane_rot = util.util.euler_to_rot([r, p, 0])
+                # friction_cone = ResidualFrictionCone(state,
+                #                                      fr_name + "_contact",
+                #                                      mu,
+                #                                      actuation.nu,
+                #                                      plane_rot)
+                # constr_friction = crocoddyl.ConstraintModelResidual(state,
+                #                                                     friction_cone,
+                #                                                     np.array([0.0]),
+                #                                                     np.array([np.inf]),
+                #                                                     True)
+                # runningConstraintModelManager.addConstraint(fr_name + "_friction",
+                #                                             constr_friction,
+                #                                             True)
 
-        if True:
-            b_soft_col_avoid = False
-            for cp_idx, cp in enumerate(geom_model.collisionPairs):
-                cp_first_name = geom_model.geometryObjects[cp.first].name
-                cp_second_name = geom_model.geometryObjects[cp.second].name
-                if 'link_0' in cp_first_name:
-                    cp_first_name = cp_first_name.replace('_link_0', '_joint')
-                elif 'primitive_shape' in cp_first_name:
-                    cp_first_name = 'root_joint'
-                elif 'hand' in cp_first_name:
-                    cp_first_name = cp_first_name.replace('rubber_hand_0', 'wrist_yaw_joint')
-                else:
-                    raise ValueError(f'[SCA] Name parsing of {cp_first_name} not specified.')
-                # get joint id of nearest joint to the collision pair
-                j_id = robot_model.getJointId(cp_first_name)
+            if True:
+                b_soft_col_avoid = False
+                for cp_idx, cp in enumerate(geom_model.collisionPairs):
+                    cp_first_name = geom_model.geometryObjects[cp.first].name
+                    cp_second_name = geom_model.geometryObjects[cp.second].name
+                    if 'link_0' in cp_first_name:
+                        cp_first_name = cp_first_name.replace('_link_0', '_joint')
+                    elif 'primitive_shape' in cp_first_name:
+                        cp_first_name = 'root_joint'
+                    elif 'hand' in cp_first_name:
+                        cp_first_name = cp_first_name.replace('rubber_hand_0', 'wrist_yaw_joint')
+                    else:
+                        raise ValueError(f'[SCA] Name parsing of {cp_first_name} not specified.')
+                    # get joint id of nearest joint to the collision pair
+                    j_id = robot_model.getJointId(cp_first_name)
 
-                # add as cost just for torso (debugging purposes -- remove IF condition later)
-                if (
-                        'root_joint' in cp_first_name or 'torso' in cp_second_name      # torso vs all
-                        or ('door' in cp_second_name or 'door' in cp_first_name)        # door vs all
-                        or ('stairs' in cp_second_name and 'knee' in cp_first_name)     # stairs vs knees
-                        or ('stairs' in cp_second_name and 'ankle' in cp_first_name)    # stairs vs ankles
-                        # or 'right_ankle' in cp_first_name and 'left_knee' in cp_second_name     # leg cross
-                        # or 'left_knee' in cp_first_name and 'right_ankle' in cp_second_name
-                        # or 'left_ankle' in cp_first_name and 'right_knee' in cp_second_name
-                        # or 'right_knee' in cp_first_name and 'left_ankle' in cp_second_name
-                ):
-                    sca_alpha = 0.005
-                    dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx)
-                    # dist_col = crocoddyl.ResidualModelPairCollision(state, actuation.nu, geom_model, cp_idx, j_id)
-                    if b_soft_col_avoid:
-                        activation_sca = ActivationModelDistanceQuad(1, 0.4, 0.2)
-                        # activation_sca = crocoddyl.ActivationModelQuadFlatExp(1, sca_alpha)
-                        # activation_sca = crocoddyl.ActivationModelQuadFlatExp(3, sca_alpha)
-                        # activation_sca = crocoddyl.ActivationModelQuadraticBarrier(
-                        #     crocoddyl.ActivationBounds(np.array([0.08, 0.08, 0.08]),
-                        #                                np.array([1.5, 1.5, 1.5]))
-                        # )
-                        sca_cost = crocoddyl.CostModelResidual(
-                            state,
-                            activation_sca,
-                            dist_col,
-                        )
-                        costs.addCost(cp_first_name + '_to_' + cp_second_name + "_sca",
-                                      sca_cost,
-                                  planner_weights.WBC_COST_WEIGHTS['sca'])
-                    else:   # use as hard inequality constraint
-                        # False to deactivate at terminal step
-                        col_avoid_constr = crocoddyl.ConstraintModelResidual(state,
-                                                                             dist_col,
-                                                                             np.array([0.0]),
-                                                                             np.array([np.inf]),
-                                                                             True)
-                        # col_avoid_constr = crocoddyl.ConstraintModelResidual(state,
-                        #                                                      dist_col,
-                        #                                                      np.array([0.02, 0.02, 0.02]),
-                        #                                                      np.array([np.inf, np.inf, np.inf]),
-                        #                                                      True)
-                        runningConstraintModelManager.addConstraint(cp_first_name + '_to_' + cp_second_name + "_sca",
-                                                                    col_avoid_constr,
-                                                                    True)
+                    # add as cost just for torso (debugging purposes -- remove IF condition later)
+                    if (
+                            'root_joint' in cp_first_name or 'torso' in cp_second_name      # torso vs all
+                            or ('door' in cp_second_name or 'door' in cp_first_name)        # door vs all
+                            or ('stairs' in cp_second_name and 'knee' in cp_first_name)     # stairs vs knees
+                            or ('stairs' in cp_second_name and 'ankle' in cp_first_name)    # stairs vs ankles
+                            or ('right_ankle' in cp_first_name and 'right_hip' in cp_second_name)     # ankle-hip
+                            or ('left_ankle' in cp_first_name and 'left_hip' in cp_second_name)     # ankle-hip
+                            or ('right_ankle' in cp_first_name and 'left_knee' in cp_second_name)     # leg cross
+                            or ('left_knee' in cp_first_name and 'right_ankle' in cp_second_name)
+                            or ('left_ankle' in cp_first_name and 'right_knee' in cp_second_name)
+                            or ('right_knee' in cp_first_name and 'left_ankle' in cp_second_name)
+                    ):
+                        sca_alpha = 0.005
+                        dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx)
+                        # dist_col = crocoddyl.ResidualModelPairCollision(state, actuation.nu, geom_model, cp_idx, j_id)
+                        if b_soft_col_avoid:
+                            activation_sca = ActivationModelDistanceQuad(1, 0.4, 0.2)
+                            # activation_sca = crocoddyl.ActivationModelQuadFlatExp(1, sca_alpha)
+                            # activation_sca = crocoddyl.ActivationModelQuadFlatExp(3, sca_alpha)
+                            # activation_sca = crocoddyl.ActivationModelQuadraticBarrier(
+                            #     crocoddyl.ActivationBounds(np.array([0.08, 0.08, 0.08]),
+                            #                                np.array([1.5, 1.5, 1.5]))
+                            # )
+                            sca_cost = crocoddyl.CostModelResidual(
+                                state,
+                                activation_sca,
+                                dist_col,
+                            )
+                            costs.addCost(cp_first_name + '_to_' + cp_second_name + "_sca",
+                                          sca_cost,
+                                      planner_weights.WBC_COST_WEIGHTS['sca'])
+                        else:   # use as hard inequality constraint
+                            # False to deactivate at terminal step
+                            col_avoid_constr = crocoddyl.ConstraintModelResidual(state,
+                                                                                 dist_col,
+                                                                                 np.array([0.0]),
+                                                                                 np.array([np.inf]),
+                                                                                 True)
+                            # col_avoid_constr = crocoddyl.ConstraintModelResidual(state,
+                            #                                                      dist_col,
+                            #                                                      np.array([0.02, 0.02, 0.02]),
+                            #                                                      np.array([np.inf, np.inf, np.inf]),
+                            #                                                      True)
+                            runningConstraintModelManager.addConstraint(cp_first_name + '_to_' + cp_second_name + "_sca",
+                                                                        col_avoid_constr,
+                                                                        True)
 
 
     # Creating the action model

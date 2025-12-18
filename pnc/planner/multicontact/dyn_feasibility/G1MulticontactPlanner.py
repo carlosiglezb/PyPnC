@@ -49,6 +49,10 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
              b_solve_by_sections: str='None',
              solver_type: str='FDDP'):
         dyn_seg_solve_time = []
+        if solver_type == 'SQP':
+            b_sqp = True
+        else:
+            b_sqp = False
 
         state = self.state
         actuation = self.actuation
@@ -91,7 +95,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                              joint_names_dict=self.joint_names_dict,
                                                              planner_weights=planner_params,
                                                              geom_model=self.geom_model,
-                                                             robot_model=self.robot_model)
+                                                             robot_model=self.robot_model,
+                                                             b_sqp=b_sqp)
                         model_seqs += createSequence([dmodel], DT, 1, integration_type)
                     else:   # last time knot in current contact phase
                         if i != (self.contact_phases - 1):
@@ -211,7 +216,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                          joint_names_dict=self.joint_names_dict,
                                                          planner_weights=planner_params,
                                                          geom_model=self.geom_model,
-                                                         robot_model=self.robot_model)
+                                                         robot_model=self.robot_model,
+                                                         b_sqp=b_sqp)
                     model_seqs += createSequence([dmodel], DT, 1, integration_type)
 
                     # save targets
