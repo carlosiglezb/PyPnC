@@ -701,7 +701,7 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
                      x0: np.ndarray, ):
     import cvxpy as cp
     # max allowed normal force of some factor x robot weight
-    mu = 0.6
+    # mu = 0.6
 
     # construct equality constraints from Centroidal Dynamics
     lf_frame_id = plan_to_model_ids['LF']

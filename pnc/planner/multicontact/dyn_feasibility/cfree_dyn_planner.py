@@ -64,14 +64,14 @@ SOLVER_TYPE = 'SQP'            # {'SQP', 'FDDP'}
 B_SOLVE_HYBRID = False
 B_SCA_REFINEMENT = False
 B_VERBOSE = False
-B_USE_SELF_COLLISION_AVOIDANCE = False
 B_USE_KNEES = True
-B_USE_KNEES_IN_SMOOTH_PLAN = True   # set to False when crossing door in single step (i.e., mode 0)
+B_USE_SELF_COLLISION_AVOIDANCE = True
+B_USE_KNEES_IN_SMOOTH_PLAN = False   # set to False when crossing door in single step (i.e., mode 0)
 
 # Data recording (Data currently works only with either KIN or DYN but not both)
 B_SAVE_KIN_DATA = False
 B_SAVE_DYN_DATA = False
-B_SAVE_HTML = True
+B_SAVE_HTML = False
 
 
 env_urdf_path = cwd + "/robot_model/ground/navy_door_fixed.urdf"
@@ -1428,10 +1428,10 @@ def get_root_to_torso_offset(geom_model):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", type=str, default='stairs',
+    parser.add_argument("--env", type=str, default='door',
                         choices=['door', 'stairs'],
                         help="Environment to load for planning")
-    parser.add_argument("--sequence", type=int, default=1,
+    parser.add_argument("--sequence", type=int, default=0,
                         help="Contact sequence to solve for")
     parser.add_argument("--robot_name", type=str, default='g1',
                         choices=['g1', 'valkyrie', 'ergoCub'],

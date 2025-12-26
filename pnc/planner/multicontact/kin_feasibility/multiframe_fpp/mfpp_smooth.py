@@ -636,12 +636,12 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             "hessian_approximation": "limited-memory",   # exact
             "max_iter": 200,
             "mu_init": 1e-6,    # *0.1 (applicable if monotone strategy)
-            "tol": 1e-2,
+            "tol": 1e-1,
             "constr_viol_tol": 1e-2,    # *0.0001
             # "slack_bound_frac": 0.1,          # *0.01
-            "mu_strategy":"monotone",   # {monotone, adaptive}
+            "mu_strategy":"adaptive",   # {monotone, adaptive}
             "nlp_scaling_method": "gradient-based", # {none, user-scaling, *gradient-based, equilibration-based}
-            "jacobian_regularization_value": 2e-4,  # 1e-6, 2e-4  * 1e-8
+            "jacobian_regularization_value": 1e-4,  # 1e-6, 2e-4  * 1e-8
             # "derivative_test": "first-order",
             # "derivative_test_print_all": "no",
             # "derivative_test_perturbation": 1e-6,
@@ -674,7 +674,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
-            sca_bez_points = range(0, num_iris_tot * n_points, 1)
+            sca_bez_points = range(0, num_iris_tot * n_points, 2)
 
             # populate col_pair_geom_data with respective primitive shape pair type information
             ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])

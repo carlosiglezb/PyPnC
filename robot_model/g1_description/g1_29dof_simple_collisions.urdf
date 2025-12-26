@@ -559,7 +559,7 @@
   </link>
 <joint name="torso_primitive_shape_joint" type="fixed">
 <!-- <origin xyz="-0.0013625 0.000257 0.055" rpy="0 0 0"/>-->
- <origin xyz="0 0 0.21" rpy="0 0 0"/>
+ <origin xyz="0 0 0.14" rpy="0 0 0"/>
  <parent link="torso_link"/>
  <child link="torso_primitive_shape"/>
  </joint>
@@ -575,6 +575,7 @@
 <!--          <box size="0.20 0.31 0.50"/>-->
 <!--        <box size="0.14 0.20 0.5"/>-->
         <cylinder radius="0.11" length="0.32"/>
+        <box size="0.20 0.31 0.67"/>
       </geometry>
   </collision>
    <collision_checking>
