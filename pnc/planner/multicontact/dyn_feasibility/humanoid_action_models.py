@@ -247,11 +247,11 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
 
         if b_sca:
             # remove friction from costs and enforce as hard constraint
-            for fr_name, fr_plane in frames_in_contact.items():
-                # costs.removeCost(fr_name + "_friction") # TODO add back
-
-                r, p = util.util.vec_to_roll_pitch(fr_plane)
-                plane_rot = util.util.euler_to_rot([r, p, 0])
+            # for fr_name, fr_plane in frames_in_contact.items():
+            #     # costs.removeCost(fr_name + "_friction") # TODO add back
+            #
+            #     r, p = util.util.vec_to_roll_pitch(fr_plane)
+            #     plane_rot = util.util.euler_to_rot([r, p, 0])
                 # friction_cone = ResidualFrictionCone(state,
                 #                                      fr_name + "_contact",
                 #                                      mu,
@@ -701,7 +701,7 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
                      x0: np.ndarray, ):
     import cvxpy as cp
     # max allowed normal force of some factor x robot weight
-    mu = 0.6
+    # mu = 0.6
 
     # construct equality constraints from Centroidal Dynamics
     lf_frame_id = plan_to_model_ids['LF']
