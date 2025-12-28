@@ -637,15 +637,15 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             "max_iter": 200,
             "mu_init": 1e-6,    # *0.1 (applicable if monotone strategy)
             "tol": 1e-1,
-            "constr_viol_tol": 1e-2,    # *0.0001
+            "constr_viol_tol": 1e-4,    # *0.0001
             # "slack_bound_frac": 0.1,          # *0.01
-            "mu_strategy":"adaptive",   # {monotone, adaptive}
+            "mu_strategy":"monotone",   # {monotone, adaptive}
             "nlp_scaling_method": "gradient-based", # {none, user-scaling, *gradient-based, equilibration-based}
             "jacobian_regularization_value": 1e-4,  # 1e-6, 2e-4  * 1e-8
             # "derivative_test": "first-order",
             # "derivative_test_print_all": "no",
-            # "derivative_test_perturbation": 1e-6,
-            # "derivative_test_tol": 0.0005
+            # "derivative_test_perturbation": 1e-7,
+            # "derivative_test_tol": 0.0001
         }
     }
 
@@ -720,11 +720,12 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
             initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points),1))))
 
-    opts["ipopt"]["max_iter"] = 200
     opts["ipopt"]["warm_start_init_point"] = "yes"
-    opts["ipopt"]["warm_start_mult_bound_push"] = 1e-8
-    opts["ipopt"]["warm_start_slack_bound_push"] = 1e-8
-    opts["ipopt"]["warm_start_bound_push"] = 1e-8
+    opts["ipopt"]["warm_start_mult_bound_push"] = 1e-5
+    opts["ipopt"]["warm_start_slack_bound_push"] = 1e-5
+    opts["ipopt"]["warm_start_slack_bound_frac"] = 1e-5
+    opts["ipopt"]["warm_start_bound_push"] = 1e-5
+    opts["ipopt"]["warm_start_bound_frac"] = 1e-5
 
     # Solve problem
     prob_construct_start_time = time.time()

@@ -28,12 +28,12 @@ class MultiContactDoorConfig(PlannerConfig):
     # ALPHA = [0.5, 0.0, 0.1]         # option 7: roll shins outwards
     # W_RIGID_LINK = [5, 0., 2]       # option 8: knees forward
     # ALPHA = [0.01, 0.1, 0.5]         # option 8: knee forward
-    W_RIGID_LINK = [5., 0., 0.]   # option 9: knees fwd
-    ALPHA = [5, 0., 0.1]         # option 9: knees fwd
-    # W_RIGID_LINK = [0., 0., 5.]   # option 10: knees-up
-    # ALPHA = [1, 0., 0.1]         # option 10: knees-up
+    # W_RIGID_LINK = [5., 0., 0.]   # option 9: knees fwd
+    # ALPHA = [5, 0., 0.1]         # option 9: knees fwd
+    W_RIGID_LINK = [0., 0., 10.]   # option 10: knees-up
+    ALPHA = [10, 0., 0.1]         # option 10: knees-up
     # W_RIGID_LINK = [5., 0., 5.]   # option 11: balanced
-    # ALPHA = [1, 0., 0.1]         # option 11: balanced
+    # ALPHA = [10, 0., 0.1]         # option 11: balanced
     # N_HORIZON_LST = [180, 240, 280, 250, 250]
     # ----- seq 1 (step on): opposite hand-foot pair at each contact
     # W_RIGID_LINK = [1.0, 0., 8.]  # option 1: high knees
@@ -44,15 +44,15 @@ class MultiContactDoorConfig(PlannerConfig):
     # ALPHA = [5.0, 0.01, 0.01]           # option 1: knee forward
     # W_RIGID_LINK = [20.0, 0., 5.]       # option 2: knee forward
     # ALPHA = [1.0, 0.01, 0.01]           # option 2: knee forward
-    N_HORIZON_LST = [250, 250, 250, 250, 250]
-    # N_HORIZON_LST = [180, 280, 280, 250, 250]
+    # N_HORIZON_LST = [250, 250, 250, 250, 250]
+    N_HORIZON_LST = [180, 280, 280, 250, 250]
 
     FOOT_SIZE = [0.15, 0.08]  # [length, width]
 
     # ----- seq 0 (step over, on_balanced, on)
     WBC_FRAME_TRACKING_GAINS = {
             'torso': np.array([3.0, 3.0, 2.5] + [0.5, 0.5, 0.01]),  # (lin, ang)
-            'feet': np.array([8.] * 3 + [0.001] * 3),  # (lin, ang)
+            'feet': np.array([6.] * 3 + [0.001] * 3),  # (lin, ang)
             'L_knee': np.array([4.] * 3 + [0.00001] * 3),
             'R_knee': np.array([4.] * 3 + [0.00001] * 3),
             'LH': np.array([4.] * 3 + [0.00001] * 3),
