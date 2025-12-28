@@ -710,10 +710,10 @@ def solve_capsule_ellipsoid_min_prox(R, L, Q, U, r1, r2, verbose=False):
     alpha = cp.Variable(1)
     gamma = cp.Variable(1)
     x = cp.Variable((3, 1))
-    bx_hat = np.reshape(Q @ np.array([1., 0., 0.]), (-1,1))
+    bz_hat = np.reshape(Q @ np.array([0., 0., 1.]), (-1,1))
 
     constraints = []
-    constraints.append(cp.SOC(alpha * R, x - (r1 + gamma * bx_hat)))
+    constraints.append(cp.SOC(alpha * R, x - (r1 + gamma * bz_hat)))
     constraints.append(-alpha * L / 2 <= gamma)
     constraints.append(alpha * L / 2 >= gamma)
     constraints.append(cp.SOC(alpha, U @ Q.T @ (x - r2)))

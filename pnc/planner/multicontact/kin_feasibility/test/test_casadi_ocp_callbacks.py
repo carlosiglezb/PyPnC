@@ -2,6 +2,8 @@ import unittest
 import os, sys
 import casadi
 
+import util.util
+
 cwd = os.getcwd()
 sys.path.append(cwd)
 
@@ -354,6 +356,19 @@ class TestCasadiOcpCallbacks(unittest.TestCase):
             else:
                 self.assertTrue(False, "Points were not mostly above/below each other")
 
+
+    def test_min_distance_capsule_ellipsoid_dcol_2points(self):
+        R = 0.11
+        L = 0.32
+        Q = np.eye(3)
+        sphere_radius = 0.08
+        U = (1/sphere_radius) * np.eye(3)       # Cholesky factorization of end effector's sphere radius
+
+        x_init = np.array([[0.0], [0.0], [L/2 + R + sphere_radius], [0.0], [0.0], [0.0]])
+
+        x, alpha, dual_v = solve_capsule_ellipsoid_min_prox(R, L, Q, U, x_init[:3], x_init[3:])
+
+        self.assertAlmostEqual()
 
 if __name__ == '__main__':
     unittest.main()
