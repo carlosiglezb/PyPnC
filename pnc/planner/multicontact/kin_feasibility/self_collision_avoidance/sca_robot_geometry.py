@@ -30,6 +30,9 @@ class SCARobotGeometry:
                     elif gm.meshPath == 'SPHERE':
                         sphere_radius = gm.geometry.radius
                         halfspace_params['U'] = 1./sphere_radius * np.eye(3)
+                    elif gm.meshPath == 'CAPSULE':
+                        halfspace_params['R'] = gm.geometry.radius
+                        halfspace_params['L'] = 2 * gm.geometry.halfLength
                     else:
                         raise NotImplementedError("Only box primitives are currently supported")
                     self._geometry_primitives[lnk] = halfspace_params
@@ -48,6 +51,8 @@ class SCARobotGeometry:
             return 'box'
         elif 'U' in self._geometry_primitives[self._plan_to_model_frames.get(link_name)]:
             return 'sphere'
+        elif 'R' in self._geometry_primitives[self._plan_to_model_frames.get(link_name)]:
+            return 'capsule'
         return 'unknown'
 
 

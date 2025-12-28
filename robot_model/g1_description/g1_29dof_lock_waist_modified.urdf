@@ -545,12 +545,16 @@
  <origin xyz="0 0 0" rpy="0 -0 0"/>
  <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
  </inertial>
-  <collision>
+  <collision name="torso_capsule">
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.20 0.31 0.67"/>
+<!--        <box size="0.20 0.31 0.67"/>-->
+        <cylinder radius="0.11" length="0.32"/>
       </geometry>
   </collision>
+     <collision_checking>
+     <capsule name="torso_capsule"/>
+    </collision_checking>
  </link>
   <joint name="waist_pitch_joint" type="fixed">
     <origin xyz="0 0 0.019" rpy="0 0 0"/>

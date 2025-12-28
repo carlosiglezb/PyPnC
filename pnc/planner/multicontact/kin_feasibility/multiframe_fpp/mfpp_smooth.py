@@ -10,7 +10,7 @@ from scipy.special import binom
 from scipy.optimize import minimize
 
 from ..casadi_ocp_constraints.casadi_ocp_functions import \
-    IndexedPolytopeEllipsoidConstraint, IndexedPolytopePolytopeConstraint
+    IndexedPolytopeEllipsoidConstraint, IndexedPolytopePolytopeConstraint, IndexedCapsuleEllipsoidConstraint
 from ..constraint_parsers import parse_mat_leq_constr, parse_repvec_eq_constr, \
     parse_vec_eq_constr, parse_mat_eq_constr
 from ..cvx_mfpp_tools import get_aux_frame_idx, \
@@ -660,8 +660,13 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         sca_col_link_idxs = []
         for i, fr in enumerate(frame_list):
             if fr == 'torso':
-                A1 = robot_geom_data.get_box_representation(fr)['A']
-                b1 = robot_geom_data.get_box_representation(fr)['b']
+                torso_geom_type = robot_geom_data.get_primitive_shape_type(fr)
+                if torso_geom_type == 'box':
+                    A1 = robot_geom_data.get_box_representation(fr)['A']
+                    b1 = robot_geom_data.get_box_representation(fr)['b']
+                elif torso_geom_type == 'capsule':
+                    R = robot_geom_data.get_box_representation(fr)['R']
+                    L = robot_geom_data.get_box_representation(fr)['L']
                 torso_idx = i
             elif robot_geom_data.is_link_in_sca_list(fr):
                 sca_col_link_idxs.append(i)
@@ -684,7 +689,10 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 col_pair_geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
             elif ee_geom_type == 'sphere':
                 U = robot_geom_data.get_sphere_representation(frame_list[col_idx])['U']
-                col_pair_geom_data = {'A1': A1, 'b1': b1, 'U': U, 'Q': Q}
+                if torso_geom_type == 'box':
+                    col_pair_geom_data = {'A1': A1, 'b1': b1, 'U': U, 'Q': Q}
+                elif torso_geom_type == 'capsule':
+                    col_pair_geom_data = {'A1': None, 'b1': None, 'R': R, 'L': L, 'U': U, 'Q': Q}
             else:
                 raise ValueError(f'Invalid primitive shape {ee_geom_type} type specified for SCA.')
 
@@ -696,7 +704,10 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 if ee_geom_type == 'box':
                     f_dist[i_name] = IndexedPolytopePolytopeConstraint(i_name, col_pair_geom_data, current_mfpp_data)
                 elif ee_geom_type == 'sphere':
-                    f_dist[i_name] = IndexedPolytopeEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
+                    if torso_geom_type == 'box':
+                        f_dist[i_name] = IndexedPolytopeEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
+                    if torso_geom_type == 'capsule':
+                        f_dist[i_name] = IndexedCapsuleEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
                 else:
                     raise ValueError(f'Invalid primitive shape type {ee_geom_type} specified for SCA.')
                 # f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, col_pair_geom_data, current_mfpp_data)

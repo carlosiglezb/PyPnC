@@ -238,7 +238,8 @@ class IndexedPrimitiveGeometryDistanceCallback(Callback):
         self.Q = geom_data['Q']      # torso rotation
 
         # dimensions of robot geometry
-        self.num_halfplanes_A1 = self.A1.shape[0]
+        if self.A1 is not None:
+            self.num_halfplanes_A1 = self.A1.shape[0]
         # self.num_halfplanes_A2 = self.A2.shape[0]
 
         # dimensions to characterize the optimization variable
@@ -405,6 +406,84 @@ class SinglePolytopeEllipsoidDistanceCallback(SinglePrimitivesDistanceCallback):
         Q = self.Q
         x_val, alpha_val, dual_val = solve_polytope_ellipsoid_min_prox(A1, b1, Q, U, r1, r2)
 
+        self.jac_callback.update_dual_vars(dual_val)
+
+        return [alpha_val]
+
+
+class IndexedCapsuleEllipsoidJacFun(IndexedPrimitiveGeometryJacFun):
+    def __init__(self, name, geometry_data, mfpp_bezier_data, z, opts={}):
+        Callback.__init__(self)
+        super().__init__(name, geometry_data, mfpp_bezier_data, z, opts)
+        self.U = geometry_data['U']
+        self.construct(name, opts)
+
+    # Evaluate numerically
+    def eval(self, arg):
+        z = np.array(arg[0])
+
+        # reconstruct cone matrices with implicit parameters
+        grad_capsule_radius = np.vstack((np.zeros((1,3)), np.eye(3)))
+        grad_capsule_length = np.zeros((2,3))
+        grad_ellipse = np.vstack((np.zeros((1,3)), self.U @ self.Q.T))
+        ret1 = self.z[:-1].T @ (np.concatenate((grad_capsule_radius, grad_capsule_length, np.zeros((4, 3)))))
+        ret2 = self.z[:-1].T @ (np.concatenate((np.zeros((6, 3)), grad_ellipse)))
+
+        # ---- distribute to corresponding indices in Jacobian
+        # aesthetics
+        pos1_idxs = self.pos1_idxs
+        pos2_idxs = self.pos2_idxs
+
+        jac_z = np.zeros((1, self.dim_optim_var))
+        jac_z[0, pos1_idxs] = ret1
+        jac_z[0, pos2_idxs] = ret2
+
+        return [jac_z]
+
+
+class IndexedCapsuleEllipsoidConstraint(IndexedPrimitiveGeometryDistanceCallback):
+    def __init__(self, name, geom_data, mfpp_bezier_data, opts={}):
+        Callback.__init__(self)
+        super().__init__(name, geom_data, mfpp_bezier_data, opts)
+        self.R = geom_data['R']         # torso capsule
+        self.L = geom_data['L']         # torso capsule
+        self.U = geom_data['U']         # EE ellipsoid
+
+        self.z = np.zeros((2, 1))       # DCOL dual variable
+
+        # initialize object construction
+        self.jac_callback = IndexedCapsuleEllipsoidJacFun(name, geom_data, mfpp_bezier_data, self.z)
+        self.construct(name, opts)
+
+    def eval(self, arg):
+        z = np.array(arg[0])
+
+        # aesthetics
+        R = self.R
+        L = self.L
+        Q = self.Q
+        U = self.U
+        num_iris_regions = self.num_iris_regions_per_frame
+        current_frames = self.current_frames
+        current_point = self.current_point
+        bezier_higher_derivatives = self.bezier_higher_derivatives
+
+        # get current point and solve min distance for each pair of points
+        curr_pnt_in_iris = current_point % self.n_points
+        curr_ir = current_point // self.n_points
+        pos1_curr_ir = (current_frames[0] * bezier_higher_derivatives * num_iris_regions +
+                        bezier_higher_derivatives * curr_ir +
+                        curr_pnt_in_iris)
+        pos2_curr_ir = (current_frames[1] * bezier_higher_derivatives * num_iris_regions +
+                        bezier_higher_derivatives * curr_ir +
+                        curr_pnt_in_iris)
+        pos1_idxs = np.arange(pos1_curr_ir, pos1_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
+        pos2_idxs = np.arange(pos2_curr_ir, pos2_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
+        r1_cp = z[pos1_idxs]
+        r2_cp = z[pos2_idxs]
+        x_val, alpha_val, dual_val = solve_capsule_ellipsoid_min_prox(R, L, Q, U, r1_cp, r2_cp)
+
+        # update dual variables to use in Jacobian
         self.jac_callback.update_dual_vars(dual_val)
 
         return [alpha_val]
@@ -620,6 +699,29 @@ def solve_polytope_ellipsoid_min_prox(A, b, Q, U, r1, r2, verbose=False):
     dual_v = list((prob.solution.dual_vars).values())
     dual_v[-1] = np.reshape(dual_v[-1], (-1, 1))
     dual_v[-2] = np.reshape(dual_v[-2], (-1, 1))
+    dual_v = np.concatenate(dual_v)
+    solver_time = prob.solver_stats.solve_time
+
+    return x.value, alpha.value, dual_v
+
+
+def solve_capsule_ellipsoid_min_prox(R, L, Q, U, r1, r2, verbose=False):
+    # find distance via optimization (dcol-style)
+    alpha = cp.Variable(1)
+    gamma = cp.Variable(1)
+    x = cp.Variable((3, 1))
+    bx_hat = np.reshape(Q @ np.array([1., 0., 0.]), (-1,1))
+
+    constraints = []
+    constraints.append(cp.SOC(alpha * R, x - (r1 + gamma * bx_hat)))
+    constraints.append(-alpha * L / 2 <= gamma)
+    constraints.append(alpha * L / 2 >= gamma)
+    constraints.append(cp.SOC(alpha, U @ Q.T @ (x - r2)))
+    constraints.append(alpha >= 0)
+    prob = cp.Problem(cp.Minimize(alpha), constraints)
+    prob.solve(solver='CLARABEL')
+
+    dual_v = list((prob.solution.dual_vars).values())
     dual_v = np.concatenate(dual_v)
     solver_time = prob.solver_stats.solve_time
 

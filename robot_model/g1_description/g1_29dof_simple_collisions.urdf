@@ -574,8 +574,8 @@
       <geometry>
 <!--          <box size="0.20 0.31 0.50"/>-->
 <!--        <box size="0.14 0.20 0.5"/>-->
+<!--        <box size="0.20 0.31 0.67"/>-->
         <cylinder radius="0.11" length="0.32"/>
-        <box size="0.20 0.31 0.67"/>
       </geometry>
   </collision>
    <collision_checking>
