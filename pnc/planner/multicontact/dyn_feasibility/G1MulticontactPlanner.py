@@ -3,6 +3,7 @@ from copy import copy
 
 import mim_solvers
 import numpy as np
+import pinocchio as pin
 import crocoddyl
 from crocoddyl.libcrocoddyl_pywrap import StdVec_VectorX
 
@@ -13,6 +14,27 @@ from pnc.planner.multicontact.dyn_feasibility.humanoid_action_models import (cre
                                                                              createSequence,
                                                                              createFinalSequence,
                                                                              quasi_static_ocp)
+from pnc.planner.multicontact.kin_feasibility.g1_ik_solver import G1IKSolver
+
+
+class FeasibilityExitCallback(mim_solvers.CallbackAbstract):
+    def __init__(self, gap_threshold=0.5, constraint_threshold=1.0):
+        super().__init__()
+        self.gap_threshold = gap_threshold
+        self.constraint_threshold = constraint_threshold
+
+    def __call__(self, solver, args={}):
+        # Extract current norms from the solver
+        # In mim-solvers CSQP, these are solver.gaps_norm and solver.constraint_norm
+        current_gaps = solver.gap_norm
+        current_cons = solver.constraint_norm
+
+        # Check if feasibility criteria are met
+        if current_gaps < self.gap_threshold and current_cons < self.constraint_threshold:
+            # Setting the stop threshold to a large value to force termination
+            solver.termination_tolerance = solver.KKT + 1.0
+            solver.stop_reached = True
+            print(f"--> Feasibility reached: Gaps={current_gaps:.4f}, Cons={current_cons:.4f}. Terminating.")
 
 
 class G1MulticontactPlanner(HumanoidMulticontactPlanner):
@@ -47,7 +69,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
              integration_type: str='Euler',
              sca_refinement: bool=False,
              b_solve_by_sections: str='None',
-             solver_type: str='FDDP'):
+             solver_type: str='SQP'):
         dyn_seg_solve_time = []
         if solver_type == 'SQP':
             b_sqp = True
@@ -192,10 +214,35 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print("[Compute Time] Dynamic feasibility check: ", sum(dyn_seg_solve_time))
         elif b_solve_by_sections == 'single':
             self.solver_type = 'single'
+            x0_stance = np.copy(x0)
+
+            # here, we use IK to construct the initial guess
+            robot_data = self.robot_model.createData()
+            pin.forwardKinematics(self.robot_model, robot_data, x0_stance[:self.robot_model.nq])
+            g1_ik = G1IKSolver(self.robot_model, robot_data, x0_stance[:self.robot_model.nq])
+
+            xs, us = [], []
             for i in range(self.contact_phases):
-                model_seqs = []
                 frames_in_contact = self.contact_planes_seq[i]
                 N_current = self.horizon_lst[i]
+
+                # update initial guess joints based on IK of current targets
+                q_ik = g1_ik.solve(self.get_targets_from_planner(i, i * T), x0_stance[:self.robot_model.nq])
+                x0_stance[:self.robot_model.nq] = q_ik
+                xs += [x0_stance] * N_current
+
+                us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0_stance)
+                if integration_type == 'RK2':
+                    us_static = np.concatenate((us_static, us_static))
+                us += [us_static] * N_current
+
+                # create next stance initial guess
+                x0_next_stance = np.copy(x0_stance)
+                q_ik = g1_ik.solve(self.get_targets_from_planner(i, (i + 1) * T), x0_stance[:self.robot_model.nq])
+                x0_stance[:self.robot_model.nq] = q_ik
+
+                # construct TO models for this contact phase
+                model_seqs = []
                 DT = T / N_current
                 for t in np.arange(i * T, (i + 1) * T, DT):
                     frame_targets_dict = self.get_targets_from_planner(i, t)
@@ -208,7 +255,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                         next_frames_in_contact = self.contact_planes_seq[i]
                     dmodel = createMultiFrameActionModel(state,
                                                          actuation,
-                                                         x0,
+                                                         x0_next_stance,
                                                          plan_to_model_ids,
                                                          frames_in_contact,
                                                          next_frames_in_contact,
@@ -242,6 +289,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                       robot_model=self.robot_model)
             model_seq_all += createFinalSequence([dmodel], integration_type)
             print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
+            xs += [x0_stance]
 
             problem = crocoddyl.ShootingProblem(x0, sum(np.vstack(model_seq_all).tolist(),[])[:-1], model_seq_all[-1][-1])
             if solver_type == 'SQP':
@@ -253,8 +301,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 fddp.eps_rel = 1e-1
                 fddp.filter_size = 10    # documentation says not to change this!
                 fddp.update_rho_with_heuristic = True
-                fddp.rho_update_interval = 100
-                fddp.max_qp_iters = 500
+                fddp.rho_update_interval = 50
+                fddp.max_qp_iters = 100
                 # fddp.use_filter_line_search = False   # (default: True)
                 # fddp.mu_dynamic = -1  # Nocedal's L1 merit function
                 # fddp.lag_mul_inf_norm_coef = 10
@@ -276,11 +324,12 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             fddp.reg_decFactor = 3
 
             # Set initial guess
-            xs = [x0] * (fddp.problem.T + 1)
-            us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0)
-            if integration_type == 'RK2':
-                us_static = np.concatenate((us_static, us_static))
-            us = [us_static] * fddp.problem.T
+            # xs = [x0] * (fddp.problem.T + 1)
+            # us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0)
+            # if integration_type == 'RK2':
+            #     us_static = np.concatenate((us_static, us_static))
+            # us = [us_static] * fddp.problem.T
+            # us = problem.quasiStatic(xs[:-1])
             start_ddp_solve_time = time.time()
             print("Problem solved to convergence:", fddp.solve(xs, us, max_iter))
             dyn_seg_solve_time.append(time.time() - start_ddp_solve_time)
@@ -418,9 +467,29 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
         knot_idx = 0
         model_seqs = []
+
+        x0_stance = np.copy(x0)
+
+        # here, we use IK to construct the initial guess
+        robot_data = self.robot_model.createData()
+        pin.forwardKinematics(self.robot_model, robot_data, x0_stance[:self.robot_model.nq])
+        g1_ik = G1IKSolver(self.robot_model, robot_data, x0_stance[:self.robot_model.nq])
+
+        xs, us = [], []
         for i in range(self.contact_phases):
             frames_in_contact = self.contact_planes_seq[i]
             N_current = self.horizon_lst[i]
+
+            # update initial guess joints based on IK of current targets
+            q_ik = g1_ik.solve(self.get_targets_from_planner(i, i * T), x0_stance[:self.robot_model.nq])
+            x0_stance[:self.robot_model.nq] = q_ik
+            xs += [x0_stance] * N_current
+
+            us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0_stance)
+            if integration_type == 'RK2':
+                us_static = np.concatenate((us_static, us_static))
+            us += [us_static] * N_current
+
             DT = T / N_current
             for t in np.arange(i * T, (i + 1) * T, DT):
                 frame_targets_dict = self.get_targets_from_planner(i, t)
@@ -432,7 +501,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                     next_frames_in_contact = self.contact_planes_seq[i]
                 dmodel = createMultiFrameActionModel(state,
                                                      actuation,
-                                                     x0,
+                                                     x0_stance,
                                                      plan_to_model_ids,
                                                      frames_in_contact,
                                                      next_frames_in_contact,
@@ -480,18 +549,20 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                                                   robot_model=self.robot_model)
         model_seqs += createFinalSequence([dmodel], integration_type)
         print(f"Last time in mode {i}. Applying Final Sequence with terminal_step={terminal_step}")
+        xs += [x0_stance]
 
         problem = crocoddyl.ShootingProblem(x0, sum(np.vstack(model_seqs).tolist(), [])[:-1], model_seqs[-1][-1])
         if solver_type == 'SQP':
             print("[SCA-Crocoddyl] Using CSQP solver for SCA refinement")
             self.fddp_full_sca = mim_solvers.SolverCSQP(problem)
-            self.fddp_full_sca.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose()])
+            customFeas = FeasibilityExitCallback(gap_threshold=5e-1, constraint_threshold=1e0)
+            self.fddp_full_sca.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose(), customFeas])
             self.fddp_full_sca.termination_tolerance = 1e0
             self.fddp_full_sca.eps_abs = 5e-1
             self.fddp_full_sca.eps_rel = 5e-1
             self.fddp_full_sca.filter_size = 10  # documentation says not to change this!
             self.fddp_full_sca.update_rho_with_heuristic = True
-            self.fddp_full_sca.max_qp_iters = 500
+            self.fddp_full_sca.max_qp_iters = 100
             self.fddp_full_sca.rho_update_interval = 100
             # self.fddp_full_sca.use_filter_line_search = False   # (default: True)
             # self.fddp_full_sca.mu_dynamic = -1  # Nocedal's L1 merit function
@@ -503,24 +574,29 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.setCallbacks([crocoddyl.CallbackLogger(), crocoddyl.CallbackVerbose()])
             # self.fddp_full_sca.setCallbacks([crocoddyl.CallbackLogger()])
 
-            # Solver settings
-            self.fddp_full_sca.th_stop = 1e-3
-            self.fddp_full_sca.th_gapTol = 1e-2
-            self.fddp_full_sca.reg_max = 1e4
-            self.fddp_full_sca.reg_incFactor = 3
-            self.fddp_full_sca.reg_decFactor = 3
+        # Solver settings
+        self.fddp_full_sca.th_stop = 1e1
+        self.fddp_full_sca.th_gapTol = 1e-2
+        self.fddp_full_sca.reg_max = 1e4
+        # self.fddp_full_sca.preg = 1e-3
+        # self.fddp_full_sca.dres = 1e-3
+        # self.fddp_full_sca.reg_incFactor = 3
+        # self.fddp_full_sca.reg_decFactor = 3
 
-        max_iter = 100
+        max_iter = 200
         # Set initial guess from latest solve
         # TODO check dimensions and/or adjust
         if self.solver_type is not None:
             xs = copy(latest_fddp_xs)
             us = StdVec_VectorX.copy(latest_fddp_us)
         else:
-            xs = [x0] * (self.fddp_full_sca.problem.T + 1)
-            us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0)
-            us = [us_static] * self.fddp_full_sca.problem.T
+            print("[SCA-Crocoddyl] No previous solution available for SCA refinement. Using quasi-static guess.")
+            # xs = [x0] * (self.fddp_full_sca.problem.T + 1)
+            # us_static = quasi_static_ocp(frames_in_contact, plan_to_model_ids, state.pinocchio, x0)
+            # us = [us_static] * self.fddp_full_sca.problem.T
+            ### below is Crocoddyl's quasiStatic method
             # us = self.fddp_full_sca.problem.quasiStatic([x0] * self.fddp_full_sca.problem.T)
+            # us = self.fddp_full_sca.problem.quasiStatic(xs[:-1])
 
         # uncomment below when removing impulse models from the guess
         # idx_removed = 0

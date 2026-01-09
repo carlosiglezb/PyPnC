@@ -235,7 +235,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     soc_constraint, cost_log_abs = [], []
     cost_log_abs_sum = 0.
     if bool(aux_frames):     # check if empy dictionary
-        link_threshold = 0.05
+        link_threshold = 0.01
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
             prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
@@ -607,7 +607,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
     # Rigid links (e.g., shin link length) constraint relaxation
     if bool(aux_frames):     # check if empty dictionary
-        link_threshold = 0.05
+        link_threshold = 0.01
         # apply auxiliary rigid link constraint throughout all safe regions
         for aux_fr in aux_frames:
             prox_fr_idx, dist_fr_idx, link_length = get_aux_frame_idx(
@@ -634,14 +634,16 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         "ipopt": {
             "print_level": 5,   # {0: none; 1: final compute statistics; 3: num of vars, *5, EXIT; 12: all}
             "hessian_approximation": "limited-memory",   # exact
-            "max_iter": 200,
+            "max_iter": 50,
             "mu_init": 1e-6,    # *0.1 (applicable if monotone strategy)
-            "tol": 1e-1,
-            "constr_viol_tol": 1e-4,    # *0.0001
+            "tol": 1e1,
+            "constr_viol_tol": 0.05,
+            "dual_inf_tol": 1e1,
+            "compl_inf_tol": 1e1,
             # "slack_bound_frac": 0.1,          # *0.01
             "mu_strategy":"monotone",   # {monotone, adaptive}
             "nlp_scaling_method": "gradient-based", # {none, user-scaling, *gradient-based, equilibration-based}
-            "jacobian_regularization_value": 1e-4,  # 1e-6, 2e-4  * 1e-8
+            "jacobian_regularization_value": 1e-8,  # 1e-6, 2e-4  * 1e-8
             # "derivative_test": "first-order",
             # "derivative_test_print_all": "no",
             # "derivative_test_perturbation": 1e-7,
@@ -679,7 +681,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
-            sca_bez_points = range(0, num_iris_tot * n_points, 2)
+            sca_bez_points = range(0, num_iris_tot * n_points, 1)
 
             # populate col_pair_geom_data with respective primitive shape pair type information
             ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])
@@ -721,11 +723,11 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points),1))))
 
     opts["ipopt"]["warm_start_init_point"] = "yes"
-    opts["ipopt"]["warm_start_mult_bound_push"] = 1e-5
-    opts["ipopt"]["warm_start_slack_bound_push"] = 1e-5
-    opts["ipopt"]["warm_start_slack_bound_frac"] = 1e-5
-    opts["ipopt"]["warm_start_bound_push"] = 1e-5
-    opts["ipopt"]["warm_start_bound_frac"] = 1e-5
+    opts["ipopt"]["warm_start_mult_bound_push"] = 1e-8
+    opts["ipopt"]["warm_start_slack_bound_push"] = 1e-8
+    opts["ipopt"]["warm_start_slack_bound_frac"] = 1e-8
+    opts["ipopt"]["warm_start_bound_push"] = 1e-8
+    opts["ipopt"]["warm_start_bound_frac"] = 1e-8
 
     # Solve problem
     prob_construct_start_time = time.time()

@@ -201,7 +201,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         state, activation_ureg, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
     costs.addCost("xReg", x_reg_cost, planner_weights.WBC_COST_WEIGHTS['xReg'])
-    costs.addCost("uReg", u_reg_cost, planner_weights.WBC_COST_WEIGHTS['uReg'])
+    # costs.addCost("uReg", u_reg_cost, planner_weights.WBC_COST_WEIGHTS['uReg'])
 
     # Adding the state limits penalization
     jvel_lim_safety_margin = 1
