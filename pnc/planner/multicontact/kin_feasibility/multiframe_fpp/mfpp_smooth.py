@@ -634,16 +634,16 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         "ipopt": {
             "print_level": 5,   # {0: none; 1: final compute statistics; 3: num of vars, *5, EXIT; 12: all}
             "hessian_approximation": "limited-memory",   # exact
-            "max_iter": 50,
-            "mu_init": 1e-6,    # *0.1 (applicable if monotone strategy)
-            "tol": 1e1,
-            "constr_viol_tol": 0.05,
-            "dual_inf_tol": 1e1,
-            "compl_inf_tol": 1e1,
+            "max_iter": 100,
+            "mu_init": 1e-4,    # *0.1 (applicable if monotone strategy)
+            "tol": 1e1,                 # *1e-8
+            "constr_viol_tol": 5e-2,    # *1e-4
+            "dual_inf_tol": 1e1,        # *1.0
+            "compl_inf_tol": 1e1,       # *1e-4
             # "slack_bound_frac": 0.1,          # *0.01
             "mu_strategy":"monotone",   # {monotone, adaptive}
             "nlp_scaling_method": "gradient-based", # {none, user-scaling, *gradient-based, equilibration-based}
-            "jacobian_regularization_value": 1e-8,  # 1e-6, 2e-4  * 1e-8
+            "jacobian_regularization_value": 1e-2,  # 1e-6, 2e-4  * 1e-8
             # "derivative_test": "first-order",
             # "derivative_test_print_all": "no",
             # "derivative_test_perturbation": 1e-7,
@@ -723,11 +723,11 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points),1))))
 
     opts["ipopt"]["warm_start_init_point"] = "yes"
-    opts["ipopt"]["warm_start_mult_bound_push"] = 1e-8
-    opts["ipopt"]["warm_start_slack_bound_push"] = 1e-8
-    opts["ipopt"]["warm_start_slack_bound_frac"] = 1e-8
-    opts["ipopt"]["warm_start_bound_push"] = 1e-8
-    opts["ipopt"]["warm_start_bound_frac"] = 1e-8
+    opts["ipopt"]["warm_start_mult_bound_push"] = 1e-5
+    opts["ipopt"]["warm_start_slack_bound_push"] = 1e-5
+    opts["ipopt"]["warm_start_slack_bound_frac"] = 1e-5
+    opts["ipopt"]["warm_start_bound_push"] = 1e-5
+    opts["ipopt"]["warm_start_bound_frac"] = 1e-5
 
     # Solve problem
     prob_construct_start_time = time.time()
