@@ -9,6 +9,8 @@ from config.multicontact.planner_config import PlannerConfig
 from pnc.planner.multicontact.crocoddyl_extensions.ActivationModelDistanceQuad import ActivationModelDistanceQuad
 from pnc.planner.multicontact.crocoddyl_extensions.ControlBounds import ControlBounds
 from pnc.planner.multicontact.crocoddyl_extensions.ResidualDistanceCollision import ResidualDistanceCollision
+from pnc.planner.multicontact.crocoddyl_extensions.ResidualFrictionCone import ResidualFrictionCone, \
+    ResidualLinearizedFrictionCone
 # from pnc.planner.multicontact.crocoddyl_extensions.ResidualFrictionCone import ResidualFrictionCone
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import ContactSequence
 from util.util import so3_from_vec_to_vec
@@ -246,21 +248,57 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                                                     True)
 
         if b_sca:
-            # remove friction from costs and enforce as hard constraint
+            # b_linear_friction = True
+            # # # remove friction from costs and enforce as hard constraint
             # for fr_name, fr_plane in frames_in_contact.items():
-            #     # costs.removeCost(fr_name + "_friction") # TODO add back
+            #     costs.removeCost(fr_name + "_friction")
             #
+            #     #### ---- Friction as in mim-solvers
             #     r, p = util.util.vec_to_roll_pitch(fr_plane)
             #     plane_rot = util.util.euler_to_rot([r, p, 0])
-                # friction_cone = ResidualFrictionCone(state,
-                #                                      fr_name + "_contact",
-                #                                      mu,
-                #                                      actuation.nu,
-                #                                      plane_rot)
+            #     if b_linear_friction:
+            #         friction_cone = ResidualLinearizedFrictionCone(state,
+            #                                                        fr_name + "_contact",
+            #                                                        mu,
+            #                                                        actuation.nu,
+            #                                                        plane_rot)
+            #         constr_friction = crocoddyl.ConstraintModelResidual(state,
+            #                                                             friction_cone,
+            #                                                             np.array([[-np.inf], [-np.inf], [-np.inf],
+            #                                                                       [-np.inf]]),
+            #                                                             np.array([[0.0], [0.0], [0.0], [0.0]]),
+            #                                                             True)
+            #     else:
+            #         friction_cone = ResidualFrictionCone(state,
+            #                                              fr_name + "_contact",
+            #                                              mu,
+            #                                              actuation.nu,
+            #                                              plane_rot)
+            #         constr_friction = crocoddyl.ConstraintModelResidual(state,
+            #                                                             friction_cone,
+            #                                                             np.array([0.0]),
+            #                                                             np.array([np.inf]),
+            #                                                             True)
+            #     runningConstraintModelManager.addConstraint(fr_name + "_friction",
+            #                                                 constr_friction,
+            #                                                 True)
+                #### ---- Friction with crocoddyl
+                # fr_id = plan_to_model_ids[fr_name]
+                # SE3_ee = pin.SE3.Identity()
+                # r, p = util.util.vec_to_roll_pitch(fr_plane)
+                # SE3_ee.rotation = util.util.euler_to_rot([r, p, 0])
+                #
+                # if 'H' in fr_name:
+                #     surf_cone = crocoddyl.FrictionCone(SE3_ee.rotation, mu, 4, True)
+                #     surf_cone_residual = crocoddyl.ResidualModelContactFrictionCone(state, fr_id, surf_cone, actuation.nu)
+                # else:
+                #     foot_size = planner_weights.FOOT_SIZE
+                #     surf_cone = crocoddyl.WrenchCone(SE3_ee.rotation, mu, np.array(foot_size), 4, True)
+                #     surf_cone_residual = crocoddyl.ResidualModelContactWrenchCone(state, fr_id, surf_cone, actuation.nu)
                 # constr_friction = crocoddyl.ConstraintModelResidual(state,
-                #                                                     friction_cone,
-                #                                                     np.array([0.0]),
-                #                                                     np.array([np.inf]),
+                #                                                     surf_cone_residual,
+                #                                                     surf_cone.lb,
+                #                                                     surf_cone.ub,
                 #                                                     True)
                 # runningConstraintModelManager.addConstraint(fr_name + "_friction",
                 #                                             constr_friction,
@@ -701,7 +739,7 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
                      x0: np.ndarray, ):
     import cvxpy as cp
     # max allowed normal force of some factor x robot weight
-    # mu = 0.6
+    mu = 0.5
 
     # construct equality constraints from Centroidal Dynamics
     lf_frame_id = plan_to_model_ids['LF']
