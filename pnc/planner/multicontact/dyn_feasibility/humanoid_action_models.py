@@ -201,7 +201,7 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
         state, activation_ureg, crocoddyl.ResidualModelControl(state, actuation.nu)
     )
     costs.addCost("xReg", x_reg_cost, planner_weights.WBC_COST_WEIGHTS['xReg'])
-    # costs.addCost("uReg", u_reg_cost, planner_weights.WBC_COST_WEIGHTS['uReg'])
+    costs.addCost("uReg", u_reg_cost, planner_weights.WBC_COST_WEIGHTS['uReg'])
 
     # Adding the state limits penalization
     jvel_lim_safety_margin = 1
@@ -739,7 +739,7 @@ def quasi_static_ocp(frames_in_contact: dict[str: np.ndarray],
                      x0: np.ndarray, ):
     import cvxpy as cp
     # max allowed normal force of some factor x robot weight
-    mu = 0.5
+    mu = 0.7
 
     # construct equality constraints from Centroidal Dynamics
     lf_frame_id = plan_to_model_ids['LF']

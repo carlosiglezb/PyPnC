@@ -295,7 +295,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             if solver_type == 'SQP':
                 print("[SCA-Crocoddyl] Using CSQP solver for single TO")
                 fddp = mim_solvers.SolverCSQP(problem)
-                fddp.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose()])
+                customFeas = FeasibilityExitCallback(gap_threshold=1e0, constraint_threshold=1e0)
+                fddp.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose(), customFeas])
                 fddp.termination_tolerance = 1  # relaxed for single TO used to warm-start
                 fddp.eps_abs = 1e-1
                 fddp.eps_rel = 1e-1
@@ -555,7 +556,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         if solver_type == 'SQP':
             print("[SCA-Crocoddyl] Using CSQP solver for SCA refinement")
             self.fddp_full_sca = mim_solvers.SolverCSQP(problem)
-            customFeas = FeasibilityExitCallback(gap_threshold=5e-1, constraint_threshold=1e0)
+            customFeas = FeasibilityExitCallback(gap_threshold=1e0, constraint_threshold=1e0)
             self.fddp_full_sca.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose(), customFeas])
             self.fddp_full_sca.termination_tolerance = 1e0
             self.fddp_full_sca.eps_abs = 5e-1

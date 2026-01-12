@@ -1231,7 +1231,7 @@ def main(args):
         sca_str = '_kin_sca' if 'sca' in kin_plan_path else '_no_kin_sca'
         action_str = '_step_' if 'door' in kin_plan_path else '_'
         seq_str = next((s for s in ['over', 'on_balanced', 'on'] if s in kin_plan_path), '')
-        env = '_door' if 'door' in kin_plan_path else '_stairs'
+        env = '_door' if 'knocker' in kin_plan_path else '_stairs'
     else:
         action_str = 'step_' if env == 'door' else '_'
     if B_BASELINE:
