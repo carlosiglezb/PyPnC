@@ -28,14 +28,14 @@ class PlannerConfig(ABC):
         'friction': 2e-3,    # step_over, on_balanced, step_on
         'frame_goal': 1e2,  # step over
         'xReg': 1e0,    # step over
-        'uReg': 2e1,
+        'uReg': 2e-1,
         'xBounds': 1e3,   # step on, step over, on_balanced
     }
     WBC_FINAL_COST_WEIGHTS = {
         'friction': 2e-3,
         'frame_goal': 1e2,
-        'xReg': 5e-1,    # step over, on_balanced
-        'uReg': 2e-2,  # stairs
+        'xReg': 1e0,    # step over, on_balanced
+        'uReg': 2e-1,  # stairs
         'xBounds': 1e3,     # step on, step over, on_balanced
     }
     WBC_IMPULSE_COST_WEIGHTS = {

@@ -92,7 +92,7 @@ def get_g1_default_initial_pose(n_joints:int, env: str = 'door'):
         q0[10] = -0.53  # right_ankle_pitch_joint
         # q0[11] = 0.  # right_ankle_roll_joint
 
-        floating_base = np.array([0., 0., 0.68, 0., 0., 0., 1.])
+        floating_base = np.array([-0.03, 0., 0.68, 0., 0., 0., 1.])
     elif env == 'stairs':
         q0 = np.zeros(n_joints, )
         q0[0] = -np.pi/6
@@ -235,7 +235,7 @@ def load_navy_env(robot_name, door_pos):
         dom_lbody_ub_r = np.array([1.6, 0.8, 1.2])
         knee_knocker_base = HPolyhedron.MakeBox(
             np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
-            np.array([0.14, 0.9, 0.4]) + door_pos + door_width)
+            np.array([0.06, 0.9, 0.4]) + door_pos + door_width)
     elif robot_name == 'valkyrie':
         dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
         dom_lbody_lb_r = np.array([-1.6, -0.8, -0.])
@@ -482,11 +482,12 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     # initialize fixed and motion frame sets
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
-    # ---- Step 1: L hand to frame
+    # ---- Step 1: L+R hand to frame
     fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
     if robot_name == 'g1':
         motion_frames_seq.add_motion_frame({
                                             'LH': door_l_inner_location,
+                                            'RH': door_r_inner_location,
                                             # 'torso': starting_torso_pos + np.array([0.07, -0.07, 0.02])
                                             })
     elif robot_name == 'ergoCub':
@@ -496,10 +497,12 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
                                             })
     lh_contact_front = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
     lh_contact_front.set_contact_breaking_velocity(np.array([0, -1, 0.]))
-    motion_frames_seq.add_contact_surfaces([lh_contact_front])
+    rh_contact_front = PlannerSurfaceContact('RH', np.array([0, 1, 0]))
+    rh_contact_front.set_contact_breaking_velocity(np.array([0, 1, 0.]))
+    motion_frames_seq.add_contact_surfaces([lh_contact_front, rh_contact_front])
 
     # ---- Step 2: step through door with left foot
-    fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
+    fixed_frames.append(['RF', 'R_knee', 'LH', 'RH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                         'LF': final_lf_pos,
                         'L_knee': final_lf_pos + np.array([0.15, 0., 0.28])})
@@ -508,20 +511,20 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     motion_frames_seq.add_contact_surfaces([lf_contact_over])
 
     # ---- Step 3: re-position L/R hands for more stability
-    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
-    motion_frames_seq.add_motion_frame({
-                        # 'LH': starting_lh_pos + np.array([0.3, 0., 0.0]),   # <-- G1
-                        # 'LH': starting_lh_pos + np.array([0.35, 0.1, 0.0]),   # <-- other
-                        # 'torso': final_torso_pos + np.array([-0.15, 0.05, 0.05]),     # good testing
-                        'RH': door_r_inner_location})
-    rh_contact_inside = PlannerSurfaceContact('RH', np.array([1, 0, 0]))
-    motion_frames_seq.add_contact_surfaces([rh_contact_inside])
+    # fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    # motion_frames_seq.add_motion_frame({
+    #                     # 'LH': starting_lh_pos + np.array([0.3, 0., 0.0]),   # <-- G1
+    #                     # 'LH': starting_lh_pos + np.array([0.35, 0.1, 0.0]),   # <-- other
+    #                     # 'torso': final_torso_pos + np.array([-0.15, 0.05, 0.05]),     # good testing
+    #                     'RH': door_r_inner_location})
+    # rh_contact_inside = PlannerSurfaceContact('RH', np.array([1, 0, 0]))
+    # motion_frames_seq.add_contact_surfaces([rh_contact_inside])
 
-    # ---- Step 4: step through door with right foot
+    # ---- Step 3: step through door with right foot
     # G1 settings
     # fixed_frames.append(['LF', 'L_knee', 'RH', 'LH'])   # frames that must not move
     # other settings
-    fixed_frames.append(['LF', 'L_knee', 'RH'])   # frames that must not move
+    fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
     motion_frames_seq.add_motion_frame({
                         'RF': final_rf_pos,
                         'torso': final_torso_pos + np.array([0.0, 0., 0.04]),     # good testing
@@ -899,7 +902,7 @@ def main(args):
         if robot_name == 'g1':
             q0 = get_g1_default_initial_pose(rob_model.nq - 7)
             door_pos = np.array([0.32, 0., 0.])
-            step_length = 0.46
+            step_length = 0.44
             # TODO fix/customize planner parameter selection
             planner_params = g1_params.MultiContactDoorConfig()
             # if B_BASELINE:
