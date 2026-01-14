@@ -554,12 +554,12 @@ def get_five_stage_on_knocker_contact_sequence(robot_name: str,
     # door_r_outer_location = np.array([0.45, -0.35, 1.2])
     if robot_name == 'g1':
         # G1 settings
-        door_l_inner_location = np.array([0.3, 0.35, 1.1])
+        door_l_inner_location = np.array([0.34, 0.35, 1.1])
         door_r_inner_location = np.array([0.34, -0.35, 1.1])
         ft_kn_offset = np.array([0.15, 0., 0.28])
     else:
         # ergoCub settings
-        door_l_inner_location = np.array([0.3, 0.35, 1.0])
+        door_l_inner_location = np.array([0.34, 0.35, 1.0])
         door_r_inner_location = np.array([0.34, -0.35, 1.0])
         ft_kn_offset = np.array([0.2, 0., 0.3])
 
@@ -657,12 +657,12 @@ def get_on_knocker_balanced_contact_sequence(robot_name: str,
                                             safe_regions_mgr_dict: dict[str: IrisRegionsManager]):
     if robot_name == 'g1':
         # G1 settings
-        door_l_inner_location = np.array([0.3, 0.35, 1.0])
+        door_l_inner_location = np.array([0.34, 0.35, 1.0])
         door_r_inner_location = np.array([0.34, -0.35, 1.0])
         ft_kn_offset = np.array([0.15, 0., 0.28])
     else:
         # ergoCub settings
-        door_l_inner_location = np.array([0.3, 0.35, 1.1])
+        door_l_inner_location = np.array([0.34, 0.35, 1.1])
         door_r_inner_location = np.array([0.34, -0.35, 1.1])
         ft_kn_offset = np.array([0.2, 0., 0.3])
 
@@ -1234,7 +1234,7 @@ def main(args):
         sca_str = '_kin_sca' if 'sca' in kin_plan_path else '_no_kin_sca'
         action_str = '_step_' if 'door' in kin_plan_path else '_'
         seq_str = next((s for s in ['over', 'on_balanced', 'on'] if s in kin_plan_path), '')
-        env = '_door' if 'knocker' in kin_plan_path else '_stairs'
+        env = '_door' if ('knocker' in kin_plan_path or 'door' in kin_plan_path) else '_stairs'
     else:
         action_str = 'step_' if env == 'door' else '_'
     if B_BASELINE:

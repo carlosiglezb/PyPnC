@@ -332,6 +332,8 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                             or ('left_knee' in cp_first_name and 'right_ankle' in cp_second_name)
                             or ('left_ankle' in cp_first_name and 'right_knee' in cp_second_name)
                             or ('right_knee' in cp_first_name and 'left_ankle' in cp_second_name)
+                            or ('right_knee' in cp_first_name and 'left_hip' in cp_second_name)
+                            or ('left_hip' in cp_first_name and 'right_knee' in cp_second_name)
                     ):
                         sca_alpha = 0.005
                         dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx)
