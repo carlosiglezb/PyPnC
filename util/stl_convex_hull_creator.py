@@ -18,6 +18,7 @@ def create_convex_hull_stl(input_path, output_path):
 
 links_to_make_convex = [
     "torso_link",
+    "pelvis_contour_link",
     "left_hip_roll_link",
     "right_hip_roll_link",
     "left_hip_yaw_link",
