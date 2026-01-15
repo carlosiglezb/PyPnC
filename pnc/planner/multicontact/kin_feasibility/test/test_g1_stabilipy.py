@@ -316,10 +316,10 @@ class TestStabilipy(unittest.TestCase):
             N_HORIZON_LST = [180, 280, 280, 250, 250]
             contact_seq_str_opts = ['over', 'on', 'on_balanced']
         else:   # stairs
-            N_HORIZON_LST = [180, 250, 250, 250, 280, 250]
-            contact_seq_str_opts = ['right_side', 'opposing_sides']
+            N_HORIZON_LST = [300] * 6
+            contact_seq_str_opts = ['right_side', 'fully_opposing']
         cs_opt = contact_seq_str_opts[1]  # depends on environment
-        cfree_soln_file = cwd + '/experiment_data/g1_skip_sca_' + cs_opt + env_opt + '_boxfddp.pkl'
+        cfree_soln_file = cwd + '/experiment_data/g1_guided_no_imp_kin_sca_no_sca_refine' + env_opt + cs_opt +  '.pkl'
         q_all = get_all_poses_from_file(cfree_soln_file)
         if len(q_all) == 1:
             # in case using full TO with impulse model, separate by contact phase
