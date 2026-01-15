@@ -183,7 +183,7 @@ def check_trajectory_collisions(robot_model, robot_geom_model, joint_pos, time):
                     collision_pair_to = robot_geom_model.geometryObjects[second_id].name
 
                     # Update the deepest penetration among all pairs at this time step
-                    min_distance_overall = min(min_distance_overall, res.min_distance)
+                    min_distance_overall = 1000*min(min_distance_overall, res.min_distance)
 
         # Store the absolute value of the minimum (deepest) penetration for each body
         max_penetration_at_step = abs(min_distance_overall)
@@ -269,7 +269,7 @@ def check_trajectory_env_robot_collisions(robot_model, robot_geom_model, joint_p
                     min_distance_overall = min(min_distance_overall, res.min_distance)
 
         # Store the absolute value of the minimum (deepest) penetration for each body
-        max_penetration_at_step = abs(min_distance_overall)
+        max_penetration_at_step = 1000*abs(min_distance_overall)
 
         if B_PRINT_COLLISION and max_penetration_at_step > 0:
             print(
@@ -291,14 +291,14 @@ def check_trajectory_env_robot_collisions(robot_model, robot_geom_model, joint_p
 
 def plot_self_collision_distances():
     plt.figure()
-    plt.plot(kin_sca_time, scol_mfpp_penetration_depths, 'r--', label='no-SCA (max)')
-    plt.plot(kin_sca_time, scol_kin_sca_penetration_depths, 'b.-', label='kin-SCA (max)')
+    plt.plot(kin_sca_time, scol_mfpp_penetration_depths, 'r--', label='no-SCA')
+    plt.plot(kin_sca_time, scol_kin_sca_penetration_depths, 'b', label='kin-SCA')
     # plt.plot(time, scol_sum_penetrations, 'r', alpha=0.4, label='kin-SCA (sum)')
-    plt.plot(sca_time, scol_sca_penetration_depths, 'k*', label='full-SCA (max)')
+    plt.plot(sca_time, scol_sca_penetration_depths, 'ko--', label='full-SCA')
     # plt.plot(sca_time, scol_sca_sum_penetrations, 'c', alpha=0.4, label='full-SCA (sum)')
     plt.xlabel('Time (s)')
-    plt.ylabel('Depth (m)')
-    plt.title('Max Self-Collision Penetration Depth')
+    plt.ylabel('Penetration Depth (mm)')
+    plt.title('Max Self-Collision Penetration')
     plt.legend()
     plt.grid()
     plt.show()
@@ -307,11 +307,11 @@ def plot_self_collision_distances():
 def plot_results():
     plt.figure()
     plt.plot(sca_time, mfpp_penetration_depths, 'r--', label='no-SCA')
-    plt.plot(sca_time, kin_sca_penetration_depths, 'b,-', label='kin-SCA')
-    plt.plot(sca_time, sca_penetration_depths, 'k*', label='full-SCA')
+    plt.plot(sca_time, kin_sca_penetration_depths, 'b', label='kin-SCA')
+    plt.plot(sca_time, sca_penetration_depths, 'ko--', label='full-SCA')
     plt.xlabel('Time (s)')
-    plt.ylabel('Penetration Depth (m)')
-    plt.title('Env Penetration Depth Over Time')
+    plt.ylabel('Penetration Depth (mm)')
+    plt.title('Max Env Penetration')
     plt.legend()
     plt.grid()
     plt.show()
@@ -330,9 +330,9 @@ def load_hull_collisions(robot_model, robot_geom_model, ROBOT_SRDF):
 
 
 if __name__ == '__main__':
-    MFPP_TRAJECTORY_PKL = cwd + "/experiment_data/g1_guided_no_imp_no_sca_refine_step_over_door_knees_up.pkl"
-    KIN_SCA_TRAJECTORY_PKL = cwd + "/experiment_data/g1_guided_no_imp_kin_sca_no_sca_refine_step_over_door_knees_up.pkl"
-    SCA_TRAJECTORY_PKL = cwd + "/experiment_data/g1_guided_no_imp_kin_sca_sca_refine_over_door_knees_up.pkl"
+    MFPP_TRAJECTORY_PKL = cwd + "/experiment_data/g1_guided_no_imp_no_sca_refine_step_on_door_knees_fwd.pkl"
+    KIN_SCA_TRAJECTORY_PKL = cwd + "/experiment_data/g1_guided_no_imp_kin_sca_no_sca_refine_step_on_door_knees_fwd.pkl"
+    SCA_TRAJECTORY_PKL = cwd + "/experiment_data/g1_guided_no_imp_kin_sca_sca_refine_step_on_door_knees_fwd.pkl"
 
     # Load models
     robot_model, robot_col_model, robot_vis_model, robot_geom_model, env_geom_model = load_simulated_models(ROBOT_URDF, ENV_URDF)
@@ -384,5 +384,5 @@ if __name__ == '__main__':
 
     # Print maximum values in each case
     print('     |     MFPP     |     kin-SCA    |     full-SCA    ')
-    print(f'self: {max(scol_mfpp_penetration_depths)}  {max(scol_kin_sca_penetration_depths)}  {max(scol_sca_penetration_depths)}')
-    print(f'env: {max(mfpp_penetration_depths)}  {max(kin_sca_penetration_depths)}  {max(sca_penetration_depths)}')
+    print(f'self: {max(scol_mfpp_penetration_depths):.2f}  {max(scol_kin_sca_penetration_depths):.2f}  {max(scol_sca_penetration_depths):.2f}')
+    print(f'env: {max(mfpp_penetration_depths):.2f}  {max(kin_sca_penetration_depths):.2f}  {max(sca_penetration_depths):.2f}')
