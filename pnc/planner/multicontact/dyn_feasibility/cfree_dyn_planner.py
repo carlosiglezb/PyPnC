@@ -101,7 +101,7 @@ def get_g1_default_initial_pose(n_joints:int, env: str = 'door'):
         q0[6] = -np.pi/6
         q0[9] = np.pi/3
         q0[10] = -np.pi/6
-        floating_base = np.array([0., 0., 0.7, 0., 0., 0., 1.])
+        floating_base = np.array([-0.03, 0., 0.7, 0., 0., 0., 1.])
     else:
         raise ValueError(f"Unspecified default initial pose for g1 in environment: {env}")
     return np.concatenate((floating_base, q0))

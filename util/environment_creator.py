@@ -70,7 +70,7 @@ class TiltedStairs:
         tilted_left_box = TiltedBox(box_width, box_depth, box_h1_left, lbox_angle, b_lbox_origin)
         tilted_left_step = tilted_left_box.get_polytope()
         b_lbox_origin_vis = [0.35, box_width/2, (box_h1_left_vis + box_h2_left_vis)/2]
-        tilted_left_box_vis = TiltedBox(box_width, box_depth - clearance, box_h1_left_vis, lbox_angle, b_lbox_origin_vis)
+        tilted_left_box_vis = TiltedBox(box_width, box_depth, box_h1_left_vis, lbox_angle, b_lbox_origin_vis)
         tilted_left_step_vis = tilted_left_box_vis.get_polytope()
 
         # right box
@@ -83,7 +83,7 @@ class TiltedStairs:
         tilted_right_box = TiltedBox(box_width, box_depth, box_h1_right, rbox_angle, b_rbox_origin)
         tilted_right_step = tilted_right_box.get_polytope()
         b_rbox_origin_vis = [0.35 + box_depth, -box_width/2, (box_h1_right_vis + box_h2_right_vis)/2]
-        tilted_right_box_vis = TiltedBox(box_width, box_depth - clearance, box_h1_right_vis, rbox_angle, b_rbox_origin_vis)
+        tilted_right_box_vis = TiltedBox(box_width, box_depth, box_h1_right_vis, rbox_angle, b_rbox_origin_vis)
         tilted_right_step_vis = tilted_right_box_vis.get_polytope()
 
         # center box

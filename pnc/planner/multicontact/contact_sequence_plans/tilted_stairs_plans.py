@@ -220,8 +220,8 @@ def get_fully_opposing_limbs_contact_sequence(stairs: TiltedStairs,
         starting_lkn_pos = starting_pose['L_knee']
         starting_rkn_pos = starting_pose['R_knee']
 
-    final_lf_pos = np.array([0.25 + 2.5 * box_depth , 0.1, 1. + final_ankle_height])
-    final_rf_pos = np.array([0.25 + 2.5 * box_depth , -0.1, 1. + final_ankle_height])
+    final_lf_pos = np.array([0.32 + 2.5 * box_depth , 0.1, 1. + final_ankle_height])
+    final_rf_pos = np.array([0.32 + 2.5 * box_depth , -0.1, 1. + final_ankle_height])
     final_torso_pos = (final_lf_pos + final_rf_pos) / 2 + np.array([0., 0., starting_torso_pos[2]])
     final_rh_pos = final_torso_pos + np.array([0.3, -0.2, torso_hand_height])
     final_lh_pos = final_torso_pos + np.array([0.3, 0.2, torso_hand_height])
@@ -234,10 +234,10 @@ def get_fully_opposing_limbs_contact_sequence(stairs: TiltedStairs,
         final_rkn_pos = scaled_knee_pos
 
     # intermediate locations
-    lf_step1 = np.array([0.35, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height + 0.04])
+    lf_step1 = np.array([0.32, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height + 0.04])
     lh_wall_step_12 = np.array([0.15 + box_depth, box_width - 0.06, lh2_height])
     rh_wall_final_step = np.array([2 * box_depth + 0.05, -(box_width - 0.06), rh3_height])
-    rf_step2 = np.array([0.32+ box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height + 0.01])
+    rf_step2 = np.array([0.32 + box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height + 0.01])
 
     # initialize fixed and motion frame sets
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()

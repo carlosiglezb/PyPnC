@@ -906,12 +906,12 @@
         <color rgba="0.7 0.7 0.7 1"/>
       </material>
     </visual>
-<!--    <collision>-->
-<!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
-<!--      <geometry>-->
-<!--        <sphere radius="0.035"/>-->
-<!--      </geometry>-->
-<!--    </collision>-->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.035"/>
+      </geometry>
+    </collision>
   </link>
   <link name="right_shoulder_pitch_link">
     <inertial>
@@ -1136,11 +1136,11 @@
         <color rgba="0.7 0.7 0.7 1"/>
       </material>
     </visual>
-<!--    <collision>-->
-<!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
-<!--      <geometry>-->
-<!--        <sphere radius="0.035"/>-->
-<!--      </geometry>-->
-<!--    </collision>-->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.035"/>
+      </geometry>
+    </collision>
   </link>
 </robot>

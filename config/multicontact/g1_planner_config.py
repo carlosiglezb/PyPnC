@@ -98,8 +98,8 @@ class MultiContactDoorConfig(PlannerConfig):
 
 class MultiContactTiltedStairsConfig(PlannerConfig):
     B_FINAL_VEL_CONSTRAINT = True
-    W_RIGID_LINK = [0., 0., 1.]
-    ALPHA = [0.05, 0.0, 0.1]
+    W_RIGID_LINK = [0., 0., 10.]
+    ALPHA = [0.01, 0.0, 0.1]
     FOOT_SIZE = [0.15, 0.08]  # [length, width]
     # N_HORIZON_LST = [180, 250, 250, 250, 280, 250]
     N_HORIZON_LST = [300] * 6
