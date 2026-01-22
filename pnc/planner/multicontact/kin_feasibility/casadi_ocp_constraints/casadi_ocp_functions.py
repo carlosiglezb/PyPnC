@@ -411,6 +411,83 @@ class SinglePolytopeEllipsoidDistanceCallback(SinglePrimitivesDistanceCallback):
         return [alpha_val]
 
 
+class IndexedEllipsoidEllipsoidJacFun(IndexedPrimitiveGeometryJacFun):
+    def __init__(self, name, geometry_data, mfpp_bezier_data, z, opts={}):
+        Callback.__init__(self)
+        super().__init__(name, geometry_data, mfpp_bezier_data, z, opts)
+        self.U1 = geometry_data['U1']
+        self.U2 = geometry_data['U2']
+        self.construct(name, opts)
+
+    # Evaluate numerically
+    def eval(self, arg):
+        z = np.array(arg[0])
+
+        # reconstruct cone matrices with implicit parameters
+        grad_ellipse1 = np.vstack((np.zeros((1,3)), self.U1 @ self.Q.T))
+        grad_ellipse2 = np.vstack((np.zeros((1,3)), self.U2 @ self.Q.T))
+        ret1 = self.z[:-1].T @ (np.concatenate((grad_ellipse1, np.zeros((4, 3)))))
+        ret2 = self.z[:-1].T @ (np.concatenate((np.zeros((4, 3)), grad_ellipse2)))
+
+        # ---- distribute to corresponding indices in Jacobian
+        # aesthetics
+        pos1_idxs = self.pos1_idxs
+        pos2_idxs = self.pos2_idxs
+
+        jac_z = np.zeros((1, self.dim_optim_var))
+        jac_z[0, pos1_idxs] = ret1
+        jac_z[0, pos2_idxs] = ret2
+
+        return [jac_z]
+
+
+class IndexedEllipsoidEllipsoidConstraint(IndexedPrimitiveGeometryDistanceCallback):
+    def __init__(self, name, geom_data, mfpp_bezier_data, opts={}):
+        Callback.__init__(self)
+        super().__init__(name, geom_data, mfpp_bezier_data, opts)
+        self.U1 = geom_data['U1']         # LF ellipsoid
+        self.U2 = geom_data['U2']         # RF ellipsoid
+
+        self.z = np.zeros((2, 1))       # DCOL dual variable
+
+        # initialize object construction
+        self.jac_callback = IndexedEllipsoidEllipsoidJacFun(name, geom_data, mfpp_bezier_data, self.z)
+        self.construct(name, opts)
+
+    def eval(self, arg):
+        z = np.array(arg[0])
+
+        # aesthetics
+        Q = self.Q
+        U1 = self.U1
+        U2 = self.U2
+        num_iris_regions = self.num_iris_regions_per_frame
+        current_frames = self.current_frames
+        current_point = self.current_point
+        bezier_higher_derivatives = self.bezier_higher_derivatives
+
+        # get current point and solve min distance for each pair of points
+        curr_pnt_in_iris = current_point % self.n_points
+        curr_ir = current_point // self.n_points
+        pos1_curr_ir = (current_frames[0] * bezier_higher_derivatives * num_iris_regions +
+                        bezier_higher_derivatives * curr_ir +
+                        curr_pnt_in_iris)
+        pos2_curr_ir = (current_frames[1] * bezier_higher_derivatives * num_iris_regions +
+                        bezier_higher_derivatives * curr_ir +
+                        curr_pnt_in_iris)
+        pos1_idxs = np.arange(pos1_curr_ir, pos1_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
+        pos2_idxs = np.arange(pos2_curr_ir, pos2_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
+        r1_cp = z[pos1_idxs]
+        r2_cp = z[pos2_idxs]
+        x_val, alpha_val, dual_val = solve_ellipsoid_ellipsoid_min_prox(Q, U1, U2, r1_cp, r2_cp)
+
+        # update dual variables to use in Jacobian
+        self.jac_callback.update_dual_vars(dual_val)
+
+        return [alpha_val]
+
+
+
 class IndexedCapsuleEllipsoidJacFun(IndexedPrimitiveGeometryJacFun):
     def __init__(self, name, geometry_data, mfpp_bezier_data, z, opts={}):
         Callback.__init__(self)
@@ -717,6 +794,24 @@ def solve_capsule_ellipsoid_min_prox(R, L, Q, U, r1, r2, verbose=False):
     constraints.append(-alpha * L / 2 <= gamma)
     constraints.append(alpha * L / 2 >= gamma)
     constraints.append(cp.SOC(alpha, U @ Q.T @ (x - r2)))
+    constraints.append(alpha >= 0)
+    prob = cp.Problem(cp.Minimize(alpha), constraints)
+    prob.solve(solver='CLARABEL')
+
+    dual_v = list((prob.solution.dual_vars).values())
+    dual_v = np.concatenate(dual_v)
+    solver_time = prob.solver_stats.solve_time
+
+    return x.value, alpha.value, dual_v
+
+def solve_ellipsoid_ellipsoid_min_prox(Q, U1, U2, r1, r2, verbose=False):
+    # find distance via optimization (dcol-style)
+    alpha = cp.Variable(1)
+    x = cp.Variable((3, 1))
+
+    constraints = []
+    constraints.append(cp.SOC(alpha, U1 @ Q.T @ (x - r1)))
+    constraints.append(cp.SOC(alpha, U2 @ Q.T @ (x - r2)))
     constraints.append(alpha >= 0)
     prob = cp.Problem(cp.Minimize(alpha), constraints)
     prob.solve(solver='CLARABEL')

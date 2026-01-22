@@ -10,7 +10,8 @@ from scipy.special import binom
 from scipy.optimize import minimize
 
 from ..casadi_ocp_constraints.casadi_ocp_functions import \
-    IndexedPolytopeEllipsoidConstraint, IndexedPolytopePolytopeConstraint, IndexedCapsuleEllipsoidConstraint
+    IndexedPolytopeEllipsoidConstraint, IndexedPolytopePolytopeConstraint, IndexedCapsuleEllipsoidConstraint, \
+    IndexedEllipsoidEllipsoidConstraint
 from ..constraint_parsers import parse_mat_leq_constr, parse_repvec_eq_constr, \
     parse_vec_eq_constr, parse_mat_eq_constr
 from ..cvx_mfpp_tools import get_aux_frame_idx, \
@@ -672,7 +673,8 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 torso_idx = i
             elif robot_geom_data.is_link_in_sca_list(fr):
                 sca_col_link_idxs.append(i)
-        print(f'Checking for self-collision with: {[frame_list[i] for i in sca_col_link_idxs]}')
+        print(f'Checking for self-collision between torso and: {[frame_list[i] for i in sca_col_link_idxs]}')
+        sca_build_start_time = time.time()
         for col_idx in sca_col_link_idxs:
             # Simplified no self-collision function and constraints bounds for specified index pairs
             mfpp_bezier_data = {'current_frames': (torso_idx, col_idx),   # make torso and RK frames SCA
@@ -698,7 +700,6 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             else:
                 raise ValueError(f'Invalid primitive shape {ee_geom_type} type specified for SCA.')
 
-            sca_build_start_time = time.time()
             for i in sca_bez_points:
                 mfpp_bezier_data['current_point'] = i
                 i_name = 'f_dist_' + str(frame_list[col_idx]) + str(i)
@@ -716,11 +717,44 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 sca_constraints.append(f_dist[i_name](points_all))
                 lbg.append(1.0)
                 ubg.append(ca.inf)
-            sca_build_time = time.time() - sca_build_start_time
 
             # assume lagrange multipliers of SCA constraints are zero
             # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
             initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points),1))))
+        sca_build_time = time.time() - sca_build_start_time
+
+        # Repeat for feet-to-feet collision avoidance
+        # first_ee_idx = 1
+        # second_ee_idx = 2
+        # print(f'Adding self-collision between: {frame_list[first_ee_idx]} and {frame_list[second_ee_idx]}')
+        # # Simplified no self-collision function and constraints bounds for specified index pairs
+        # mfpp_bezier_data = {'current_frames': (first_ee_idx, second_ee_idx),  # feet always assumed to have collision body
+        #                     'n_points': n_points,
+        #                     'num_derivatives': D,
+        #                     'num_iris_per_frame': num_iris_tot,
+        #                     'num_frames': n_frames
+        #                     }
+        # sca_bez_points = range(0, num_iris_tot * n_points, 1)
+        #
+        # # populate col_pair_geom_data with respective primitive shape pair type information
+        # U1 = robot_geom_data.get_sphere_representation(frame_list[first_ee_idx])['U']
+        # U2 = robot_geom_data.get_sphere_representation(frame_list[second_ee_idx])['U']
+        # col_pair_geom_data = {'A1': None, 'b1': None, 'Q': Q, 'U1': U1, 'U2': U2}
+        #
+        # for i in sca_bez_points:
+        #     mfpp_bezier_data['current_point'] = i
+        #     i_name = 'f_dist_' + str(frame_list[first_ee_idx]) + '_' + str(frame_list[second_ee_idx]) + str(i)
+        #     current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
+        #     f_dist[i_name] = IndexedEllipsoidEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
+        #     sca_constraints.append(f_dist[i_name](points_all))
+        #     lbg.append(1.0)
+        #     ubg.append(ca.inf)
+        # sca_build_time = time.time() - sca_build_start_time
+        #
+        # # assume lagrange multipliers of SCA constraints are zero
+        # # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
+        # initial_guess['lam_g0'] = np.concatenate(
+        #     (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
 
     opts["ipopt"]["warm_start_init_point"] = "yes"
     opts["ipopt"]["warm_start_mult_bound_push"] = 1e-5

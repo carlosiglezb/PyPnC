@@ -244,7 +244,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 # construct TO models for this contact phase
                 model_seqs = []
                 DT = T / N_current
-                for t in np.arange(i * T, (i + 1) * T, DT):
+                # for t in np.arange(i * T, (i + 1) * T, DT):
+                for t in np.linspace(i * T, (i + 1) * T, N_current):
                     frame_targets_dict = self.get_targets_from_planner(i, t)
 
                     # get upcoming frames in contact (unless in last contact phase)
@@ -345,6 +346,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_single = fddp
             self.solver_type = 'single'
             super().update_costs_from_solver(solver_type='single', integration_type=integration_type)
+            self.solver_stats['contacts_phases_solve_times'] = dyn_seg_solve_time
 
         else:
             self.solver_type = None
@@ -430,6 +432,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.plan_sca(solver_type='SQP')
 
     def save_targets(self, frame_targets_dict):
+        if self.knot_idx >= len(self.base_targets):
+            return
         if 'torso' in frame_targets_dict:
             self.base_targets[self.knot_idx] = frame_targets_dict['torso']
         if 'LF' in frame_targets_dict:
@@ -492,7 +496,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             us += [us_static] * N_current
 
             DT = T / N_current
-            for t in np.arange(i * T, (i + 1) * T, DT):
+            # for t in np.arange(i * T, (i + 1) * T, DT):
+            for t in np.linspace(i * T, (i + 1) * T, N_current):
                 frame_targets_dict = self.get_targets_from_planner(i, t)
                 # get upcoming frames in contact (unless in last contact phase)
                 if i != (self.contact_phases - 1):
@@ -618,6 +623,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         self.solver_type = 'sca'
         super().update_costs_from_solver(solver_type='sca', integration_type=integration_type)
         super().update_constraint_residuals_from_solver()
+        self.solver_stats['contacts_phases_solve_times'] = dyn_seg_solve_time
 
     # def reset_default_gains(self, frame_name: str, updated_gains: np.array):
     #     self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains

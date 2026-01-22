@@ -48,13 +48,13 @@ from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterfa
 from plot.data_saver import *
 
 # Plots visuals
-B_SHOW_JOINT_PLOTS = True
-B_SHOW_JOINT_LIM_PLOTS = True
-B_SHOW_COST_PLOTS = True
-B_SHOW_GRF_PLOTS = True
+B_SHOW_JOINT_PLOTS = False
+B_SHOW_JOINT_LIM_PLOTS = False
+B_SHOW_COST_PLOTS = False
+B_SHOW_GRF_PLOTS = False
 
 # Meshcat visuals
-B_VISUALIZE_KIN = True
+B_VISUALIZE_KIN = False
 B_VISUALIZE_DYN = True
 
 # Planner options
@@ -65,13 +65,13 @@ B_SOLVE_HYBRID = False
 B_SCA_REFINEMENT = False
 B_VERBOSE = False
 B_USE_KNEES = True
-B_USE_SELF_COLLISION_AVOIDANCE = True
-B_USE_KNEES_IN_SMOOTH_PLAN = False   # set to False when crossing door in single step (i.e., mode 0)
+B_USE_SELF_COLLISION_AVOIDANCE = False
+B_USE_KNEES_IN_SMOOTH_PLAN = True   # set to False when crossing door in single step (i.e., mode 0)
 
 # Data recording (Data currently works only with either KIN or DYN but not both)
 B_SAVE_KIN_DATA = False
-B_SAVE_DYN_DATA = False
-B_SAVE_HTML = False
+B_SAVE_DYN_DATA = True
+B_SAVE_HTML = True
 
 
 env_urdf_path = cwd + "/robot_model/ground/navy_door_fixed.urdf"
@@ -235,7 +235,7 @@ def load_navy_env(robot_name, door_pos):
         dom_lbody_ub_r = np.array([1.6, 0.8, 1.2])
         knee_knocker_base = HPolyhedron.MakeBox(
             np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
-            np.array([0.06, 0.9, 0.4]) + door_pos + door_width)
+            np.array([0.06, 0.9, 0.42]) + door_pos + door_width)
     elif robot_name == 'valkyrie':
         dom_lbody_lb_l = np.array([-1.6, -0.05, -0.])
         dom_lbody_lb_r = np.array([-1.6, -0.8, -0.])
@@ -262,11 +262,11 @@ def load_navy_env(robot_name, door_pos):
         np.array([-2, -0.9, -0.05]) + door_pos + door_width,
         np.array([2, 0.9, -0.001]) + door_pos + door_width)
     knee_knocker_lwall = HPolyhedron.MakeBox(
-        np.array([-0.025, 0.9 - 0.518, 0.0]) + door_pos + door_width,
+        np.array([-0.025, 0.9 - 0.518 - 0.025, 0.0]) + door_pos + door_width,
         np.array([0.025, 0.9, 2.2]) + door_pos + door_width)
     knee_knocker_rwall = HPolyhedron.MakeBox(
         np.array([-0.025, -0.9, 0.0]) + door_pos + door_width,
-        np.array([0.025, -(0.9 - 0.518), 2.2]) + door_pos + door_width)
+        np.array([0.025, -(0.9 - 0.518 - 0.025), 2.2]) + door_pos + door_width)
     knee_knocker_top = HPolyhedron.MakeBox(
         np.array([-0.025, -0.9, 1.85]) + door_pos + door_width,
         np.array([0.025, 0.9, 2.25]) + door_pos + door_width)
@@ -461,8 +461,8 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     # door_r_outer_location = np.array([0.45, -0.35, 1.2])
     if robot_name == 'g1':
         # G1 settings
-        door_l_inner_location = np.array([0.34, 0.37, 0.9])
-        door_r_inner_location = np.array([0.34, -0.37, 0.9])
+        door_l_inner_location = np.array([0.34, 0.35, 1.1])
+        door_r_inner_location = np.array([0.34, -0.35, 1.1])
     else:
         # ergoCub settings
         door_l_inner_location = np.array([0.3, 0.35, 1.0])
@@ -819,7 +819,6 @@ def main(args):
         force_joint_frames['RH'] = "right_wrist_yaw_joint"
         package_dir = cwd + "/robot_model/g1_description"
         refined_collisions_urdf_file = package_dir + "/g1_29dof_simple_collisions.urdf"
-        # robot_urdf_file = package_dir + "/g1_29dof_simple_collisions.urdf"
         robot_urdf_file = package_dir + "/g1_29dof_lock_waist_modified.urdf"
     elif robot_name == 'valkyrie':
         plan_to_model_frames['torso'] = 'torso'
@@ -1095,7 +1094,7 @@ def main(args):
             # override kinematic planner with baseline planner
             frame_planner = BaselineFramePlanner(rob_data, plan_to_model_ids,
                                                  motion_frames_seq, fixed_frames_seq, T,
-                                                 "linear")
+                                                 "linear")  # constant
             ik_cfree_planner.set_planner(frame_planner)
 
     else:
@@ -1125,8 +1124,10 @@ def main(args):
     # Start Dynamic Feasibility Check
     #
     # pass more-refined collision model to dynamic planner and merge with environment
+    dyn_rob_model, dyn_col_model, dyn_vis_model, dyn_rob_data, dyn_col_data, dyn_vis_data \
+        = load_robot_model(package_dir, refined_collisions_urdf_file)
     if refined_collisions_urdf_file is not None:
-        refined_geom_model = pin.buildGeomFromUrdf(rob_model,
+        refined_geom_model = pin.buildGeomFromUrdf(dyn_rob_model,
                                            refined_collisions_urdf_file,
                                            pin.GeometryType.COLLISION)
         refined_geom_model.addAllCollisionPairs()
@@ -1150,17 +1151,17 @@ def main(args):
     N_horizon_lst = planner_params.N_HORIZON_LST
     contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
     if robot_name == 'g1':
-        robot_dyn_plan = G1MulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params, refined_geom_model)
+        robot_dyn_plan = G1MulticontactPlanner(dyn_rob_model, contact_sequence, ik_cfree_planner, planner_params, refined_geom_model)
         robot_dyn_plan.set_zero_configuration(q0)   # TODO: check if this is needed in all scenarios
         if env == 'door':
             if contact_seq == 1:    # step on knee knocker
                 # robot_dyn_plan.reset_default_gains('torso', np.array([2.5, 3.5, 1.5] + [0.5, 0.5, 0.001]))
                 robot_dyn_plan.set_zero_configuration(q0)
     elif robot_name == 'ergoCub':
-        robot_dyn_plan = ErgoCubMulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params)
+        robot_dyn_plan = ErgoCubMulticontactPlanner(dyn_rob_model, contact_sequence, ik_cfree_planner, planner_params)
         robot_dyn_plan.set_zero_configuration(q0)
     elif robot_name == 'valkyrie':
-        robot_dyn_plan = ValkyrieMulticontactPlanner(rob_model, contact_sequence, ik_cfree_planner, planner_params)
+        robot_dyn_plan = ValkyrieMulticontactPlanner(dyn_rob_model, contact_sequence, ik_cfree_planner, planner_params)
     else:
         raise NotImplementedError(f"Matching multicontact planner for {robot_name} not found")
 
@@ -1243,15 +1244,29 @@ def main(args):
         base_str = '_guided_'
     impact_str = '_imp' if B_SOLVE_HYBRID else '_no_imp'
     sca_refine_str = '_sca_refine_' if B_SCA_REFINEMENT else '_no_sca_refine_'
-    soln_str = robot_name + base_str + impact_str + sca_str + sca_refine_str + action_str + seq_str + env + '_all_cols'
+    # knee strategy
+    relaxation_hot_vector = np.where(np.array(planner_params.W_RIGID_LINK) != 0)[0]
+    if len(relaxation_hot_vector) == 1:
+        if relaxation_hot_vector[0] == 0:
+            knee_strategy_str = '_knees_fwd'
+        elif relaxation_hot_vector[0] == 2:
+            knee_strategy_str = '_knees_up'
+        else:
+            raise ValueError('Unassigned knee strategy string for solution filename')
+    else:
+        if relaxation_hot_vector[0] == 0 and relaxation_hot_vector[1] == 2:
+            knee_strategy_str = '_knees_diag'
+        else:
+            raise ValueError('Unassigned knee strategy string for solution filename')
+    soln_str = robot_name + base_str + impact_str + sca_str + sca_refine_str + action_str + seq_str + env + knee_strategy_str
 
     # Creating display
     if B_VISUALIZE_DYN:
         col_data = refined_geom_model.createData()
         save_freq = 10
         display_idx = np.arange(0, len(robot_dyn_plan.lf_targets), save_freq)
-        display = vis_tools.MeshcatPinocchioAnimation(rob_model, refined_geom_model, vis_model,
-                          rob_data, vis_data, col_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
+        display = vis_tools.MeshcatPinocchioAnimation(dyn_rob_model, refined_geom_model, dyn_vis_model,
+                          dyn_rob_data, dyn_vis_data, col_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
         if 'door' in env:
             display.add_robot("door", door_model, door_collision_model, door_visual_model)
         elif 'stairs' in env:
@@ -1329,20 +1344,20 @@ def main(args):
                 for contact in rf_t:
                     # determine contact link
                     cur_link = int(contact['key'])
-                    if rob_model.names[cur_link] == force_joint_frames['LF']:
+                    if dyn_rob_model.names[cur_link] == force_joint_frames['LF']:
                         rf_lfoot[:, time_idx] = contact['f'].linear
                         w_rf_lfoot[:, time_idx] = contact['w_f'].linear
-                    elif rob_model.names[cur_link] == force_joint_frames['RF']:
+                    elif dyn_rob_model.names[cur_link] == force_joint_frames['RF']:
                         rf_rfoot[:, time_idx] = contact['f'].linear
                         w_rf_rfoot[:, time_idx] = contact['w_f'].linear
-                    elif rob_model.names[cur_link] == force_joint_frames['LH']:
+                    elif dyn_rob_model.names[cur_link] == force_joint_frames['LH']:
                         rf_lwrist[:, time_idx] = contact['f'].linear
                         w_rf_lwrist[:, time_idx] = contact['w_f'].linear
-                    elif rob_model.names[cur_link] == force_joint_frames['RH']:
+                    elif dyn_rob_model.names[cur_link] == force_joint_frames['RH']:
                         rf_rwrist[:, time_idx] = contact['f'].linear
                         w_rf_rwrist[:, time_idx] = contact['w_f'].linear
                     else:
-                        print(f"ERROR: Non-specified contact {rob_model.names[cur_link]}")
+                        print(f"ERROR: Non-specified contact {dyn_rob_model.names[cur_link]}")
                 dt = it.problem.runningModels[0].dt     # assumes constant dt over fddp sequence
                 if time_idx < len(sim_time) - 1:
                     sim_time[time_idx+1] = sim_time[time_idx] + dt
@@ -1361,14 +1376,15 @@ def main(args):
         # Saving data tools
         dyn_data_saver = DataSaver(soln_str + '.pkl')
         # save kinematic TO solution
-        if hasattr(ik_cfree_planner, 'planner'):
-            dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
-            dyn_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
-            dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
-            dyn_data_saver.add('fixed_frames', fixed_frames_seq)
-        else:
-            dyn_data_saver.add('bez_path', ik_cfree_planner)
-            dyn_data_saver.add('fixed_frames', fixed_frames)
+        if not B_BASELINE:
+            if hasattr(ik_cfree_planner, 'planner'):
+                dyn_data_saver.add('bez_points', ik_cfree_planner.planner.points)
+                dyn_data_saver.add('n_iris_traversed_per_frame', len(ik_cfree_planner.planner.path[0].beziers))
+                dyn_data_saver.add('bez_path', ik_cfree_planner.planner.path)
+                dyn_data_saver.add('fixed_frames', fixed_frames_seq)
+            else:
+                dyn_data_saver.add('bez_path', ik_cfree_planner)
+                dyn_data_saver.add('fixed_frames', fixed_frames)
         dyn_data_saver.add('contact_seq_planes', contact_seq_planes)
         for (i, fp) in enumerate(fddp):
             com_lst = []
@@ -1388,21 +1404,21 @@ def main(args):
                 log = fp.getCallbacks()[0]
                 xs = log.xs
                 us = log.us
-            q = np.array(xs)[:, :rob_model.nq]
-            qd = np.array(xs)[:, rob_model.nq:]
+            q = np.array(xs)[:, :dyn_rob_model.nq]
+            qd = np.array(xs)[:, dyn_rob_model.nq:]
             dyn_data_saver.add('joint_pos', q.tolist())
             dyn_data_saver.add('joint_vel', qd.tolist())
             dyn_data_saver.add('joint_torque', [vec.tolist() for vec in us.tolist()])
             for (qi, qdi) in zip(q, qd):
-                com_lst.append(pin.centerOfMass(rob_model, rob_data, qi, qdi))
-                pin.forwardKinematics(rob_model, rob_data, qi, qdi)
-                torso_pos.append(pin.updateFramePlacement(rob_model, rob_data, plan_to_model_ids['torso']).translation.tolist())
-                lf_pos.append(pin.updateFramePlacement(rob_model, rob_data, plan_to_model_ids['LF']).translation.tolist())
-                rf_pos.append(pin.updateFramePlacement(rob_model, rob_data, plan_to_model_ids['RF']).translation.tolist())
-                lkn_pos.append(pin.updateFramePlacement(rob_model, rob_data, plan_to_model_ids['L_knee']).translation.tolist())
-                rkn_pos.append(pin.updateFramePlacement(rob_model, rob_data, plan_to_model_ids['R_knee']).translation.tolist())
-                lh_pos.append(pin.updateFramePlacement(rob_model, rob_data, plan_to_model_ids['LH']).translation.tolist())
-                rh_pos.append(pin.updateFramePlacement(rob_model, rob_data, plan_to_model_ids['RH']).translation.tolist())
+                com_lst.append(pin.centerOfMass(dyn_rob_model, rob_data, qi, qdi))
+                pin.forwardKinematics(dyn_rob_model, rob_data, qi, qdi)
+                torso_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['torso']).translation.tolist())
+                lf_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['LF']).translation.tolist())
+                rf_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['RF']).translation.tolist())
+                lkn_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['L_knee']).translation.tolist())
+                rkn_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['R_knee']).translation.tolist())
+                lh_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['LH']).translation.tolist())
+                rh_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['RH']).translation.tolist())
             dyn_data_saver.add('center_of_mass', com_lst)
             dyn_data_saver.add('torso_act', torso_pos)
             dyn_data_saver.add('lf_act', lf_pos)

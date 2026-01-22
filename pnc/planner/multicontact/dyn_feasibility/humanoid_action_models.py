@@ -327,7 +327,9 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                             or ('stairs' in cp_second_name and 'knee' in cp_first_name)     # stairs vs knees
                             or ('stairs' in cp_second_name and 'ankle' in cp_first_name)    # stairs vs ankles
                             or ('right_ankle' in cp_first_name and 'right_hip' in cp_second_name)     # ankle-hip
+                            or ('right_hip' in cp_first_name and 'right_ankle' in cp_second_name)     # ankle-hip
                             or ('left_ankle' in cp_first_name and 'left_hip' in cp_second_name)     # ankle-hip
+                            or ('left_hip' in cp_first_name and 'left_ankle' in cp_second_name)     # ankle-hip
                             or ('right_ankle' in cp_first_name and 'left_knee' in cp_second_name)     # leg cross
                             or ('left_knee' in cp_first_name and 'right_ankle' in cp_second_name)
                             or ('left_ankle' in cp_first_name and 'right_knee' in cp_second_name)
@@ -340,6 +342,8 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                             or ('right_hip' in cp_first_name and 'left_knee' in cp_second_name)  # opposing knee-hip
                             or ('right_knee' in cp_first_name and 'left_hip' in cp_second_name)  # opposing knee-hip
                             or ('left_hip' in cp_first_name and 'right_knee' in cp_second_name)  # opposing knee-hip
+                            or ('pelvis' in cp_first_name and 'hip' in cp_second_name)  # pelvis-hips
+                            or ('hip' in cp_first_name and 'pelvis' in cp_second_name)  # pelvis-hips
                     ):
                         sca_alpha = 0.005
                         dist_col = ResidualDistanceCollision(state, actuation.nu, geom_model, cp_idx)

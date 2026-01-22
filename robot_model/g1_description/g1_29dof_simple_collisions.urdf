@@ -1,4 +1,4 @@
-<robot name="g1_29dof_lock_waist">
+<robot name="g1_29dof_simple_collisions">
   <mujoco>
     <compiler meshdir="meshes" discardvisual="false"/>
   </mujoco>
@@ -41,6 +41,12 @@
         <color rgba="0.7 0.7 0.7 1"/>
       </material>
     </visual>
+    <collision>
+      <origin xyz="0 0 -0.08" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1 0.12 0.1"/>
+      </geometry>
+    </collision>
 <!--    <collision>-->
 <!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
 <!--      <geometry>-->
@@ -101,7 +107,7 @@
     <collision name="left_hip_roll_collision_cylinder">
       <origin xyz="0.02 0.0 -0.1" rpy="0 0 0"/>
       <geometry>
-        <cylinder radius="0.06" length="0.2"/>
+        <cylinder radius="0.05" length="0.2"/>
       </geometry>
     </collision>
     <collision_checking>
@@ -315,7 +321,7 @@
     <collision name="right_hip_roll_collision_capsule">
       <origin xyz="0.02 0.0 -0.1" rpy="0 0 0"/>
       <geometry>
-        <cylinder radius="0.06" length="0.2"/>
+        <cylinder radius="0.05" length="0.2"/>
       </geometry>
     </collision>
     <collision_checking>
@@ -559,7 +565,8 @@
   </link>
 <joint name="torso_primitive_shape_joint" type="fixed">
 <!-- <origin xyz="-0.0013625 0.000257 0.055" rpy="0 0 0"/>-->
- <origin xyz="0 0 0.14" rpy="0 0 0"/>
+ <origin xyz="0 0 0.21" rpy="0 0 0"/>   <!--  up to top of pelvis -->
+ <!-- <origin xyz="0 0 0.14" rpy="0 0 0"/>     down to end of pelvis -->
  <parent link="torso_link"/>
  <child link="torso_primitive_shape"/>
  </joint>
@@ -575,7 +582,8 @@
 <!--          <box size="0.20 0.31 0.50"/>-->
 <!--        <box size="0.14 0.20 0.5"/>-->
 <!--        <box size="0.20 0.31 0.67"/>-->
-        <cylinder radius="0.11" length="0.32"/>
+       <cylinder radius="0.11" length="0.33"/>  <!-- up to top of pelvis -->
+        <!-- <cylinder radius="0.11" length="0.44"/>  down to end of pelvis -->
       </geometry>
   </collision>
    <collision_checking>

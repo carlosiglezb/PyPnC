@@ -169,7 +169,10 @@ def plot_hold_vector_traj(time, vector, suptitle, ax_label=None, legends=None):
         plt.grid(True)
         plt.legend()
 
-    plt.xlabel('time')
+    plt.xlabel('time', fontsize=14)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+
     fig.suptitle(suptitle)
 
 def plot_multiple_state_traj(time, states_traj_lst, phase,
@@ -191,9 +194,10 @@ def plot_multiple_state_traj(time, states_traj_lst, phase,
         axes[i].plot(time, states_t, linewidth=3, label=ax_labels[i])
         plot_phase(axes[i], time, phase)
         axes[i].grid(True)
-        axes[i].set_xlabel('time')
+        axes[i].set_xlabel('time', fontsize=14)
+        axes[i].tick_params(axis='both', labelsize=14)
         if ylabels is not None:
-            axes[i].set_ylabel(ylabels[i])
+            axes[i].set_ylabel(ylabels[i], fontsize=14)
         axes[i].legend()
     fig.suptitle(suptitle)
 

@@ -26,8 +26,8 @@ class PlannerConfig(ABC):
     # WBP_BAUMGARTE_GAINS6D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
     WBC_COST_WEIGHTS = {
         'friction': 2e-3,    # step_over, on_balanced, step_on
-        'frame_goal': 1e2,  # step over
-        'xReg': 1e0,    # step over
+        'frame_goal': 2e1,  # step over
+        'xReg': 1e-1,    # step over
         'uReg': 2e-1,
         'xBounds': 1e3,   # step on, step over, on_balanced
     }

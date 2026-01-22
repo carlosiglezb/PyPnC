@@ -32,7 +32,7 @@ class MultiContactDoorConfig(PlannerConfig):
     # ALPHA = [1, 0., 0.1]         # option 9: knees fwd (RAL)
     # W_RIGID_LINK = [0., 0., 1.]   # option 10: knees-up (RAL)
     # ALPHA = [1, 0., 0.1]         # option 10: knees-up (RAL)
-    W_RIGID_LINK = [0.5, 0., 0.5]   # option 11: balanced (RAL)
+    W_RIGID_LINK = [0.2, 0., 0.8]   # option 11: balanced (RAL)
     ALPHA = [1, 0., 0.1]         # option 11: balanced (RAL)
     # N_HORIZON_LST = [180, 240, 280, 250, 250]
     # ----- seq 1 (step on): opposite hand-foot pair at each contact
@@ -60,10 +60,10 @@ class MultiContactDoorConfig(PlannerConfig):
     #     }
     # ----- seq 1 (step on)
     WBC_FRAME_TRACKING_GAINS = {
-            'torso': np.array([5, 5, 0.5] + [0.02, 0.2, 0.001]),
+            'torso': np.array([4, 4, 0.5] + [0.02, 0.02, 0.001]),
             'feet': np.array([6.] * 3 + [0.01] * 3),  # (lin, ang)
-            'L_knee': np.array([5.] * 3 + [0.00001] * 3),
-            'R_knee': np.array([5.] * 3 + [0.00001] * 3),
+            'L_knee': np.array([4.] * 3 + [0.00001] * 3),
+            'R_knee': np.array([4.] * 3 + [0.00001] * 3),
             'LH': np.array([4.] * 3 + [0.00001] * 3),
             'RH': np.array([4.] * 3 + [0.00001] * 3)
         }
@@ -86,7 +86,7 @@ class MultiContactDoorConfig(PlannerConfig):
         }
     WBC_WEIGHTED_COSTS = {
         #                 q_b_lin, q_b_ang, q_j, (v_b_lin, v_b_ang), v_j
-        'xReg': np.array([0] * 6 + [0.01] * (N_V - 6) + [1.0] * 3 + [0.5] * 3 + [1.0] * (N_V - 6)), # step on
+        'xReg': np.array([0] * 6 + [0.01] * (N_V - 6) + [1.0] * 3 + [0.1] * 3 + [2.0] * (N_V - 6)), # step on
         'uReg': np.array([1.0] * N_U),
     }
     WBC_PHASE_END_WEIGHTED_COSTS = {
