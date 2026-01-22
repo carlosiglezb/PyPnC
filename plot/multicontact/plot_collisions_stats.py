@@ -19,16 +19,18 @@ from util.pydrake_meshcat_interface import hpoly_to_fcl_collision, create_convex
 
 
 # --- Configuration ---
-# ROBOT_URDF = cwd + "/robot_model/g1_description/g1_29dof_simple_collisions.urdf"
-ROBOT_URDF = cwd + "/robot_model/g1_description/g1_29dof_lock_waist_chull.urdf"
-ROBOT_SRDF = cwd + "/robot_model/g1_description/g1_29dof_lock_waist.srdf"
+# ROBOT_MODEL = "g1_29dof_simple_collisions"
+ROBOT_MODEL = "g1_29dof_lock_waist_chull"
+ROBOT_URDF_PATH = cwd + "/robot_model/g1_description/"
+ROBOT_URDF = ROBOT_URDF_PATH + ROBOT_MODEL + ".urdf"
+ROBOT_SRDF = ROBOT_URDF_PATH + ROBOT_MODEL + ".srdf"
 ROBOT_PACKAGE_DIRS = [cwd + "/robot_model/g1_description"]
 ENV_URDF = cwd + "/robot_model/ground/navy_door_fixed.urdf"
 ENV_NAME = 'door'   # {door, stairs} selects either door URDF or Stairs Collision objects
 
 B_VISUALIZE_DOOR = False
 B_ANIMATE = False
-B_PRINT_COLLISION = False
+B_PRINT_COLLISION = True
 
 def load_simulated_models(robot_urdf_path, env_urdf_path):
     """
@@ -330,9 +332,9 @@ def load_hull_collisions(robot_model, robot_geom_model, ROBOT_SRDF):
 
 
 if __name__ == '__main__':
-    MFPP_TRAJECTORY_PKL = cwd + "/experiment_data/g1_guided_no_imp_no_sca_refine_step_on_door_knees_fwd.pkl"
-    KIN_SCA_TRAJECTORY_PKL = cwd + "/experiment_data/g1_guided_no_imp_kin_sca_no_sca_refine_step_on_door_knees_fwd.pkl"
-    SCA_TRAJECTORY_PKL = cwd + "/experiment_data/g1_guided_no_imp_kin_sca_sca_refine_step_on_door_knees_fwd.pkl"
+    MFPP_TRAJECTORY_PKL = cwd + "/experiment_data/pelvis_box/g1_guided__no_imp__no_sca_refine_step_on_balanced_door_knees_diag.pkl"
+    KIN_SCA_TRAJECTORY_PKL = cwd + "/experiment_data/pelvis_box/g1_guided__no_imp_kin_sca_no_sca_refine__step_on_balanced_door_knees_diag.pkl"
+    SCA_TRAJECTORY_PKL = cwd + "/experiment_data/pelvis_box/g1_guided__no_imp_kin_sca_sca_refine__step_on_balanced_door_knees_diag.pkl"
 
     # Load models
     robot_model, robot_col_model, robot_vis_model, robot_geom_model, env_geom_model = load_simulated_models(ROBOT_URDF, ENV_URDF)
@@ -384,5 +386,5 @@ if __name__ == '__main__':
 
     # Print maximum values in each case
     print('     |     MFPP     |     kin-SCA    |     full-SCA    ')
-    print(f'self: {max(scol_mfpp_penetration_depths):.2f}  {max(scol_kin_sca_penetration_depths):.2f}  {max(scol_sca_penetration_depths):.2f}')
-    print(f'env: {max(mfpp_penetration_depths):.2f}  {max(kin_sca_penetration_depths):.2f}  {max(sca_penetration_depths):.2f}')
+    print(f'self: {max(scol_mfpp_penetration_depths):.1f}  {max(scol_kin_sca_penetration_depths):.1f}  {max(scol_sca_penetration_depths):.1f}')
+    print(f'env: {max(mfpp_penetration_depths):.1f}  {max(kin_sca_penetration_depths):.1f}  {max(sca_penetration_depths):.1f}')
