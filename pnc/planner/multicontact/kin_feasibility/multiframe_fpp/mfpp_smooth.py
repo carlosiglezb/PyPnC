@@ -292,7 +292,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                 for pnt in range(1):
                     link_proximal_point = points[prox_fr_idx+nb][0][pnt]
                     link_distal_point = points[dist_fr_idx+nb][0][pnt]
-                    print(f"{aux_fr['parent_frame']} Link length discrepancy: {np.linalg.norm(link_proximal_point.value - link_distal_point.value) - link_length}")
+                    # print(f"{aux_fr['parent_frame']} Link length discrepancy: {np.linalg.norm(link_proximal_point.value - link_distal_point.value) - link_length}")
 
     # Reconstruct trajectory.
     beziers, path = [], []
@@ -807,7 +807,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                 for pnt in range(1):
                     link_proximal_point = sol_points[prox_fr_idx+nb][0][pnt]
                     link_distal_point = sol_points[dist_fr_idx+nb][0][pnt]
-                    print(f"{aux_fr['parent_frame']} Link length discrepancy: {np.linalg.norm(link_proximal_point - link_distal_point) - link_length}")
+                    # print(f"{aux_fr['parent_frame']} Link length discrepancy: {np.linalg.norm(link_proximal_point - link_distal_point) - link_length}")
 
     # Reconstruct trajectory.
     beziers, path = [], []

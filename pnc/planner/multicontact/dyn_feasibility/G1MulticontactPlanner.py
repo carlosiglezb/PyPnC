@@ -623,7 +623,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         self.solver_type = 'sca'
         super().update_costs_from_solver(solver_type='sca', integration_type=integration_type)
         super().update_constraint_residuals_from_solver()
-        self.solver_stats['contacts_phases_solve_times'] = dyn_seg_solve_time
+        self.solver_stats['sca_solve_time'] = dyn_seg_solve_time
 
     # def reset_default_gains(self, frame_name: str, updated_gains: np.array):
     #     self.planner_params.WBC_FRAME_TRACKING_GAINS[frame_name] = updated_gains

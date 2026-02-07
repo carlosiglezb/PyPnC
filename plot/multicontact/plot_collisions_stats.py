@@ -298,11 +298,12 @@ def plot_self_collision_distances():
     # plt.plot(time, scol_sum_penetrations, 'r', alpha=0.4, label='kin-SCA (sum)')
     plt.plot(sca_time, scol_sca_penetration_depths, 'ko--', label='full-SCA')
     # plt.plot(sca_time, scol_sca_sum_penetrations, 'c', alpha=0.4, label='full-SCA (sum)')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Penetration Depth (mm)')
-    plt.title('Max Self-Collision Penetration')
-    plt.legend()
+    plt.xlabel('Time (s)', fontsize=14)
+    plt.ylabel('Penetration Depth (mm)', fontsize=14)
+    plt.title('Max Self-Collision Penetration', fontsize=14)
+    plt.legend(fontsize=14)
     plt.grid()
+    plt.tick_params(axis='both', which='major', labelsize=14)
     plt.show()
 
 
@@ -311,11 +312,12 @@ def plot_results():
     plt.plot(sca_time, mfpp_penetration_depths, 'r--', label='no-SCA')
     plt.plot(sca_time, kin_sca_penetration_depths, 'b', label='kin-SCA')
     plt.plot(sca_time, sca_penetration_depths, 'ko--', label='full-SCA')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Penetration Depth (mm)')
-    plt.title('Max Env Penetration')
-    plt.legend()
+    plt.xlabel('Time (s)', fontsize=14)
+    plt.ylabel('Penetration Depth (mm)', fontsize=14)
+    plt.title('Max Env Penetration', fontsize=14)
+    plt.legend(fontsize=14)
     plt.grid()
+    plt.tick_params(axis='both', which='major', labelsize=14)
     plt.show()
 
 
