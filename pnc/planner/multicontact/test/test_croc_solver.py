@@ -20,7 +20,7 @@ import config.multicontact.g1_planner_config as g1_params
 import config.multicontact.g1_baseline_planner_config as g1_baseline_params
 
 B_VISUALIZE = True
-B_SHOW_GRF_PLOTS = False
+B_SHOW_GRF_PLOTS = True
 B_SHOW_COST_PLOTS = True
 
 
@@ -217,7 +217,8 @@ class TestG1Planner(unittest.TestCase):
 
 
     def test_lean_on_left_wall_high_knees(self):
-        planner_params = self.baseline_planner_params
+        # planner_params = self.baseline_planner_params
+        planner_params = self.planner_params
         rob_model = self.rob_model
         force_joint_frames = self.force_joint_frames
         contact_seq_planes = [{'RF': np.array([0, 0, 1]),

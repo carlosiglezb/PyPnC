@@ -723,7 +723,8 @@ class TestFrameTraverseIris(unittest.TestCase):
 
         # include simplified rigid bodies for self-collision avoidance
         robot_model_path = cwd + "/robot_model/g1_description/"
-        urdf_path = robot_model_path + "g1_cube_sphere_collisions.urdf"
+        # urdf_path = robot_model_path + "g1_cube_sphere_collisions.urdf"
+        urdf_path = robot_model_path + "g1_29dof_lock_waist_modified.urdf"
         plan_to_model_frames = {
             'torso': 'torso_link',
             'LF': 'left_ankle_roll_link',
@@ -734,8 +735,8 @@ class TestFrameTraverseIris(unittest.TestCase):
             'RH': 'right_palm_link'
         }
         sca_geom = SCARobotGeometry(robot_model_path, urdf_path, plan_to_model_frames)
-        A1 = sca_geom.get_box_representation('torso')['A']
-        b1 = sca_geom.get_box_representation('torso')['b']
+        # A1 = sca_geom.get_box_representation('torso')['A']
+        # b1 = sca_geom.get_box_representation('torso')['b']
         U = sca_geom.get_sphere_representation('RF')['U']
 
         # Create points from Bezier curve
@@ -746,7 +747,7 @@ class TestFrameTraverseIris(unittest.TestCase):
                     bezier_curve = [p.beziers[seg]]
                     if i == 0:
                         fr_name = 'torso'
-                        LocomanipulationFramePlanner.visualize_bezier_polytope(self.vis, fr_name, bezier_curve, seg, A1, b1)
+                        # LocomanipulationFramePlanner.visualize_bezier_polytope(self.vis, fr_name, bezier_curve, seg, A1, b1)
                     elif i == 1:
                         fr_name = 'RF'
                         radius = 1 / U[0,0]
@@ -790,7 +791,7 @@ class TestFrameTraverseIris(unittest.TestCase):
                     bezier_curve = [p.beziers[seg]]
                     if i == 0:
                         fr_name = 'torso'
-                        LocomanipulationFramePlanner.visualize_bezier_polytope(self.vis, fr_name, bezier_curve, seg, A1, b1)
+                        # LocomanipulationFramePlanner.visualize_bezier_polytope(self.vis, fr_name, bezier_curve, seg, A1, b1)
                     elif i == 1:
                         fr_name = 'RF'
                         radius = 1 / U[0,0]

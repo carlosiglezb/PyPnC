@@ -551,11 +551,15 @@ class TestIKCFreePlanner(unittest.TestCase):
         self.assertEqual(True, True)
 
     def test_five_stage_plan_one_hand_at_a_time(self, sca_geometry=None):
+        import config.multicontact.g1_planner_config as g1_params
+
         b_save_plan = True
         frame_names = self.frame_names
         plan_to_model_frames = self.plan_to_model_frames
 
-        ik_cfree_planner = IKCFreePlanner(self.robot.model, self.robot.data, plan_to_model_frames, self.q0)
+        planner_params = g1_params.MultiContactDoorConfig()
+        ik_cfree_planner = IKCFreePlanner(self.robot.model, self.robot.data,
+                                          plan_to_model_frames, self.q0, planner_params)
         ee_halfspace_params = OrderedDict()
         for fr in frame_names:
             ee_halfspace_params[fr] = cwd + '/pnc/reachability_map/output/g1/g1_' + fr + '.yaml'
@@ -648,7 +652,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         weights_rigid_link = np.array([5., 0., 0.])
         ik_cfree_planner.set_planner(frame_planner)
         ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
-        ik_cfree_planner.plan(p_init, T, alpha, weights_rigid_link, visualizer)
+        ik_cfree_planner.plan(p_init, T, planner_params, visualizer)
 
         if b_save_plan:
             # save the solution parameters needed to reconstruct the Bezier curves
