@@ -28,12 +28,10 @@ class MultiContactDoorConfig(PlannerConfig):
     # ALPHA = [0.5, 0.0, 0.1]         # option 7: roll shins outwards
     # W_RIGID_LINK = [5, 0., 2]       # option 8: knees forward
     # ALPHA = [0.01, 0.1, 0.5]         # option 8: knee forward
-    # W_RIGID_LINK = [1., 0., 0.]   # option 9: knees fwd (RAL)
-    # ALPHA = [1, 0., 0.1]         # option 9: knees fwd (RAL)
+    W_RIGID_LINK = [1., 0., 0.]   # option 9: knees fwd (RAL)
     # W_RIGID_LINK = [0., 0., 1.]   # option 10: knees-up (RAL)
-    # ALPHA = [1, 0., 0.1]         # option 10: knees-up (RAL)
-    W_RIGID_LINK = [0.2, 0., 0.8]   # option 11: balanced (RAL)
-    ALPHA = [1, 0., 0.1]         # option 11: balanced (RAL)
+    # W_RIGID_LINK = [0.2, 0., 0.8]   # option 11: balanced (RAL)
+    ALPHA = [1, 0., 0.1]         # options 9-11 (RAL)
     # N_HORIZON_LST = [180, 240, 280, 250, 250]
     # ----- seq 1 (step on): opposite hand-foot pair at each contact
     # W_RIGID_LINK = [1.0, 0., 8.]  # option 1: high knees
@@ -98,8 +96,8 @@ class MultiContactDoorConfig(PlannerConfig):
 
 class MultiContactTiltedStairsConfig(PlannerConfig):
     B_FINAL_VEL_CONSTRAINT = True
-    W_RIGID_LINK = [0., 0., 10.]
-    ALPHA = [1, 0.0, 0.1]
+    W_RIGID_LINK = [0., 0., 1.]
+    ALPHA = [1, 0.0, 0.01]
     FOOT_SIZE = [0.15, 0.08]  # [length, width]
     # N_HORIZON_LST = [180, 250, 250, 250, 280, 250]
     N_HORIZON_LST = [300] * 6

@@ -958,7 +958,8 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/left_rubber_hand.STL"/>
+<!--        <mesh filename="meshes/left_rubber_hand.STL"/>-->
+        <sphere radius="0.035"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1212,7 +1213,8 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/right_rubber_hand.STL"/>
+<!--        <mesh filename="meshes/right_rubber_hand.STL"/>-->
+        <sphere radius="0.035"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>

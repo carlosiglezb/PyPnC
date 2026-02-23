@@ -29,8 +29,8 @@ ENV_URDF = cwd + "/robot_model/ground/navy_door_fixed.urdf"
 ENV_NAME = 'door'   # {door, stairs} selects either door URDF or Stairs Collision objects
 
 B_VISUALIZE_DOOR = False
-B_ANIMATE = False
-B_PRINT_COLLISION = True
+B_ANIMATE = True
+B_PRINT_COLLISION = False
 
 def load_simulated_models(robot_urdf_path, env_urdf_path):
     """
@@ -293,10 +293,10 @@ def check_trajectory_env_robot_collisions(robot_model, robot_geom_model, joint_p
 
 def plot_self_collision_distances():
     plt.figure()
-    plt.plot(kin_sca_time, scol_mfpp_penetration_depths, 'r--', label='no-SCA')
-    plt.plot(kin_sca_time, scol_kin_sca_penetration_depths, 'b', label='kin-SCA')
+    plt.plot(kin_sca_time, scol_mfpp_penetration_depths, 'r--', label=r'Stage 1 $\rightarrow$ Stage 3(dyn)')
+    plt.plot(kin_sca_time, scol_kin_sca_penetration_depths, 'b', label=r'Stage 2 $\rightarrow$ Stage 3(dyn)')
     # plt.plot(time, scol_sum_penetrations, 'r', alpha=0.4, label='kin-SCA (sum)')
-    plt.plot(sca_time, scol_sca_penetration_depths, 'ko--', label='full-SCA')
+    plt.plot(sca_time, scol_sca_penetration_depths, 'ko--', label='Full pipeline')
     # plt.plot(sca_time, scol_sca_sum_penetrations, 'c', alpha=0.4, label='full-SCA (sum)')
     plt.xlabel('Time (s)', fontsize=14)
     plt.ylabel('Penetration Depth (mm)', fontsize=14)
@@ -334,9 +334,10 @@ def load_hull_collisions(robot_model, robot_geom_model, ROBOT_SRDF):
 
 
 if __name__ == '__main__':
-    MFPP_TRAJECTORY_PKL = cwd + "/experiment_data/pelvis_box/g1_guided__no_imp__no_sca_refine_step_on_balanced_door_knees_diag.pkl"
-    KIN_SCA_TRAJECTORY_PKL = cwd + "/experiment_data/pelvis_box/g1_guided__no_imp_kin_sca_no_sca_refine__step_on_balanced_door_knees_diag.pkl"
-    SCA_TRAJECTORY_PKL = cwd + "/experiment_data/pelvis_box/g1_guided__no_imp_kin_sca_sca_refine__step_on_balanced_door_knees_diag.pkl"
+    MFPP_TRAJECTORY_PKL = cwd + "/experiment_data/RAL/DoorShort/g1_guided__no_imp__no_sca_refine_step_over_door_knees_fwd.pkl"
+    KIN_SCA_TRAJECTORY_PKL = cwd + "/experiment_data/RAL/DoorShort/g1_guided__no_imp_kin_sca_no_sca_refine__step_over_door_knees_fwd.pkl"
+    SCA_TRAJECTORY_PKL = cwd + "/experiment_data/RAL/DoorShort/g1_guided__no_imp_sca__sca_refine_step_over_door_knees_fwd.pkl"
+    # SCA_TRAJECTORY_PKL = cwd + "/experiment_data/pelvis_box/g1_guided__no_imp_kin_sca_sca_refine__step_on_balanced_door_knees_diag.pkl"
 
     # Load models
     robot_model, robot_col_model, robot_vis_model, robot_geom_model, env_geom_model = load_simulated_models(ROBOT_URDF, ENV_URDF)

@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 import os, sys
 
+from util.environment_creator import TiltedStairs
 from util.util import so3_from_vec_to_vec
 from util.polytope_math import get_closest_distance_to_polytope_surface
 
@@ -310,16 +311,19 @@ class TestStabilipy(unittest.TestCase):
         package_dir = cwd + "/robot_model/g1_description"
 
         # get list of configurations throughout multiple contacts
-        env_opts = ['_door', '_stairs']
-        env_opt = env_opts[1]
+        env_opts = ['_door', '_stairs_']
+        test_env = 1
+        test_sequence = 1
+        env_opt = env_opts[test_env]
         if 'door' in env_opt:
             N_HORIZON_LST = [180, 280, 280, 250, 250]
             contact_seq_str_opts = ['over', 'on', 'on_balanced']
         else:   # stairs
             N_HORIZON_LST = [300] * 6
             contact_seq_str_opts = ['right_side', 'fully_opposing']
-        cs_opt = contact_seq_str_opts[1]  # depends on environment
-        cfree_soln_file = cwd + '/experiment_data/g1_guided_no_imp_kin_sca_no_sca_refine' + env_opt + cs_opt +  '.pkl'
+        cs_opt = contact_seq_str_opts[test_sequence]  # depends on environment
+        # cfree_soln_file = cwd + '/experiment_data/g1_guided_kin_sca_sca_refine' + env_opt + cs_opt +  '.pkl'
+        cfree_soln_file = cwd + '/experiment_data/g1_guided__no_imp_sca__sca_refine___stairs_no_smooth_knees' + '.pkl'
         q_all = get_all_poses_from_file(cfree_soln_file)
         if len(q_all) == 1:
             # in case using full TO with impulse model, separate by contact phase
@@ -345,6 +349,11 @@ class TestStabilipy(unittest.TestCase):
         display = vis_tools.MeshcatPinocchioAnimation(model, collision_model, visual_model,
                           data, vis_data, col_data, ctrl_freq=np.average(N_horizon_lst)/T, save_freq=save_freq)
 
+        # Load Environment into Meshcat
+        if 'stairs' in env_opt:
+            stairs = TiltedStairs()
+            display.add_shapes_from(stairs.obstacles_vis)
+
         dist_in_lst, dist_out_lst, time_lst = [], [], []
 
         # robot-specific default parameters
@@ -360,7 +369,7 @@ class TestStabilipy(unittest.TestCase):
         c_obj = Sphere(0.01)
         com_obj = Sphere(0.02)
 
-        if env_opt == '_door':
+        if 'door' in env_opt:
             if cs_opt == 'over':
                 contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
                                     ['right_ankle_roll_link', 'left_rubber_hand'],
@@ -381,15 +390,15 @@ class TestStabilipy(unittest.TestCase):
                                     ['left_ankle_roll_link', 'right_ankle_roll_link']]
             else:
                 raise ValueError(f"Contact sequence option {cs_opt} for {env_opt} env not recognized")
-        elif env_opt == '_stairs':
-            if 'right_side' in cs_opt:
+        elif 'stairs' in env_opt:
+            if test_sequence == 0:
                 contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
                                     ['right_ankle_roll_link', 'right_rubber_hand'],
                                     ['right_rubber_hand', 'left_ankle_roll_link'],
                                     ['right_ankle_roll_link', 'left_rubber_hand'],
                                     ['left_ankle_roll_link', 'right_rubber_hand'],
                                     ['left_ankle_roll_link', 'right_ankle_roll_link']]
-            elif 'opposing_sides' in cs_opt:
+            elif test_sequence == 1:
                 contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
                                     ['right_ankle_roll_link', 'left_rubber_hand'],
                                     ['right_rubber_hand', 'left_ankle_roll_link'],
@@ -474,7 +483,7 @@ class TestStabilipy(unittest.TestCase):
 
             polytope = [margin * s for s in shape]
             polyhedron.gravity_envelope = polytope
-            polyhedron.compute(stab.Mode.best, epsilon=1e-2, maxIter=20, solver='qhull',
+            polyhedron.compute(stab.Mode.best, epsilon=1e-2, maxIter=30, solver='qhull',
                                record_anim=False, plot_init=False,
                                plot_step=False, plot_final=b_plot_final)
 

@@ -23,10 +23,14 @@ class SCARobotGeometry:
                 # This will currently only save the settings of the last collision item
                 if lnk in gm.name:
                     halfspace_params = {}
+                    R = gm.placement.rotation
+                    origin = gm.placement.translation.reshape(-1, 1)
                     if gm.meshPath == 'BOX':
                         box_half_side = gm.geometry.halfSide.reshape(-1, 1)
                         halfspace_params['A'] = np.vstack((np.eye(3), -np.eye(3)))
                         halfspace_params['b'] = np.vstack((box_half_side, box_half_side))
+                        halfspace_params['polytope_origin'] = origin
+                        halfspace_params['polytope_rotation'] = R
                     elif gm.meshPath == 'SPHERE':
                         sphere_radius = gm.geometry.radius
                         halfspace_params['U'] = 1./sphere_radius * np.eye(3)
@@ -55,6 +59,11 @@ class SCARobotGeometry:
             return 'capsule'
         return 'unknown'
 
-
     def is_link_in_sca_list(self, link_name) -> bool:
         return self._plan_to_model_frames[link_name] in self._geometry_primitives.keys()
+
+    def get_shape_origin(self, link_name: str) -> np.array:
+        return self._geometry_primitives[self._plan_to_model_frames.get(link_name)].get('polytope_origin', None)
+
+    def get_shape_rotation(self, link_name: str) -> np.array:
+        return self._geometry_primitives[self._plan_to_model_frames.get(link_name)].get('polytope_rotation', None)

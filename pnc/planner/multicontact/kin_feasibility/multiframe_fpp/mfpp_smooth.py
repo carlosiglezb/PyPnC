@@ -448,6 +448,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                   alpha: dict[int: float],
                                   safe_points_lst: List[dict[str, np.array]],
                                   robot_geom_data: SCARobotGeometry=None,
+                                  env_geometry=None,
                                   fixed_frames=None,
                                   b_final_vel_constr=False,
                                   contact_sequence=None,
@@ -721,40 +722,75 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             # assume lagrange multipliers of SCA constraints are zero
             # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
             initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points),1))))
+
+        # sca_build_time = time.time() - sca_build_start_time
+        # Repeat for feet-to-feet collision avoidance
+        first_ee_idx = 1
+        second_ee_idx = 2
+        print(f'Adding self-collision between: {frame_list[first_ee_idx]} and {frame_list[second_ee_idx]}')
+        # Simplified no self-collision function and constraints bounds for specified index pairs
+        mfpp_bezier_data = {'current_frames': (first_ee_idx, second_ee_idx),  # feet always assumed to have collision body
+                            'n_points': n_points,
+                            'num_derivatives': D,
+                            'num_iris_per_frame': num_iris_tot,
+                            'num_frames': n_frames
+                            }
+        sca_bez_points = range(0, num_iris_tot * n_points, 1)
+
+        # populate col_pair_geom_data with respective primitive shape pair type information
+        U1 = robot_geom_data.get_sphere_representation(frame_list[first_ee_idx])['U']
+        U2 = robot_geom_data.get_sphere_representation(frame_list[second_ee_idx])['U']
+        col_pair_geom_data = {'A1': None, 'b1': None, 'Q': Q, 'U1': U1, 'U2': U2}
+
+        for i in sca_bez_points:
+            mfpp_bezier_data['current_point'] = i
+            i_name = 'f_dist_' + str(frame_list[first_ee_idx]) + '_' + str(frame_list[second_ee_idx]) + str(i)
+            current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
+            f_dist[i_name] = IndexedEllipsoidEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
+            sca_constraints.append(f_dist[i_name](points_all))
+            lbg.append(1.0)
+            ubg.append(ca.inf)
         sca_build_time = time.time() - sca_build_start_time
 
-        # Repeat for feet-to-feet collision avoidance
-        # first_ee_idx = 1
-        # second_ee_idx = 2
-        # print(f'Adding self-collision between: {frame_list[first_ee_idx]} and {frame_list[second_ee_idx]}')
-        # # Simplified no self-collision function and constraints bounds for specified index pairs
-        # mfpp_bezier_data = {'current_frames': (first_ee_idx, second_ee_idx),  # feet always assumed to have collision body
-        #                     'n_points': n_points,
-        #                     'num_derivatives': D,
-        #                     'num_iris_per_frame': num_iris_tot,
-        #                     'num_frames': n_frames
-        #                     }
-        # sca_bez_points = range(0, num_iris_tot * n_points, 1)
+        # assume lagrange multipliers of SCA constraints are zero
+        # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
+        initial_guess['lam_g0'] = np.concatenate(
+            (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
+
+        # Repeat for environment
+        # for ee_idx in [3, 4]:
+        #     print(f'Adding Collision Avoidance between: {frame_list[ee_idx]} and Knee Knocker base')
+        #     # Simplified no self-collision function and constraints bounds for specified index pairs
+        #     mfpp_bezier_data = {'current_frames': (ee_idx, None),  # feet always assumed to have collision body
+        #                         'n_points': n_points,
+        #                         'num_derivatives': D,
+        #                         'num_iris_per_frame': num_iris_tot,
+        #                         'num_frames': n_frames
+        #                         }
+        #     sca_bez_points = range(0, num_iris_tot * n_points, 1)
         #
-        # # populate col_pair_geom_data with respective primitive shape pair type information
-        # U1 = robot_geom_data.get_sphere_representation(frame_list[first_ee_idx])['U']
-        # U2 = robot_geom_data.get_sphere_representation(frame_list[second_ee_idx])['U']
-        # col_pair_geom_data = {'A1': None, 'b1': None, 'Q': Q, 'U1': U1, 'U2': U2}
+        #     # populate col_pair_geom_data with respective primitive shape pair type information
+        #     U = robot_geom_data.get_sphere_representation(frame_list[ee_idx])['U']
+        #     A1 = env_geometry.get_box_representation('bottom')['A']
+        #     b1 = env_geometry.get_box_representation('bottom')['b']
+        #     origin = env_geometry.get_shape_origin('bottom')
+        #     rotation = env_geometry.get_shape_rotation('bottom')
+        #     col_pair_geom_data = {'A1': A1, 'b1': b1, 'Q': Q, 'U': U, 'polytope_origin': origin, 'polytope_rotation': rotation}
         #
-        # for i in sca_bez_points:
-        #     mfpp_bezier_data['current_point'] = i
-        #     i_name = 'f_dist_' + str(frame_list[first_ee_idx]) + '_' + str(frame_list[second_ee_idx]) + str(i)
-        #     current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-        #     f_dist[i_name] = IndexedEllipsoidEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
-        #     sca_constraints.append(f_dist[i_name](points_all))
-        #     lbg.append(1.0)
-        #     ubg.append(ca.inf)
-        # sca_build_time = time.time() - sca_build_start_time
+        #     for i in sca_bez_points:
+        #         mfpp_bezier_data['current_point'] = i
+        #         i_name = 'f_dist_' + str(frame_list[ee_idx]) + '_door_frame_0' + str(i)
+        #         current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
+        #         f_dist[i_name] = IndexedPolytopeEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
+        #         sca_constraints.append(f_dist[i_name](points_all))
+        #         lbg.append(1.0)
+        #         ubg.append(ca.inf)
+        #     sca_build_time = time.time() - sca_build_start_time
         #
-        # # assume lagrange multipliers of SCA constraints are zero
-        # # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
-        # initial_guess['lam_g0'] = np.concatenate(
-        #     (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
+        #     # assume lagrange multipliers of SCA constraints are zero
+        #     # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
+        #     initial_guess['lam_g0'] = np.concatenate(
+        #         (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
 
     opts["ipopt"]["warm_start_init_point"] = "yes"
     opts["ipopt"]["warm_start_mult_bound_push"] = 1e-5

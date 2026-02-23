@@ -78,6 +78,7 @@ class LocomanipulationFramePlanner:
             self.aux_frames = aux_frames_path
 
         self.sca_robot_geom = sca_robot_geom
+        self.env_geometry = None
         self.solver_stats = {}
 
     def add_offset_to_plane_eqn_from_file(self, frame_name,
@@ -127,11 +128,15 @@ class LocomanipulationFramePlanner:
                                                                                     A, fixed_frames,
                                                                                     motion_frames_seq,
                                                                                     sca_robot_geom,
+                                                                                    self.env_geometry,
                                                                                     w_rigid,
                                                                                     w_rigid_poly,
                                                                                     b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan,
                                                                                     b_final_vel_constr=b_final_vel_constraint
                                                                                     )
+
+    def set_env_geometry(self, env_geometry):
+        self.env_geometry = env_geometry
 
     def plot(self, visualizer, static_html=False):
         i = 0

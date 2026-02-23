@@ -49,24 +49,24 @@ from plot.data_saver import *
 
 # Plots visuals
 B_SHOW_JOINT_PLOTS = False
-B_SHOW_JOINT_LIM_PLOTS = False
-B_SHOW_COST_PLOTS = False
+B_SHOW_JOINT_LIM_PLOTS = True
+B_SHOW_COST_PLOTS = True
 B_SHOW_GRF_PLOTS = False
 
 # Meshcat visuals
 B_VISUALIZE_KIN = False
-B_VISUALIZE_DYN = True
+B_VISUALIZE_DYN = False
 
 # Planner options
 B_BASELINE = False
 SOLVE_BY_SECTIONS = 'single'    # {'seq', 'single', 'None'}
 SOLVER_TYPE = 'SQP'            # {'SQP', 'FDDP'}
 B_SOLVE_HYBRID = False
-B_SCA_REFINEMENT = False
+B_SCA_REFINEMENT = True
 B_VERBOSE = False
 B_USE_KNEES = True
-B_USE_SELF_COLLISION_AVOIDANCE = False
-B_USE_KNEES_IN_SMOOTH_PLAN = True   # set to False when crossing door in single step (i.e., mode 0)
+B_USE_SELF_COLLISION_AVOIDANCE = True
+B_USE_KNEES_IN_SMOOTH_PLAN = False   # set to False when crossing door in single step (i.e., mode 0)
 
 # Data recording (Data currently works only with either KIN or DYN but not both)
 B_SAVE_KIN_DATA = False
@@ -268,7 +268,7 @@ def load_navy_env(robot_name, door_pos):
         np.array([-0.025, -0.9, 0.0]) + door_pos + door_width,
         np.array([0.025, -(0.9 - 0.518 - 0.025), 2.2]) + door_pos + door_width)
     knee_knocker_top = HPolyhedron.MakeBox(
-        np.array([-0.025, -0.9, 1.85]) + door_pos + door_width,
+        np.array([-0.025, -0.9, 1.40]) + door_pos + door_width,
         np.array([0.025, 0.9, 2.25]) + door_pos + door_width)
     # knee_knocker_llip = HPolyhedron.MakeBox(
     #     np.array([-0.035, 0.9 - 0.518, 0.25]) + door_pos + door_width,
@@ -343,34 +343,39 @@ def compute_iris_regions_mgr(obstacles,
     final_rf_pos = starting_rf_pos + np.array([goal_step_length, 0., 0.])
     starting_rh_pos = robot_data.oMf[plan_to_model_ids['RH']].translation
     final_rh_pos = starting_rh_pos + np.array([goal_step_length, 0., 0.])
-    starting_lkn_pos = robot_data.oMf[plan_to_model_ids['L_knee']].translation
-    final_lkn_pos = starting_lkn_pos + np.array([goal_step_length, 0., 0.])
-    starting_rkn_pos = robot_data.oMf[plan_to_model_ids['R_knee']].translation
-    final_rkn_pos = starting_rkn_pos + np.array([goal_step_length, 0., 0.])
+    if B_USE_KNEES:
+        starting_lkn_pos = robot_data.oMf[plan_to_model_ids['L_knee']].translation
+        final_lkn_pos = starting_lkn_pos + np.array([goal_step_length, 0., 0.])
+        starting_rkn_pos = robot_data.oMf[plan_to_model_ids['R_knee']].translation
+        final_rkn_pos = starting_rkn_pos + np.array([goal_step_length, 0., 0.])
 
     safe_torso_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_torso_pos)
     safe_torso_end_region = IrisGeomInterface(obstacles, domain_ubody, final_torso_pos)
     safe_lf_start_region = IrisGeomInterface(obstacles, domain_lbody_l, starting_lf_pos + iris_lf_shift)
     safe_lf_end_region = IrisGeomInterface(obstacles, domain_lbody_l, final_lf_pos + iris_ft_goal_shift)
-    safe_lk_start_region = IrisGeomInterface(obstacles, domain_lbody_l, starting_lkn_pos + iris_kn_shift)
-    safe_lk_end_region = IrisGeomInterface(obstacles, domain_lbody_l, final_lkn_pos + iris_kn_end_shift)
     safe_lh_start_region = IrisGeomInterface(obstacles, domain_ubody, lhand_door_inner)
     # safe_lh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_lh_pos + np.array([0.1, 0., 0.]))
     safe_lh_end_region = IrisGeomInterface(obstacles, domain_ubody, final_lh_pos)
     safe_rf_start_region = IrisGeomInterface(obstacles, domain_lbody_r, starting_rf_pos + iris_rf_shift)
     safe_rf_end_region = IrisGeomInterface(obstacles, domain_lbody_r, final_rf_pos + iris_ft_goal_shift)
-    safe_rk_start_region = IrisGeomInterface(obstacles, domain_lbody_r, starting_rkn_pos + iris_kn_shift)
-    safe_rk_end_region = IrisGeomInterface(obstacles, domain_lbody_r, final_rkn_pos + iris_kn_end_shift)
     safe_rh_start_region = IrisGeomInterface(obstacles, domain_ubody, rhand_door_inner)
     # safe_rh_start_region = IrisGeomInterface(obstacles, domain_ubody, starting_rh_pos + np.array([0.1, 0., 0.]))
     safe_rh_end_region = IrisGeomInterface(obstacles, domain_ubody, final_rh_pos)
+    if B_USE_KNEES:
+        safe_lk_start_region = IrisGeomInterface(obstacles, domain_lbody_l, starting_lkn_pos + iris_kn_shift)
+        safe_lk_end_region = IrisGeomInterface(obstacles, domain_lbody_l, final_lkn_pos + iris_kn_end_shift)
+        safe_rk_start_region = IrisGeomInterface(obstacles, domain_lbody_r, starting_rkn_pos + iris_kn_shift)
+        safe_rk_end_region = IrisGeomInterface(obstacles, domain_lbody_r, final_rkn_pos + iris_kn_end_shift)
     safe_regions_mgr_dict = {'torso': IrisRegionsManager(safe_torso_start_region, safe_torso_end_region),
                              'LF': IrisRegionsManager(safe_lf_start_region, safe_lf_end_region),
-                             'L_knee': IrisRegionsManager(safe_lk_start_region, safe_lk_end_region),
+                             # 'L_knee': IrisRegionsManager(safe_lk_start_region, safe_lk_end_region),
                              'LH': IrisRegionsManager(safe_lh_start_region, safe_lh_end_region),
                              'RF': IrisRegionsManager(safe_rf_start_region, safe_rf_end_region),
-                             'R_knee': IrisRegionsManager(safe_rk_start_region, safe_rk_end_region),
+                             # 'R_knee': IrisRegionsManager(safe_rk_start_region, safe_rk_end_region),
                              'RH': IrisRegionsManager(safe_rh_start_region, safe_rh_end_region)}
+    if B_USE_KNEES:
+        safe_regions_mgr_dict['L_knee'] = IrisRegionsManager(safe_lk_start_region, safe_lk_end_region)
+        safe_regions_mgr_dict['R_knee'] = IrisRegionsManager(safe_rk_start_region, safe_rk_end_region)
 
     # compute and connect IRIS from start to goal
     start_iris_compute_time = time.time()
@@ -384,8 +389,9 @@ def compute_iris_regions_mgr(obstacles,
     p_init['torso'] = starting_torso_pos
     p_init['LF'] = starting_lf_pos
     p_init['RF'] = starting_rf_pos
-    p_init['L_knee'] = starting_lkn_pos
-    p_init['R_knee'] = starting_rkn_pos
+    if B_USE_KNEES:
+        p_init['L_knee'] = starting_lkn_pos
+        p_init['R_knee'] = starting_rkn_pos
     p_init['LH'] = starting_lh_pos
     p_init['RH'] = starting_rh_pos
 
@@ -472,18 +478,22 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     starting_rh_pos = safe_regions_mgr_dict['RH'].iris_list[0].seed_pos
     starting_torso_pos = safe_regions_mgr_dict['torso'].iris_list[0].seed_pos
     final_lf_pos = safe_regions_mgr_dict['LF'].iris_list[1].seed_pos
-    final_lkn_pos = safe_regions_mgr_dict['L_knee'].iris_list[1].seed_pos
     final_rf_pos = safe_regions_mgr_dict['RF'].iris_list[1].seed_pos
     final_torso_pos = safe_regions_mgr_dict['torso'].iris_list[1].seed_pos
-    final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
     final_rh_pos = safe_regions_mgr_dict['RH'].iris_list[1].seed_pos
     final_lh_pos = safe_regions_mgr_dict['LH'].iris_list[1].seed_pos
+    if B_USE_KNEES:
+        final_lkn_pos = safe_regions_mgr_dict['L_knee'].iris_list[1].seed_pos
+        final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
 
     # initialize fixed and motion frame sets
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
     # ---- Step 1: L+R hand to frame
-    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    if B_USE_KNEES:
+        fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    else:
+        fixed_frames.append(['LF', 'RF'])   # frames that must not move
     if robot_name == 'g1':
         motion_frames_seq.add_motion_frame({
                                             'LH': door_l_inner_location,
@@ -502,11 +512,16 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     motion_frames_seq.add_contact_surfaces([lh_contact_front, rh_contact_front])
 
     # ---- Step 2: step through door with left foot
-    fixed_frames.append(['RF', 'R_knee', 'LH', 'RH'])   # frames that must not move
-    motion_frames_seq.add_motion_frame({
-                        'LF': final_lf_pos,
-                        'L_knee': final_lf_pos + np.array([0.15, 0., 0.28])})
-                        # 'L_knee': final_lkn_pos + np.array([-0.05, 0., 0.07])})
+    if B_USE_KNEES:
+        fixed_frames.append(['RF', 'R_knee', 'LH', 'RH'])   # frames that must not move
+        motion_frames_seq.add_motion_frame({
+                            'LF': final_lf_pos,
+                            'L_knee': final_lf_pos + np.array([0.15, 0., 0.28])})
+                            # 'L_knee': final_lkn_pos + np.array([-0.05, 0., 0.07])})
+    else:
+        fixed_frames.append(['RF', 'LH', 'RH'])   # frames that must not move
+        motion_frames_seq.add_motion_frame({
+                            'LF': final_lf_pos})
     lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surfaces([lf_contact_over])
 
@@ -524,20 +539,30 @@ def get_five_stage_one_hand_contact_sequence(robot_name, safe_regions_mgr_dict):
     # G1 settings
     # fixed_frames.append(['LF', 'L_knee', 'RH', 'LH'])   # frames that must not move
     # other settings
-    fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
-    motion_frames_seq.add_motion_frame({
-                        'RF': final_rf_pos,
-                        'torso': final_torso_pos + np.array([0.0, 0., 0.04]),     # good testing
-                        'R_knee': final_rf_pos + np.array([0.15, 0., 0.28]),
-                        # 'R_knee': final_rkn_pos + np.array([-0.05, 0., 0.07]),
-                        # 'LH': starting_lh_pos + np.array([0.35, 0.0, 0.0])
-    })
+    if B_USE_KNEES:
+        fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
+        motion_frames_seq.add_motion_frame({
+                            'RF': final_rf_pos,
+                            'torso': final_torso_pos + np.array([0.0, 0., 0.04]),     # good testing
+                            'R_knee': final_rf_pos + np.array([0.15, 0., 0.28]),
+                            # 'R_knee': final_rkn_pos + np.array([-0.05, 0., 0.07]),
+                            # 'LH': starting_lh_pos + np.array([0.35, 0.0, 0.0])
+        })
+    else:
+        fixed_frames.append(['LF', 'LH', 'RH'])   # frames that must not move
+        motion_frames_seq.add_motion_frame({
+                            'RF': final_rf_pos,
+                            'torso': final_torso_pos + np.array([0.0, 0., 0.04]),     # good testing
+        })
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surfaces([rf_contact_over])
 
     # ---- Step 5: square up
     # fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
-    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee'])
+    if B_USE_KNEES:
+        fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee'])
+    else:
+        fixed_frames.append(['torso', 'LF', 'RF'])
     motion_frames_seq.add_motion_frame({
         # 'torso': final_torso_pos,
         'RH': final_rh_pos, # + np.array([-0.20, 0., 0.]),
@@ -568,10 +593,11 @@ def get_five_stage_on_knocker_contact_sequence(robot_name: str,
     starting_rh_pos = safe_regions_mgr_dict['RH'].iris_list[0].seed_pos
     starting_torso_pos = safe_regions_mgr_dict['torso'].iris_list[0].seed_pos
     final_lf_pos = safe_regions_mgr_dict['LF'].iris_list[1].seed_pos
-    final_lkn_pos = safe_regions_mgr_dict['L_knee'].iris_list[1].seed_pos
+    if B_USE_KNEES:
+        final_lkn_pos = safe_regions_mgr_dict['L_knee'].iris_list[1].seed_pos
+        final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
     final_rf_pos = safe_regions_mgr_dict['RF'].iris_list[1].seed_pos
     final_torso_pos = safe_regions_mgr_dict['torso'].iris_list[1].seed_pos #+ np.array([0.04, 0., 0.0])
-    final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
     final_rh_pos = safe_regions_mgr_dict['RH'].iris_list[1].seed_pos
     final_lh_pos = safe_regions_mgr_dict['LH'].iris_list[1].seed_pos
     if robot_name == 'g1':
@@ -585,7 +611,10 @@ def get_five_stage_on_knocker_contact_sequence(robot_name: str,
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
     # ---- Step 1: L hand to frame
-    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    if B_USE_KNEES:
+        fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    else:
+        fixed_frames.append(['LF', 'RF'])   # frames that must not move
     if robot_name == 'g1':
         motion_frames_seq.add_motion_frame({
                                             'LH': door_l_inner_location,
@@ -601,15 +630,24 @@ def get_five_stage_on_knocker_contact_sequence(robot_name: str,
 
     # ---- Step 2: step on knee-knocker with left foot
     if robot_name == 'g1':
-        fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
+        if B_USE_KNEES:
+            fixed_frames.append(['RF', 'R_knee', 'LH'])   # frames that must not move
+        else:
+            fixed_frames.append(['RF', 'LH'])   # frames that must not move
     elif robot_name == 'ergoCub':
         fixed_frames.append(['RF', 'R_knee', 'LH'])
-    motion_frames_seq.add_motion_frame({
-                        # 'RH': intermediate_rh_pos,      # added for ergoCub
-                        'LF': intermediate_lf_pos,
-                        'L_knee': intermediate_lf_pos + ft_kn_offset,
-                        'RH': door_r_inner_location,
-    })
+    if B_USE_KNEES:
+        motion_frames_seq.add_motion_frame({
+                            # 'RH': intermediate_rh_pos,      # added for ergoCub
+                            'LF': intermediate_lf_pos,
+                            'L_knee': intermediate_lf_pos + ft_kn_offset,
+                            'RH': door_r_inner_location,
+        })
+    else:
+        motion_frames_seq.add_motion_frame({
+                            'LF': intermediate_lf_pos,
+                            'RH': door_r_inner_location,
+        })
     lf_contact_on = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
     rh_contact_wall = PlannerSurfaceContact('RH', np.array([0, 1, 0]))
     motion_frames_seq.add_contact_surfaces([lf_contact_on, rh_contact_wall])
@@ -622,32 +660,51 @@ def get_five_stage_on_knocker_contact_sequence(robot_name: str,
 
     # ---- Step 3: step through door with right foot
     if robot_name == 'g1':
-        fixed_frames.append(['LF', 'L_knee', 'RH'])   # frames that must not move
+        if B_USE_KNEES:
+            fixed_frames.append(['LF', 'L_knee', 'RH'])   # frames that must not move
+        else:
+            fixed_frames.append(['LF', 'RH'])   # frames that must not move
     elif robot_name == 'ergoCub':
         fixed_frames.append(['LF', 'L_knee', 'RH'])  # frames that must not move
-    motion_frames_seq.add_motion_frame({
-                        'R_knee': final_rf_pos + ft_kn_offset,
-                        'RF': final_rf_pos,
-                        'LH': door_l_inner_location})
+    if B_USE_KNEES:
+        motion_frames_seq.add_motion_frame({
+                            'R_knee': final_rf_pos + ft_kn_offset,
+                            'RF': final_rf_pos,
+                            'LH': door_l_inner_location})
+    else:
+        motion_frames_seq.add_motion_frame({
+                            'RF': final_rf_pos,
+                            'LH': door_l_inner_location})
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     lh_contact_inner = PlannerSurfaceContact('LH', np.array([0, -1, 0]))
     motion_frames_seq.add_contact_surfaces([rf_contact_over, lh_contact_inner])
 
     # ---- Step 5: balance / square up
     # fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH', 'RH'])
-    fixed_frames.append(['RF', 'R_knee', 'LH'])
-    motion_frames_seq.add_motion_frame({
-        'torso': final_torso_pos,
-        'LF': final_lf_pos,
-        'L_knee': final_lf_pos + ft_kn_offset,
-        'RH': final_rh_pos,
-        # 'LH': final_lh_pos
-    })
+    if B_USE_KNEES:
+        fixed_frames.append(['RF', 'R_knee', 'LH'])
+        motion_frames_seq.add_motion_frame({
+            'torso': final_torso_pos,
+            'LF': final_lf_pos,
+            'L_knee': final_lf_pos + ft_kn_offset,
+            'RH': final_rh_pos,
+            # 'LH': final_lh_pos
+        })
+    else:
+        fixed_frames.append(['RF', 'LH'])
+        motion_frames_seq.add_motion_frame({
+            'torso': final_torso_pos,
+            'LF': final_lf_pos,
+            'RH': final_rh_pos,
+        })
     lf_square_up = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surfaces([lf_square_up])
 
     # ---- Step 6: balance
-    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'RH'])
+    if B_USE_KNEES:
+        fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'RH'])
+    else:
+        fixed_frames.append(['torso', 'LF', 'RF', 'RH'])
     motion_frames_seq.add_motion_frame({'LH': final_lh_pos})
 
     return fixed_frames, motion_frames_seq
@@ -670,10 +727,11 @@ def get_on_knocker_balanced_contact_sequence(robot_name: str,
     starting_rh_pos = safe_regions_mgr_dict['RH'].iris_list[0].seed_pos
     starting_torso_pos = safe_regions_mgr_dict['torso'].iris_list[0].seed_pos
     final_lf_pos = safe_regions_mgr_dict['LF'].iris_list[1].seed_pos
-    final_lkn_pos = safe_regions_mgr_dict['L_knee'].iris_list[1].seed_pos
+    if B_USE_KNEES:
+        final_lkn_pos = safe_regions_mgr_dict['L_knee'].iris_list[1].seed_pos
+        final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
     final_rf_pos = safe_regions_mgr_dict['RF'].iris_list[1].seed_pos
     final_torso_pos = safe_regions_mgr_dict['torso'].iris_list[1].seed_pos
-    final_rkn_pos = safe_regions_mgr_dict['R_knee'].iris_list[1].seed_pos
     final_rh_pos = safe_regions_mgr_dict['RH'].iris_list[1].seed_pos
     final_lh_pos = safe_regions_mgr_dict['LH'].iris_list[1].seed_pos
     if robot_name == 'g1':
@@ -686,7 +744,10 @@ def get_on_knocker_balanced_contact_sequence(robot_name: str,
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
     # ---- Step 1: L hand to frame
-    fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    if B_USE_KNEES:
+        fixed_frames.append(['LF', 'RF', 'L_knee', 'R_knee'])   # frames that must not move
+    else:
+        fixed_frames.append(['LF', 'RF'])   # frames that must not move
     if robot_name == 'g1':
         motion_frames_seq.add_motion_frame({
                                             'LH': door_l_inner_location,
@@ -705,24 +766,39 @@ def get_on_knocker_balanced_contact_sequence(robot_name: str,
 
     # ---- Step 2: step on knee-knocker with right foot
     if robot_name == 'g1':
-        fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
+        if B_USE_KNEES:
+            fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
+        else:
+            fixed_frames.append(['LF', 'LH', 'RH'])   # frames that must not move
     elif robot_name == 'ergoCub':
         fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # added RH back
-    motion_frames_seq.add_motion_frame({
-                        # 'RH': intermediate_rh_pos,      # added for ergoCub
-                        'RF': intermediate_rf_pos,
-                        'R_knee': intermediate_rf_pos + ft_kn_offset})
+    if B_USE_KNEES:
+        motion_frames_seq.add_motion_frame({
+                            # 'RH': intermediate_rh_pos,      # added for ergoCub
+                            'RF': intermediate_rf_pos,
+                            'R_knee': intermediate_rf_pos + ft_kn_offset})
+    else:
+        motion_frames_seq.add_motion_frame({
+                            'RF': intermediate_rf_pos,
+                            })
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surfaces([rf_contact_over])
 
     # ---- Step 3: step through door with left foot
     if robot_name == 'g1':
-        fixed_frames.append(['RF', 'R_knee', 'LH', 'RH'])   # frames that must not move
+        if B_USE_KNEES:
+            fixed_frames.append(['RF', 'R_knee', 'LH', 'RH'])   # frames that must not move
+        else:
+            fixed_frames.append(['RF', 'LH', 'RH'])   # frames that must not move
     elif robot_name == 'ergoCub':
         fixed_frames.append(['RF', 'R_knee', 'LH', 'RH'])  # # added RH back
-    motion_frames_seq.add_motion_frame({
-                        'L_knee': final_lf_pos + ft_kn_offset,
-                        'LF': final_lf_pos})
+    if B_USE_KNEES:
+        motion_frames_seq.add_motion_frame({
+                            'L_knee': final_lf_pos + ft_kn_offset,
+                            'LF': final_lf_pos})
+    else:
+        motion_frames_seq.add_motion_frame({
+                            'LF': final_lf_pos})
     lf_contact_over = PlannerSurfaceContact('LF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surfaces([lf_contact_over])
 
@@ -744,19 +820,30 @@ def get_on_knocker_balanced_contact_sequence(robot_name: str,
     # motion_frames_seq.add_contact_surfaces([rf_square_up])
 
     # ---- Step 6: balance + return to zero configuration
-    fixed_frames.append(['LF', 'L_knee', 'RH'])
-    motion_frames_seq.add_motion_frame({
-        'torso': final_torso_pos,
-        'RF': final_rf_pos,
-        'R_knee': final_rf_pos + ft_kn_offset,
-        # 'RH': final_rh_pos,
-        'LH': final_lh_pos
-    })
+    if B_USE_KNEES:
+        fixed_frames.append(['LF', 'L_knee', 'RH'])
+        motion_frames_seq.add_motion_frame({
+            'torso': final_torso_pos,
+            'RF': final_rf_pos,
+            'R_knee': final_rf_pos + ft_kn_offset,
+            # 'RH': final_rh_pos,
+            'LH': final_lh_pos
+        })
+    else:
+        fixed_frames.append(['LF', 'RH'])
+        motion_frames_seq.add_motion_frame({
+            'torso': final_torso_pos,
+            'RF': final_rf_pos,
+            'LH': final_lh_pos
+        })
     rf_square_up = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surfaces([rf_square_up])
 
     # ---- Step 7: balance + return to zero configuration
-    fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH'])
+    if B_USE_KNEES:
+        fixed_frames.append(['torso', 'LF', 'RF', 'L_knee', 'R_knee', 'LH'])
+    else:
+        fixed_frames.append(['torso', 'LF', 'RF', 'LH'])
     motion_frames_seq.add_motion_frame({'RH': final_rh_pos})
 
     return fixed_frames, motion_frames_seq
@@ -807,8 +894,9 @@ def main(args):
         plan_to_model_frames['torso'] = 'torso_primitive_shape'
         plan_to_model_frames['LF'] = 'left_ankle_roll_link'
         plan_to_model_frames['RF'] = 'right_ankle_roll_link'
-        plan_to_model_frames['L_knee'] = 'left_knee_link'
-        plan_to_model_frames['R_knee'] = 'right_knee_link'
+        if B_USE_KNEES:
+            plan_to_model_frames['L_knee'] = 'left_knee_link'
+            plan_to_model_frames['R_knee'] = 'right_knee_link'
         plan_to_model_frames['LH'] = 'left_rubber_hand'
         plan_to_model_frames['RH'] = 'right_rubber_hand'
         # plan_to_model_frames['LH'] = 'left_hand_palm_joint'
@@ -854,8 +942,11 @@ def main(args):
     #
     # Load robot model, reachable regions, and environment
     #
-    aux_frames_path = (cwd + '/pnc/reachability_map/output/' + robot_name + '/' +
-                       robot_name + '_aux_frames.yaml')
+    if B_USE_KNEES:
+        aux_frames_path = (cwd + '/pnc/reachability_map/output/' + robot_name + '/' +
+                           robot_name + '_aux_frames.yaml')
+    else:
+        aux_frames_path = None
     ee_halfspace_params = OrderedDict()
     reach_path = cwd + '/pnc/reachability_map/output/' + robot_name + '/' + robot_name
     for fr in plan_to_model_frames.keys():
@@ -879,8 +970,9 @@ def main(args):
     plan_to_model_ids = {}
     plan_to_model_ids['RF'] = rob_model.getFrameId(plan_to_model_frames['RF'])
     plan_to_model_ids['LF'] = rob_model.getFrameId(plan_to_model_frames['LF'])
-    plan_to_model_ids['R_knee'] = rob_model.getFrameId(plan_to_model_frames['R_knee'])
-    plan_to_model_ids['L_knee'] = rob_model.getFrameId(plan_to_model_frames['L_knee'])
+    if B_USE_KNEES:
+        plan_to_model_ids['R_knee'] = rob_model.getFrameId(plan_to_model_frames['R_knee'])
+        plan_to_model_ids['L_knee'] = rob_model.getFrameId(plan_to_model_frames['L_knee'])
     plan_to_model_ids['LH'] = rob_model.getFrameId(plan_to_model_frames['LH'])
     plan_to_model_ids['RH'] = rob_model.getFrameId(plan_to_model_frames['RH'])
     plan_to_model_ids['torso'] = rob_model.getFrameId(plan_to_model_frames['torso'])
@@ -940,6 +1032,12 @@ def main(args):
         x0 = np.concatenate([q0, v0])
     else:
         raise NotImplementedError('Specified environment cannot be loaded')
+
+    # if env == 'door':
+    # load knee knocker visualization and collision models
+    # TODO see if we can simply replace with navy_door_fixed
+    door_model, _, door_visual_model = load_navy_door_models()
+    door_collision_model = pin.buildGeomFromUrdf(door_model, env_urdf_path, pin.GeometryType.COLLISION)
 
     if kin_plan_path is None:
 
@@ -1049,13 +1147,20 @@ def main(args):
             if B_USE_SELF_COLLISION_AVOIDANCE:
                 sca_str = '_sca_'
                 sca_geometry = SCARobotGeometry(package_dir, robot_urdf_file, plan_to_model_frames)
-            traversable_regions = [traversable_regions_dict['torso'],
-                                   traversable_regions_dict['LF'],
-                                   traversable_regions_dict['RF'],
-                                   traversable_regions_dict['L_knee'],
-                                   traversable_regions_dict['R_knee'],
-                                   traversable_regions_dict['LH'],
-                                   traversable_regions_dict['RH']]
+            if B_USE_KNEES:
+                traversable_regions = [traversable_regions_dict['torso'],
+                                       traversable_regions_dict['LF'],
+                                       traversable_regions_dict['RF'],
+                                       traversable_regions_dict['L_knee'],
+                                       traversable_regions_dict['R_knee'],
+                                       traversable_regions_dict['LH'],
+                                       traversable_regions_dict['RH']]
+            else:
+                traversable_regions = [traversable_regions_dict['torso'],
+                                       traversable_regions_dict['LF'],
+                                       traversable_regions_dict['RF'],
+                                       traversable_regions_dict['LH'],
+                                       traversable_regions_dict['RH']]
             frame_planner = LocomanipulationFramePlanner(traversable_regions,
                                                          aux_frames_path=aux_frames_path,
                                                          fixed_frames=fixed_frames_seq,
@@ -1066,7 +1171,16 @@ def main(args):
             # compute paths and create targets
             ik_cfree_planner.set_planner(frame_planner)
             ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
+            if env == 'door':
+                door_to_geom_names = {}
+                door_to_geom_names['bottom'] = 'door_frame_0'
+                door_to_geom_names['left'] = 'door_frame_1'
+                door_to_geom_names['right'] = 'door_frame_2'
+                env_package_dir = cwd + "/robot_model/ground"
+                env_geom = SCARobotGeometry(env_package_dir, env_urdf_path, door_to_geom_names)
+                ik_cfree_planner.set_env_geometry(env_geom)
             ik_cfree_planner.plan(p_init, T, planner_params, visualizer, B_VERBOSE)
+            kin_solver_stats = ik_cfree_planner.solver_stats
 
             if B_SAVE_KIN_DATA:
                 # save the solution parameters needed to reconstruct the Bezier curves
@@ -1114,11 +1228,6 @@ def main(args):
         # contact_seqs[-1].remove('RH')
         T = ik_cfree_planner[0].beziers[0].b
 
-    # if env == 'door':
-    # load knee knocker visualization and collision models
-    # TODO see if we can simply replace with navy_door_fixed
-    door_model, _, door_visual_model = load_navy_door_models()
-    door_collision_model = pin.buildGeomFromUrdf(door_model, env_urdf_path, pin.GeometryType.COLLISION)
 
     #
     # Start Dynamic Feasibility Check
@@ -1188,14 +1297,16 @@ def main(args):
                 kin_display.animate_single_collision(plan_to_model_frames['torso'] + '_0', frame_targets_dict['torso'])
                 kin_display.animate_single_collision(plan_to_model_frames['LH'] + '_0', frame_targets_dict['LH'])
                 kin_display.animate_single_collision(plan_to_model_frames['RH'] + '_0', frame_targets_dict['RH'])
-                kin_display.animate_single_collision(plan_to_model_frames['L_knee'] + '_0', frame_targets_dict['L_knee'])
-                kin_display.animate_single_collision(plan_to_model_frames['R_knee'] + '_0', frame_targets_dict['R_knee'])
+                if B_USE_KNEES:
+                    kin_display.animate_single_collision(plan_to_model_frames['L_knee'] + '_0', frame_targets_dict['L_knee'])
+                    kin_display.animate_single_collision(plan_to_model_frames['R_knee'] + '_0', frame_targets_dict['R_knee'])
                 kin_display.animate_single_collision(plan_to_model_frames['LF'] + '_0', frame_targets_dict['LF'])
                 kin_display.animate_single_collision(plan_to_model_frames['RF'] + '_0', frame_targets_dict['RF'])
                 kin_display.animate_target("lfoot_target", [frame_targets_dict['LF']], [1, 1, 0])
-                kin_display.animate_target("lknee_target", [frame_targets_dict['L_knee']], [0, 0, 1])
+                if B_USE_KNEES:
+                    kin_display.animate_target("lknee_target", [frame_targets_dict['L_knee']], [0, 0, 1])
+                    kin_display.animate_target("rknee_target", [frame_targets_dict['R_knee']], [0, 0, 1])
                 kin_display.animate_target("rfoot_target", [frame_targets_dict['RF']], [1, 1, 0])
-                kin_display.animate_target("rknee_target", [frame_targets_dict['R_knee']], [0, 0, 1])
                 kin_display.animate_target("lhand_target", [frame_targets_dict['LH']], [0.5, 0, 0])
                 kin_display.animate_target("rhand_target", [frame_targets_dict['RH']], [0.5, 0, 0])
                 kin_display.animate_target("base_target", [frame_targets_dict['torso']], [0, 0.5, 0])
@@ -1203,6 +1314,10 @@ def main(args):
                 kin_display.animate_single_collision(plan_to_model_frames['torso'] + '_0', get_frame_des_pos(ik_cfree_planner[0], t))
                 kin_display.animate_single_collision(plan_to_model_frames['LH'] + '_0', get_frame_des_pos(ik_cfree_planner[5], t))
                 kin_display.animate_single_collision(plan_to_model_frames['RH'] + '_0', get_frame_des_pos(ik_cfree_planner[6], t))
+                kin_display.animate_single_collision(plan_to_model_frames['LF'] + '_0', get_frame_des_pos(ik_cfree_planner[1], t))
+                kin_display.animate_single_collision(plan_to_model_frames['RF'] + '_0', get_frame_des_pos(ik_cfree_planner[2], t))
+                kin_display.animate_single_collision(plan_to_model_frames['L_knee'] + '_0', get_frame_des_pos(ik_cfree_planner[3], t))
+                kin_display.animate_single_collision(plan_to_model_frames['R_knee'] + '_0', get_frame_des_pos(ik_cfree_planner[4], t))
                 kin_display.animate_target("lfoot_target", [get_frame_des_pos(ik_cfree_planner[1], t)], [1, 1, 0])
                 kin_display.animate_target("lknee_target", [get_frame_des_pos(ik_cfree_planner[3], t)], [0, 0, 1])
                 kin_display.animate_target("rfoot_target", [get_frame_des_pos(ik_cfree_planner[2], t)], [1, 1, 0])
@@ -1228,7 +1343,9 @@ def main(args):
                         integration_type='Euler',
                         sca_refinement=B_SCA_REFINEMENT,
                         b_solve_by_sections=SOLVE_BY_SECTIONS,
-                        solver_type=SOLVER_TYPE)
+                        solver_type=SOLVER_TYPE,
+                        b_use_knees=B_USE_KNEES)
+    dyn_solver_stats = robot_dyn_plan.solver_stats
 
     # strings for saving data
     if kin_plan_path is not None:
@@ -1259,6 +1376,8 @@ def main(args):
         else:
             raise ValueError('Unassigned knee strategy string for solution filename')
     soln_str = robot_name + base_str + impact_str + sca_str + sca_refine_str + action_str + seq_str + env + knee_strategy_str
+    if not B_USE_KNEES:
+        soln_str += '_no_knees'
 
     # Creating display
     if B_VISUALIZE_DYN:
@@ -1303,7 +1422,7 @@ def main(args):
         display.hide_visuals(["env/2"])
         display.hide_visuals(["g1_29dof_lock_waist/collisions"])
         if B_SAVE_HTML:
-            display.save_html(cwd + "/experiment_data/RAL/", soln_str + "_DYN_anim.html")
+            display.save_html(cwd + "/experiment_data/", soln_str + "_DYN_anim.html")
 
     if B_SHOW_JOINT_PLOTS or B_SHOW_COST_PLOTS or B_SHOW_JOINT_LIM_PLOTS:
         plan_plotter = MulticontactPlotter(robot_dyn_plan)
@@ -1316,7 +1435,7 @@ def main(args):
             plan_plotter.plot_constraint_violations()
         if B_SHOW_JOINT_LIM_PLOTS:
             plan_plotter.plot_joint_limit_margins()
-        # plt.show()
+        plt.show()
 
     if B_SHOW_GRF_PLOTS or B_SAVE_DYN_DATA:
         if robot_dyn_plan.solver_type == 'sca':
@@ -1386,6 +1505,9 @@ def main(args):
                 dyn_data_saver.add('bez_path', ik_cfree_planner)
                 dyn_data_saver.add('fixed_frames', fixed_frames)
         dyn_data_saver.add('contact_seq_planes', contact_seq_planes)
+        if kin_plan_path is None:
+            dyn_data_saver.add('kin_solver_stats', kin_solver_stats)
+        dyn_data_saver.add('dyn_solver_stats', dyn_solver_stats)
         for (i, fp) in enumerate(fddp):
             com_lst = []
             torso_pos, lf_pos, rf_pos, lkn_pos, rkn_pos, lh_pos, rh_pos = [], [], [], [], [], [], []
@@ -1415,16 +1537,18 @@ def main(args):
                 torso_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['torso']).translation.tolist())
                 lf_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['LF']).translation.tolist())
                 rf_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['RF']).translation.tolist())
-                lkn_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['L_knee']).translation.tolist())
-                rkn_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['R_knee']).translation.tolist())
+                if B_USE_KNEES:
+                    lkn_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['L_knee']).translation.tolist())
+                    rkn_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['R_knee']).translation.tolist())
                 lh_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['LH']).translation.tolist())
                 rh_pos.append(pin.updateFramePlacement(dyn_rob_model, rob_data, plan_to_model_ids['RH']).translation.tolist())
             dyn_data_saver.add('center_of_mass', com_lst)
             dyn_data_saver.add('torso_act', torso_pos)
             dyn_data_saver.add('lf_act', lf_pos)
             dyn_data_saver.add('rf_act', rf_pos)
-            dyn_data_saver.add('lkn_act', lkn_pos)
-            dyn_data_saver.add('rkn_act', rkn_pos)
+            if B_USE_KNEES:
+                dyn_data_saver.add('lkn_act', lkn_pos)
+                dyn_data_saver.add('rkn_act', rkn_pos)
             dyn_data_saver.add('lh_act', lh_pos)
             dyn_data_saver.add('rh_act', rh_pos)
             dyn_data_saver.advance()
@@ -1447,10 +1571,10 @@ def get_root_to_torso_offset(geom_model):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", type=str, default='door',
+    parser.add_argument("--env", type=str, default='stairs',
                         choices=['door', 'stairs'],
                         help="Environment to load for planning")
-    parser.add_argument("--sequence", type=int, default=2,
+    parser.add_argument("--sequence", type=int, default=1,
                         help="Contact sequence to solve for")
     parser.add_argument("--robot_name", type=str, default='g1',
                         choices=['g1', 'valkyrie', 'ergoCub'],

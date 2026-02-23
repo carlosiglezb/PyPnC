@@ -124,7 +124,8 @@ class IndexedHessFun(Callback):
 
         # Sparse entries in Jacobian
         self.jac_dm[pos1_curr_ir:pos1_curr_ir + 3, 0] = 1
-        self.jac_dm[pos2_curr_ir:pos2_curr_ir + 3, 0] = 1
+        if pos2_curr_ir is not None:
+            self.jac_dm[pos2_curr_ir:pos2_curr_ir + 3, 0] = 1
         self.jac_dm_in = self.jac_dm.reshape(1, -1)
 
         self.jac_np = np.zeros((self.dim_optim_var, 1))
@@ -190,13 +191,18 @@ class IndexedPrimitiveGeometryJacFun(Callback):
         pos1_curr_ir = (current_frames[0] * self.bezier_higher_derivatives * num_iris_regions +
                         self.bezier_higher_derivatives * curr_ir +
                         curr_pnt_in_iris)
-        pos2_curr_ir = (current_frames[1] * self.bezier_higher_derivatives * num_iris_regions +
-                        self.bezier_higher_derivatives * curr_ir +
-                        curr_pnt_in_iris)
         pos1_idxs = np.arange(pos1_curr_ir, pos1_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
-        pos2_idxs = np.arange(pos2_curr_ir, pos2_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
         self.jac_dm[0, pos1_idxs] = 1
-        self.jac_dm[0, pos2_idxs] = 1
+
+        if self.current_frames[1] is not None:
+            pos2_curr_ir = (current_frames[1] * self.bezier_higher_derivatives * num_iris_regions +
+                            self.bezier_higher_derivatives * curr_ir +
+                            curr_pnt_in_iris)
+            pos2_idxs = np.arange(pos2_curr_ir, pos2_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
+            self.jac_dm[0, pos2_idxs] = 1
+        else:
+            pos2_curr_ir = None
+            pos2_idxs = None
 
         self.hess_callback = IndexedHessFun(name, self.dim_optim_var, pos1_curr_ir, pos2_curr_ir, opts)
 
@@ -253,6 +259,11 @@ class IndexedPrimitiveGeometryDistanceCallback(Callback):
         self.state_dim_per_frame = self.bezier_higher_derivatives * self.num_iris_regions_per_frame
         self.dim_optim_var = self.state_dim_per_frame * self.n_frames
 
+        if self.current_frames[1] is None:
+            self.polytope_origin = geom_data['polytope_origin']
+            self.polytope_rotation = geom_data['polytope_rotation']
+        else:
+            self.polytope_origin = None
         # torso cone representation matrices
         # self.G1 = np.zeros((self.num_halfplanes_A1, 4))
         # self.G1[:, :3] = self.A1 @ self.Q.T
@@ -590,7 +601,8 @@ class IndexedPolytopeEllipsoidJacFun(IndexedPrimitiveGeometryJacFun):
 
         jac_z = np.zeros((1, self.dim_optim_var))
         jac_z[0, pos1_idxs] = ret1
-        jac_z[0, pos2_idxs] = ret2
+        if pos2_idxs is not None:
+            jac_z[0, pos2_idxs] = ret2
 
         return [jac_z]
 
@@ -629,13 +641,18 @@ class IndexedPolytopeEllipsoidConstraint(IndexedPrimitiveGeometryDistanceCallbac
         pos1_curr_ir = (current_frames[0] * bezier_higher_derivatives * num_iris_regions +
                         bezier_higher_derivatives * curr_ir +
                         curr_pnt_in_iris)
-        pos2_curr_ir = (current_frames[1] * bezier_higher_derivatives * num_iris_regions +
-                        bezier_higher_derivatives * curr_ir +
-                        curr_pnt_in_iris)
         pos1_idxs = np.arange(pos1_curr_ir, pos1_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
-        pos2_idxs = np.arange(pos2_curr_ir, pos2_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
         r1_cp = z[pos1_idxs]
-        r2_cp = z[pos2_idxs]
+
+        if current_frames[1] is None:
+            r2_cp = self.polytope_origin
+            Q = self.polytope_rotation
+        else:
+            pos2_curr_ir = (current_frames[1] * bezier_higher_derivatives * num_iris_regions +
+                            bezier_higher_derivatives * curr_ir +
+                            curr_pnt_in_iris)
+            pos2_idxs = np.arange(pos2_curr_ir, pos2_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
+            r2_cp = z[pos2_idxs]
         x_val, alpha_val, dual_val = solve_polytope_ellipsoid_min_prox(A1, b1, Q, U, r1_cp, r2_cp)
 
         # update dual variables to use in Jacobian
@@ -765,10 +782,11 @@ def solve_polytope_ellipsoid_min_prox(A, b, Q, U, r1, r2, verbose=False):
     # find distance via optimization (dcol-style)
     alpha = cp.Variable(1)
     x = cp.Variable((3, 1))
+    Q_sphere = np.eye(3)
 
     constraints = []
     constraints.append(A @ Q.T @ (x - r1) <= alpha * b)
-    constraints.append(cp.SOC(alpha, U @ Q.T @ (x - r2)))
+    constraints.append(cp.SOC(alpha, U @ Q_sphere @ (x - r2)))
     constraints.append(alpha >= 0)
     prob = cp.Problem(cp.Minimize(alpha), constraints)
     prob.solve(solver='CLARABEL')

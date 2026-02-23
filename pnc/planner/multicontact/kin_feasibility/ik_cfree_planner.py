@@ -204,19 +204,24 @@ class IKCFreePlanner:
     def set_plan_to_model_frames(self, plan_to_model_frames: dict[str: str]):
         self.plan_to_model_frames = plan_to_model_frames
 
+    def set_env_geometry(self, env_geometry):
+        self.planner.set_env_geometry(env_geometry)
+
     def pack_current_targets(self, t):
         planner_path = self.planner.path
         idx_LF = list(self.plan_to_model_frames.keys()).index('LF')
-        idx_L_knee = list(self.plan_to_model_frames.keys()).index('L_knee')
+        if 'L_knee' in self.plan_to_model_frames.keys():
+            idx_L_knee = list(self.plan_to_model_frames.keys()).index('L_knee')
+            lknee_t = get_frame_des_pos(planner_path[idx_L_knee], t)
         idx_RF = list(self.plan_to_model_frames.keys()).index('RF')
-        idx_R_knee = list(self.plan_to_model_frames.keys()).index('R_knee')
+        if 'R_knee' in self.plan_to_model_frames.keys():
+            idx_R_knee = list(self.plan_to_model_frames.keys()).index('R_knee')
+            rknee_t = get_frame_des_pos(planner_path[idx_R_knee], t)
         idx_LH = list(self.plan_to_model_frames.keys()).index('LH')
         idx_RH = list(self.plan_to_model_frames.keys()).index('RH')
         idx_torso = list(self.plan_to_model_frames.keys()).index('torso')
         lfoot_t = get_frame_des_pos(planner_path[idx_LF], t)
-        lknee_t = get_frame_des_pos(planner_path[idx_L_knee], t)
         rfoot_t = get_frame_des_pos(planner_path[idx_RF], t)
-        rknee_t = get_frame_des_pos(planner_path[idx_R_knee], t)
         lhand_t = get_frame_des_pos(planner_path[idx_LH], t)
         rhand_t = get_frame_des_pos(planner_path[idx_RH], t)
         base_t = get_frame_des_pos(planner_path[idx_torso], t)
@@ -224,11 +229,13 @@ class IKCFreePlanner:
             'torso': base_t,
             'LF': lfoot_t,
             'RF': rfoot_t,
-            'L_knee': lknee_t,
-            'R_knee': rknee_t,
             'LH': lhand_t,
             'RH': rhand_t
         }
+        if 'L_knee' in self.plan_to_model_frames.keys():
+            frame_targets_dict['L_knee'] = lknee_t
+        if 'R_knee' in self.plan_to_model_frames.keys():
+            frame_targets_dict['R_knee'] = rknee_t
         return frame_targets_dict
 
     def get_frame_targets_from_kin_planner(self, phase, t):

@@ -69,7 +69,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
              integration_type: str='Euler',
              sca_refinement: bool=False,
              b_solve_by_sections: str='None',
-             solver_type: str='SQP'):
+             solver_type: str='SQP',
+             b_use_knees: bool=True):
         dyn_seg_solve_time = []
         if solver_type == 'SQP':
             b_sqp = True
@@ -219,7 +220,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             # here, we use IK to construct the initial guess
             robot_data = self.robot_model.createData()
             pin.forwardKinematics(self.robot_model, robot_data, x0_stance[:self.robot_model.nq])
-            g1_ik = G1IKSolver(self.robot_model, robot_data, x0_stance[:self.robot_model.nq])
+            g1_ik = G1IKSolver(self.robot_model, robot_data, x0_stance[:self.robot_model.nq], b_use_knees)
 
             xs, us = [], []
             for i in range(self.contact_phases):
@@ -429,7 +430,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             super().update_costs_from_solver(solver_type=self.solver_type, integration_type=integration_type)
 
         if sca_refinement:
-            self.plan_sca(solver_type='SQP')
+            self.plan_sca(solver_type='SQP', b_use_knees=b_use_knees)
 
     def save_targets(self, frame_targets_dict):
         if self.knot_idx >= len(self.base_targets):
@@ -459,7 +460,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
     def plan_sca(self, integration_type: str='Euler',
                  solver_type: str ='FDDP',
-                 b_impulse: bool=False):
+                 b_impulse: bool=False,
+                 b_use_knees: bool=True):
         T = self.T
         state = self.state
         actuation = self.actuation
@@ -478,7 +480,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         # here, we use IK to construct the initial guess
         robot_data = self.robot_model.createData()
         pin.forwardKinematics(self.robot_model, robot_data, x0_stance[:self.robot_model.nq])
-        g1_ik = G1IKSolver(self.robot_model, robot_data, x0_stance[:self.robot_model.nq])
+        g1_ik = G1IKSolver(self.robot_model, robot_data, x0_stance[:self.robot_model.nq], b_use_knees)
 
         xs, us = [], []
         for i in range(self.contact_phases):

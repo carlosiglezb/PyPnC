@@ -900,18 +900,19 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/left_rubber_hand.STL"/>
+<!--        <mesh filename="meshes/left_rubber_hand.STL"/>-->
+        <sphere radius="0.035"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
       </material>
     </visual>
-<!--    <collision>-->
-<!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
-<!--      <geometry>-->
-<!--        <sphere radius="0.035"/>-->
-<!--      </geometry>-->
-<!--    </collision>-->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.035"/>
+      </geometry>
+    </collision>
   </link>
   <link name="right_shoulder_pitch_link">
     <inertial>
@@ -1130,17 +1131,18 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/right_rubber_hand.STL"/>
+<!--        <mesh filename="meshes/right_rubber_hand.STL"/>-->
+        <sphere radius="0.035"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
       </material>
     </visual>
-<!--    <collision>-->
-<!--      <origin xyz="0 0 0" rpy="0 0 0"/>-->
-<!--      <geometry>-->
-<!--        <sphere radius="0.035"/>-->
-<!--      </geometry>-->
-<!--    </collision>-->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.035"/>
+      </geometry>
+    </collision>
   </link>
 </robot>

@@ -6,7 +6,8 @@ import qpsolvers
 class G1IKSolver:
     def __init__(self, robot_model: pinocchio.Model,
                  robot_data: pinocchio.Data,
-                 q0: np.array):
+                 q0: np.array,
+                 b_use_knees: bool = True):
         # PInK robot data configuration
         self.pink_config = Configuration(robot_model, robot_data, q0)
 
@@ -18,14 +19,14 @@ class G1IKSolver:
         #         self.pink_config.get_transform_frame_to_world(m_frame).rotation)
 
         # PInK tasks
-        self.tasks_dict = self._initialize_tasks()
+        self.tasks_dict = self._initialize_tasks(b_use_knees)
 
         # Select quadprog solver, if available
         self.solver = qpsolvers.available_solvers[0]
         if "quadprog" in qpsolvers.available_solvers:
             self.solver = "quadprog"
 
-    def _initialize_tasks(self)  -> dict[str, PostureTask | FrameTask]:
+    def _initialize_tasks(self, b_use_knees:bool = True) -> dict[str, PostureTask | FrameTask]:
             torso_task = FrameTask(
                 "torso_primitive_shape",    # torso_link
                 position_cost=1.0,
@@ -40,16 +41,6 @@ class G1IKSolver:
                 "right_ankle_roll_link",  # "r_foot_contact",
                 position_cost=1.0,
                 orientation_cost=0.2,
-            )
-            left_knee_task = FrameTask(
-                "left_knee_link",  # "l_knee_fe_ld
-                position_cost=0.2,
-                orientation_cost=0.00001,
-            )
-            right_knee_task = FrameTask(
-                "right_knee_link",  # r_knee_fe_ld",
-                position_cost=0.2,
-                orientation_cost=0.00001,
             )
             left_hand_task = FrameTask(
                 "left_rubber_hand",  # "l_hand_contact",
@@ -71,11 +62,22 @@ class G1IKSolver:
                 'torso_task': torso_task,
                 'LF_task': left_foot_task,
                 'RF_task': right_foot_task,
-                'L_knee_task': left_knee_task,
-                'R_knee_task': right_knee_task,
                 'LH_task': left_hand_task,
                 'RH_task': right_hand_task,
             }
+            if b_use_knees:
+                left_knee_task = FrameTask(
+                    "left_knee_link",  # "l_knee_fe_ld
+                    position_cost=0.2,
+                    orientation_cost=0.00001,
+                )
+                right_knee_task = FrameTask(
+                    "right_knee_link",  # r_knee_fe_ld",
+                    position_cost=0.2,
+                    orientation_cost=0.00001,
+                )
+                task_dict['L_knee_task'] = left_knee_task
+                task_dict['R_knee_task'] = right_knee_task
             # return [torso_task, left_foot_task, right_foot_task, left_knee_task, right_knee_task,
             #         left_hand_task, right_hand_task]
             return task_dict

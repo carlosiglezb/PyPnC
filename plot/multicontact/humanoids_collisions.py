@@ -29,8 +29,9 @@ def main():
     #               cwd + "/robot_model/ergoCub/ergoCub.urdf",
     #               cwd + "/robot_model/g1_description/g1.urdf"]
     robots_names = ['g1']
-    urdf_paths = [cwd + "/robot_model/g1_description/g1_29dof_simple_collisions.urdf"]  # g1.urdf
-    # urdf_paths = [cwd + "/robot_model/g1_description/g1_29dof_lock_waist_modified.urdf"]  # g1.urdf
+    # urdf_paths = [cwd + "/robot_model/g1_description/g1_29dof_simple_collisions.urdf"]  # g1.urdf
+    urdf_paths = [cwd + "/robot_model/g1_description/g1_29dof_lock_waist_modified.urdf"]  # g1.urdf
+    # urdf_paths = [cwd + "/robot_model/g1_description/g1_29dof_lock_waist_chull.urdf"]  # g1.urdf
     z_offsets = {'valkyrie': 1.167, 'ergoCub': 0.774, 'g1': 0.75}
 
     # load (real) door to visualizer
