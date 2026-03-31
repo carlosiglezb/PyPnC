@@ -316,7 +316,7 @@ class TestStabilipy(unittest.TestCase):
         test_sequence = 1
         env_opt = env_opts[test_env]
         if 'door' in env_opt:
-            N_HORIZON_LST = [180, 280, 280, 250, 250]
+            N_HORIZON_LST = [300] * 5
             contact_seq_str_opts = ['over', 'on', 'on_balanced']
         else:   # stairs
             N_HORIZON_LST = [300] * 6
@@ -373,7 +373,7 @@ class TestStabilipy(unittest.TestCase):
             if cs_opt == 'over':
                 contacts_seq_lst = [['left_ankle_roll_link', 'right_ankle_roll_link'],
                                     ['right_ankle_roll_link', 'left_rubber_hand'],
-                                    ['left_ankle_roll_link', 'right_ankle_roll_link'],
+                                    ['left_ankle_roll_link', 'left_rubber_hand', 'right_rubber_hand'],
                                     ['left_ankle_roll_link', 'right_rubber_hand'],
                                     ['left_ankle_roll_link', 'right_ankle_roll_link']]
             elif cs_opt == 'on':
