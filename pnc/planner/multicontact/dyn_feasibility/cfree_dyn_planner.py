@@ -14,8 +14,9 @@ import config.multicontact.valkyrie_planner_config as valkyrie_params
 from pnc.planner.multicontact.kin_feasibility import SCARobotGeometry
 
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
-from util.environment_creator import TiltedStairs
+from util.environment_creator import TiltedStairs, HoleInWallObstructed
 import pnc.planner.multicontact.contact_sequence_plans.tilted_stairs_plans as stairs_plan
+import pnc.planner.multicontact.contact_sequence_plans.hole_in_wall_plans as hole_plan
 
 import crocoddyl
 import numpy as np
@@ -49,12 +50,12 @@ from plot.data_saver import *
 
 # Plots visuals
 B_SHOW_JOINT_PLOTS = False
-B_SHOW_JOINT_LIM_PLOTS = True
-B_SHOW_COST_PLOTS = True
+B_SHOW_JOINT_LIM_PLOTS = False
+B_SHOW_COST_PLOTS = False
 B_SHOW_GRF_PLOTS = False
 
 # Meshcat visuals
-B_VISUALIZE_KIN = False
+B_VISUALIZE_KIN = True
 B_VISUALIZE_DYN = False
 
 # Planner options
@@ -65,13 +66,13 @@ B_SOLVE_HYBRID = False
 B_SCA_REFINEMENT = True
 B_VERBOSE = False
 B_USE_KNEES = True
-B_USE_SELF_COLLISION_AVOIDANCE = True
+B_USE_SELF_COLLISION_AVOIDANCE = False
 B_USE_KNEES_IN_SMOOTH_PLAN = False   # set to False when crossing door in single step (i.e., mode 0)
 
 # Data recording (Data currently works only with either KIN or DYN but not both)
 B_SAVE_KIN_DATA = False
-B_SAVE_DYN_DATA = True
-B_SAVE_HTML = True
+B_SAVE_DYN_DATA = False
+B_SAVE_HTML = False
 
 
 env_urdf_path = cwd + "/robot_model/ground/navy_door_fixed.urdf"
@@ -1030,6 +1031,15 @@ def main(args):
             raise NotImplementedError('Robot default configuration not specified for stairs')
         v0 = np.zeros(rob_model.nv)
         x0 = np.concatenate([q0, v0])
+    elif env == 'obstructed_hole':
+        seq_str = '_'
+        q0 = get_g1_default_initial_pose(rob_model.nq - 7)
+        door_pos = np.array([0.32, 0., 0.])
+        step_length = 0.44
+        planner_params = g1_params.MultiContactDoorConfig()
+        v0 = np.zeros(rob_model.nv)
+        x0 = np.concatenate([q0, v0])
+        obstructed_hole = HoleInWallObstructed(door_pos)
     else:
         raise NotImplementedError('Specified environment cannot be loaded')
 
@@ -1054,7 +1064,7 @@ def main(args):
                                                                      standing_pos, step_length,
                                                                      robot_name=robot_name,
                                                                      root_to_torso_offset=root_to_torso_offset)
-        elif env == 'stairs':
+        elif env == 'stairs' or env == 'obstructed_hole':
             # set-up easy access to fwd kinematics for IRIS seeds
             robot_fwdk = PinocchioRobotSystem(robot_urdf_file, package_dir, False, False)
             cmd = robot_fwdk.create_cmd_ordered_dict(q0[7:], np.zeros(len(q0[7:])),
@@ -1064,19 +1074,26 @@ def main(args):
                                           cmd["joint_pos"], cmd["joint_vel"])
 
             # hand-chosen five-stage sequence of contacts
-            starting_pose = {}
-            for fr in plan_to_model_frames.keys():
-                starting_pose[fr] = robot_fwdk.get_link_iso(plan_to_model_frames[fr])[:3, 3]
-            if contact_seq == 0:
-                fixed_frames_seq, motion_frames_seq = stairs_plan.get_opposing_limbs_contact_sequence(stairs, starting_pose, robot_name, b_use_knees=B_USE_KNEES)
-            elif contact_seq == 1:
-                fixed_frames_seq, motion_frames_seq = stairs_plan.get_fully_opposing_limbs_contact_sequence(stairs, starting_pose, robot_name, b_use_knees=B_USE_KNEES)
-            else:
-                NotImplementedError(f"Contact sequence {contact_seq} not implemented for stairs")
-
-            # process vision and create IRIS regions
             standing_pos = q0[:3]
-            safe_regions_mgr_dict = stairs_plan.compute_stairs_iris_regions_mgr(stairs, starting_pose, motion_frames_seq)
+            starting_pose = {}
+            if env == 'stairs':
+                for fr in plan_to_model_frames.keys():
+                    starting_pose[fr] = robot_fwdk.get_link_iso(plan_to_model_frames[fr])[:3, 3]
+                if contact_seq == 0:
+                    fixed_frames_seq, motion_frames_seq = stairs_plan.get_opposing_limbs_contact_sequence(stairs, starting_pose, robot_name, b_use_knees=B_USE_KNEES)
+                elif contact_seq == 1:
+                    fixed_frames_seq, motion_frames_seq = stairs_plan.get_fully_opposing_limbs_contact_sequence(stairs, starting_pose, robot_name, b_use_knees=B_USE_KNEES)
+                else:
+                    NotImplementedError(f"Contact sequence {contact_seq} not implemented for stairs")
+                # process vision and create IRIS regions
+                safe_regions_mgr_dict = stairs_plan.compute_stairs_iris_regions_mgr(stairs, starting_pose,
+                                                                                    motion_frames_seq)
+            elif env == 'obstructed_hole':
+                for fr in plan_to_model_frames.keys():
+                    starting_pose[fr] = robot_fwdk.get_link_iso(plan_to_model_frames[fr])[:3, 3]
+                fixed_frames_seq, motion_frames_seq = hole_plan.get_on_balanced_contact_seq(obstructed_hole, starting_pose, robot_name, B_USE_KNEES=B_USE_KNEES)
+                safe_regions_mgr_dict = hole_plan.compute_stairs_iris_regions_mgr(obstructed_hole, starting_pose,
+                                                                                    motion_frames_seq)
             p_init = {}
             p_init['torso'] = starting_pose['torso']
             p_init['LF'] = starting_pose['LF']
@@ -1188,6 +1205,8 @@ def main(args):
                     save_filename = robot_name + sca_str + 'step_' + seq_str + '_knee_knocker_kin.pkl'
                 elif env == 'stairs':
                     save_filename = robot_name + sca_str + 'tilted_stairs_kin.pkl'
+                elif env == 'obstructed_hole':
+                    save_filename = robot_name + sca_str + 'obstructed_hole_kin.pkl'
                 else:
                     raise NotImplementedError(f"Filename to save data for environment {env} not implemented")
                 transition_times = []
@@ -1255,6 +1274,18 @@ def main(args):
                                                         obstacle_geom,
                                                         'stairs_obstacle_' + str(i_col))
                 refined_geom_model.addGeometryObject(new_geom)
+        elif env == 'obstructed_hole':
+            for i_col, col_obj in enumerate(obstructed_hole.obstacles):
+                if i_col <= 1:  # skip floor collisions
+                    continue
+                if isinstance(col_obj, HPolyhedron):
+                    obstacle_geom = hpoly_to_fcl_collision(col_obj)
+                else:
+                    raise NotImplementedError("Only HPolyhedron obstacles are supported for stairs environment")
+                new_geom = create_convex_geom_from_copy(door_collision_model.geometryObjects[0],
+                                                        obstacle_geom,
+                                                        'hole_obstacle_' + str(i_col))
+                refined_geom_model.addGeometryObject(new_geom)
         refined_geom_model.addAllCollisionPairs()
 
     N_horizon_lst = planner_params.N_HORIZON_LST
@@ -1286,6 +1317,8 @@ def main(args):
             kin_display.add_robot("door", door_model, door_collision_model, door_visual_model)
         elif env == 'stairs':
             kin_display.add_shapes_from(stairs.obstacles_vis)
+        elif env == 'obstructed_hole':
+            kin_display.add_shapes_from(obstructed_hole.obstacles)
         else:
             raise NotImplementedError(f"Visualization for environment {env} not implemented")
 
@@ -1571,10 +1604,10 @@ def get_root_to_torso_offset(geom_model):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", type=str, default='stairs',
-                        choices=['door', 'stairs'],
+    parser.add_argument("--env", type=str, default='obstructed_hole',
+                        choices=['door', 'stairs', 'obstructed_hole'],
                         help="Environment to load for planning")
-    parser.add_argument("--sequence", type=int, default=1,
+    parser.add_argument("--sequence", type=int, default=0,
                         help="Contact sequence to solve for")
     parser.add_argument("--robot_name", type=str, default='g1',
                         choices=['g1', 'valkyrie', 'ergoCub'],
