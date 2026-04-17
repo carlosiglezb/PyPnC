@@ -6,6 +6,8 @@ from collections import OrderedDict
 cwd = os.getcwd()
 sys.path.append(cwd)
 
+from pnc.planner.multicontact.kin_feasibility.self_collision_avoidance.SCAHPolyhedronGeometry import \
+    SCAHPolyhedronGeometry
 from util.pydrake_meshcat_interface import hpoly_to_fcl_collision, create_convex_geom_from_copy
 import config.multicontact.g1_planner_config as g1_params
 import config.multicontact.g1_baseline_planner_config as g1_baseline_params
@@ -51,12 +53,12 @@ from plot.data_saver import *
 # Plots visuals
 B_SHOW_JOINT_PLOTS = False
 B_SHOW_JOINT_LIM_PLOTS = False
-B_SHOW_COST_PLOTS = False
+B_SHOW_COST_PLOTS = True
 B_SHOW_GRF_PLOTS = False
 
 # Meshcat visuals
 B_VISUALIZE_KIN = True
-B_VISUALIZE_DYN = False
+B_VISUALIZE_DYN = True
 
 # Planner options
 B_BASELINE = False
@@ -66,13 +68,13 @@ B_SOLVE_HYBRID = False
 B_SCA_REFINEMENT = True
 B_VERBOSE = False
 B_USE_KNEES = True
-B_USE_SELF_COLLISION_AVOIDANCE = False
+B_USE_SELF_COLLISION_AVOIDANCE = True
 B_USE_KNEES_IN_SMOOTH_PLAN = False   # set to False when crossing door in single step (i.e., mode 0)
 
 # Data recording (Data currently works only with either KIN or DYN but not both)
 B_SAVE_KIN_DATA = False
-B_SAVE_DYN_DATA = False
-B_SAVE_HTML = False
+B_SAVE_DYN_DATA = True
+B_SAVE_HTML = True
 
 
 env_urdf_path = cwd + "/robot_model/ground/navy_door_fixed.urdf"
@@ -103,6 +105,23 @@ def get_g1_default_initial_pose(n_joints:int, env: str = 'door'):
         q0[9] = np.pi/3
         q0[10] = -np.pi/6
         floating_base = np.array([-0.03, 0., 0.7, 0., 0., 0., 1.])
+    elif 'hole' in env:
+        q0 = np.zeros(n_joints, )
+        q0[0] = -0.697  # left_hip_pitch_joint
+        # q0[1] = np.radians(hip_yaw_angle)  # left_hip_roll_joint
+        # q0[2] = np.radians(hip_yaw_angle)  # left_hip_yaw_joint
+        q0[3] = 1.23  # left_knee_joint
+        q0[4] = -0.53  # left_ankle_pitch_joint
+        # q0[5] = np.radians(-hip_yaw_angle)  # left_ankle_roll_joint
+        q0[6] = -0.697  # right_hip_pitch_joint
+        # q0[7] = np.pi / 6  # right_hip_roll_joint
+        # q0[8] = 0.  # right_hip_yaw_joint
+        q0[9] = 1.23  # right_knee_joint
+        q0[10] = -0.53  # right_ankle_pitch_joint
+        # q0[11] = 0.  # right_ankle_roll_joint
+
+        floating_base = np.array([-0.03, 0.0, 0.68, 0., 0., 0., 1.])
+
     else:
         raise ValueError(f"Unspecified default initial pose for g1 in environment: {env}")
     return np.concatenate((floating_base, q0))
@@ -1033,10 +1052,10 @@ def main(args):
         x0 = np.concatenate([q0, v0])
     elif env == 'obstructed_hole':
         seq_str = '_'
-        q0 = get_g1_default_initial_pose(rob_model.nq - 7)
-        door_pos = np.array([0.32, 0., 0.])
-        step_length = 0.44
-        planner_params = g1_params.MultiContactDoorConfig()
+        q0 = get_g1_default_initial_pose(rob_model.nq - 7, env)
+        door_pos = np.array([0.32, 0.0, 0.])
+        step_length = 0.46
+        planner_params = g1_params.MultiContactObstructedHoleConfig()
         v0 = np.zeros(rob_model.nv)
         x0 = np.concatenate([q0, v0])
         obstructed_hole = HoleInWallObstructed(door_pos)
@@ -1091,7 +1110,7 @@ def main(args):
             elif env == 'obstructed_hole':
                 for fr in plan_to_model_frames.keys():
                     starting_pose[fr] = robot_fwdk.get_link_iso(plan_to_model_frames[fr])[:3, 3]
-                fixed_frames_seq, motion_frames_seq = hole_plan.get_on_balanced_contact_seq(obstructed_hole, starting_pose, robot_name, B_USE_KNEES=B_USE_KNEES)
+                fixed_frames_seq, motion_frames_seq = hole_plan.get_on_rf_balanced_contact_seq(obstructed_hole, starting_pose, robot_name, B_USE_KNEES=B_USE_KNEES)
                 safe_regions_mgr_dict = hole_plan.compute_stairs_iris_regions_mgr(obstructed_hole, starting_pose,
                                                                                     motion_frames_seq)
             p_init = {}
@@ -1196,6 +1215,9 @@ def main(args):
                 env_package_dir = cwd + "/robot_model/ground"
                 env_geom = SCARobotGeometry(env_package_dir, env_urdf_path, door_to_geom_names)
                 ik_cfree_planner.set_env_geometry(env_geom)
+            elif env == 'obstructed_hole':
+                env_geom = SCAHPolyhedronGeometry.from_wall_scene(obstructed_hole)
+                ik_cfree_planner.set_env_geometry(env_geom)
             ik_cfree_planner.plan(p_init, T, planner_params, visualizer, B_VERBOSE)
             kin_solver_stats = ik_cfree_planner.solver_stats
 
@@ -1275,13 +1297,8 @@ def main(args):
                                                         'stairs_obstacle_' + str(i_col))
                 refined_geom_model.addGeometryObject(new_geom)
         elif env == 'obstructed_hole':
-            for i_col, col_obj in enumerate(obstructed_hole.obstacles):
-                if i_col <= 1:  # skip floor collisions
-                    continue
-                if isinstance(col_obj, HPolyhedron):
-                    obstacle_geom = hpoly_to_fcl_collision(col_obj)
-                else:
-                    raise NotImplementedError("Only HPolyhedron obstacles are supported for stairs environment")
+            for i_col, col_obj in enumerate(obstructed_hole.obstacles[1:]):
+                obstacle_geom = hpoly_to_fcl_collision(col_obj)
                 new_geom = create_convex_geom_from_copy(door_collision_model.geometryObjects[0],
                                                         obstacle_geom,
                                                         'hole_obstacle_' + str(i_col))
@@ -1385,7 +1402,12 @@ def main(args):
         sca_str = '_kin_sca' if 'sca' in kin_plan_path else '_no_kin_sca'
         action_str = '_step_' if 'door' in kin_plan_path else '_'
         seq_str = next((s for s in ['over', 'on_balanced', 'on'] if s in kin_plan_path), '')
-        env = '_door' if ('knocker' in kin_plan_path or 'door' in kin_plan_path) else '_stairs'
+        if 'hole' in kin_plan_path:
+            env = '_hole'
+        elif ('knocker' in kin_plan_path) or ('door' in kin_plan_path):
+            env = '_door'
+        else:
+            env = '_stairs'
     else:
         action_str = 'step_' if env == 'door' else '_'
     if B_BASELINE:
@@ -1423,6 +1445,8 @@ def main(args):
             display.add_robot("door", door_model, door_collision_model, door_visual_model)
         elif 'stairs' in env:
             display.add_shapes_from(stairs.obstacles_vis)
+        elif 'hole' in env:
+            display.add_shapes_from(obstructed_hole.obstacles)
         if not B_BASELINE:
             display.display_targets("lfoot_target", robot_dyn_plan.lf_targets[display_idx], [1, 1, 0])
             display.display_targets("lknee_target", robot_dyn_plan.lkn_targets[display_idx], [0, 0, 1])
@@ -1452,7 +1476,7 @@ def main(args):
         # viz_to_hide = list(("base_target", "lhand_target", "rhand_target",
         #                     "lfoot_target", "lknee_target",
         #                     "rfoot_target", "rknee_target"))
-        display.hide_visuals(["env/2"])
+        # display.hide_visuals(["env/2"])
         display.hide_visuals(["g1_29dof_lock_waist/collisions"])
         if B_SAVE_HTML:
             display.save_html(cwd + "/experiment_data/", soln_str + "_DYN_anim.html")
@@ -1607,7 +1631,7 @@ if __name__ == "__main__":
     parser.add_argument("--env", type=str, default='obstructed_hole',
                         choices=['door', 'stairs', 'obstructed_hole'],
                         help="Environment to load for planning")
-    parser.add_argument("--sequence", type=int, default=0,
+    parser.add_argument("--sequence", type=int, default=2,
                         help="Contact sequence to solve for")
     parser.add_argument("--robot_name", type=str, default='g1',
                         choices=['g1', 'valkyrie', 'ergoCub'],

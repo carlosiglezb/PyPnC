@@ -142,6 +142,13 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
     if b_max_new != b_min_new:
         distribute_box_seq(box_seq_lst[-1], b_max_new)
 
+    # check if iris region had global_iris. If so, assign it to contact sequence
+    for fname in p_init.keys():
+        if len(iris_regions[fname].global_iris):
+            for bs_i in range(len(box_seq_lst)):
+                for ir_region_num in range(len(box_seq_lst[bs_i][fname])):
+                    box_seq_lst[bs_i][fname][ir_region_num] = iris_regions[fname].global_iris[0][0]
+
     # throw exception if any frames have un-assigned safe regions
     for f_list in box_seq_lst:
         for fname, bs in f_list.items():

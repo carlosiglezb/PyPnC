@@ -226,11 +226,11 @@ class HoleInWallObstructed:
 
         # Obstacles
         floor = HPolyhedron.MakeBox(
-            np.array([-2, -0.9, -0.05]) + door_pos + door_width,
+            np.array([-2, -0.9, -0.1]) + door_pos + door_width,
             np.array([2, 0.9, -0.001]) + door_pos + door_width)
         knee_knocker_base = HPolyhedron.MakeBox(
-            np.array([-0.05, -0.9, 0.0]) + door_pos + door_width,
-            np.array([0.06, 0.9, 0.42]) + door_pos + door_width)
+            np.array([-0.04, -0.9, 0.0]) + door_pos + door_width,
+            np.array([0.04, 0.9, 0.4]) + door_pos + door_width)
         knee_knocker_lwall = HPolyhedron.MakeBox(
             np.array([-0.025, 0.9 - 0.518 - 0.025, 0.0]) + door_pos + door_width,
             np.array([0.025, 0.9, 2.2]) + door_pos + door_width)
@@ -242,15 +242,21 @@ class HoleInWallObstructed:
             np.array([0.025, 0.9, 2.25]) + door_pos + door_width)
 
         # Additional obstacle covering hole
-        triangle_sides = [1.0, 0.7, 0.4453]
-        triangle_pos = np.array([door_pos[0], -0.765/2, 0.4])
+        # triangle_sides = [1.0, 0.7, 0.4453]   # for contact [0.34, -0.15, 1.15]
+        triangle_sides = [1.0, 0.6, 0.46301]    # for contact [0.34, -0.25, 1.15]
+        triangle_pos = np.array([door_pos[0] + door_width[0], -0.765/1.8, 0.2])
         triangle_rot = RotationMatrix(RollPitchYaw([0, -np.pi/2, 0]))
         right_triangle = FloatingTriangle(triangle_sides, door_width[0], triangle_pos, triangle_rot)
+        # bottom_triangle_rot = RotationMatrix(RollPitchYaw([0, -np.pi/2, 0]))
+        # bottom_triangle_pos = np.array([door_pos[0] + door_width[0], 0.765, 0.3])
+        # bottom_triangle = FloatingTriangle(triangle_sides, door_width[0], bottom_triangle_pos, bottom_triangle_rot)
         self.obstacles = [floor,
                           knee_knocker_base,
                           knee_knocker_lwall,
                           knee_knocker_rwall,
                           knee_knocker_top,
-                          right_triangle.get_polytope()]
+                          right_triangle.get_polytope(),
+                          # bottom_triangle.get_polytope()
+                          ]
         self.domain = HPolyhedron.MakeBox(dom_lb, dom_ub)
         self.door_pos = door_pos

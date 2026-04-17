@@ -326,6 +326,12 @@ def createMultiFrameActionModel(state: crocoddyl.StateMultibody,
                             or ('door' in cp_second_name or 'door' in cp_first_name)        # door vs all
                             or ('stairs' in cp_second_name and 'knee' in cp_first_name)     # stairs vs knees
                             or ('stairs' in cp_second_name and 'ankle' in cp_first_name)    # stairs vs ankles
+                            # or ('hole' in cp_second_name and 'hip' in cp_first_name)        # hole vs hips
+                            # or ('hole' in cp_second_name or 'hole' in cp_first_name)       # hole vs knees
+                            or ('hole' in cp_second_name and 'knee' in cp_first_name)       # hole vs knees
+                            or ('hole' in cp_second_name and 'ankle' in cp_first_name)      # hole vs ankles
+                            or ('hole' in cp_second_name and 'elbow' in cp_first_name)      # hole vs elbows
+                            # or ('hole' in cp_second_name and 'shoulder' in cp_first_name)      # hole vs shoulders
                             or ('right_ankle' in cp_first_name and 'right_hip' in cp_second_name)     # ankle-hip
                             or ('right_hip' in cp_first_name and 'right_ankle' in cp_second_name)     # ankle-hip
                             or ('left_ankle' in cp_first_name and 'left_hip' in cp_second_name)     # ankle-hip

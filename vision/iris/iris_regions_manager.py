@@ -84,7 +84,8 @@ class IrisRegionsManager:
                 return True
         return False
 
-    def connectIrisListSeeds(self, choose_iris_by: str = None):
+    def connectIrisListSeeds(self, choose_iris_by: str = None,
+                             hint: np.ndarray = None):
         """
         Connect the list of IRIS regions.
         This approach is based on checking if the IRIS region in the iris_list are connected.
@@ -131,11 +132,15 @@ class IrisRegionsManager:
         for ir_num, ir in enumerate(self.iris_list):
             if ir_num >= len(self.iris_list) - 1:
                 break
-            start_centroid = self.iris_list[ir_num].seed_pos
-            goal_centroid = self.iris_list[ir_num+1].seed_pos
-            # start_centroid = self.iris_list[ir_num].iris_region.ChebyshevCenter()
-            # goal_centroid = self.iris_list[ir_num+1].iris_region.ChebyshevCenter()
-            new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.1, 0.01, 0.1])
+            if hint is not None:
+                new_seed = hint
+            else:
+                start_centroid = self.iris_list[ir_num].seed_pos
+                goal_centroid = self.iris_list[ir_num+1].seed_pos
+                # start_centroid = self.iris_list[ir_num].iris_region.ChebyshevCenter()
+                # goal_centroid = self.iris_list[ir_num+1].iris_region.ChebyshevCenter()
+                new_seed = np.random.normal(loc=(start_centroid+goal_centroid)/2, scale=[0.05, 0.01, 0.1])
+                new_seed[2] = (self.iris_list[ir_num].iris_region.ChebyshevCenter()[2] + self.iris_list[ir_num+1].iris_region.ChebyshevCenter()[2])/2
 
             # check that new seed is not in collision before creating new IRIS region
             b_resample = self.pointInCollision(new_seed)

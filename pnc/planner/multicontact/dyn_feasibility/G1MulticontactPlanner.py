@@ -299,9 +299,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
                 fddp = mim_solvers.SolverCSQP(problem)
                 customFeas = FeasibilityExitCallback(gap_threshold=1e0, constraint_threshold=1e0)
                 fddp.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose(), customFeas])
-                fddp.termination_tolerance = 1  # relaxed for single TO used to warm-start
-                fddp.eps_abs = 1e-1
-                fddp.eps_rel = 1e-1
+                fddp.termination_tolerance = 0.1  # relaxed for single TO used to warm-start
+                fddp.eps_abs = 1e-2
+                fddp.eps_rel = 1e-2
                 fddp.filter_size = 10    # documentation says not to change this!
                 fddp.update_rho_with_heuristic = True
                 fddp.rho_update_interval = 50
@@ -591,7 +591,7 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         # self.fddp_full_sca.reg_incFactor = 3
         # self.fddp_full_sca.reg_decFactor = 3
 
-        max_iter = 200
+        max_iter = 100
         # Set initial guess from latest solve
         # TODO check dimensions and/or adjust
         if self.solver_type is not None:

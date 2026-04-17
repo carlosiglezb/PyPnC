@@ -129,3 +129,38 @@ class MultiContactTiltedStairsConfig(PlannerConfig):
     WBC_FINAL_WEIGHTED_COSTS = {
         'xReg': np.array([0] * 3 + [10.0] * 3 + [5.] * (N_V - 6) + [20.] * N_V),
     }
+
+class MultiContactObstructedHoleConfig(PlannerConfig):
+    B_FINAL_VEL_CONSTRAINT = False
+    W_RIGID_LINK = [0.2, 0., 0.8]
+    ALPHA = [1.0, 0.1, 0.0]
+    FOOT_SIZE = [0.15, 0.08]  # [length, width]
+    N_HORIZON_LST = [350] * 5
+
+    WBC_FRAME_TRACKING_GAINS = {
+            'torso': np.array([4, 4, 0.5] + [0.02, 0.02, 0.001]),
+            'feet': np.array([6.] * 3 + [0.1] * 3),  # (lin, ang)
+            'L_knee': np.array([4.] * 3 + [0.00001] * 3),
+            'R_knee': np.array([4.] * 3 + [0.00001] * 3),
+            'LH': np.array([4.] * 3 + [0.00001] * 3),
+            'RH': np.array([4.] * 3 + [0.00001] * 3)
+        }
+    WBC_FINAL_FRAME_TRACKING_GAINS = {
+            'torso': np.array([8, 8, 8] + [2, 2, 2]),  # (lin, ang)  step over, on_balanced
+            'feet': np.array([12.] * 3 + [6.5] * 3),  # (lin, ang)
+            'L_knee': np.array([6.] * 3 + [0.00001] * 3),
+            'R_knee': np.array([6.] * 3 + [0.00001] * 3),
+            'LH': np.array([8.] * 3 + [0.00001] * 3),
+            'RH': np.array([8.] * 3 + [0.00001] * 3)
+        }
+    WBC_WEIGHTED_COSTS = {
+        #                 q_b_lin, q_b_ang, q_j, (v_b_lin, v_b_ang), v_j
+        'xReg': np.array([0] * 6 + [0.01] * (N_V - 6) + [1.0] * 3 + [0.1] * 3 + [2.0] * (N_V - 6)), # step on
+        'uReg': np.array([1.0] * N_U),
+    }
+    WBC_PHASE_END_WEIGHTED_COSTS = {
+        'xReg': np.array([0] * 3 + [20.0] * 3 + [5.] * (N_V - 6) + [30.] * N_V),    # step on balanced
+    }
+    WBC_FINAL_WEIGHTED_COSTS = {
+        'xReg': np.array([0] * 3 + [20.0] * 3 + [5.] * (N_V - 6) + [30.] * N_V),    # step on balanced
+    }
