@@ -68,6 +68,7 @@ class SCAHPolyhedronGeometry:
         """
         names = [
             "floor", "bottom", "knee_knocker_lwall",
-            "knee_knocker_rwall", "knee_knocker_top", "triangle_obstacle"
+            "knee_knocker_rwall", "knee_knocker_top",
+            "right_triangle_obstacle", "bottom_triangle_obstacle"
         ]
         return cls(hole_scene_instance.obstacles, names)

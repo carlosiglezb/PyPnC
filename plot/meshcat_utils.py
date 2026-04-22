@@ -259,7 +259,7 @@ class MeshcatPinocchioAnimation:
                 self.add_shape(name, meshcat_geom, meshcat_obstacle_obj(BLUE, 0.7))
             elif i == 4:
                 self.add_shape(name, meshcat_geom, meshcat_obstacle_obj(GREEN, 0.7))
-            elif i == 5:
+            elif i >= 5:
                 self.add_shape(name, meshcat_geom, meshcat_obstacle_obj(PURPLE, 0.7))
 
     def add_shape(self, viewer_name, meshcat_shape, obj_material=None):
