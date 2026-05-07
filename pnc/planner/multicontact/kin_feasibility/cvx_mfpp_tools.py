@@ -118,7 +118,8 @@ def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_
         if f_name == ssn.contact_frame_name:
             cur_seg_surface_normal = ssn
             break
-        # if we reach this point, the current frame does not have an assigned contact surface at this segment
+    # if we reach this point, the current frame does not have an assigned contact surface at this segment
+    if cur_seg_surface_normal is None:
         return
     surf_normal = cur_seg_surface_normal.surface_normal
     surf_normal = surf_normal / scipy.linalg.norm(surf_normal)      # normalize
@@ -128,22 +129,18 @@ def add_vel_acc_constr(f_name, seg_surface_normal, point, constraints, b_constr_
         frame_vel_ini = cur_seg_surface_normal.get_contact_breaking_velocity()
         constraints.append(frame_vel_ini @ point[BezierParam.VEL.value][0,:] >= 0)
 
-    # final velocity parallel to normal surface
+    # final velocity parallel to normal surface (n x V[-1] = 0)
     normal_mat = np.array([[0, -surf_normal[2], surf_normal[1]],
                            [surf_normal[2], 0, -surf_normal[0]],
                            [-surf_normal[1], surf_normal[0], 0]])
-    constraints.append(normal_mat @ point[BezierParam.VEL.value][-2,:].T == 0)
-    # parse_vec_eq_constr(np.zeros(3), normal_mat @ point[BezierParam.VEL.value][-1,:].T, constraints, lbg, ubg)
+    constraints.append(normal_mat @ point[BezierParam.VEL.value][-1,:].T == 0)
 
-    # final velocity magnitude
-    # normal_tilde = -(1. / eps_vel_constr) * surf_normal
-    # constraints.append(normal_tilde.reshape(-1, 1).T @ point[BezierParam.VEL.value][-2, :].T >= 0)
-    normal_tilde = -eps_vel_constr * surf_normal
-    constraints.append(point[BezierParam.VEL.value][-2, :] == normal_tilde)
-    # lbg.append(0.)
-    # ubg.append(casadi.inf)
-    # constraints.append(-point[BezierParam.VEL.value][-2,:] @ normal_tilde >= 0)
-    # constraints.append(point[BezierParam.VEL.value][-1] == - eps_vel_constr * np.sign(surf_normal))
+    # approach from normal direction: n · V[-1] <= 0 (soft stop allowed at contact)
+    constraints.append(surf_normal @ point[BezierParam.VEL.value][-1, :] <= 0)
+
+    # decelerate along normal: n · V[-2] <= n · V[-1]
+    constraints.append(surf_normal @ point[BezierParam.VEL.value][-2, :] <=
+                       surf_normal @ point[BezierParam.VEL.value][-1, :])
 
     if b_constr_accel:
         # apply only strictly positive and negative accelerations
@@ -177,7 +174,8 @@ def add_vel_acc_constr_casadi(f_name, seg_surface_normal, point, constraints, lb
         if f_name == ssn.contact_frame_name:
             cur_seg_surface_normal = ssn
             break
-        # if we reach this point, the current frame does not have an assigned contact surface at this segment
+    # if we reach this point, the current frame does not have an assigned contact surface at this segment
+    if cur_seg_surface_normal is None:
         return
     surf_normal = cur_seg_surface_normal.surface_normal
     surf_normal = surf_normal / scipy.linalg.norm(surf_normal)      # normalize
@@ -193,13 +191,13 @@ def add_vel_acc_constr_casadi(f_name, seg_surface_normal, point, constraints, lb
     normal_mat = np.array([[0, -surf_normal[2], surf_normal[1]],
                            [surf_normal[2], 0, -surf_normal[0]],
                            [-surf_normal[1], surf_normal[0], 0]])
-    parse_vec_eq_constr(np.zeros(3), normal_mat @ point[BezierParam.VEL.value][-2,:].T, constraints, lbg, ubg)
+    parse_vec_eq_constr(np.zeros(3), normal_mat @ point[BezierParam.VEL.value][-1,:].T, constraints, lbg, ubg)
     # constraints.append(normal_mat @ point[BezierParam.VEL.value][-1,:].T == 0)
 
     # final velocity magnitude
     # TODO uncomment back in
-    normal_tilde = -eps_vel_constr * surf_normal
-    parse_vec_eq_constr(normal_tilde, point[BezierParam.VEL.value][-2,:].T, constraints, lbg, ubg)
+    # normal_tilde = -eps_vel_constr * surf_normal
+    # parse_vec_eq_constr(normal_tilde, point[BezierParam.VEL.value][-2,:].T, constraints, lbg, ubg)
     # constraints.append(-normal_tilde.reshape(-1, 1).T @ point[BezierParam.VEL.value][-1, :].T)
     # lbg.append(0.)
     # ubg.append(casadi.inf)
