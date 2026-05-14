@@ -2,8 +2,6 @@ import unittest
 import os, sys
 import casadi
 
-import util.util
-
 cwd = os.getcwd()
 sys.path.append(cwd)
 

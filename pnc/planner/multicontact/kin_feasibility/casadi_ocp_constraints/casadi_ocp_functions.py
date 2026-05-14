@@ -119,17 +119,21 @@ class IndexedHessFun(Callback):
         Callback.__init__(self)
         self.dim_optim_var = dim_optim_var
 
-        self.jac_dm = np.zeros((dim_optim_var, 1), dtype=bool)
-        self.hess_dm = np.zeros((dim_optim_var, dim_optim_var), dtype=bool)
+        # Hessian is approximated as zero; empty sparsity avoids O(dim²) allocation
+        self.hess_sparsity = Sparsity(dim_optim_var, dim_optim_var)
 
-        # Sparse entries in Jacobian
-        self.jac_dm[pos1_curr_ir:pos1_curr_ir + 3, 0] = 1
+        # Gradient output: (dim_optim_var, 1) sparse at the 3+3 position entries
+        nz_rows_jac = list(range(pos1_curr_ir, pos1_curr_ir + 3))
         if pos2_curr_ir is not None:
-            self.jac_dm[pos2_curr_ir:pos2_curr_ir + 3, 0] = 1
-        self.jac_dm_in = self.jac_dm.reshape(1, -1)
+            nz_rows_jac += list(range(pos2_curr_ir, pos2_curr_ir + 3))
+        self.jac_sparsity_hess = Sparsity.triplet(
+            dim_optim_var, 1, nz_rows_jac, [0] * len(nz_rows_jac)
+        )
 
-        self.jac_np = np.zeros((self.dim_optim_var, 1))
-        self.hess_np = np.zeros((self.dim_optim_var, self.dim_optim_var))
+        # Input Jacobian: (1, dim_optim_var) with same nonzero column positions
+        self.jac_in_sparsity = Sparsity.triplet(
+            1, dim_optim_var, [0] * len(nz_rows_jac), nz_rows_jac
+        )
 
         self.construct(name, opts)
 
@@ -145,23 +149,17 @@ class IndexedHessFun(Callback):
         elif i == 1:    # nominal output, f(x)
             return Sparsity.dense(1, 1)
         elif i == 2:    # nominal jac, J(x)
-            return sparsify(DM(self.jac_dm_in.tolist())).sparsity()
-            # return Sparsity.dense(1, self.dim_optim_var)
+            return self.jac_in_sparsity
 
     def get_sparsity_out(self, i):
-        if i == 0:      # hessian
-            return sparsify(DM(self.hess_dm.tolist())).sparsity()
-            # return Sparsity.dense(self.dim_optim_var, self.dim_optim_var)
-        elif i == 1:    # jacobian
-            return sparsify(DM(self.jac_dm.tolist())).sparsity()
-            # return Sparsity.dense(self.dim_optim_var, 1)
+        if i == 0:      # hessian (always zero)
+            return self.hess_sparsity
+        elif i == 1:    # gradient
+            return self.jac_sparsity_hess
 
     def eval(self, arg):
-        x = np.array(arg[0])
-        alpha = np.array(arg[1])
-        jac = np.array(arg[2])
-
-        return self.hess_np, jac
+        jac = arg[2]
+        return [DM(self.hess_sparsity), jac]
 
 
 class IndexedPrimitiveGeometryJacFun(Callback):
@@ -183,26 +181,31 @@ class IndexedPrimitiveGeometryJacFun(Callback):
 
         current_frames = mfpp_bezier_data['current_frames']
         num_iris_regions = mfpp_bezier_data['num_iris_per_frame']
-        # ------- sparse entries in Jacobian
-        self.jac_dm = np.zeros((1, self.dim_optim_var), dtype=bool)
-        # get current point and solve min distance for each pair of points
+        # ------- sparse entries in Jacobian (built directly without dense intermediates)
         curr_pnt_in_iris = self.current_point % self.n_points
         curr_ir = self.current_point // self.n_points
         pos1_curr_ir = (current_frames[0] * self.bezier_higher_derivatives * num_iris_regions +
                         self.bezier_higher_derivatives * curr_ir +
                         curr_pnt_in_iris)
         pos1_idxs = np.arange(pos1_curr_ir, pos1_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
-        self.jac_dm[0, pos1_idxs] = 1
 
         if self.current_frames[1] is not None:
             pos2_curr_ir = (current_frames[1] * self.bezier_higher_derivatives * num_iris_regions +
                             self.bezier_higher_derivatives * curr_ir +
                             curr_pnt_in_iris)
             pos2_idxs = np.arange(pos2_curr_ir, pos2_curr_ir + 3*self.n_points, step=self.n_points, dtype=int)
-            self.jac_dm[0, pos2_idxs] = 1
+            nz_cols = np.concatenate([pos1_idxs, pos2_idxs])
         else:
             pos2_curr_ir = None
             pos2_idxs = None
+            nz_cols = pos1_idxs.copy()
+
+        nz_rows = np.zeros(len(nz_cols), dtype=int)
+        sort_order = np.argsort(nz_cols, kind='stable')
+        self._jac_nz_order = sort_order
+        self.jac_sparsity = Sparsity.triplet(
+            1, self.dim_optim_var, nz_rows[sort_order].tolist(), nz_cols[sort_order].tolist()
+        )
 
         self.hess_callback = IndexedHessFun(name, self.dim_optim_var, pos1_curr_ir, pos2_curr_ir, opts)
 
@@ -223,8 +226,7 @@ class IndexedPrimitiveGeometryJacFun(Callback):
 
     def get_sparsity_out(self, i):
         if i == 0:
-            return sparsify(DM(self.jac_dm.tolist())).sparsity()
-            # return Sparsity.dense(1, self.dim_optim_var)
+            return self.jac_sparsity
 
     def update_dual_vars(self, z):
         self.z = z
@@ -432,24 +434,13 @@ class IndexedEllipsoidEllipsoidJacFun(IndexedPrimitiveGeometryJacFun):
 
     # Evaluate numerically
     def eval(self, arg):
-        z = np.array(arg[0])
-
-        # reconstruct cone matrices with implicit parameters
         grad_ellipse1 = np.vstack((np.zeros((1,3)), self.U1 @ self.Q.T))
         grad_ellipse2 = np.vstack((np.zeros((1,3)), self.U2 @ self.Q.T))
         ret1 = self.z[:-1].T @ (np.concatenate((grad_ellipse1, np.zeros((4, 3)))))
         ret2 = self.z[:-1].T @ (np.concatenate((np.zeros((4, 3)), grad_ellipse2)))
 
-        # ---- distribute to corresponding indices in Jacobian
-        # aesthetics
-        pos1_idxs = self.pos1_idxs
-        pos2_idxs = self.pos2_idxs
-
-        jac_z = np.zeros((1, self.dim_optim_var))
-        jac_z[0, pos1_idxs] = ret1
-        jac_z[0, pos2_idxs] = ret2
-
-        return [jac_z]
+        all_vals = np.concatenate([ret1.flatten(), ret2.flatten()])
+        return [DM(self.jac_sparsity, all_vals[self._jac_nz_order].tolist())]
 
 
 class IndexedEllipsoidEllipsoidConstraint(IndexedPrimitiveGeometryDistanceCallback):
@@ -508,25 +499,14 @@ class IndexedCapsuleEllipsoidJacFun(IndexedPrimitiveGeometryJacFun):
 
     # Evaluate numerically
     def eval(self, arg):
-        z = np.array(arg[0])
-
-        # reconstruct cone matrices with implicit parameters
         grad_capsule_radius = np.vstack((np.zeros((1,3)), np.eye(3)))
         grad_capsule_length = np.zeros((2,3))
         grad_ellipse = np.vstack((np.zeros((1,3)), self.U @ self.Q.T))
         ret1 = self.z[:-1].T @ (np.concatenate((grad_capsule_radius, grad_capsule_length, np.zeros((4, 3)))))
         ret2 = self.z[:-1].T @ (np.concatenate((np.zeros((6, 3)), grad_ellipse)))
 
-        # ---- distribute to corresponding indices in Jacobian
-        # aesthetics
-        pos1_idxs = self.pos1_idxs
-        pos2_idxs = self.pos2_idxs
-
-        jac_z = np.zeros((1, self.dim_optim_var))
-        jac_z[0, pos1_idxs] = ret1
-        jac_z[0, pos2_idxs] = ret2
-
-        return [jac_z]
+        all_vals = np.concatenate([ret1.flatten(), ret2.flatten()])
+        return [DM(self.jac_sparsity, all_vals[self._jac_nz_order].tolist())]
 
 
 class IndexedCapsuleEllipsoidConstraint(IndexedPrimitiveGeometryDistanceCallback):
@@ -586,25 +566,16 @@ class IndexedPolytopeEllipsoidJacFun(IndexedPrimitiveGeometryJacFun):
 
     # Evaluate numerically
     def eval(self, arg):
-        z = np.array(arg[0])
-
-        # reconstruct cone matrices with implicit parameters
         grad_polytope = -self.A1 @ self.Q.T
         grad_ellipse = np.vstack((np.zeros((1,3)), self.U @ self.Q.T))
         ret1 = self.z[:-1].T @ (np.concatenate((grad_polytope, np.zeros((4, 3)))))
         ret2 = self.z[:-1].T @ (np.concatenate((np.zeros((6, 3)), grad_ellipse)))
 
-        # ---- distribute to corresponding indices in Jacobian
-        # aesthetics
-        pos1_idxs = self.pos1_idxs
-        pos2_idxs = self.pos2_idxs
-
-        jac_z = np.zeros((1, self.dim_optim_var))
-        jac_z[0, pos1_idxs] = ret1
-        if pos2_idxs is not None:
-            jac_z[0, pos2_idxs] = ret2
-
-        return [jac_z]
+        if self.pos2_idxs is not None:
+            all_vals = np.concatenate([ret1.flatten(), ret2.flatten()])
+        else:
+            all_vals = ret1.flatten()
+        return [DM(self.jac_sparsity, all_vals[self._jac_nz_order].tolist())]
 
 
 class IndexedPolytopeEllipsoidConstraint(IndexedPrimitiveGeometryDistanceCallback):
@@ -671,24 +642,13 @@ class IndexedPolytopePolytopeJacFun(IndexedPrimitiveGeometryJacFun):
 
     # Evaluate numerically
     def eval(self, arg):
-        z = np.array(arg[0])
-
-        # reconstruct cone matrices with implicit parameters
         grad_torso_polytope = -self.A1 @ self.Q.T
         grad_ee_polytope = -self.A2 @ self.Q.T
         ret1 = self.z[:-1].T @ (np.concatenate((grad_torso_polytope, np.zeros((6, 3)))))
         ret2 = self.z[:-1].T @ (np.concatenate((np.zeros((6, 3)), grad_ee_polytope)))
 
-        # ---- distribute to corresponding indices in Jacobian
-        # aesthetics
-        pos1_idxs = self.pos1_idxs
-        pos2_idxs = self.pos2_idxs
-
-        jac_z = np.zeros((1, self.dim_optim_var))
-        jac_z[0, pos1_idxs] = ret1
-        jac_z[0, pos2_idxs] = ret2
-
-        return [jac_z]
+        all_vals = np.concatenate([ret1.flatten(), ret2.flatten()])
+        return [DM(self.jac_sparsity, all_vals[self._jac_nz_order].tolist())]
 
 class IndexedPolytopePolytopeConstraint(IndexedPrimitiveGeometryDistanceCallback):
     def __init__(self, name, geom_data, mfpp_bezier_data, opts={}):
