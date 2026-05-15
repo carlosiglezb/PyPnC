@@ -1,4 +1,5 @@
 import numpy as np
+from itertools import combinations
 
 # Convex Hull description
 from scipy.spatial import ConvexHull
@@ -9,12 +10,37 @@ import hppfcl as fcl
 import pinocchio as pin
 
 
+def _vertices_from_hpoly_3d(A: np.ndarray, b: np.ndarray, tol: float = 1e-8) -> np.ndarray:
+    """
+    Enumerate the vertices of a 3D H-polytope {x : Ax <= b} by intersecting
+    every triple of bounding planes and keeping the feasible intersections.
+
+    Avoids pycddlib (and its GMP requirement) entirely; uses only numpy.
+    Complexity is O(n^3) in the number of halfspaces, which is fine for the
+    small obstacle polytopes used here (typically 5-15 faces).
+    """
+    n_faces = A.shape[0]
+    vertices = []
+    for i, j, k in combinations(range(n_faces), 3):
+        A_sub = A[[i, j, k], :]
+        if abs(np.linalg.det(A_sub)) < 1e-10:
+            continue  # planes don't meet at a unique point
+        x = np.linalg.solve(A_sub, b[[i, j, k]])
+        if np.all(A @ x <= b + tol):
+            vertices.append(x)
+    if len(vertices) < 4:
+        raise ValueError("Fewer than 4 feasible vertices found — polytope may be unbounded or degenerate.")
+    vertices = np.array(vertices)
+    # deduplicate near-coincident vertices
+    _, unique_idx = np.unique(np.round(vertices, 7), axis=0, return_index=True)
+    return vertices[unique_idx]
+
+
 def pydrake_geom_to_meshcat(mut_polyhedron: HPolyhedron):
     poly_A = mut_polyhedron.A()
     poly_b = mut_polyhedron.b()
-    poly_vertices = compute_polytope_vertices(poly_A, poly_b)
-    # poly_chull = ConvexHull(poly_vertices, qhull_options='QbB')
-    poly_chull = ConvexHull(poly_vertices, qhull_options='QJ')    # qhull_options='QJ', 'QbB', 'QR0', 'Qs', 'En'
+    poly_vertices = _vertices_from_hpoly_3d(poly_A, poly_b)
+    poly_chull = ConvexHull(poly_vertices, qhull_options='QJ')
     return TriangularMeshGeometry(poly_chull.points, poly_chull.simplices)
 
 def scipy_hull_to_meshcat(convex_hull: ConvexHull):
@@ -44,15 +70,12 @@ def hpoly_to_fcl_collision(drake_hpoly: HPolyhedron) -> fcl.Convex:
         RuntimeError: If necessary FCL binding classes are not found.
     """
 
-    # Validation and H-rep to V-rep
-
-    # In a real environment, you would use a library like pypoman here:
     A = drake_hpoly.A()
     b = drake_hpoly.b()
-    hpoly_vertices = compute_polytope_vertices(A, b)
+    hpoly_vertices = _vertices_from_hpoly_3d(A, b)
 
     # Compute the Convex Hull to get the Faces (Triangulation)
-    hull = ConvexHull(hpoly_vertices, qhull_options='QJ')    # qhull_options='QJ', 'QbB', 'QR0', 'Qs', 'En'
+    hull = ConvexHull(hpoly_vertices, qhull_options='QJ')
     fcl_faces_indices = hull.simplices  # M x 3 array of vertex indices
 
     # Create the required list of 3D Vectors (Vertices)
