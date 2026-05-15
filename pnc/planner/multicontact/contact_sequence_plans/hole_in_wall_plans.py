@@ -247,10 +247,10 @@ def get_on_rf_balanced_contact_seq(hole: HoleInWallObstructed,
 
     return fixed_frames, motion_frames_seq
 
-def compute_stairs_iris_regions_mgr(hole: HoleInWallObstructed,
-                                    starting_pose: dict[str, np.ndarray],
-                                    motion_frames_seq: MotionFrameSequencer,
-                                    b_use_knees: bool = True):
+def compute_iris_regions_mgr(hole: HoleInWallObstructed,
+                             starting_pose: dict[str, np.ndarray],
+                             motion_frames_seq: MotionFrameSequencer,
+                             b_use_knees: bool = True):
     # load obstacle, domain, and start / end seed for IRIS
     obstacles = hole.obstacles
     domain = hole.domain

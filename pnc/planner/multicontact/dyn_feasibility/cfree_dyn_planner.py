@@ -1111,8 +1111,8 @@ def main(args):
                 for fr in plan_to_model_frames.keys():
                     starting_pose[fr] = robot_fwdk.get_link_iso(plan_to_model_frames[fr])[:3, 3]
                 fixed_frames_seq, motion_frames_seq = hole_plan.get_on_rf_balanced_contact_seq(obstructed_hole, starting_pose, robot_name, B_USE_KNEES=B_USE_KNEES)
-                safe_regions_mgr_dict = hole_plan.compute_stairs_iris_regions_mgr(obstructed_hole, starting_pose,
-                                                                                    motion_frames_seq)
+                safe_regions_mgr_dict = hole_plan.compute_iris_regions_mgr(obstructed_hole, starting_pose,
+                                                                           motion_frames_seq)
             p_init = {}
             p_init['torso'] = starting_pose['torso']
             p_init['LF'] = starting_pose['LF']

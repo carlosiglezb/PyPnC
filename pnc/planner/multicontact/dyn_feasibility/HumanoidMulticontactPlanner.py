@@ -41,6 +41,7 @@ class HumanoidMulticontactPlanner:
         self.fddp_full = crocoddyl.SolverFDDP
         self.fddp_full_sca = crocoddyl.SolverFDDP
         self.T = contact_seqs.phases_durations  # time_per_phase
+        self.b_sca_converges = False
 
         self.planner_params = planner_params
         # TODO set some default values

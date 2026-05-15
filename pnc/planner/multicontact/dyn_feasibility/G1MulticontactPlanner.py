@@ -615,7 +615,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
         #     idx_removed += 1
 
         start_ddp_solve_time = time.time()
-        print("[SCA-Crocoddyl] Problem solved to convergence:", self.fddp_full_sca.solve(xs, us, max_iter))
+        self.b_sca_converges = self.fddp_full_sca.solve(xs, us, max_iter)
+        print("[SCA-Crocoddyl] Problem solved to convergence:", self.b_sca_converges)
         dyn_seg_solve_time = time.time() - start_ddp_solve_time
         print(f"[SCA-Crocoddyl] Is feasible: {self.fddp_full_sca.isFeasible}")
         print("[SCA-Crocoddyl] Number of iterations:", self.fddp_full_sca.iter)
