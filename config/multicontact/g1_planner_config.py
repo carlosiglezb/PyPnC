@@ -9,7 +9,7 @@ class MultiContactDoorConfig(PlannerConfig):
     # W_RIGID_LINK_STEP_ON_DOOR = [1000., 0., 0.]
 
     # ----- seq 0 (step over): single hand, step through door
-    B_FINAL_VEL_CONSTRAINT = False
+    B_FINAL_VEL_CONSTRAINT = True
     # W_RIGID_LINK = [10., 0., 0.]  # option 0: knees forward
     # ALPHA = [1., 0., 0.01]           # option 0: knees forward
     # W_RIGID_LINK = [5., 0., 0.]  # option 1: knees forward
@@ -28,9 +28,9 @@ class MultiContactDoorConfig(PlannerConfig):
     # ALPHA = [0.5, 0.0, 0.1]         # option 7: roll shins outwards
     # W_RIGID_LINK = [5, 0., 2]       # option 8: knees forward
     # ALPHA = [0.01, 0.1, 0.5]         # option 8: knee forward
-    W_RIGID_LINK = [1., 0., 0.]   # option 9: knees fwd (RAL)
-    # W_RIGID_LINK = [0., 0., 1.]   # option 10: knees-up (RAL)
-    # W_RIGID_LINK = [0.2, 0., 0.8]   # option 11: balanced (RAL)
+    # W_RIGID_LINK = [1., 0., 0.]   # option 9: knees fwd (RAL)
+    W_RIGID_LINK = [0., 0., 1.]   # option 10: knees-up (RAL)
+    # W_RIGID_LINK = [0.5, 0., 0.5]   # option 11: balanced (RAL)
     ALPHA = [1, 0., 0.1]         # options 9-11 (RAL)
     # N_HORIZON_LST = [180, 240, 280, 250, 250]
     # ----- seq 1 (step on): opposite hand-foot pair at each contact
@@ -133,7 +133,7 @@ class MultiContactTiltedStairsConfig(PlannerConfig):
 class MultiContactObstructedHoleConfig(PlannerConfig):
     B_FINAL_VEL_CONSTRAINT = False
     W_RIGID_LINK = [0.2, 0., 0.8]
-    ALPHA = [1.0, 0.1, 0.0]
+    ALPHA = [0.0, 0.1, 0.0]
     FOOT_SIZE = [0.15, 0.08]  # [length, width]
     N_HORIZON_LST = [350] * 5
 
