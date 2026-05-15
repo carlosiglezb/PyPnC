@@ -572,9 +572,12 @@ class IndexedPolytopeEllipsoidJacFun(IndexedPrimitiveGeometryJacFun):
         ret2 = self.z[:-1].T @ (np.concatenate((np.zeros((6, 3)), grad_ellipse)))
 
         if self.pos2_idxs is not None:
+            # Both frames tracked: ret1 = ∂α/∂r1 (polytope/torso), ret2 = ∂α/∂r2 (sphere/EE)
             all_vals = np.concatenate([ret1.flatten(), ret2.flatten()])
         else:
-            all_vals = ret1.flatten()
+            # Environment collision: only the EE/sphere (at pos1) moves; polytope is fixed.
+            # ret2 is the gradient of α w.r.t. the sphere centre (= EE/knee).
+            all_vals = ret2.flatten()
         return [DM(self.jac_sparsity, all_vals[self._jac_nz_order].tolist())]
 
 
@@ -616,8 +619,10 @@ class IndexedPolytopeEllipsoidConstraint(IndexedPrimitiveGeometryDistanceCallbac
         r1_cp = z[pos1_idxs]
 
         if current_frames[1] is None:
-            r2_cp = self.polytope_origin
+            # Environment collision: wall is polytope (r1=wall center), EE/knee is sphere (r2=EE pos)
             Q = self.polytope_rotation
+            r2_cp = r1_cp                 # sphere center = EE/knee position from opt vector
+            r1_cp = self.polytope_origin  # polytope center = fixed wall origin
         else:
             pos2_curr_ir = (current_frames[1] * bezier_higher_derivatives * num_iris_regions +
                             bezier_higher_derivatives * curr_ir +
