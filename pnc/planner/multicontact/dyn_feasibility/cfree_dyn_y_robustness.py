@@ -145,19 +145,25 @@ def build_knocker_contact_seq(starting_pose: dict, b_use_knees: bool = True):
     Phase 3  – LF + L_knee step onto the knocker
     Phase 4  – torso stabilises over the knocker; LH adjusts
     Phase 5  – final balance; RH adjusts
-    """
-    rf_y = starting_pose['RF'][1]
-    torso_pos = starting_pose['torso']
 
-    rf_on_knocker  = np.array([KNOCKER_X, rf_y, KNOCKER_Z])
-    lf_final = starting_pose['LF'] + np.array([STEP_LENGTH, 0., 0.])
-    rf_final = starting_pose['RF'] + np.array([STEP_LENGTH, 0., 0.])
-    rh_final = starting_pose['RH'] + np.array([STEP_LENGTH, 0., 0.])
-    lh_final = starting_pose['LH'] + np.array([STEP_LENGTH, 0., 0.])
+    The robot's final standing position is centred at y=0.  RF lands on the
+    knocker at the y mid-point between its initial y and 0 (dy_knocker), then
+    all frames step to their final y-centred positions (dy_final).
+    """
+    torso_y0   = starting_pose['torso'][1]  # initial torso y ≈ y_pos
+    dy_knocker = -torso_y0 / 2              # half y-shift: knocker step mid-point
+    dy_final   = -torso_y0                  # full y-shift: centre torso at y=0
+
+    rf_on_knocker  = np.array([KNOCKER_X, starting_pose['RF'][1] + dy_knocker, KNOCKER_Z])
     rkn_on_knocker = rf_on_knocker + FT_KN_OFFSET
-    lkn_final = lf_final + FT_KN_OFFSET
-    rkn_final = rf_final + FT_KN_OFFSET
-    torso_final = torso_pos + np.array([STEP_LENGTH, 0., 0.])
+
+    lf_final    = starting_pose['LF']    + np.array([STEP_LENGTH, dy_final, 0.])
+    rf_final    = starting_pose['RF']    + np.array([STEP_LENGTH, dy_final, 0.])
+    lkn_final   = lf_final + FT_KN_OFFSET
+    rkn_final   = rf_final + FT_KN_OFFSET
+    torso_final = starting_pose['torso'] + np.array([STEP_LENGTH, dy_final, 0.])
+    rh_final    = starting_pose['RH']    + np.array([STEP_LENGTH, dy_final, 0.])
+    lh_final    = starting_pose['LH']    + np.array([STEP_LENGTH, dy_final, 0.])
 
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
