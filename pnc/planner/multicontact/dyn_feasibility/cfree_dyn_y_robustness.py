@@ -576,21 +576,12 @@ def run_trial(y_pos: float, shared: dict) -> dict:
                 contact_mask_t   = np.zeros((n_steps, 4), dtype=np.float32)
                 contact_normal_t = np.zeros((n_steps, 4, 3), dtype=np.float32)
                 phase_start = 0
-                for phase_i, (cs, cp) in enumerate(zip(contact_seqs, contact_seq_planes)):
+                for phase_i, cp in enumerate(contact_seq_planes):
                     phase_end = phase_start + N_horizon_lst[phase_i]
                     for ee_idx, ee_name in enumerate(_EE_ORDER):
-                        if ee_name in cs:
+                        if ee_name in cp:
                             contact_mask_t[phase_start:phase_end, ee_idx] = 1.0
-                            if ee_name in cp:
-                                contact_normal_t[phase_start:phase_end, ee_idx] = cp[ee_name]
-                            else:
-                                # get_contact_planes_from_motion_frames_seq only populates
-                                # LF/RF for the last phase; fall back to the most recent
-                                # known normal for this EE from earlier phases.
-                                for prev_cp in reversed(contact_seq_planes[:phase_i]):
-                                    if ee_name in prev_cp:
-                                        contact_normal_t[phase_start:phase_end, ee_idx] = prev_cp[ee_name]
-                                        break
+                            contact_normal_t[phase_start:phase_end, ee_idx] = cp[ee_name]
                     phase_start = phase_end
                 # Terminal state: copy contact state of the last knot
                 contact_mask_t[-1]   = contact_mask_t[-2]
@@ -616,13 +607,18 @@ def run_trial(y_pos: float, shared: dict) -> dict:
                     for fi, ee_name in enumerate(_FEET_ORDER):
                         contact_key = ee_name + '_contact'
                         if contact_key in contacts_map:
-                            f = contacts_map[contact_key].f
-                            contact_forces_feet_arr[k, fi, :3] = f.linear.astype(np.float32)
-                            contact_forces_feet_arr[k, fi, 3:] = f.angular.astype(np.float32)
+                            contact = contacts_map[contact_key]
+                            joint = dyn_rob_model.frames[contact.frame].parentJoint
+                            R = contact.pinocchio.oMi[joint].rotation
+                            contact_forces_feet_arr[k, fi, :3] = (R @ contact.f.linear).astype(np.float32)
+                            contact_forces_feet_arr[k, fi, 3:] = (R @ contact.f.angular).astype(np.float32)
                     for hi, ee_name in enumerate(_HANDS_ORDER):
                         contact_key = ee_name + '_contact'
                         if contact_key in contacts_map:
-                            contact_forces_hands_arr[k, hi] = contacts_map[contact_key].f.linear.astype(np.float32)
+                            contact = contacts_map[contact_key]
+                            joint = dyn_rob_model.frames[contact.frame].parentJoint
+                            R = contact.pinocchio.oMi[joint].rotation
+                            contact_forces_hands_arr[k, hi] = (R @ contact.f.linear).astype(np.float32)
                 # Copy terminal forces from last running step
                 contact_forces_feet_arr[-1]  = contact_forces_feet_arr[-2]
                 contact_forces_hands_arr[-1] = contact_forces_hands_arr[-2]
