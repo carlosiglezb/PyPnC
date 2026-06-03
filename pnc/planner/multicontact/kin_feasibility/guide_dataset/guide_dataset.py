@@ -122,6 +122,9 @@ def generate_guide_dataset(
     w_rigid_mid_fixed: float = 0.0,
     seed: int = 42,
     save_path: str = "guide_dataset.npz",
+    dyn_plan_fn: Callable | None = None,
+    dyn_save_path: str | None = None,
+    dyn_joint_names: list[str] | None = None,
 ) -> None:
     """Generate and save a dataset of kinematic guides as Bezier control points.
 
@@ -146,11 +149,25 @@ def generate_guide_dataset(
     ----------
     planner_builder_fn : Callable[[np.ndarray], Any]
         Called as ``planner_builder_fn(xy_offset)`` where ``xy_offset`` is a
-        shape-(2,) array [dx, dy].  Must return a 2-tuple
-        ``(ik_cfree_planner, p_init)`` where ``ik_cfree_planner`` is a fully
-        initialised :class:`IKCFreePlanner` (with its inner
-        ``LocomanipulationFramePlanner`` set) and ``p_init`` is a dict mapping
-        planner-frame names to their 3-D starting positions.
+        shape-(2,) array [dx, dy].  Returns a tuple whose first two elements are
+        ``(ik_cfree_planner, p_init)`` — a fully initialised
+        :class:`IKCFreePlanner` and a dict mapping planner-frame names to their
+        3-D starting positions.  Any additional elements are forwarded verbatim
+        as positional arguments to ``dyn_plan_fn`` (after ``ik_cfree_planner``
+        and ``T_i``).
+    dyn_plan_fn : Callable or None
+        If provided, called after each successful kinematic solve as
+        ``dyn_plan_fn(ik_cfree_planner, T_i, *extra_ctx)`` where ``extra_ctx``
+        is whatever ``planner_builder_fn`` returned beyond the first two values.
+        Must return a dict with keys ``joint_pos``, ``joint_vel``, ``torso_pos``,
+        and ``dt``.  If it raises, the guide is discarded and a replacement is
+        drawn (same as a failed kinematic solve).
+    dyn_save_path : str or None
+        Destination ``.npz`` for the dynamic trajectory dataset.  Required when
+        ``dyn_plan_fn`` is not None; ignored otherwise.
+    dyn_joint_names : list[str] or None
+        Actuated-joint names in the order that matches ``joint_pos`` columns.
+        Saved verbatim as the ``joint_names`` array in ``dyn_save_path``.
     xy_offset_bounds : np.ndarray, shape (2,)
         Symmetric bounds [bound_x, bound_y].
     T_min, T_max : float
@@ -190,6 +207,12 @@ def generate_guide_dataset(
     T_used:             list[float] = []
     torso_nominal_used: list[np.ndarray] = []
 
+    joint_pos_list:    list[np.ndarray] = []
+    joint_vel_list:    list[np.ndarray] = []
+    q_base_list:       list[np.ndarray] = []
+    torso_pos_dyn_list: list[np.ndarray] = []
+    dt_list:           list[float] = []
+
     total = n_alpha * n_w_rigid
 
     # Pre-flatten the grid into a queue; extend with fresh random samples on
@@ -223,19 +246,32 @@ def generate_guide_dataset(
               f"w_rigid={np.round(w_rigid, 3)}  T={T_i:.2f}s  "
               f"offset=[{xy_offset[0]:+.3f}, {xy_offset[1]:+.3f}]", end="  ")
         try:
-            ik_cfree_planner, p_init = planner_builder_fn(xy_offset)
+            _result = planner_builder_fn(xy_offset)
+            ik_cfree_planner, p_init = _result[0], _result[1]
+            _dyn_ctx = _result[2:] if len(_result) > 2 else ()
             ik_cfree_planner.planner.plan_iris(
                 p_init, T_i, alpha.tolist(), w_rigid, w_rigid,
                 b_final_vel_constraint=True, verbose=False,
             )
             ctrl_pts, trans_times = _extract_bezier_control_points(ik_cfree_planner.planner.path)
             T_i_total = float(trans_times[-1])
+
+            dyn_result = None
+            if dyn_plan_fn is not None:
+                dyn_result = dyn_plan_fn(ik_cfree_planner, T_i, *_dyn_ctx)
+
             ctrl_pts_list.append(ctrl_pts)
             trans_times_list.append(trans_times)
             alpha_used.append(alpha.copy())
             w_rigid_used.append(w_rigid.copy())
             T_used.append(T_i_total)
             torso_nominal_used.append(p_init['torso'].astype(np.float32))
+            if dyn_result is not None:
+                joint_pos_list.append(dyn_result['joint_pos'])
+                joint_vel_list.append(dyn_result['joint_vel'])
+                q_base_list.append(dyn_result['q_base'])
+                torso_pos_dyn_list.append(dyn_result['torso_pos'])
+                dt_list.append(float(dyn_result['dt']))
             print("ok")
         except Exception as exc:
             skipped += 1
@@ -269,6 +305,31 @@ def generate_guide_dataset(
           f"({skipped} infeasible skipped, {attempt} attempts total, "
           f"n_frames={n_frames}, n_segments={n_segments}, "
           f"degree={degree_plus_1 - 1}, {mb:.2f} MB)")
+
+    if dyn_plan_fn is not None and joint_pos_list and dyn_save_path is not None:
+        joint_pos_arr    = np.stack(joint_pos_list,    axis=0)   # (n_guides, n_steps, n_joints)
+        joint_vel_arr    = np.stack(joint_vel_list,    axis=0)   # (n_guides, n_steps, n_joints)
+        q_base_arr       = np.stack(q_base_list,       axis=0)   # (n_guides, n_steps, 7)
+        torso_pos_dyn_arr = np.stack(torso_pos_dyn_list, axis=0) # (n_guides, n_steps, 3)
+        dt_arr           = np.array(dt_list, dtype=np.float32)   # (n_guides,)
+        n_steps          = joint_pos_arr.shape[1]
+        T_plan_dyn       = dt_arr * (n_steps - 1)                # (n_guides,) total duration
+        np.savez(
+            dyn_save_path,
+            joint_pos=joint_pos_arr.astype(np.float32),
+            joint_vel=joint_vel_arr.astype(np.float32),
+            q_base=q_base_arr.astype(np.float32),
+            dt=float(dt_arr.mean()),
+            dt_arr=dt_arr,
+            p_init_nominal_torso=np.array(torso_nominal_used, dtype=np.float32),
+            T_plan_arr=T_plan_dyn.astype(np.float32),
+            torso_pos=torso_pos_dyn_arr.astype(np.float32),
+            joint_names=np.array(dyn_joint_names if dyn_joint_names is not None else []),
+        )
+        dyn_mb = (joint_pos_arr.nbytes + joint_vel_arr.nbytes + torso_pos_dyn_arr.nbytes) / 1e6
+        print(f"Saved dynamic plan → {dyn_save_path}  "
+              f"(n_guides={n}, n_steps={n_steps}, n_joints={joint_pos_arr.shape[2]}, "
+              f"dt_mean={float(dt_arr.mean()):.4f}s, {dyn_mb:.2f} MB)")
 
 
 # ---------------------------------------------------------------------------

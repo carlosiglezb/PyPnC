@@ -37,6 +37,29 @@ class FeasibilityExitCallback(mim_solvers.CallbackAbstract):
             print(f"--> Feasibility reached: Gaps={current_gaps:.4f}, Cons={current_cons:.4f}. Terminating.")
 
 
+class HighConstraintEarlyExitCallback(mim_solvers.CallbackAbstract):
+    """Terminates the SQP solver early if the constraint norm exceeds a threshold
+    after a minimum number of iterations, signalling an infeasible problem.
+
+    Termination is forced by setting termination_tolerance > KKT (same mechanism
+    as FeasibilityExitCallback).  The `triggered` flag lets the caller override
+    the returned convergence boolean to False afterwards.
+    """
+
+    def __init__(self, iter_threshold: int = 50, constraint_threshold: float = 10.0):
+        super().__init__()
+        self.iter_threshold = iter_threshold
+        self.constraint_threshold = constraint_threshold
+        self.triggered = False
+
+    def __call__(self, solver, args={}):
+        if solver.iter >= self.iter_threshold and solver.constraint_norm > self.constraint_threshold:
+            solver.termination_tolerance = solver.KKT + 1.0  # forces loop exit
+            self.triggered = True
+            print(f"--> Early infeasible exit: iter={solver.iter}, "
+                  f"constraint_norm={solver.constraint_norm:.4f} > {self.constraint_threshold}.")
+
+
 class G1MulticontactPlanner(HumanoidMulticontactPlanner):
     def __init__(self, robot_model,
                  contact_seqs,
@@ -564,7 +587,9 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             print("[SCA-Crocoddyl] Using CSQP solver for SCA refinement")
             self.fddp_full_sca = mim_solvers.SolverCSQP(problem)
             customFeas = FeasibilityExitCallback(gap_threshold=1e0, constraint_threshold=1e0)
-            self.fddp_full_sca.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose(), customFeas])
+            earlyInfeasExit = HighConstraintEarlyExitCallback(iter_threshold=50, constraint_threshold=5.0)
+            self.fddp_full_sca.setCallbacks([mim_solvers.CallbackLogger(), mim_solvers.CallbackVerbose(),
+                                             customFeas, earlyInfeasExit])
             self.fddp_full_sca.termination_tolerance = 1e0
             self.fddp_full_sca.eps_abs = 5e-1
             self.fddp_full_sca.eps_rel = 5e-1
@@ -616,6 +641,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
 
         start_ddp_solve_time = time.time()
         self.b_sca_converges = self.fddp_full_sca.solve(xs, us, max_iter)
+        if earlyInfeasExit.triggered:
+            self.b_sca_converges = False
         print("[SCA-Crocoddyl] Problem solved to convergence:", self.b_sca_converges)
         dyn_seg_solve_time = time.time() - start_ddp_solve_time
         print(f"[SCA-Crocoddyl] Is feasible: {self.fddp_full_sca.isFeasible}")

@@ -67,6 +67,13 @@ B_USE_KNEES                 = True
 B_USE_SELF_COLLISION_AVOIDANCE = True
 B_USE_KNEES_IN_SMOOTH_PLAN  = False
 B_VISUALIZE_KIN             = True
+B_VISUALIZE_DYN             = True
+
+# ---------------------------------------------------------------------------
+# Dataset saving
+# ---------------------------------------------------------------------------
+SAVE_DYN_PLAN = True
+DYN_SAVE_PATH = "guide_dataset_dyn_single.npz"
 
 # ---------------------------------------------------------------------------
 # Contact geometry constants for the obstructed-hole environment (G1)
@@ -337,10 +344,12 @@ def setup_g1_obstructed_hole():
         vis_model=vis_model,
         root_to_torso_offset=root_to_torso_offset,
         dyn_rob_model=dyn_rob_model,
+        dyn_vis_model=dyn_vis_model,
         refined_geom_model=refined_geom_model,
         obstructed_hole=obstructed_hole,
         sca_geometry=sca_geometry,
         planner_params=planner_params,
+        joint_names=list(dyn_rob_model.names[2:]),
     )
 
 
@@ -526,6 +535,130 @@ def run_trial(y_pos: float, shared: dict) -> dict:
         result['solver_type'] = robot_dyn_plan.solver_type
         if latest_fddp is not None:
             result['is_optimal'] = bool(robot_dyn_plan.b_sca_converges)
+            if SAVE_DYN_PLAN:
+                xs = np.array([np.asarray(x) for x in latest_fddp.xs])
+                nq = dyn_rob_model.nq
+                result['q_base']        = xs[:, :7].astype(np.float32)
+                result['joint_pos']     = xs[:, 7:nq].astype(np.float32)
+                result['base_lin_vel']  = xs[:, nq:nq + 3].astype(np.float32)
+                result['base_ang_vel']  = xs[:, nq + 3:nq + 6].astype(np.float32)
+                result['joint_vel']     = xs[:, nq + 6:].astype(np.float32)
+                result['p_init_torso'] = starting_pose['torso'].astype(np.float32)
+                result['dt'] = float(T / planner_params.N_HORIZON_LST[0])
+                dyn_rob_data_tmp = dyn_rob_model.createData()
+                torso_frame_id = dyn_rob_model.getFrameId('torso_primitive_shape')
+                _ee_frame_names = [
+                    'left_ankle_roll_link', 'right_ankle_roll_link',
+                    'left_rubber_hand',     'right_rubber_hand',
+                    'left_knee_link',       'right_knee_link',
+                ]
+                _ee_frame_ids = [dyn_rob_model.getFrameId(n) for n in _ee_frame_names]
+                n_steps = xs.shape[0]
+                us = np.array([np.asarray(u) for u in latest_fddp.us])
+                result['torques'] = us.astype(np.float32)
+
+                torso_pos_arr = np.zeros((n_steps, 3), dtype=np.float32)
+                com_pos_arr   = np.zeros((n_steps, 3), dtype=np.float32)
+                ee_pos_arr    = np.zeros((n_steps, len(_ee_frame_ids), 3), dtype=np.float32)
+                for k in range(n_steps):
+                    pin.forwardKinematics(dyn_rob_model, dyn_rob_data_tmp, xs[k, :nq])
+                    pin.updateFramePlacements(dyn_rob_model, dyn_rob_data_tmp)
+                    torso_pos_arr[k] = dyn_rob_data_tmp.oMf[torso_frame_id].translation.astype(np.float32)
+                    com_pos_arr[k]   = pin.centerOfMass(dyn_rob_model, dyn_rob_data_tmp, xs[k, :nq]).astype(np.float32)
+                    for i_ee, fid in enumerate(_ee_frame_ids):
+                        ee_pos_arr[k, i_ee] = dyn_rob_data_tmp.oMf[fid].translation.astype(np.float32)
+                result['torso_pos'] = torso_pos_arr
+                result['com_pos']   = com_pos_arr
+                result['ee_pos']    = ee_pos_arr
+
+                # Per-timestep contact mask and surface normals — EE order: [LF, RF, LH, RH]
+                _EE_ORDER = ['LF', 'RF', 'LH', 'RH']
+                contact_mask_t   = np.zeros((n_steps, 4), dtype=np.float32)
+                contact_normal_t = np.zeros((n_steps, 4, 3), dtype=np.float32)
+                phase_start = 0
+                for phase_i, (cs, cp) in enumerate(zip(contact_seqs, contact_seq_planes)):
+                    phase_end = phase_start + N_horizon_lst[phase_i]
+                    for ee_idx, ee_name in enumerate(_EE_ORDER):
+                        if ee_name in cs:
+                            contact_mask_t[phase_start:phase_end, ee_idx] = 1.0
+                            if ee_name in cp:
+                                contact_normal_t[phase_start:phase_end, ee_idx] = cp[ee_name]
+                            else:
+                                # get_contact_planes_from_motion_frames_seq only populates
+                                # LF/RF for the last phase; fall back to the most recent
+                                # known normal for this EE from earlier phases.
+                                for prev_cp in reversed(contact_seq_planes[:phase_i]):
+                                    if ee_name in prev_cp:
+                                        contact_normal_t[phase_start:phase_end, ee_idx] = prev_cp[ee_name]
+                                        break
+                    phase_start = phase_end
+                # Terminal state: copy contact state of the last knot
+                contact_mask_t[-1]   = contact_mask_t[-2]
+                contact_normal_t[-1] = contact_normal_t[-2]
+                result['contact_mask']   = contact_mask_t
+                result['contact_normal'] = contact_normal_t
+
+                # Reaction forces in world frame (LOCAL_WORLD_ALIGNED)
+                # Feet [LF, RF]: full 6D wrench (Fx,Fy,Fz,Mx,My,Mz) — shape (n_steps, 2, 6)
+                # Hands [LH, RH]: 3D linear force — shape (n_steps, 2, 3)
+                _FEET_ORDER = ['LF', 'RF']
+                _HANDS_ORDER = ['LH', 'RH']
+                contact_forces_feet_arr  = np.zeros((n_steps, 2, 6), dtype=np.float32)
+                contact_forces_hands_arr = np.zeros((n_steps, 2, 3), dtype=np.float32)
+                for k in range(n_steps - 1):
+                    run_data = list(latest_fddp.problem.runningDatas)[k]
+                    if not hasattr(run_data, 'differential'):
+                        continue
+                    diff_data = run_data.differential
+                    if not hasattr(diff_data, 'multibody') or not hasattr(diff_data.multibody, 'contacts'):
+                        continue
+                    contacts_map = diff_data.multibody.contacts.contacts
+                    for fi, ee_name in enumerate(_FEET_ORDER):
+                        contact_key = ee_name + '_contact'
+                        if contact_key in contacts_map:
+                            f = contacts_map[contact_key].f
+                            contact_forces_feet_arr[k, fi, :3] = f.linear.astype(np.float32)
+                            contact_forces_feet_arr[k, fi, 3:] = f.angular.astype(np.float32)
+                    for hi, ee_name in enumerate(_HANDS_ORDER):
+                        contact_key = ee_name + '_contact'
+                        if contact_key in contacts_map:
+                            contact_forces_hands_arr[k, hi] = contacts_map[contact_key].f.linear.astype(np.float32)
+                # Copy terminal forces from last running step
+                contact_forces_feet_arr[-1]  = contact_forces_feet_arr[-2]
+                contact_forces_hands_arr[-1] = contact_forces_hands_arr[-2]
+                result['contact_forces_feet']  = contact_forces_feet_arr
+                result['contact_forces_hands'] = contact_forces_hands_arr
+
+            if B_VISUALIZE_DYN:
+                dyn_vis_model = shared['dyn_vis_model']
+                save_freq = 10
+                display_idx = np.arange(0, len(robot_dyn_plan.lf_targets), save_freq)
+                dyn_rob_data_vis = dyn_rob_model.createData()
+                col_data_vis = refined_geom_model.createData()
+                dyn_vis_data_vis = dyn_vis_model.createData()
+                display = vis_tools.MeshcatPinocchioAnimation(
+                    dyn_rob_model, refined_geom_model, dyn_vis_model,
+                    dyn_rob_data_vis, dyn_vis_data_vis, col_data_vis,
+                    ctrl_freq=np.average(planner_params.N_HORIZON_LST) / T,
+                    save_freq=save_freq)
+                display.add_shapes_from(obstructed_hole.obstacles)
+                display.display_targets(
+                    "lfoot_target", robot_dyn_plan.lf_targets[display_idx], [1, 1, 0])
+                display.display_targets(
+                    "rfoot_target", robot_dyn_plan.rf_targets[display_idx], [1, 1, 0])
+                display.display_targets(
+                    "lhand_target", robot_dyn_plan.lh_targets[display_idx], [0.5, 0, 0])
+                display.display_targets(
+                    "rhand_target", robot_dyn_plan.rh_targets[display_idx], [0.5, 0, 0])
+                display.display_targets(
+                    "base_target", robot_dyn_plan.base_targets[display_idx], [0, 0.5, 0])
+                if B_USE_KNEES:
+                    display.display_targets(
+                        "lknee_target", robot_dyn_plan.lkn_targets[display_idx], [0, 0, 1])
+                    display.display_targets(
+                        "rknee_target", robot_dyn_plan.rkn_targets[display_idx], [0, 0, 1])
+                display.displayFromCrocoddylSolver([latest_fddp])
+                display.hide_visuals([f"{dyn_rob_model.name}/collisions"])
 
     except Exception as exc:
         result['error'] = traceback.format_exc()
@@ -598,6 +731,62 @@ def main():
     print(f"Suboptimal ({len(suboptimal_trials)}/{N_TRIALS}): trials {suboptimal_trials}")
     print(f"Errors     ({len(failed_trials)}/{N_TRIALS}): trials {failed_trials}")
     print("=" * 60)
+
+    if SAVE_DYN_PLAN:
+        saved = [r for r in results if r.get('joint_pos') is not None]
+        if saved:
+            joint_pos_arr           = np.stack([r['joint_pos']            for r in saved], axis=0)
+            joint_vel_arr           = np.stack([r['joint_vel']            for r in saved], axis=0)
+            q_base_arr              = np.stack([r['q_base']               for r in saved], axis=0)
+            base_lin_vel_arr        = np.stack([r['base_lin_vel']         for r in saved], axis=0)
+            base_ang_vel_arr        = np.stack([r['base_ang_vel']         for r in saved], axis=0)
+            torso_pos_dyn_arr       = np.stack([r['torso_pos']            for r in saved], axis=0)
+            com_pos_arr             = np.stack([r['com_pos']              for r in saved], axis=0)
+            torques_arr             = np.stack([r['torques']              for r in saved], axis=0)
+            contact_mask_arr        = np.stack([r['contact_mask']         for r in saved], axis=0)
+            contact_normal_arr      = np.stack([r['contact_normal']       for r in saved], axis=0)
+            contact_forces_feet_arr = np.stack([r['contact_forces_feet']  for r in saved], axis=0)
+            contact_forces_hands_arr= np.stack([r['contact_forces_hands'] for r in saved], axis=0)
+            dt_arr                  = np.array([r['dt']                   for r in saved], dtype=np.float32)
+            p_init_arr              = np.array([r['p_init_torso']         for r in saved], dtype=np.float32)
+            ee_pos_dyn_arr          = np.stack([r['ee_pos']               for r in saved], axis=0)
+            is_optimal_arr          = np.array([r['is_optimal']           for r in saved], dtype=bool)
+            n_steps            = joint_pos_arr.shape[1]
+            T_plan_dyn         = dt_arr * (n_steps - 1)
+            np.savez(
+                DYN_SAVE_PATH,
+                joint_pos=joint_pos_arr.astype(np.float32),
+                joint_vel=joint_vel_arr.astype(np.float32),
+                q_base=q_base_arr.astype(np.float32),
+                base_lin_vel=base_lin_vel_arr.astype(np.float32),
+                base_ang_vel=base_ang_vel_arr.astype(np.float32),
+                torques=torques_arr.astype(np.float32),
+                com_pos=com_pos_arr.astype(np.float32),
+                dt=float(dt_arr.mean()),
+                dt_arr=dt_arr,
+                p_init_nominal_torso=p_init_arr,
+                T_plan_arr=T_plan_dyn.astype(np.float32),
+                torso_pos=torso_pos_dyn_arr.astype(np.float32),
+                joint_names=np.array(shared['joint_names']),
+                contact_mask=contact_mask_arr.astype(np.float32),
+                contact_normal=contact_normal_arr.astype(np.float32),
+                ee_names=np.array(['left_ankle_roll_link', 'right_ankle_roll_link',
+                                   'left_rubber_hand', 'right_rubber_hand']),
+                ee_pos=ee_pos_dyn_arr.astype(np.float32),
+                ee_pos_names=np.array(['left_ankle_roll_link', 'right_ankle_roll_link',
+                                       'left_rubber_hand', 'right_rubber_hand',
+                                       'left_knee_link', 'right_knee_link']),
+                contact_forces_feet=contact_forces_feet_arr.astype(np.float32),
+                contact_forces_hands=contact_forces_hands_arr.astype(np.float32),
+                contact_forces_feet_names=np.array(['LF', 'RF']),
+                contact_forces_hands_names=np.array(['LH', 'RH']),
+                is_optimal=is_optimal_arr,
+            )
+            print(f"\nSaved dynamic dataset → {DYN_SAVE_PATH}  "
+                  f"({len(saved)}/{N_TRIALS} trials, "
+                  f"n_steps={n_steps}, dt_mean={float(dt_arr.mean()):.4f}s)")
+        else:
+            print("\nSAVE_DYN_PLAN is set but no trial produced a valid trajectory.")
 
 
 if __name__ == "__main__":
