@@ -49,6 +49,12 @@ from pnc.planner.multicontact.kin_feasibility.locomanipulation_frame_planner imp
 from pnc.planner.multicontact.kin_feasibility.guide_dataset.guide_dataset import (
     generate_guide_dataset,
 )
+from pnc.planner.multicontact.dyn_feasibility.G1MulticontactPlanner import G1MulticontactPlanner
+from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import ContactSequence
+from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import (
+    get_contact_seq_from_fixed_frames_seq,
+    get_contact_planes_from_motion_frames_seq,
+)
 
 # ---------------------------------------------------------------------------
 # Planner options
@@ -226,6 +232,27 @@ def setup_g1_obstructed_hole() -> dict:
     door_pos        = np.array([0.32, 0.0, 0.])
     obstructed_hole = HoleInWallObstructed(door_pos)
 
+    # ---- Dynamic model for trajectory optimisation ----
+    refined_urdf_file = package_dir + "/g1_29dof_simple_collisions.urdf"
+    dyn_rob_model, _, _, _, _, _ = _load_robot_model(package_dir, refined_urdf_file)
+    refined_geom_model = pin.buildGeomFromUrdf(
+        dyn_rob_model, refined_urdf_file, pin.GeometryType.COLLISION)
+    refined_geom_model.addAllCollisionPairs()
+    _, door_col_model, _ = pin.buildModelsFromUrdf(
+        env_urdf_path, cwd + "/robot_model/ground")
+    for i_col, col_obj in enumerate(obstructed_hole.obstacles[1:]):
+        obstacle_geom = hpoly_to_fcl_collision(col_obj)
+        new_geom = create_convex_geom_from_copy(
+            door_col_model.geometryObjects[0], obstacle_geom,
+            'hole_obstacle_' + str(i_col))
+        refined_geom_model.addGeometryObject(new_geom)
+    refined_geom_model.addAllCollisionPairs()
+    plan_to_model_ids = {
+        key: dyn_rob_model.getFrameId(fn)
+        for key, fn in plan_to_model_frames.items()
+    }
+    joint_names = list(dyn_rob_model.names[2:])
+
     sca_geometry = (
         SCARobotGeometry(package_dir, robot_urdf_file, plan_to_model_frames)
         if B_USE_SELF_COLLISION_AVOIDANCE else None
@@ -257,6 +284,10 @@ def setup_g1_obstructed_hole() -> dict:
         sca_geometry         = sca_geometry,
         planner_params       = planner_params,
         iris_regions_default = iris_regions_default,
+        dyn_rob_model        = dyn_rob_model,
+        refined_geom_model   = refined_geom_model,
+        plan_to_model_ids    = plan_to_model_ids,
+        joint_names          = joint_names,
     )
 
 
@@ -350,7 +381,106 @@ def build_planner(
     ik_cfree_planner.set_env_geometry(env_geom)
 
     p_init = {fr: starting_pose[fr] for fr in plan_to_model_frames.keys()}
-    return ik_cfree_planner, p_init
+    return ik_cfree_planner, p_init, q0, fixed_frames_seq, motion_frames_seq
+
+
+# ---------------------------------------------------------------------------
+# Dynamic plan runner
+# ---------------------------------------------------------------------------
+
+def run_dyn_plan(
+    ik_cfree_planner,
+    q0: np.ndarray,
+    T: float,
+    fixed_frames_seq: list,
+    motion_frames_seq,
+    shared: dict,
+) -> dict:
+    """Run G1MulticontactPlanner for one guide and return joint trajectory arrays.
+
+    Parameters
+    ----------
+    ik_cfree_planner : IKCFreePlanner
+        Fully solved kinematic planner for this guide.
+    q0 : np.ndarray, shape (nq,)
+        Initial robot configuration (floating-base + joints).
+    T : float
+        Per-phase duration used in the kinematic plan (seconds).
+    fixed_frames_seq : list[list[str]]
+        Contact frame sequence from ``build_knocker_contact_seq``.
+    motion_frames_seq : MotionFrameSequencer
+        Motion frame sequencer from ``build_knocker_contact_seq``.
+    shared : dict
+        Output of :func:`setup_g1_obstructed_hole`.
+
+    Returns
+    -------
+    dict with keys:
+        joint_pos  : (n_steps, n_joints) float32
+        joint_vel  : (n_steps, n_joints) float32
+        torso_pos  : (n_steps, 3) float32  — FK of torso_primitive_shape
+        dt         : float  — integration step = T / N_per_phase
+        joint_names: list[str]
+    """
+    dyn_rob_model      = shared['dyn_rob_model']
+    refined_geom_model = shared['refined_geom_model']
+    plan_to_model_ids  = shared['plan_to_model_ids']
+    planner_params     = shared['planner_params']
+    joint_names        = shared['joint_names']
+
+    v0 = np.zeros(dyn_rob_model.nv)
+    x0 = np.concatenate([q0, v0])
+
+    contact_seqs      = get_contact_seq_from_fixed_frames_seq(fixed_frames_seq)
+    contact_seq_planes = get_contact_planes_from_motion_frames_seq(contact_seqs, motion_frames_seq)
+    contact_sequence  = ContactSequence(contact_seq_planes, planner_params.N_HORIZON_LST, T)
+
+    robot_dyn_plan = G1MulticontactPlanner(
+        dyn_rob_model, contact_sequence, ik_cfree_planner, planner_params, refined_geom_model)
+    robot_dyn_plan.set_zero_configuration(q0)
+    robot_dyn_plan.set_plan_to_model_params(plan_to_model_ids)
+    robot_dyn_plan.set_initial_configuration(x0)
+
+    robot_dyn_plan.plan(
+        b_solve_hybrid=False,
+        integration_type='Euler',
+        sca_refinement=True,
+        b_solve_by_sections='single',
+        solver_type='SQP',
+        b_use_knees=B_USE_KNEES,
+    )
+
+    latest_fddp = robot_dyn_plan.get_latest_fddp()
+    if latest_fddp is None:
+        raise RuntimeError("Dynamic planner produced no solution.")
+
+    xs = np.array([np.asarray(x) for x in latest_fddp.xs])  # (n_steps, nq+nv)
+    nq = dyn_rob_model.nq
+
+    q_base    = xs[:, :7].astype(np.float32)            # (n_steps, 7): xyz + quat(xyzw)
+    joint_pos = xs[:, 7:nq].astype(np.float32)         # (n_steps, n_joints)
+    joint_vel = xs[:, nq + 6:].astype(np.float32)      # (n_steps, n_joints)
+
+    # Offline FK to get torso world position at every waypoint.
+    dyn_rob_data   = dyn_rob_model.createData()
+    torso_frame_id = dyn_rob_model.getFrameId('torso_primitive_shape')
+    n_steps        = xs.shape[0]
+    torso_pos      = np.zeros((n_steps, 3), dtype=np.float32)
+    for k in range(n_steps):
+        pin.forwardKinematics(dyn_rob_model, dyn_rob_data, xs[k, :nq])
+        pin.updateFramePlacements(dyn_rob_model, dyn_rob_data)
+        torso_pos[k] = dyn_rob_data.oMf[torso_frame_id].translation.astype(np.float32)
+
+    dt = float(T / planner_params.N_HORIZON_LST[0])
+
+    return dict(
+        q_base      = q_base,
+        joint_pos   = joint_pos,
+        joint_vel   = joint_vel,
+        torso_pos   = torso_pos,
+        dt          = dt,
+        joint_names = joint_names,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -377,6 +507,11 @@ def main() -> None:
                         metavar=("BX", "BY"),
                         help="Symmetric XY bounds for per-guide offset sampling: "
                              "dx ~ U(-BX, +BX), dy ~ U(-BY, +BY) (default: 0.025 0.15)")
+    parser.add_argument("--save_dyn_plan", action="store_true",
+                        help="After each kinematic guide, run G1MulticontactPlanner and save "
+                             "the resulting joint trajectory as a separate .npz dataset.")
+    parser.add_argument("--dyn_save_path", default="",
+                        help="Output path for the dynamic-plan .npz (default: <save_path>_dyn.npz)")
     args = parser.parse_args()
 
     xy_offset_bounds = np.array(args.xy_offset_bounds, dtype=np.float64)
@@ -392,6 +527,18 @@ def main() -> None:
     def planner_builder_fn(xy_offset: np.ndarray):
         return build_planner(xy_offset, shared)
 
+    dyn_plan_fn = None
+    dyn_save_path = None
+    if args.save_dyn_plan:
+        def dyn_plan_fn(ik_cfree_planner, T_i, q0, fixed_frames_seq, motion_frames_seq):
+            return run_dyn_plan(ik_cfree_planner, q0, T_i, fixed_frames_seq, motion_frames_seq, shared)
+
+        if args.dyn_save_path:
+            dyn_save_path = args.dyn_save_path
+        else:
+            base, ext = os.path.splitext(args.save_path)
+            dyn_save_path = base + "_dyn" + (ext or ".npz")
+
     generate_guide_dataset(
         planner_builder_fn=planner_builder_fn,
         xy_offset_bounds=xy_offset_bounds,
@@ -401,6 +548,9 @@ def main() -> None:
         n_w_rigid=args.n_w_rigid,
         seed=args.seed,
         save_path=args.save_path,
+        dyn_plan_fn=dyn_plan_fn,
+        dyn_save_path=dyn_save_path,
+        dyn_joint_names=shared['joint_names'] if args.save_dyn_plan else None,
     )
 
 

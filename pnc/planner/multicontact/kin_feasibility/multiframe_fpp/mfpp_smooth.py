@@ -643,7 +643,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             "dual_inf_tol": 1e1,        # *1.0
             "compl_inf_tol": 1e0,       # *1e-4
             # "slack_bound_frac": 0.1,          # *0.01
-            "mu_strategy":"adaptive",   # {monotone, adaptive}
+            "mu_strategy":"monotone",   # {monotone, adaptive}
             "nlp_scaling_method": "gradient-based", # {none, user-scaling, *gradient-based, equilibration-based}
             "jacobian_regularization_value": 1e-2,  # 1e-6, 2e-4  * 1e-8
             # "derivative_test": "first-order",

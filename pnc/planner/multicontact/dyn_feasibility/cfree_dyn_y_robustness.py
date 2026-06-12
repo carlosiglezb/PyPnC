@@ -8,6 +8,7 @@ standard door-frame locations.  At the end, a summary table reports which trials
 returned an optimal (feasible) solution from the HumanoidMulticontactPlanner solver.
 """
 
+import copy
 import os
 import sys
 import time
@@ -42,6 +43,7 @@ from pnc.planner.multicontact.kin_feasibility.ik_cfree_planner import *
 from humanoid_action_models import *
 from pnc.planner.multicontact.dyn_feasibility.G1MulticontactPlanner import G1MulticontactPlanner
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import ContactSequence
+from pnc.planner.multicontact.dyn_feasibility.cfree_dyn_planner import get_five_stage_one_hand_contact_sequence
 from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterface
 
 import pinocchio as pin
@@ -52,12 +54,22 @@ from pinocchio.visualize import MeshcatVisualizer
 # Trial parameters
 # ---------------------------------------------------------------------------
 N_TRIALS    = 5
-Y_LB, Y_UB = -0.15, 0.15
-RNG_SEED    = 42          # set to None for non-reproducible draws
+Y_LB, Y_UB = -0., 0.
+RNG_SEED    = 2          # set to None for non-reproducible draws
+
+# When True, W_RIGID_LINK and ALPHA are drawn independently per trial from
+# the same uniform distributions used in generate_guide_dataset.py:
+#   ALPHA    ~ [U(0,1), U(0,0.5), U(0,0.1)]
+#   W_RIGID_LINK ~ [U(0,1), 0.0, U(0,1)]   (middle entry is always 0)
+B_RANDOMIZE_PARAMS = True
 
 # ---------------------------------------------------------------------------
 # Planner options (mirror cfree_dyn_planner.py defaults for the hole env)
 # ---------------------------------------------------------------------------
+# Contact sequence selection (matches cfree_dyn_planner.py --sequence):
+#   0 : step through door  (get_five_stage_one_hand_contact_sequence)
+#   1 : step on knocker, y-varying  (build_knocker_contact_seq — this file)
+CONTACT_SEQ                 = 0
 SOLVE_BY_SECTIONS           = 'single'
 SOLVER_TYPE                 = 'SQP'
 B_SOLVE_HYBRID              = False
@@ -66,14 +78,14 @@ B_VERBOSE                   = False
 B_USE_KNEES                 = True
 B_USE_SELF_COLLISION_AVOIDANCE = True
 B_USE_KNEES_IN_SMOOTH_PLAN  = False
-B_VISUALIZE_KIN             = True
+B_VISUALIZE_KIN             = False
 B_VISUALIZE_DYN             = True
 
 # ---------------------------------------------------------------------------
 # Dataset saving
 # ---------------------------------------------------------------------------
 SAVE_DYN_PLAN = True
-DYN_SAVE_PATH = "guide_dataset_dyn_single.npz"
+DYN_SAVE_PATH = "guide_dataset_dyn_multiple_cs0_origin.npz"
 
 # ---------------------------------------------------------------------------
 # Contact geometry constants for the obstructed-hole environment (G1)
@@ -357,12 +369,22 @@ def setup_g1_obstructed_hole():
 # Per-trial planner run
 # ---------------------------------------------------------------------------
 
-def run_trial(y_pos: float, shared: dict) -> dict:
+def run_trial(y_pos: float, shared: dict,
+              alpha: np.ndarray = None, w_rigid: np.ndarray = None) -> dict:
     """
     Run a single KIN + DYN feasibility trial for the given floating-base y position.
 
+    Parameters
+    ----------
+    alpha : np.ndarray, shape (3,), optional
+        Overrides planner_params.ALPHA for this trial (used when B_RANDOMIZE_PARAMS=True).
+    w_rigid : np.ndarray, shape (3,), optional
+        Overrides planner_params.W_RIGID_LINK for this trial.
+
     Returns a dict with:
       - 'y_pos'       : the sampled y starting position
+      - 'alpha'       : ALPHA values used (list of 3 floats)
+      - 'w_rigid'     : W_RIGID_LINK values used (list of 3 floats)
       - 'is_optimal'  : bool – True if the HumanoidMulticontactPlanner solver
                         reported a feasible (optimal) solution (fddp.isFeasible)
       - 'solver_type' : which solver path was taken ('single', 'sca', ...)
@@ -370,7 +392,8 @@ def run_trial(y_pos: float, shared: dict) -> dict:
       - 'error'       : None on success, exception string on failure
     """
     result = {'y_pos': y_pos, 'is_optimal': False, 'solver_type': None,
-              'solve_time': None, 'error': None}
+              'solve_time': None, 'error': None,
+              'alpha': None, 'w_rigid': None}
     try:
         rob_model         = shared['rob_model']
         col_model            = shared['col_model']
@@ -389,6 +412,17 @@ def run_trial(y_pos: float, shared: dict) -> dict:
         sca_geometry         = shared['sca_geometry']
         planner_params       = shared['planner_params']
         visualizer           = shared.get('visualizer')
+
+        # ---- Apply per-trial randomized params (if requested) ----
+        if alpha is not None or w_rigid is not None:
+            planner_params = copy.copy(planner_params)
+            if alpha is not None:
+                planner_params.ALPHA = alpha.tolist()
+            if w_rigid is not None:
+                planner_params.W_RIGID_LINK = w_rigid.tolist()
+
+        result['alpha']   = list(planner_params.ALPHA)
+        result['w_rigid'] = list(planner_params.W_RIGID_LINK)
 
         # ---- Initial configuration ----
         q0 = get_g1_pose_with_y(rob_model.nq - 7, y_pos)
@@ -409,8 +443,20 @@ def run_trial(y_pos: float, shared: dict) -> dict:
             starting_pose[fr] = robot_fwdk.get_link_iso(plan_to_model_frames[fr])[:3, 3]
 
         # ---- Build contact sequence ----
-        fixed_frames_seq, motion_frames_seq = build_knocker_contact_seq(
-            starting_pose, B_USE_KNEES)
+        if CONTACT_SEQ == 0:
+            # seq 0 (step through door) derives frame targets from IRIS seeds, so we
+            # need safe_regions_mgr_dict first.  Compute it preliminarily using the
+            # knocker motion frames (seq 1) — the primary start/end seeds are
+            # identical; only intermediate seeds differ.
+            _prelim_fixed, _prelim_motion = build_knocker_contact_seq(starting_pose, B_USE_KNEES)
+            _prelim_iris = hole_plan.compute_iris_regions_mgr(
+                obstructed_hole, starting_pose, _prelim_motion, b_use_knees=B_USE_KNEES)
+            fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(
+                'g1', _prelim_iris)
+        else:  # CONTACT_SEQ == 1: knocker contact sequence
+            fixed_frames_seq, motion_frames_seq = build_knocker_contact_seq(
+                starting_pose, B_USE_KNEES)
+
         contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames_seq)
         contact_seq_planes = get_contact_planes_from_motion_frames_seq(
             contact_seqs, motion_frames_seq)
@@ -673,9 +719,10 @@ def main():
 
     print("=" * 60)
     print(f"G1 obstructed-hole y-robustness test")
-    print(f"  Trials : {N_TRIALS}")
-    print(f"  y range: [{Y_LB}, {Y_UB}]  (seed={RNG_SEED})")
-    print(f"  Samples: {np.round(y_samples, 4).tolist()}")
+    print(f"  Trials          : {N_TRIALS}")
+    print(f"  y range         : [{Y_LB}, {Y_UB}]  (seed={RNG_SEED})")
+    print(f"  Samples         : {np.round(y_samples, 4).tolist()}")
+    print(f"  Randomize params: {B_RANDOMIZE_PARAMS}")
     print("=" * 60)
 
     # One-time setup
@@ -690,10 +737,26 @@ def main():
 
     results = []
     for trial_idx, y_pos in enumerate(y_samples):
+        trial_alpha = trial_w_rigid = None
+        if B_RANDOMIZE_PARAMS:
+            trial_alpha = np.array([
+                rng.uniform(0.0, 1.0),
+                rng.uniform(0.0, 0.5),
+                rng.uniform(0.0, 0.1),
+            ])
+            trial_w_rigid = np.array([
+                rng.uniform(0.0, 1.0),
+                0.0,
+                rng.uniform(0.0, 1.0),
+            ])
+
         print(f"\n{'─'*60}")
         print(f"Trial {trial_idx + 1}/{N_TRIALS}  |  y = {y_pos:.4f}")
+        if B_RANDOMIZE_PARAMS:
+            print(f"  alpha    = {np.round(trial_alpha, 4).tolist()}")
+            print(f"  w_rigid  = {np.round(trial_w_rigid, 4).tolist()}")
         print(f"{'─'*60}")
-        res = run_trial(float(y_pos), shared)
+        res = run_trial(float(y_pos), shared, alpha=trial_alpha, w_rigid=trial_w_rigid)
         results.append(res)
 
     # ---------------------------------------------------------------------------
@@ -747,6 +810,8 @@ def main():
             p_init_arr              = np.array([r['p_init_torso']         for r in saved], dtype=np.float32)
             ee_pos_dyn_arr          = np.stack([r['ee_pos']               for r in saved], axis=0)
             is_optimal_arr          = np.array([r['is_optimal']           for r in saved], dtype=bool)
+            alpha_arr               = np.array([r['alpha']                for r in saved], dtype=np.float32)
+            w_rigid_arr             = np.array([r['w_rigid']              for r in saved], dtype=np.float32)
             n_steps            = joint_pos_arr.shape[1]
             T_plan_dyn         = dt_arr * (n_steps - 1)
             np.savez(
@@ -777,6 +842,8 @@ def main():
                 contact_forces_feet_names=np.array(['LF', 'RF']),
                 contact_forces_hands_names=np.array(['LH', 'RH']),
                 is_optimal=is_optimal_arr,
+                alpha=alpha_arr,
+                w_rigid=w_rigid_arr,
             )
             print(f"\nSaved dynamic dataset → {DYN_SAVE_PATH}  "
                   f"({len(saved)}/{N_TRIALS} trials, "
@@ -786,4 +853,11 @@ def main():
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sequence", type=int, default=CONTACT_SEQ,
+                        choices=[0, 1],
+                        help="Contact sequence: 0=step through door, 1=step on knocker (y-varying)")
+    args = parser.parse_args()
+    CONTACT_SEQ = args.sequence
     main()
