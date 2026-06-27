@@ -21,6 +21,9 @@ from vision.iris.iris_regions_manager import IrisRegionsManager
 # IRIS sequence planner
 from pnc.planner.multicontact.kin_feasibility.multiframe_fpp.multiframe_fpp import plan_multistage_iris_seq
 from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
+# Stability polytope tools
+from pnc.planner.multicontact.kin_feasibility.stability_polytope_tools import (
+    StabilityPolytopeManager, expand_contact_frame_to_points)
 
 b_visualize = True
 b_static_html = False
@@ -818,6 +821,286 @@ class TestFrameTraverseIris(unittest.TestCase):
         self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Final RF distance error: {error}")
         error = path[1].beziers[-1].points[-1] - self.rf_final_pos
         self.assertTrue(sp.linalg.norm(error) < 1e-3, f"Final RF distance error: {error}")
+
+
+    # -----------------------------------------------------------------------
+    # Stability-polytope tests
+    # -----------------------------------------------------------------------
+
+    def test_stability_polytope_manager_direct_constructor(self):
+        """
+        StabilityPolytopeManager built directly from contact sequences must
+        produce valid (non-None) polytopes after compute().
+        """
+        contact_seqs   = [['RF']]
+        contact_planes = [{'RF': np.array([0., 0., 1.])}]
+        robot_mass     = 35.0
+        manager = StabilityPolytopeManager(
+            contact_seqs, contact_planes, robot_mass, n_phases_out=1)
+
+        safe_pnt_lst = [{'RF': self.rf_starting_pos}]
+        manager.compute(safe_pnt_lst)
+
+        self.assertTrue(manager.is_computed,
+                        "Manager must be marked computed after compute()")
+        self.assertEqual(len(manager), 1, "Should have one polytope (one phase)")
+        poly = manager.get_polytope(0)
+        self.assertIsNotNone(poly, "Phase-0 polytope must not be None for one-foot stance")
+        A_stab, b_stab = poly
+        self.assertEqual(A_stab.shape[1], 3, "A_stab must have 3 columns")
+        self.assertEqual(A_stab.shape[0], b_stab.shape[0],
+                         "A_stab rows must match b_stab length")
+
+    def test_stability_polytope_manager_torso_inside(self):
+        """
+        The torso starting position must lie inside the outer stability
+        polytope when both feet are on flat ground.
+        """
+        contact_seqs   = [['LF', 'RF']]
+        contact_planes = [{'LF': np.array([0., 0., 1.]),
+                           'RF': np.array([0., 0., 1.])}]
+        robot_mass = 35.0
+        manager = StabilityPolytopeManager(
+            contact_seqs, contact_planes, robot_mass, n_phases_out=1)
+
+        safe_pnt_lst = [{'LF': np.array([-0.2, 0.1, 0.001]),
+                         'RF': self.rf_starting_pos}]
+        manager.compute(safe_pnt_lst)
+
+        poly = manager.get_polytope(0)
+        self.assertIsNotNone(poly, "Polytope must be computed for two-foot stance")
+
+        A_stab, b_stab = poly
+        # Check torso start (directly above foot midpoint) is inside A_stab @ p <= b_stab
+        p = self.torso_starting_pos
+        tol = 0.05   # allow small numerical margin
+        self.assertTrue(np.all(A_stab @ p <= b_stab + tol),
+                        "Torso starting position should be inside outer stability polytope")
+
+    def test_stability_polytope_manager_from_fixed_frames(self):
+        """
+        StabilityPolytopeManager.from_fixed_frames() must produce a computed
+        manager when fixed_frames contains valid contact-frame names.
+        Uses the RF/RH scenario from the multi-frame helper.
+        """
+        iris_seq, safe_points_lst, safe_regions_mgr_dict = \
+            self.test_multistage_iris_seq_multiple_frame()
+
+        robot_mass = 35.0
+        # self.fixed_frames_seq = [['RH'], ['RF']] — both are valid contact frames
+        manager = StabilityPolytopeManager.from_fixed_frames(
+            self.fixed_frames_seq, self.motion_frames_seq, robot_mass)
+        manager.compute(safe_points_lst)
+
+        self.assertTrue(manager.is_computed,
+                        "from_fixed_frames manager must be computed")
+        self.assertGreater(len(manager), 0, "Must have at least one polytope")
+        poly = manager.get_polytope(0)
+        self.assertIsNotNone(poly, "First polytope must not be None")
+        A_stab, b_stab = poly
+        self.assertEqual(A_stab.shape[1], 3, "A_stab must be 3-D")
+
+    def test_bezier_opt_lh_rf_stability_polytope_cvxpy(self):
+        """
+        Cvxpy optimization with LH (left-hand grip) and RF (right foot) as
+        fixed bilateral contacts throughout the motion; LF (left foot) crosses
+        the knee-knocker sill.  Torso is co-optimised.
+
+        LH and RF enter the optimizer as fixed frames so their trajectories are
+        fully constrained to their rest positions, exercising the fixed-frame
+        constraint path in optimize_multiple_bezier_iris.  The stability
+        polytope is built from LH + RF contacts using 4-corner palm / sole
+        expansions.
+
+        Phase 0: LF swings over the sill (torso, LH, RF fixed).
+        Phase 1: torso follows (LF, LH, RF fixed).
+        """
+        # ---- contact-frame positions ----------------------------------------
+        lh_pos    = np.array([0., 0.35, 0.9])    # left hand grip, door left post
+        lh_normal = np.array([0., -1., 0.])       # surface normal toward robot
+        rf_pos    = self.rf_starting_pos           # [-0.2, -0.1, 0.001]
+        lf_start  = np.array([-0.2,  0.1, 0.001]) # left foot before sill
+        lf_end    = np.array([ 0.2,  0.1, 0.001]) # left foot after sill
+        torso_start = self.torso_starting_pos      # [ 0.,   0.,  0.65]
+        torso_end   = self.torso_final_pos         # [ 0.2,  0.,  0.65]
+
+        # ---- IRIS for all four frames; LH and RF use same seed (fixed) ------
+        obstacles = self.obstacles
+        domain    = self.domain
+        safe_regions_mgr_dict = {
+            'torso': IrisRegionsManager(
+                IrisGeomInterface(obstacles, domain, torso_start),
+                IrisGeomInterface(obstacles, domain, torso_end)),
+            'LF': IrisRegionsManager(
+                IrisGeomInterface(obstacles, domain, lf_start),
+                IrisGeomInterface(obstacles, domain, lf_end)),
+            'LH': IrisRegionsManager(
+                IrisGeomInterface(obstacles, domain, lh_pos),
+                IrisGeomInterface(obstacles, domain, lh_pos)),
+            'RF': IrisRegionsManager(
+                IrisGeomInterface(obstacles, domain, rf_pos),
+                IrisGeomInterface(obstacles, domain, rf_pos)),
+        }
+        for mgr in safe_regions_mgr_dict.values():
+            mgr.computeIris()
+            mgr.connectIrisSeeds()
+
+        if b_visualize:
+            for name, mgr in safe_regions_mgr_dict.items():
+                mgr.visualize(self.vis, name + '_lhrf')
+
+        # ---- Motion sequence ------------------------------------------------
+        fixed_frames      = []
+        motion_frames_seq = MotionFrameSequencer()
+        starting_pos_dict = {
+            'torso': torso_start, 'LF': lf_start,
+            'LH': lh_pos,         'RF': rf_pos,
+        }
+
+        # Phase 0: LF moves; torso, LH, RF are fixed
+        fixed_frames.append(['torso', 'LH', 'RF'])
+        motion_frames_seq.add_motion_frame({'LF': lf_end})
+        motion_frames_seq.add_contact_surfaces(
+            [PlannerSurfaceContact('LF', np.array([0., 0., 1.]))])
+
+        # Phase 1: torso moves; LF, LH, RF are fixed
+        fixed_frames.append(['LF', 'LH', 'RF'])
+        motion_frames_seq.add_motion_frame({'torso': torso_end})
+        motion_frames_seq.add_contact_surfaces(
+            [PlannerSurfaceContact('LF', None)])
+
+        motion_frames_lst = motion_frames_seq.get_motion_frames()
+        iris_seq, safe_pnt_lst = plan_multistage_iris_seq(
+            safe_regions_mgr_dict, fixed_frames, motion_frames_lst, starting_pos_dict)
+
+        # Derive durations directly from the box counts returned by the planner
+        durations = [
+            {f: np.array([0.2] * len(boxes)) for f, boxes in phase.items()}
+            for phase in iris_seq
+        ]
+        alpha               = {1: 1, 2: 1, 3: 0}
+        surface_normals_lst = motion_frames_seq.get_contact_surfaces()
+
+        # ---- Stability polytope: LH (4 palm corners) + RF (4 sole corners) --
+        contact_seqs   = [['LH', 'RF'], ['LH', 'RF']]
+        contact_planes = [
+            {'LH': lh_normal, 'RF': np.array([0., 0., 1.])},
+            {'LH': lh_normal, 'RF': np.array([0., 0., 1.])},
+        ]
+        w_stab       = 1e-2
+        stab_manager = StabilityPolytopeManager(
+            contact_seqs, contact_planes, 35.0, n_phases_out=len(durations))
+        stab_manager.compute(safe_pnt_lst)
+
+        self.assertTrue(stab_manager.is_computed,
+                        "Stability manager must be computed for LH+RF contact")
+        self.assertIsNotNone(stab_manager.get_polytope(0),
+                             "Phase-0 polytope must not be None for LH+RF contact")
+
+        # ---- cvxpy solve with stability-polytope soft constraint ------------
+        path, sol_stats, bez_points, _ = optimize_multiple_bezier_iris(
+            None, [], safe_regions_mgr_dict, durations, alpha, safe_pnt_lst,
+            fixed_frames=fixed_frames,
+            surface_normals_lst=surface_normals_lst,
+            stab_poly_manager=stab_manager,
+            w_stability_polytope=w_stab)
+
+        # ---- visualisation --------------------------------------------------
+        if b_visualize:
+            frame_names = list(starting_pos_dict.keys())
+            for i, fname in enumerate(frame_names):
+                for seg in range(len(path[i].beziers)):
+                    LocomanipulationFramePlanner.visualize_bezier_points(
+                        self.vis, fname + '_lhrf_stab', [path[i].beziers[seg]], seg)
+            lh_palm_pts, _ = expand_contact_frame_to_points('LH', lh_pos, lh_normal)
+            lh_palm_arr = np.array([p.flatten() for p in lh_palm_pts])
+            LocomanipulationFramePlanner.visualize_simple_points(
+                self.vis, 'LH_lhrf_stab/palm_corners', lh_palm_arr,
+                color=[1., 0., 0., 0.8])
+            LocomanipulationFramePlanner.visualize_simple_points(
+                self.vis, 'LH_lhrf_stab/center', lh_pos.reshape(1, 3),
+                color=[1., 0.5, 0., 1.0])
+            rf_sole_pts, _ = expand_contact_frame_to_points(
+                'RF', rf_pos, np.array([0., 0., 1.]))
+            rf_sole_arr = np.array([p.flatten() for p in rf_sole_pts])
+            LocomanipulationFramePlanner.visualize_simple_points(
+                self.vis, 'RF_lhrf_stab/sole_corners', rf_sole_arr,
+                color=[0., 0., 1., 0.8])
+            LocomanipulationFramePlanner.visualize_simple_points(
+                self.vis, 'RF_lhrf_stab/center', rf_pos.reshape(1, 3),
+                color=[0., 1., 1., 1.0])
+
+        # ---- assertions -----------------------------------------------------
+        frame_names = list(starting_pos_dict.keys())
+        i_torso = frame_names.index('torso')
+        i_lf    = frame_names.index('LF')
+        i_lh    = frame_names.index('LH')
+        i_rf    = frame_names.index('RF')
+
+        self.assertIsNotNone(path,
+                             "cvxpy path must not be None with LH+RF stability constraint")
+        self.assertLess(
+            sp.linalg.norm(path[i_torso].beziers[0].points[0] - torso_start), 1e-3,
+            "Torso must start at torso_start")
+        self.assertLess(
+            sp.linalg.norm(path[i_torso].beziers[-1].points[-1] - torso_end), 1e-3,
+            "Torso must end at torso_end")
+        self.assertLess(
+            sp.linalg.norm(path[i_lf].beziers[0].points[0] - lf_start), 1e-3,
+            "LF must start before the sill")
+        self.assertLess(
+            sp.linalg.norm(path[i_lf].beziers[-1].points[-1] - lf_end), 1e-3,
+            "LF must end after the sill")
+        self.assertLess(
+            sp.linalg.norm(path[i_lh].beziers[0].points[0] - lh_pos), 1e-3,
+            "LH must remain at its grip position (start)")
+        self.assertLess(
+            sp.linalg.norm(path[i_lh].beziers[-1].points[-1] - lh_pos), 1e-3,
+            "LH must remain at its grip position (end)")
+        self.assertLess(
+            sp.linalg.norm(path[i_rf].beziers[0].points[0] - rf_pos), 1e-3,
+            "RF must remain at its standing position (start)")
+        self.assertLess(
+            sp.linalg.norm(path[i_rf].beziers[-1].points[-1] - rf_pos), 1e-3,
+            "RF must remain at its standing position (end)")
+
+    def test_stability_polytope_soft_cost_increases_with_weight(self):
+        """
+        Raising the stability-polytope weight must not decrease the reported
+        cvxpy objective (the soft barrier adds cost, never reduces it).
+        Both trajectories must still satisfy the hard boundary constraints.
+        """
+        iris_seq, safe_points_lst, safe_regions_mgr_dict = \
+            self.test_multistage_torso_iris_seq_multiple_frame()
+        motion_frames_seq = self.motion_frames_seq
+        fixed_frames      = self.fixed_frames_seq
+
+        durations = [
+            {'torso': np.array([0.2] * 3), 'RF': np.array([0.2] * 3)},
+            {'torso': np.array([0.2] * 1), 'RF': np.array([0.2] * 1)},
+        ]
+        alpha = {1: 1, 2: 1, 3: 0}
+        surface_normals_lst = motion_frames_seq.get_contact_surfaces()
+
+        contact_seqs   = [['RF'], ['RF']]
+        contact_planes = [{'RF': np.array([0., 0., 1.])},
+                          {'RF': np.array([0., 0., 1.])}]
+        stab_manager = StabilityPolytopeManager(
+            contact_seqs, contact_planes, 35.0, n_phases_out=len(durations))
+        stab_manager.compute(safe_points_lst)
+
+        costs = []
+        for w_stab in (0.0, 1e-2):
+            _, sol_stats, _, _ = optimize_multiple_bezier_iris(
+                None, [], safe_regions_mgr_dict, durations, alpha, safe_points_lst,
+                fixed_frames=fixed_frames,
+                surface_normals_lst=surface_normals_lst,
+                stab_poly_manager=stab_manager if w_stab > 0 else None,
+                w_stability_polytope=w_stab)
+            costs.append(sol_stats['cost'])
+
+        self.assertGreaterEqual(costs[1], costs[0] - 1e-6,
+                                "Stability-polytope soft barrier must not reduce the objective")
 
 
 if __name__ == '__main__':

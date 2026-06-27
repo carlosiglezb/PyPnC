@@ -7,6 +7,8 @@ class PlannerConfig(ABC):
     ALPHA : list[float] = None            # weights on the task cost function (derivatives)
     FOOT_SIZE : list[float] = None        # size of the feet in the form [length, width]
     N_HORIZON_LST : list[int] = None      # list of horizon lengths for the whole-body planner
+    B_USE_STABILITY_POLYTOPE : bool = False   # activate stability-polytope soft constraint
+    W_STABILITY_POLYTOPE : float = 1e-3       # weight on the quadratic barrier penalty
     WBC_FRAME_TRACKING_GAINS : dict[str: np.ndarray] = {}  # gains for the whole-body planner frame tracking tasks
     WBC_FINAL_FRAME_TRACKING_GAINS : dict[str: np.ndarray] = {}  # gains for the terminal state of whole-body planner frame tracking tasks
     WBC_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for the whole-body planner frame tracking tasks

@@ -115,7 +115,10 @@ class LocomanipulationFramePlanner:
              w_rigid: np.array,
              w_rigid_poly: np.array = None,
              b_final_vel_constraint: bool = False,
-             verbose: bool=False):
+             verbose: bool=False,
+             b_use_stability_polytope: bool = False,
+             robot_mass: float = None,
+             w_stability_polytope: float = 0.0):
         S = self.safe_boxes     # dict of IrisRegionsManager
         R = self.reachability_planes
         A = self.aux_frames
@@ -132,7 +135,10 @@ class LocomanipulationFramePlanner:
                                                                                     w_rigid,
                                                                                     w_rigid_poly,
                                                                                     b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan,
-                                                                                    b_final_vel_constr=b_final_vel_constraint
+                                                                                    b_final_vel_constr=b_final_vel_constraint,
+                                                                                    b_use_stability_polytope=b_use_stability_polytope,
+                                                                                    robot_mass=robot_mass,
+                                                                                    w_stability_polytope=w_stability_polytope,
                                                                                     )
 
     def set_env_geometry(self, env_geometry):

@@ -78,7 +78,8 @@ B_VERBOSE                   = False
 B_USE_KNEES                 = True
 B_USE_SELF_COLLISION_AVOIDANCE = True
 B_USE_KNEES_IN_SMOOTH_PLAN  = False
-B_VISUALIZE_KIN             = False
+B_USE_STABILITY_POLYTOPE    = False   # set True to activate stability-polytope soft constraint
+B_VISUALIZE_KIN             = True
 B_VISUALIZE_DYN             = True
 
 # ---------------------------------------------------------------------------
@@ -414,12 +415,13 @@ def run_trial(y_pos: float, shared: dict,
         visualizer           = shared.get('visualizer')
 
         # ---- Apply per-trial randomized params (if requested) ----
-        if alpha is not None or w_rigid is not None:
+        if alpha is not None or w_rigid is not None or B_USE_STABILITY_POLYTOPE:
             planner_params = copy.copy(planner_params)
             if alpha is not None:
                 planner_params.ALPHA = alpha.tolist()
             if w_rigid is not None:
                 planner_params.W_RIGID_LINK = w_rigid.tolist()
+            planner_params.B_USE_STABILITY_POLYTOPE = B_USE_STABILITY_POLYTOPE
 
         result['alpha']   = list(planner_params.ALPHA)
         result['w_rigid'] = list(planner_params.W_RIGID_LINK)

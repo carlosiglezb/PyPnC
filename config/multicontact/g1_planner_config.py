@@ -8,6 +8,8 @@ class MultiContactDoorConfig(PlannerConfig):
     # W_RIGID_LINK_SINGLE_STEP = [5., 0., 0.]
     # W_RIGID_LINK_STEP_ON_DOOR = [1000., 0., 0.]
 
+    W_STABILITY_POLYTOPE = 1e-3   # low initial weight; tune upward for stronger bias
+
     # ----- seq 0 (step over): single hand, step through door
     B_FINAL_VEL_CONSTRAINT = True
     # W_RIGID_LINK = [10., 0., 0.]  # option 0: knees forward
@@ -95,6 +97,8 @@ class MultiContactDoorConfig(PlannerConfig):
     }
 
 class MultiContactTiltedStairsConfig(PlannerConfig):
+    W_STABILITY_POLYTOPE = 1e-3
+
     B_FINAL_VEL_CONSTRAINT = True
     W_RIGID_LINK = [0., 0., 1.]
     ALPHA = [1, 0.0, 0.01]
@@ -131,6 +135,8 @@ class MultiContactTiltedStairsConfig(PlannerConfig):
     }
 
 class MultiContactObstructedHoleConfig(PlannerConfig):
+    W_STABILITY_POLYTOPE = 1e-3
+
     B_FINAL_VEL_CONSTRAINT = False
     W_RIGID_LINK = [0.2, 0., 0.8]
     ALPHA = [0.0, 0.1, 0.0]

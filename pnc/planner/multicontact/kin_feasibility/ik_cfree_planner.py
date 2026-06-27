@@ -61,6 +61,8 @@ class IKCFreePlanner:
         self.plan_to_model_frames = None
         self._b_record_anim = False
         self.w_rigid_poly = np.array(gains.W_RIGID_LINK)
+        self.robot_mass = (sum(inertia.mass for inertia in pin_robot_model.inertias)
+                           if pin_robot_model is not None else None)
 
         if q0 is None and pin_robot_model is not None:
             q0 = np.zeros(pin_robot_model.nq)
@@ -173,8 +175,14 @@ class IKCFreePlanner:
         alpha = planner_params.ALPHA
         w_rigid = np.array(planner_params.W_RIGID_LINK)
         b_final_vel_constraint = planner_params.B_FINAL_VEL_CONSTRAINT
+        b_use_stability_polytope = getattr(planner_params, 'B_USE_STABILITY_POLYTOPE', False)
+        w_stability_polytope = getattr(planner_params, 'W_STABILITY_POLYTOPE', 0.0)
         ik_all_start_time = time.time()
-        self.planner.plan_iris(p_init, T, alpha, w_rigid, self.w_rigid_poly, b_final_vel_constraint, verbose)
+        self.planner.plan_iris(p_init, T, alpha, w_rigid, self.w_rigid_poly,
+                               b_final_vel_constraint, verbose,
+                               b_use_stability_polytope=b_use_stability_polytope,
+                               robot_mass=self.robot_mass,
+                               w_stability_polytope=w_stability_polytope)
         self.solver_stats = self.planner.solver_stats
         self.solver_stats['ik_plan_total_time'] = time.time() - ik_all_start_time
         if verbose:

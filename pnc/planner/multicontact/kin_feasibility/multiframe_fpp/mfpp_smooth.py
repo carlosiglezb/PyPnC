@@ -78,6 +78,8 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                                   surface_normals_lst=None,
                                   weights_rigid_link=None,
                                   b_use_knees_in_smooth_plan=True,
+                                  stab_poly_manager=None,
+                                  w_stability_polytope: float = 0.0,
                                   n_points=None, **kwargs):
     if weights_rigid_link is None:
         weights_rigid_link = np.array([3500., 0.5, 10.])     # default for g1
@@ -185,14 +187,27 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
         # Cost function
         for i, ai in alpha.items():
             h = n_points - 1 - i
-            A = np.zeros((h + 1, h + 1))
+            A_gram = np.zeros((h + 1, h + 1))
             for m in range(h + 1):
-                for n in range(h + 1):
-                    A[m, n] = binom(h, m) * binom(h, n) / binom(2 * h, m + n)
-            A *= durations[seg_idx][f_name][fr_seg_k_box] / (2 * h + 1)
-            A = np.kron(A, np.eye(d))
+                for n_gram in range(h + 1):
+                    A_gram[m, n_gram] = binom(h, m) * binom(h, n_gram) / binom(2 * h, m + n_gram)
+            A_gram *= durations[seg_idx][f_name][fr_seg_k_box] / (2 * h + 1)
+            A_gram = np.kron(A_gram, np.eye(d))
             p = cp.vec(points[k][i], order='C')
-            cost += ai * cp.quad_form(p, A)
+            cost += ai * cp.quad_form(p, A_gram)
+
+        # Stability-polytope soft barrier for torso control points
+        if (stab_poly_manager is not None
+                and stab_poly_manager.is_computed
+                and w_stability_polytope > 0.0
+                and f_name == 'torso'):
+            stab_poly = stab_poly_manager.get_polytope(seg_idx)
+            if stab_poly is not None:
+                A_stab, b_stab = stab_poly
+                # violation[i,j] = (A_stab @ ctrl_pt_j)[i] - b_stab[i]  >=0 means outside
+                b_stab_mat = np.repeat(b_stab.reshape(-1, 1), n_points, axis=1)
+                violation = A_stab @ points[k][0].T - b_stab_mat
+                cost += w_stability_polytope * cp.sum(cp.maximum(violation, 0) ** 2)
 
         # Adjust frame name, segment and box numbers
         if (k+1) % num_iris_tot == 0:
@@ -457,6 +472,8 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                   weights_rigid_link=None,
                                   b_use_knees_in_smooth_plan=True,
                                   b_skip_sca=True,
+                                  stab_poly_manager=None,
+                                  w_stability_polytope: float = 0.0,
                                   n_points=None, **kwargs):
     if weights_rigid_link is None:
         weights_rigid_link = np.array([3500., 0.5, 10.])     # default for g1
@@ -563,14 +580,27 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         # Cost function
         for i, ai in alpha.items():
             h = n_points - 1 - i
-            A = np.zeros((h + 1, h + 1))
+            A_gram = np.zeros((h + 1, h + 1))
             for m in range(h + 1):
-                for n in range(h + 1):
-                    A[m, n] = binom(h, m) * binom(h, n) / binom(2 * h, m + n)
-            A *= durations[seg_idx][f_name][fr_seg_k_box] / (2 * h + 1)
-            A = np.kron(A, np.eye(d))
+                for n_gram in range(h + 1):
+                    A_gram[m, n_gram] = binom(h, m) * binom(h, n_gram) / binom(2 * h, m + n_gram)
+            A_gram *= durations[seg_idx][f_name][fr_seg_k_box] / (2 * h + 1)
+            A_gram = np.kron(A_gram, np.eye(d))
             p = ca.vec(points[k][i].T)
-            cost += ai * ca.bilin(A, p, p)
+            cost += ai * ca.bilin(A_gram, p, p)
+
+        # Stability-polytope soft barrier for torso control points
+        if (stab_poly_manager is not None
+                and stab_poly_manager.is_computed
+                and w_stability_polytope > 0.0
+                and f_name == 'torso'):
+            stab_poly = stab_poly_manager.get_polytope(seg_idx)
+            if stab_poly is not None:
+                A_stab, b_stab = stab_poly
+                b_stab_rep = np.tile(b_stab.reshape(-1, 1), (1, n_points))
+                # violation shape (n_halfspaces, n_points); positive means outside polytope
+                violation_stab = A_stab @ points[k][0].T - b_stab_rep
+                cost += w_stability_polytope * ca.sumsqr(ca.fmax(violation_stab, 0))
 
         # Adjust frame name, segment and box numbers
         if (k+1) % num_iris_tot == 0:

@@ -8,8 +8,10 @@ from .mfpp_smooth import optimize_multiple_bezier_iris, \
     optimize_multiple_bezier_iris_casadi, pack_points_for_single_vector
 from vision.iris.iris_regions_manager import IrisRegionsManager
 from ..fpp_sequencer_tools import get_last_defined_point, distribute_box_seq, distribute_free_frames
-from ..planner_surface_contact import get_contact_seq_from_fixed_frames_seq
+from ..planner_surface_contact import (get_contact_seq_from_fixed_frames_seq,
+                                        get_contact_planes_from_motion_frames_seq)
 from ..self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
+from ..stability_polytope_tools import StabilityPolytopeManager
 
 
 def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
@@ -190,11 +192,25 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                   env_geometry=None,
                   w_rigid=None, w_rigid_poly=None,
                   b_use_knees_in_smooth_plan=False,
-                  b_final_vel_constr=False):
+                  b_final_vel_constr=False,
+                  b_use_stability_polytope=False,
+                  robot_mass=None,
+                  w_stability_polytope=0.0):
     solver_stats = {}
     # Find IRIS sequence and minimize length between safe points
     motion_frames_lst = motion_frames_seq.get_motion_frames()
     iris_seq, safe_pnt_lst = plan_multistage_iris_seq(S, fixed_frames, motion_frames_lst, p_init)
+
+    # Build stability-polytope manager (computed once, reused by both optimisers)
+    stab_poly_manager = None
+    if b_use_stability_polytope and robot_mass is not None:
+        stab_poly_manager = StabilityPolytopeManager.from_fixed_frames(
+            fixed_frames, motion_frames_seq, robot_mass,
+            n_phases_out=len(iris_seq))
+        stab_poly_manager.compute(safe_pnt_lst)
+        if verbose:
+            print(f"[StabilityPolytope] computed {len(stab_poly_manager)} polytopes "
+                  f"(robot_mass={robot_mass:.1f} kg)")
 
     traj, length, solver_time = solve_min_reach_iris_distance(R, S, iris_seq, safe_pnt_lst,
                                                               aux_frames=A,
@@ -248,7 +264,9 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                              weights_rigid_link=w_rigid,
                                                              verbose=verbose,
                                                              b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan,
-                                                             b_final_vel_constr=b_final_vel_constr)
+                                                             b_final_vel_constr=b_final_vel_constr,
+                                                             stab_poly_manager=stab_poly_manager,
+                                                             w_stability_polytope=w_stability_polytope)
     solver_stats['multiple_bezier_iris_cvxpy_time'] = sol_stats['runtime']
     if verbose:
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
@@ -273,7 +291,9 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                                  verbose=verbose,
                                                                  b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan,
                                                                  b_final_vel_constr=b_final_vel_constr,
-                                                                 b_skip_sca=b_skip_sca)
+                                                                 b_skip_sca=b_skip_sca,
+                                                                 stab_poly_manager=stab_poly_manager,
+                                                                 w_stability_polytope=w_stability_polytope)
         solver_stats['multiple_bezier_iris_sca_casadi_time'] = sol_stats['runtime']
         if not b_skip_sca:
             solver_stats['multiple_bezier_iris_sca_build_time'] = sol_stats['sca_build_time']
