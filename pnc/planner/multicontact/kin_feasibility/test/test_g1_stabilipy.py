@@ -312,8 +312,8 @@ class TestStabilipy(unittest.TestCase):
 
         # get list of configurations throughout multiple contacts
         env_opts = ['_door', '_stairs_']
-        test_env = 1
-        test_sequence = 1
+        test_env = 0
+        test_sequence = 2
         env_opt = env_opts[test_env]
         if 'door' in env_opt:
             N_HORIZON_LST = [300] * 5
@@ -323,7 +323,8 @@ class TestStabilipy(unittest.TestCase):
             contact_seq_str_opts = ['right_side', 'fully_opposing']
         cs_opt = contact_seq_str_opts[test_sequence]  # depends on environment
         # cfree_soln_file = cwd + '/experiment_data/g1_guided_kin_sca_sca_refine' + env_opt + cs_opt +  '.pkl'
-        cfree_soln_file = cwd + '/experiment_data/g1_guided__no_imp_sca__sca_refine___stairs_no_smooth_knees' + '.pkl'
+        # cfree_soln_file = cwd + '/experiment_data/g1_guided__no_imp_sca__sca_refine___stairs_no_smooth_knees' + '.pkl'
+        cfree_soln_file = cwd + '/experiment_data/RAL/DoorShort/g1_guided__no_imp_sca__sca_refine_step_on_balanced_door_knees_diag.pkl'
         q_all = get_all_poses_from_file(cfree_soln_file)
         if len(q_all) == 1:
             # in case using full TO with impulse model, separate by contact phase

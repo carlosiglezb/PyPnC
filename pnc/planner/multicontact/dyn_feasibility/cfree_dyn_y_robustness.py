@@ -43,7 +43,7 @@ from pnc.planner.multicontact.kin_feasibility.ik_cfree_planner import *
 from humanoid_action_models import *
 from pnc.planner.multicontact.dyn_feasibility.G1MulticontactPlanner import G1MulticontactPlanner
 from pnc.planner.multicontact.dyn_feasibility.HumanoidMulticontactPlanner import ContactSequence
-from pnc.planner.multicontact.dyn_feasibility.cfree_dyn_planner import get_five_stage_one_hand_contact_sequence
+from pnc.planner.multicontact.dyn_feasibility.cfree_dyn_planner import get_five_stage_two_hand_contact_sequence
 from vision.iris.iris_regions_manager import IrisRegionsManager, IrisGeomInterface
 
 import pinocchio as pin
@@ -53,7 +53,7 @@ from pinocchio.visualize import MeshcatVisualizer
 # ---------------------------------------------------------------------------
 # Trial parameters
 # ---------------------------------------------------------------------------
-N_TRIALS    = 5
+N_TRIALS    = 1
 Y_LB, Y_UB = -0., 0.
 RNG_SEED    = 2          # set to None for non-reproducible draws
 
@@ -61,13 +61,13 @@ RNG_SEED    = 2          # set to None for non-reproducible draws
 # the same uniform distributions used in generate_guide_dataset.py:
 #   ALPHA    ~ [U(0,1), U(0,0.5), U(0,0.1)]
 #   W_RIGID_LINK ~ [U(0,1), 0.0, U(0,1)]   (middle entry is always 0)
-B_RANDOMIZE_PARAMS = True
+B_RANDOMIZE_PARAMS = False
 
 # ---------------------------------------------------------------------------
 # Planner options (mirror cfree_dyn_planner.py defaults for the hole env)
 # ---------------------------------------------------------------------------
 # Contact sequence selection (matches cfree_dyn_planner.py --sequence):
-#   0 : step through door  (get_five_stage_one_hand_contact_sequence)
+#   0 : step through door  (get_five_stage_two_hand_contact_sequence)
 #   1 : step on knocker, y-varying  (build_knocker_contact_seq — this file)
 CONTACT_SEQ                 = 0
 SOLVE_BY_SECTIONS           = 'single'
@@ -86,13 +86,13 @@ B_VISUALIZE_DYN             = True
 # Dataset saving
 # ---------------------------------------------------------------------------
 SAVE_DYN_PLAN = True
-DYN_SAVE_PATH = "guide_dataset_dyn_multiple_cs0_origin.npz"
+DYN_SAVE_PATH = "guide_dataset_dyn_single_cs0_origin.npz"
 
 # ---------------------------------------------------------------------------
 # Contact geometry constants for the obstructed-hole environment (G1)
 # ---------------------------------------------------------------------------
 # Knee-knocker landing height (top of base + foot thickness)
-KNOCKER_X   = 0.35
+KNOCKER_X   = 0.3
 KNOCKER_Z   = 0.44
 FT_KN_OFFSET = np.array([0.15, 0., 0.28])   # foot → knee offset used in hole plans
 STEP_LENGTH = 0.44
@@ -132,13 +132,13 @@ def get_root_to_torso_offset(geom_model):
 def get_g1_pose_with_y(n_joints: int, y_pos: float) -> np.ndarray:
     """Default G1 'hole' joint configuration with the floating-base y replaced."""
     q0 = np.zeros(n_joints)
-    q0[0]  = -0.697   # left_hip_pitch_joint
-    q0[3]  =  1.23    # left_knee_joint
-    q0[4]  = -0.53    # left_ankle_pitch_joint
-    q0[6]  = -0.697   # right_hip_pitch_joint
-    q0[9]  =  1.23    # right_knee_joint
-    q0[10] = -0.53    # right_ankle_pitch_joint
-    floating_base = np.array([-0.03, y_pos, 0.68, 0., 0., 0., 1.])
+    q0[0]  = -np.pi/8  # left_hip_pitch_joint
+    q0[3]  = np.pi/4  # left_knee_joint
+    q0[4]  = -np.pi/8  # left_ankle_pitch_joint
+    q0[6]  = -np.pi/8  # right_hip_pitch_joint
+    q0[9]  = np.pi/4  # right_knee_joint
+    q0[10] =  -np.pi/8  # right_ankle_pitch_joint
+    floating_base = np.array([-0.0, y_pos, 0.75, 0., 0., 0., 1.])
     return np.concatenate((floating_base, q0))
 
 
@@ -315,7 +315,7 @@ def setup_g1_obstructed_hole():
         plan_to_model_ids[key] = rob_model.getFrameId(frame_name)
 
     # Environment
-    door_pos = np.array([0.32, 0.0, 0.])
+    door_pos = np.array([KNOCKER_X - 0.03, 0.0, 0.])
     obstructed_hole = HoleInWallObstructed(door_pos)
 
     # Refined collision model for dynamics + merge with hole obstacles
@@ -446,15 +446,9 @@ def run_trial(y_pos: float, shared: dict,
 
         # ---- Build contact sequence ----
         if CONTACT_SEQ == 0:
-            # seq 0 (step through door) derives frame targets from IRIS seeds, so we
-            # need safe_regions_mgr_dict first.  Compute it preliminarily using the
-            # knocker motion frames (seq 1) — the primary start/end seeds are
-            # identical; only intermediate seeds differ.
-            _prelim_fixed, _prelim_motion = build_knocker_contact_seq(starting_pose, B_USE_KNEES)
-            _prelim_iris = hole_plan.compute_iris_regions_mgr(
-                obstructed_hole, starting_pose, _prelim_motion, b_use_knees=B_USE_KNEES)
-            fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(
-                'g1', _prelim_iris)
+            final_pose = {fr: pos + np.array([STEP_LENGTH, 0., 0.]) for fr, pos in starting_pose.items()}
+            fixed_frames_seq, motion_frames_seq = get_five_stage_two_hand_contact_sequence(
+                'g1', KNOCKER_X, final_pose)
         else:  # CONTACT_SEQ == 1: knocker contact sequence
             fixed_frames_seq, motion_frames_seq = build_knocker_contact_seq(
                 starting_pose, B_USE_KNEES)

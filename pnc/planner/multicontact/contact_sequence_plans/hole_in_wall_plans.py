@@ -287,9 +287,9 @@ def compute_iris_regions_mgr(hole: HoleInWallObstructed,
     safe_rf_start_region = IrisGeomInterface(obstacles, domain, starting_rf_pos + iris_rf_shift)
     safe_rh_start_region = IrisGeomInterface(obstacles, domain, starting_rh_pos + iris_rh_shift)
     safe_torso_final_region = IrisGeomInterface(obstacles, domain, final_torso_pos + np.array([-0.1, 0., 0.]))
-    safe_lf_final_region = IrisGeomInterface(obstacles, domain, final_lf_pos)
+    safe_lf_final_region = IrisGeomInterface(obstacles, domain, final_lf_pos + np.array([-0.1, 0., 0.]))
     safe_lh_final_region = IrisGeomInterface(obstacles, domain, final_lh_pos)
-    safe_rf_final_region = IrisGeomInterface(obstacles, domain, final_rf_pos)
+    safe_rf_final_region = IrisGeomInterface(obstacles, domain, final_rf_pos + np.array([-0.1, 0., 0.]))
     safe_rh_final_region = IrisGeomInterface(obstacles, domain, final_rh_pos)
     safe_regions_mgr_dict = {'torso': IrisRegionsManager(safe_torso_start_region, safe_torso_final_region),
                              'LF': IrisRegionsManager(safe_lf_start_region, safe_lf_final_region),

@@ -389,7 +389,7 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         return fixed_frames, motion_frames_seq
 
-    def get_five_stage_one_hand_contact_sequence(self, safe_regions_mgr_dict):
+    def get_five_stage_two_hand_contact_sequence(self, safe_regions_mgr_dict):
         # door position
         door_l_inner_location = np.array([0.3, 0.35, 1.0])
         door_r_inner_location = np.array([0.34, -0.35, 1.0])
@@ -583,7 +583,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         self.assertEqual(True, True)
 
         # hand-chosen five-stage sequence of contacts
-        fixed_frames_seq, motion_frames_seq = self.get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict)
+        fixed_frames_seq, motion_frames_seq = self.get_five_stage_two_hand_contact_sequence(safe_regions_mgr_dict)
 
         # planner parameters
         T = 3

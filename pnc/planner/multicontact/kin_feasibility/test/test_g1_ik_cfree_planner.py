@@ -319,7 +319,7 @@ class TestIKCFreePlanner(unittest.TestCase):
 
         return fixed_frames, motion_frames_seq
 
-    def get_five_stage_one_hand_contact_sequence(self, safe_regions_mgr_dict):
+    def get_five_stage_two_hand_contact_sequence(self, safe_regions_mgr_dict):
         starting_lh_pos = safe_regions_mgr_dict['LH'].iris_list[0].seed_pos
         starting_rh_pos = safe_regions_mgr_dict['RH'].iris_list[0].seed_pos
         final_lf_pos = safe_regions_mgr_dict['LF'].iris_list[1].seed_pos
@@ -515,7 +515,7 @@ class TestIKCFreePlanner(unittest.TestCase):
             p_init[fr] = safe_regions_mgr_dict[fr].iris_list[0].seed_pos  # starting_pos
 
         # hand-chosen five-stage sequence of contacts
-        fixed_frames_seq, motion_frames_seq = self.get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict)
+        fixed_frames_seq, motion_frames_seq = self.get_five_stage_two_hand_contact_sequence(safe_regions_mgr_dict)
 
         # planner parameters
         T = 3
@@ -628,7 +628,7 @@ class TestIKCFreePlanner(unittest.TestCase):
         p_init['RH'] = self.starting_rh_pos
 
         # hand-chosen five-stage sequence of contacts
-        fixed_frames_seq, motion_frames_seq = self.get_five_stage_one_hand_contact_sequence(safe_regions_mgr_dict)
+        fixed_frames_seq, motion_frames_seq = self.get_five_stage_two_hand_contact_sequence(safe_regions_mgr_dict)
         # fixed_frames_seq, motion_frames_seq = self.get_five_stage_on_knocker_contact_sequence(safe_regions_mgr_dict)
 
         # planner parameters

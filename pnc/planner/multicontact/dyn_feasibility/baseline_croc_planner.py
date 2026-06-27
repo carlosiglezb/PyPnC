@@ -228,7 +228,7 @@ def get_two_stage_contact_sequence(safe_regions_mgr_dict):
     return fixed_frames, motion_frames_seq
 
 
-def get_five_stage_one_hand_contact_sequence(robot_name: str,
+def get_five_stage_two_hand_contact_sequence(robot_name: str,
                                              robot_data: pinocchio.Data,
                                              plan_to_model_ids: dict[str: int],
                                              goal_step_length: float,
@@ -748,7 +748,7 @@ def main(args):
         # Note: the contact sequence was defined earlier for the stairs environment
         if env == 'door':
             if contact_seq == 0:    # step through door
-                fixed_frames_seq, motion_frames_seq = get_five_stage_one_hand_contact_sequence(robot_name,
+                fixed_frames_seq, motion_frames_seq = get_five_stage_two_hand_contact_sequence(robot_name,
                                                                                                rob_data,
                                                                                                plan_to_model_ids,
                                                                                                step_length,

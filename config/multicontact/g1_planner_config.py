@@ -11,7 +11,7 @@ class MultiContactDoorConfig(PlannerConfig):
     W_STABILITY_POLYTOPE = 1e-3   # low initial weight; tune upward for stronger bias
 
     # ----- seq 0 (step over): single hand, step through door
-    B_FINAL_VEL_CONSTRAINT = True
+    B_FINAL_VEL_CONSTRAINT = False
     # W_RIGID_LINK = [10., 0., 0.]  # option 0: knees forward
     # ALPHA = [1., 0., 0.01]           # option 0: knees forward
     # W_RIGID_LINK = [5., 0., 0.]  # option 1: knees forward
@@ -30,8 +30,8 @@ class MultiContactDoorConfig(PlannerConfig):
     # ALPHA = [0.5, 0.0, 0.1]         # option 7: roll shins outwards
     # W_RIGID_LINK = [5, 0., 2]       # option 8: knees forward
     # ALPHA = [0.01, 0.1, 0.5]         # option 8: knee forward
-    # W_RIGID_LINK = [1., 0., 0.]   # option 9: knees fwd (RAL)
-    W_RIGID_LINK = [0., 0., 1.]   # option 10: knees-up (RAL)
+    W_RIGID_LINK = [1., 0., 0.]   # option 9: knees fwd (RAL)
+    # W_RIGID_LINK = [0., 0., 1.]   # option 10: knees-up (RAL)
     # W_RIGID_LINK = [0.5, 0., 0.5]   # option 11: balanced (RAL)
     ALPHA = [1, 0., 0.1]         # options 9-11 (RAL)
     # N_HORIZON_LST = [180, 240, 280, 250, 250]
@@ -45,7 +45,7 @@ class MultiContactDoorConfig(PlannerConfig):
     # W_RIGID_LINK = [20.0, 0., 5.]       # option 2: knee forward
     # ALPHA = [1.0, 0.01, 0.01]           # option 2: knee forward
     # N_HORIZON_LST = [250, 250, 250, 250, 250]
-    N_HORIZON_LST = [300] * 5
+    N_HORIZON_LST = [300] * 4
 
     FOOT_SIZE = [0.15, 0.08]  # [length, width]
 
@@ -60,7 +60,7 @@ class MultiContactDoorConfig(PlannerConfig):
     #     }
     # ----- seq 1 (step on)
     WBC_FRAME_TRACKING_GAINS = {
-            'torso': np.array([4, 4, 0.5] + [0.02, 0.02, 0.001]),
+            'torso': np.array([4, 4, 3.5] + [0.02, 0.02, 0.001]),
             'feet': np.array([6.] * 3 + [0.01] * 3),  # (lin, ang)
             'L_knee': np.array([4.] * 3 + [0.00001] * 3),
             'R_knee': np.array([4.] * 3 + [0.00001] * 3),
