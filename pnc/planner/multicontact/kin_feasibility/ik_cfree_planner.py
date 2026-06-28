@@ -167,7 +167,8 @@ class IKCFreePlanner:
              planner_params: PlannerConfig,
              visualizer: MeshcatVisualizer = None,
              verbose: bool = False,
-             save_html:bool = False):
+             save_html:bool = False,
+             stab_poly_callback=None):
         if self.planner is None:
             raise ValueError("Planner not set")
 
@@ -177,12 +178,17 @@ class IKCFreePlanner:
         b_final_vel_constraint = planner_params.B_FINAL_VEL_CONSTRAINT
         b_use_stability_polytope = getattr(planner_params, 'B_USE_STABILITY_POLYTOPE', False)
         w_stability_polytope = getattr(planner_params, 'W_STABILITY_POLYTOPE', 0.0)
+        foot_force_lim = getattr(planner_params, 'FOOT_FORCE_LIM', 1.5)
+        hand_force_lim = getattr(planner_params, 'HAND_FORCE_LIM', 0.25)
         ik_all_start_time = time.time()
         self.planner.plan_iris(p_init, T, alpha, w_rigid, self.w_rigid_poly,
                                b_final_vel_constraint, verbose,
                                b_use_stability_polytope=b_use_stability_polytope,
                                robot_mass=self.robot_mass,
-                               w_stability_polytope=w_stability_polytope)
+                               w_stability_polytope=w_stability_polytope,
+                               foot_force_lim=foot_force_lim,
+                               hand_force_lim=hand_force_lim,
+                               stab_poly_callback=stab_poly_callback)
         self.solver_stats = self.planner.solver_stats
         self.solver_stats['ik_plan_total_time'] = time.time() - ik_all_start_time
         if verbose:

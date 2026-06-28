@@ -156,7 +156,9 @@ class StabilityPolytopeManager:
                  radius: float = 1.0,
                  margin: float = 0.0,
                  epsilon: float = 1e-2,
-                 max_iter: int = 20,
+                 max_iter: int = 30,
+                 foot_force_lim: float = 1.5,
+                 hand_force_lim: float = 0.25,
                  **contact_geom_kwargs):
         self._contact_seqs   = contact_seqs
         self._contact_planes = contact_planes
@@ -167,6 +169,8 @@ class StabilityPolytopeManager:
         self._margin         = margin
         self._epsilon        = epsilon
         self._max_iter       = max_iter
+        self._foot_force_lim = foot_force_lim
+        self._hand_force_lim = hand_force_lim
         self._geom_kwargs    = contact_geom_kwargs
         self._polytopes: list | None = None   # computed lazily
 
@@ -222,7 +226,14 @@ class StabilityPolytopeManager:
             contains the frame positions at the start of contact phase *k*.
         """
         n_cs = len(self._contact_seqs)
-        gravity_envelope = [self._margin * s for s in _GRAVITY_SHAPE_DIRS]
+        # ForceConstraint.compute() sums forces across ALL gravity-envelope directions,
+        # so n_g redundant copies of the same zero-perturbation make the effective limit
+        # n_g× tighter than intended.  When margin=0 all directions are identical zero
+        # vectors — collapse to one to keep n_g=1 and ForceConstraint correct.
+        if self._margin > 0:
+            gravity_envelope = [self._margin * s for s in _GRAVITY_SHAPE_DIRS]
+        else:
+            gravity_envelope = [np.zeros((3, 1))]
 
         polytopes = []
         last_valid = None
@@ -233,7 +244,8 @@ class StabilityPolytopeManager:
             planes   = (self._contact_planes[cs_k]
                         if cs_k < len(self._contact_planes) else {})
 
-            pos_all, nrm_all = [], []
+            contacts = []
+            per_limb_contacts = {'LF': [], 'RF': [], 'LH': [], 'RH': []}
             for frame in cf_names:
                 frame_pos = get_last_defined_point(safe_pnt_lst[:k + 1], frame)
                 if (frame_pos is None
@@ -245,22 +257,35 @@ class StabilityPolytopeManager:
                                                                   np.array([0., 0., 1.])))
                 pts, nrms = expand_contact_frame_to_points(
                     frame, frame_pos, normal, **self._geom_kwargs)
-                pos_all.extend(pts)
-                nrm_all.extend(nrms)
+                frame_conts = [stab.Contact(self._mu, p, n) for p, n in zip(pts, nrms)]
+                contacts.extend(frame_conts)
+                if frame in per_limb_contacts:
+                    per_limb_contacts[frame].extend(frame_conts)
 
-            if not pos_all:
+            if not contacts:
                 print(f"[StabilityPolytopeManager] Phase {k}: "
                       "no contact points — skipping.")
                 polytopes.append(last_valid)
                 continue
 
             try:
-                contacts = [stab.Contact(self._mu, p, n)
-                            for p, n in zip(pos_all, nrm_all)]
                 polyhedron = stab.StabilityPolygon(
                     self._robot_mass, dimension=3, radius=self._radius)
                 polyhedron.contacts = contacts
+                # Set envelope first so ForceConstraint.compute() sees the correct n_g.
                 polyhedron.gravity_envelope = gravity_envelope
+                # Per-limb force limits: one ForceConstraint per foot/hand so that
+                # ||f_limb|| <= lim*weight for each limb independently.  Grouping
+                # feet together would force ||f_LF+f_RF|| <= weight, which equals
+                # the equilibrium support force and leaves no slack for friction.
+                for limb in ('LF', 'RF'):
+                    if per_limb_contacts[limb] and self._foot_force_lim is not None:
+                        polyhedron.addForceConstraint(per_limb_contacts[limb],
+                                                      self._foot_force_lim)
+                for limb in ('LH', 'RH'):
+                    if per_limb_contacts[limb] and self._hand_force_lim is not None:
+                        polyhedron.addForceConstraint(per_limb_contacts[limb],
+                                                      self._hand_force_lim)
                 polyhedron.compute(
                     stab.Mode.best,
                     epsilon=self._epsilon,
@@ -272,18 +297,18 @@ class StabilityPolytopeManager:
                     plot_final=False,
                 )
 
-                p_outer = HPolyhedron(
-                    polyhedron.outer.halfspaces[:, :3],
-                    -polyhedron.outer.halfspaces[:, -1])
+                p_inner = HPolyhedron(
+                    polyhedron.inner.equations[:, :3],
+                    -polyhedron.inner.equations[:, -1])
 
-                if not p_outer.IsBounded():
+                if not p_inner.IsBounded():
                     print(f"[StabilityPolytopeManager] Phase {k}: "
-                          "outer polytope unbounded — skipping.")
+                          "inner polytope unbounded — skipping.")
                     polytopes.append(last_valid)
                     continue
 
-                A_stab = polyhedron.outer.halfspaces[:, :3].copy()
-                b_stab = (-polyhedron.outer.halfspaces[:, -1]).copy()
+                A_stab = polyhedron.inner.equations[:, :3].copy()
+                b_stab = (-polyhedron.inner.equations[:, -1]).copy()
                 last_valid = (A_stab, b_stab)
                 polytopes.append(last_valid)
 

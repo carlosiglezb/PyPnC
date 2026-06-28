@@ -118,7 +118,10 @@ class LocomanipulationFramePlanner:
              verbose: bool=False,
              b_use_stability_polytope: bool = False,
              robot_mass: float = None,
-             w_stability_polytope: float = 0.0):
+             w_stability_polytope: float = 0.0,
+             foot_force_lim: float = 1.5,
+             hand_force_lim: float = 0.25,
+             stab_poly_callback=None):
         S = self.safe_boxes     # dict of IrisRegionsManager
         R = self.reachability_planes
         A = self.aux_frames
@@ -139,6 +142,9 @@ class LocomanipulationFramePlanner:
                                                                                     b_use_stability_polytope=b_use_stability_polytope,
                                                                                     robot_mass=robot_mass,
                                                                                     w_stability_polytope=w_stability_polytope,
+                                                                                    foot_force_lim=foot_force_lim,
+                                                                                    hand_force_lim=hand_force_lim,
+                                                                                    stab_poly_callback=stab_poly_callback,
                                                                                     )
 
     def set_env_geometry(self, env_geometry):

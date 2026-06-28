@@ -18,11 +18,16 @@ from collections import OrderedDict
 cwd = os.getcwd()
 sys.path.append(cwd)
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from pnc.planner.multicontact.kin_feasibility.self_collision_avoidance.SCAHPolyhedronGeometry import \
     SCAHPolyhedronGeometry
-from util.pydrake_meshcat_interface import hpoly_to_fcl_collision, create_convex_geom_from_copy
+from util.pydrake_meshcat_interface import (hpoly_to_fcl_collision, create_convex_geom_from_copy,
+                                             pydrake_geom_to_meshcat)
+import meshcat.transformations as tf
+from meshcat.geometry import Sphere
+from visualizer.meshcat_tools.meshcat_palette import meshcat_domain_obj, meshcat_obstacle_obj
 import config.multicontact.g1_planner_config as g1_params
 from pnc.planner.multicontact.kin_feasibility import SCARobotGeometry
 
@@ -78,7 +83,8 @@ B_VERBOSE                   = False
 B_USE_KNEES                 = True
 B_USE_SELF_COLLISION_AVOIDANCE = True
 B_USE_KNEES_IN_SMOOTH_PLAN  = False
-B_USE_STABILITY_POLYTOPE    = False   # set True to activate stability-polytope soft constraint
+B_USE_STABILITY_POLYTOPE    = True   # set True to activate stability-polytope soft constraint
+B_PLOT_STAB_POLY_VIOLATION  = True   # plot unscaled violation per control point after KIN solve
 B_VISUALIZE_KIN             = True
 B_VISUALIZE_DYN             = True
 
@@ -107,6 +113,63 @@ env_urdf_path = cwd + "/robot_model/ground/navy_door_fixed.urdf"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _add_stab_polys_to_viewer(stab_mgr, meshcat_viewer):
+    """Push one stability polytope per contact phase into a live meshcat viewer.
+
+    Called immediately after stabilipy finishes (before the KIN TO starts) so
+    the polytopes appear in the browser while the solver is running.
+    """
+    if stab_mgr is None or not stab_mgr.is_computed:
+        return
+    n_added = 0
+    for phase_idx in range(stab_mgr.n_phases):
+        poly = stab_mgr.get_polytope(phase_idx)
+        if poly is None:
+            continue
+        A_stab, b_stab = poly
+        try:
+            h_poly = HPolyhedron(A_stab, b_stab)
+            poly_mesh = pydrake_geom_to_meshcat(h_poly)
+            meshcat_viewer[f"stability/phase_{phase_idx}"].set_object(
+                poly_mesh, meshcat_domain_obj(opacity=0.15))
+            n_added += 1
+        except Exception as exc:
+            print(f"[StabPolyViz] Phase {phase_idx}: failed to render — {exc}")
+    print(f"[StabPolyViz] Added {n_added}/{stab_mgr.n_phases} stability polytopes to meshcat.")
+
+
+def _plot_stab_poly_violation(solver_stats: dict, w_stability_polytope=None):
+    """Plot unscaled stability polytope violation over the motion (per Bezier control point).
+
+    The y-axis shows sum_i max(A_i p - b_i, 0) at each torso control point —
+    the L1 penetration depth into violated halfspaces, without the W_STABILITY_POLYTOPE
+    scale factor.  Use this to decide whether to increase or decrease the weight:
+      - Large violation + small cost effect → increase W_STABILITY_POLYTOPE
+      - Violation already near zero → the current weight is sufficient
+    """
+    violation = solver_stats.get('stab_poly_violation')
+    viol_time = solver_stats.get('stab_poly_violation_time')
+    if violation is None or len(violation) == 0:
+        print("[StabPolyPlot] No violation data available (stability polytope not active or no polytope computed).")
+        return
+
+    t_axis = viol_time if viol_time is not None else np.arange(len(violation))
+    w_str = f"W = {w_stability_polytope:.0e}" if w_stability_polytope is not None else "W unknown"
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.fill_between(t_axis, violation, alpha=0.25, color='tab:red')
+    ax.plot(t_axis, violation, color='tab:red', linewidth=1.5)
+    ax.axhline(0., color='k', linewidth=0.8, linestyle='--')
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("Stability polytope violation\n" + r"$\sum_i \max(A_i p - b_i,\; 0)$")
+    ax.set_title(f"Unscaled stability polytope violation  ({w_str})\n"
+                 f"Max: {violation.max():.4f}   Mean: {violation.mean():.4f}")
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show(block=False)
+    plt.pause(0.1)
+
 
 def load_robot_model(package_dir, urdf_file):
     rob_model, col_model, vis_model = pin.buildModelsFromUrdf(
@@ -505,7 +568,19 @@ def run_trial(y_pos: float, shared: dict,
 
         p_init = {fr: starting_pose[fr] for fr in plan_to_model_frames.keys()}
         T = 3
-        ik_cfree_planner.plan(p_init, T, planner_params, visualizer, B_VERBOSE)
+        # Callback fires right after stabilipy finishes, before the Bezier TO starts.
+        # This lets us inspect the polytopes in meshcat while the solver runs.
+        stab_poly_cb = None
+        if B_USE_STABILITY_POLYTOPE and B_VISUALIZE_KIN and visualizer is not None:
+            stab_poly_cb = lambda mgr: _add_stab_polys_to_viewer(mgr, visualizer.viewer)
+
+        ik_cfree_planner.plan(p_init, T, planner_params, visualizer, B_VERBOSE,
+                              stab_poly_callback=stab_poly_cb)
+
+        # ---- Stability polytope violation plot (for W_STABILITY_POLYTOPE tuning) ----
+        if B_PLOT_STAB_POLY_VIOLATION and B_USE_STABILITY_POLYTOPE:
+            _plot_stab_poly_violation(ik_cfree_planner.solver_stats,
+                                      getattr(planner_params, 'W_STABILITY_POLYTOPE', None))
 
         # ---- Build dynamic planner (needed for lf_targets before plan()) ----
         N_horizon_lst   = planner_params.N_HORIZON_LST
@@ -526,6 +601,19 @@ def run_trial(y_pos: float, shared: dict,
                 rob_data, vis_data, col_data,
                 ctrl_freq=N_knots / (n_contacts * T), save_freq=save_freq)
             kin_display.add_shapes_from(obstructed_hole.obstacles)
+
+            # Static sphere at initial torso position so the polytope scale is clear
+            if B_USE_STABILITY_POLYTOPE:
+                kin_display.add_shape("torso_init",
+                                      Sphere(0.05),
+                                      meshcat_obstacle_obj(color=0x00cc00, opacity=0.8))
+                kin_display.viz.viewer["torso_init"].set_transform(
+                    tf.translation_matrix(starting_pose['torso']))
+                # Animated sphere that follows the torso through the motion
+                kin_display.add_shape("torso_moving",
+                                      Sphere(0.05),
+                                      meshcat_obstacle_obj(color=0xff8800, opacity=0.9))
+
             kin_display.start_animation()
             for t_anim in np.linspace(0, n_contacts * T, N_knots // save_freq):
                 frame_targets_dict = ik_cfree_planner.get_frame_targets_from_kin_planner(
@@ -553,6 +641,10 @@ def run_trial(y_pos: float, shared: dict,
                 kin_display.animate_target("lhand_target", [frame_targets_dict['LH']], [0.5, 0, 0])
                 kin_display.animate_target("rhand_target", [frame_targets_dict['RH']], [0.5, 0, 0])
                 kin_display.animate_target("base_target", [frame_targets_dict['torso']], [0, 0.5, 0])
+                if B_USE_STABILITY_POLYTOPE:
+                    kin_display.animate_single_shape(
+                        "torso_moving",
+                        tf.translation_matrix(frame_targets_dict['torso']))
                 kin_display.animation_step()
             kin_display.hide_visuals(["g1_29dof_lock_waist/visuals"])
             kin_display.hide_visuals(["g1_29dof_lock_waist/collisions"], True)

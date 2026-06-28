@@ -9,6 +9,8 @@ class PlannerConfig(ABC):
     N_HORIZON_LST : list[int] = None      # list of horizon lengths for the whole-body planner
     B_USE_STABILITY_POLYTOPE : bool = False   # activate stability-polytope soft constraint
     W_STABILITY_POLYTOPE : float = 1e-3       # weight on the quadratic barrier penalty
+    FOOT_FORCE_LIM : float = 1.5              # per-foot ||f|| limit as fraction of robot weight; ankle gives ~1.46× normal, total vector ~1.78× with μ=0.7 friction
+    HAND_FORCE_LIM : float = 0.25             # per-hand ||f|| limit as fraction of robot weight (shoulder limited to ~0.13–0.26× normal)
     WBC_FRAME_TRACKING_GAINS : dict[str: np.ndarray] = {}  # gains for the whole-body planner frame tracking tasks
     WBC_FINAL_FRAME_TRACKING_GAINS : dict[str: np.ndarray] = {}  # gains for the terminal state of whole-body planner frame tracking tasks
     WBC_WEIGHTED_COSTS : dict[str: np.ndarray] = {}  # costs for the whole-body planner frame tracking tasks

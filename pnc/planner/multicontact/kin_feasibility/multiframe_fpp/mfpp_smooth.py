@@ -23,6 +23,15 @@ from ..self_collision_avoidance.sca_robot_geometry import SCARobotGeometry
 from vision.iris.iris_regions_manager import IrisRegionsManager
 
 
+def _compute_stab_poly_violation(ctrl_pts: np.ndarray, A_stab: np.ndarray, b_stab: np.ndarray) -> np.ndarray:
+    """Per-control-point L1 stability polytope violation (unscaled, no w_stability_polytope factor).
+
+    Returns shape (n_points,) where each entry is sum_i max(A[i]p - b[i], 0).
+    Positive values mean the control point lies outside the polytope.
+    """
+    return np.sum(np.maximum(A_stab @ ctrl_pts.T - b_stab.reshape(-1, 1), 0.), axis=0)
+
+
 def has_safe_point_at(points_sequence_order: List[np.ndarray],
                       num_iris_tot: int,
                       safe_points_lst: List[dict[str: np.ndarray]],
@@ -309,8 +318,9 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                     link_distal_point = points[dist_fr_idx+nb][0][pnt]
                     # print(f"{aux_fr['parent_frame']} Link length discrepancy: {np.linalg.norm(link_proximal_point.value - link_distal_point.value) - link_length}")
 
-    # Reconstruct trajectory.
+    # Reconstruct trajectory and stability-polytope violation.
     beziers, path = [], []
+    stab_viol_lst, stab_viol_time_lst = [], []
     a = 0
     fr_seg_k_box, frame_idx, seg_idx = 0, 0, 0
     frame_name = frame_list[frame_idx]
@@ -329,6 +339,15 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
 
         b = a + durations[seg_idx][frame_name][fr_seg_k_box]
         beziers.append(BezierCurve(points[k][0].value, a, b))
+
+        if frame_name == 'torso' and stab_poly_manager is not None and stab_poly_manager.is_computed:
+            stab_poly = stab_poly_manager.get_polytope(seg_idx)
+            if stab_poly is not None:
+                A_stab, b_stab = stab_poly
+                viol = _compute_stab_poly_violation(points[k][0].value, A_stab, b_stab)
+                stab_viol_lst.extend(viol.tolist())
+                stab_viol_time_lst.extend(np.linspace(a, b, n_points).tolist())
+
         a = b
         fr_seg_k_box += 1
         # skip the final positions, those are assigned later
@@ -351,6 +370,10 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
     sol_stats['runtime'] = prob.solver_stats.solve_time
     sol_stats['cost_breakdown'] = cost_breakdown
     sol_stats['retiming_weights'] = retiming_weights
+    if stab_viol_lst:
+        sol_stats['stab_poly_violation'] = np.array(stab_viol_lst)
+        sol_stats['stab_poly_violation_time'] = np.array(stab_viol_time_lst)
+        print(f"[Smooth] Max stability polytope violation: {max(stab_viol_lst):.4f}")
     dual_vars = {}
     dual_vars['lam_g0'] = prob.solution.dual_vars
     dual_vars['constraints_idx'] = sum(
@@ -976,8 +999,9 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                     link_distal_point = sol_points[dist_fr_idx+nb][0][pnt]
                     # print(f"{aux_fr['parent_frame']} Link length discrepancy: {np.linalg.norm(link_proximal_point - link_distal_point) - link_length}")
 
-    # Reconstruct trajectory.
+    # Reconstruct trajectory and stability-polytope violation.
     beziers, path = [], []
+    stab_viol_lst, stab_viol_time_lst = [], []
     a = 0
     fr_seg_k_box, frame_idx, seg_idx = 0, 0, 0
     frame_name = frame_list[frame_idx]
@@ -998,6 +1022,15 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
 
         b = a + durations[seg_idx][frame_name][fr_seg_k_box]
         beziers.append(BezierCurve(sol_points[k][0], a, b))
+
+        if frame_name == 'torso' and stab_poly_manager is not None and stab_poly_manager.is_computed:
+            stab_poly = stab_poly_manager.get_polytope(seg_idx)
+            if stab_poly is not None:
+                A_stab, b_stab = stab_poly
+                viol = _compute_stab_poly_violation(sol_points[k][0], A_stab, b_stab)
+                stab_viol_lst.extend(viol.tolist())
+                stab_viol_time_lst.extend(np.linspace(a, b, n_points).tolist())
+
         a = b
 
         # check cost of initial guess
@@ -1029,16 +1062,15 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
     # Solution statistics.
     print(f"[Smooth CasADi] Initial Guess Cost: {cost_prime.full()[0][0]:.3f}")
     print(f"[Smooth CasADi] Cost: {sol['f'].full()[0][0]:.3f}")
-    sol_stats = {'runtime': solver_compute_time,
-                 }
+    sol_stats = {'runtime': solver_compute_time}
     if not b_skip_sca:
         sol_stats['sca_build_time'] = sca_build_time if bool(aux_frames) else 0.0
         sol_stats['prob_construct_time'] = prob_construct_time
+    if stab_viol_lst:
+        sol_stats['stab_poly_violation'] = np.array(stab_viol_lst)
+        sol_stats['stab_poly_violation_time'] = np.array(stab_viol_time_lst)
+        print(f"[Smooth CasADi] Max stability polytope violation: {max(stab_viol_lst):.4f}")
 
-    # sol_stats['cost'] = prob.value
-    # sol_stats['runtime'] = sol_stats_all['t_wall_total']
-    # sol_stats['cost_breakdown'] = cost_breakdown
-    # sol_stats['retiming_weights'] = retiming_weights
     dual_vars = {'lam_g0': sol['lam_g'].full(),
                  'lam_x0': sol['lam_x'].full()}
 

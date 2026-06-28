@@ -195,7 +195,10 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                   b_final_vel_constr=False,
                   b_use_stability_polytope=False,
                   robot_mass=None,
-                  w_stability_polytope=0.0):
+                  w_stability_polytope=0.0,
+                  foot_force_lim=1.5,
+                  hand_force_lim=0.25,
+                  stab_poly_callback=None):
     solver_stats = {}
     # Find IRIS sequence and minimize length between safe points
     motion_frames_lst = motion_frames_seq.get_motion_frames()
@@ -206,11 +209,15 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     if b_use_stability_polytope and robot_mass is not None:
         stab_poly_manager = StabilityPolytopeManager.from_fixed_frames(
             fixed_frames, motion_frames_seq, robot_mass,
-            n_phases_out=len(iris_seq))
+            n_phases_out=len(iris_seq),
+            foot_force_lim=foot_force_lim,
+            hand_force_lim=hand_force_lim)
         stab_poly_manager.compute(safe_pnt_lst)
         if verbose:
             print(f"[StabilityPolytope] computed {len(stab_poly_manager)} polytopes "
                   f"(robot_mass={robot_mass:.1f} kg)")
+        if stab_poly_callback is not None:
+            stab_poly_callback(stab_poly_manager)
 
     traj, length, solver_time = solve_min_reach_iris_distance(R, S, iris_seq, safe_pnt_lst,
                                                               aux_frames=A,
@@ -268,6 +275,10 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                              stab_poly_manager=stab_poly_manager,
                                                              w_stability_polytope=w_stability_polytope)
     solver_stats['multiple_bezier_iris_cvxpy_time'] = sol_stats['runtime']
+    for key in ('stab_poly_violation', 'stab_poly_violation_time'):
+        if key in sol_stats:
+            solver_stats[key] = sol_stats[key]
+    solver_stats['stab_poly_manager'] = stab_poly_manager  # None when not active
     if verbose:
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
 
@@ -298,4 +309,8 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
         if not b_skip_sca:
             solver_stats['multiple_bezier_iris_sca_build_time'] = sol_stats['sca_build_time']
             solver_stats['multiple_bezier_iris_sca_construct_time'] = sol_stats['prob_construct_time']
+        # Overwrite with casadi violation (more refined than cvxpy warm-start)
+        for key in ('stab_poly_violation', 'stab_poly_violation_time'):
+            if key in sol_stats:
+                solver_stats[key] = sol_stats[key]
     return paths, iris_seq, points, safe_pnt_lst, solver_stats

@@ -8,7 +8,7 @@ class MultiContactDoorConfig(PlannerConfig):
     # W_RIGID_LINK_SINGLE_STEP = [5., 0., 0.]
     # W_RIGID_LINK_STEP_ON_DOOR = [1000., 0., 0.]
 
-    W_STABILITY_POLYTOPE = 1e-3   # low initial weight; tune upward for stronger bias
+    W_STABILITY_POLYTOPE = 1e3   # low initial weight; tune upward for stronger bias
 
     # ----- seq 0 (step over): single hand, step through door
     B_FINAL_VEL_CONSTRAINT = False
@@ -33,7 +33,7 @@ class MultiContactDoorConfig(PlannerConfig):
     W_RIGID_LINK = [1., 0., 0.]   # option 9: knees fwd (RAL)
     # W_RIGID_LINK = [0., 0., 1.]   # option 10: knees-up (RAL)
     # W_RIGID_LINK = [0.5, 0., 0.5]   # option 11: balanced (RAL)
-    ALPHA = [1, 0., 0.1]         # options 9-11 (RAL)
+    ALPHA = [0.5, 0.1, 0.0]         # options 9-11 (RAL)
     # N_HORIZON_LST = [180, 240, 280, 250, 250]
     # ----- seq 1 (step on): opposite hand-foot pair at each contact
     # W_RIGID_LINK = [1.0, 0., 8.]  # option 1: high knees
@@ -45,7 +45,7 @@ class MultiContactDoorConfig(PlannerConfig):
     # W_RIGID_LINK = [20.0, 0., 5.]       # option 2: knee forward
     # ALPHA = [1.0, 0.01, 0.01]           # option 2: knee forward
     # N_HORIZON_LST = [250, 250, 250, 250, 250]
-    N_HORIZON_LST = [300] * 4
+    N_HORIZON_LST = [300] * 5
 
     FOOT_SIZE = [0.15, 0.08]  # [length, width]
 
