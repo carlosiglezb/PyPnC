@@ -1,10 +1,11 @@
 """
-Robustness test for the G1 obstructed-hole planner under lateral (y) starting-position
-variations.  Samples N_TRIALS starting configurations from U(Y_LB, Y_UB) in the
-floating-base y-coordinate, keeping the joint angles identical to the default
-'hole' pose.  The contact sequence is simplified: both feet and knees land directly
-on the knee-knocker (x ≈ 0.35, z = 0.44) while the hand targets remain at the
-standard door-frame locations.  At the end, a summary table reports which trials
+Robustness test for the G1 multicontact planner under starting-position
+variations, for either the obstructed-hole or the tilted-stairs environment
+(select with ENV / --env).  Samples N_TRIALS starting configurations with
+per-environment uniform x/y offsets (XY_BOUNDS) applied to the floating base,
+keeping the joint angles identical to the environment's default pose.
+Intermediate and final contact targets are world-fixed, irrespective of the
+sampled starting position.  At the end, a summary table reports which trials
 returned an optimal (feasible) solution from the HumanoidMulticontactPlanner solver.
 """
 
@@ -32,8 +33,9 @@ import config.multicontact.g1_planner_config as g1_params
 from pnc.planner.multicontact.kin_feasibility import SCARobotGeometry
 
 from pnc.robot_system.pinocchio_robot_system import PinocchioRobotSystem
-from util.environment_creator import HoleInWallObstructed
+from util.environment_creator import HoleInWallObstructed, TiltedStairs
 import pnc.planner.multicontact.contact_sequence_plans.hole_in_wall_plans as hole_plan
+import pnc.planner.multicontact.contact_sequence_plans.tilted_stairs_plans as stairs_plan
 
 import crocoddyl
 
@@ -58,23 +60,41 @@ from pinocchio.visualize import MeshcatVisualizer
 # ---------------------------------------------------------------------------
 # Trial parameters
 # ---------------------------------------------------------------------------
-N_TRIALS    = 1
-Y_LB, Y_UB = -0., 0.
+N_TRIALS    = 6
+# Per-environment sampling bounds for the floating-base x/y offset from the
+# nominal starting position.  Stairs use a tighter y range: the tilted boxes
+# are only box_width=0.35 wide and their landing targets are world-fixed.
+XY_BOUNDS = {
+    'obstructed_hole': {'x': (-0.05, 0.05), 'y': (-0.12, 0.12)},
+    'stairs':          {'x': (-0.06, 0.04), 'y': (-0.06, 0.06)},
+}
 RNG_SEED    = 2          # set to None for non-reproducible draws
 
-# When True, W_RIGID_LINK and ALPHA are drawn independently per trial from
-# the same uniform distributions used in generate_guide_dataset.py:
-#   ALPHA    ~ [U(0,1), U(0,0.5), U(0,0.1)]
+# When True, W_RIGID_LINK and ALPHA are drawn independently per trial.
+# ALPHA is drawn from per-environment uniform ranges (ALPHA_BOUNDS, one
+# (lo, hi) pair per entry): the obstructed-hole ranges match those used in
+# generate_guide_dataset.py, while the stairs ranges bracket the tuned
+# MultiContactTiltedStairsConfig default ALPHA = [1, 0, 0.01].
 #   W_RIGID_LINK ~ [U(0,1), 0.0, U(0,1)]   (middle entry is always 0)
-B_RANDOMIZE_PARAMS = False
+B_RANDOMIZE_PARAMS = True
+ALPHA_BOUNDS = {
+    'obstructed_hole': [(0.0, 1.0), (0.0, 0.5), (0.0, 0.1)],
+    'stairs':          [(0.5, 1.5), (0.0, 0.1), (0.0, 0.05)],
+}
 
 # ---------------------------------------------------------------------------
-# Planner options (mirror cfree_dyn_planner.py defaults for the hole env)
+# Planner options (mirror cfree_dyn_planner.py defaults)
 # ---------------------------------------------------------------------------
-# Contact sequence selection (matches cfree_dyn_planner.py --sequence):
-#   0 : step through door  (get_five_stage_two_hand_contact_sequence)
-#   1 : step on knocker, y-varying  (build_knocker_contact_seq — this file)
-CONTACT_SEQ                 = 0
+# Environment selection (overridable via --env):
+#   'obstructed_hole' : knee-knocker door with obstructed hole
+#   'stairs'          : tilted stairs (TiltedStairs)
+ENV                         = 'stairs'
+# Contact sequence selection (env-dependent, matches cfree_dyn_planner.py --sequence):
+#   obstructed_hole — 0: step through door  (get_five_stage_two_hand_contact_sequence)
+#                     1: step on knocker    (build_knocker_contact_seq — this file)
+#   stairs          — 0: opposing limbs     (get_opposing_limbs_contact_sequence)
+#                     1: fully opposing     (get_fully_opposing_limbs_contact_sequence)
+CONTACT_SEQ                 = 1
 SOLVE_BY_SECTIONS           = 'single'
 SOLVER_TYPE                 = 'SQP'
 B_SOLVE_HYBRID              = False
@@ -83,8 +103,9 @@ B_VERBOSE                   = False
 B_USE_KNEES                 = True
 B_USE_SELF_COLLISION_AVOIDANCE = True
 B_USE_KNEES_IN_SMOOTH_PLAN  = False
-B_USE_STABILITY_POLYTOPE    = True   # set True to activate stability-polytope soft constraint
-B_PLOT_STAB_POLY_VIOLATION  = True   # plot unscaled violation per control point after KIN solve
+B_USE_STABILITY_POLYTOPE    = False   # set True to activate stability-polytope soft constraint
+B_USE_HARD_FRICTION_CONE_SCA = False  # replace the soft friction-cone cost with a hard constraint in plan_sca
+B_PLOT_STAB_POLY_VIOLATION  = False   # plot unscaled violation per control point after KIN solve
 B_VISUALIZE_KIN             = True
 B_VISUALIZE_DYN             = True
 
@@ -92,7 +113,7 @@ B_VISUALIZE_DYN             = True
 # Dataset saving
 # ---------------------------------------------------------------------------
 SAVE_DYN_PLAN = True
-DYN_SAVE_PATH = "guide_dataset_dyn_single_cs0_origin.npz"
+DYN_SAVE_PATH_TEMPLATE = "guide_dataset_dyn_multiple_{env}_cs{seq}_random.npz"
 
 # ---------------------------------------------------------------------------
 # Contact geometry constants for the obstructed-hole environment (G1)
@@ -100,12 +121,11 @@ DYN_SAVE_PATH = "guide_dataset_dyn_single_cs0_origin.npz"
 # Knee-knocker landing height (top of base + foot thickness)
 KNOCKER_X   = 0.3
 KNOCKER_Z   = 0.44
-FT_KN_OFFSET = np.array([0.15, 0., 0.28])   # foot → knee offset used in hole plans
 STEP_LENGTH = 0.44
 
 # Door-frame hand targets (matching get_on_knocker_balanced_contact_sequence in cfree_dyn_planner.py)
-DOOR_L_INNER = np.array([0.34,  0.32, 1.0])
-DOOR_R_INNER = np.array([0.34, -0.32, 1.0])
+DOOR_L_INNER = np.array([KNOCKER_X,  0.32, 1.0])
+DOOR_R_INNER = np.array([KNOCKER_X, -0.32, 1.0])
 
 env_urdf_path = cwd + "/robot_model/ground/navy_door_fixed.urdf"
 
@@ -167,8 +187,8 @@ def _plot_stab_poly_violation(solver_stats: dict, w_stability_polytope=None):
                  f"Max: {violation.max():.4f}   Mean: {violation.mean():.4f}")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.show(block=False)
-    plt.pause(0.1)
+    plt.show()
+    # plt.pause(0.1)
 
 
 def load_robot_model(package_dir, urdf_file):
@@ -192,16 +212,28 @@ def get_root_to_torso_offset(geom_model):
             raise ValueError("Could not find torso_primitive_shape in geometry model.")
 
 
-def get_g1_pose_with_y(n_joints: int, y_pos: float) -> np.ndarray:
-    """Default G1 'hole' joint configuration with the floating-base y replaced."""
+def get_g1_pose_with_xy(n_joints: int, x_pos: float, y_pos: float,
+                        env: str = 'obstructed_hole') -> np.ndarray:
+    """Default G1 joint configuration for the given environment, with the
+    floating base offset by (x_pos, y_pos) from the nominal starting position."""
     q0 = np.zeros(n_joints)
-    q0[0]  = -np.pi/8  # left_hip_pitch_joint
-    q0[3]  = np.pi/4  # left_knee_joint
-    q0[4]  = -np.pi/8  # left_ankle_pitch_joint
-    q0[6]  = -np.pi/8  # right_hip_pitch_joint
-    q0[9]  = np.pi/4  # right_knee_joint
-    q0[10] =  -np.pi/8  # right_ankle_pitch_joint
-    floating_base = np.array([-0.0, y_pos, 0.75, 0., 0., 0., 1.])
+    if env == 'stairs':
+        # mirrors get_g1_default_initial_pose(env='stairs') in cfree_dyn_planner.py
+        q0[0]  = -np.pi/6  # left_hip_pitch_joint
+        q0[3]  = np.pi/3   # left_knee_joint
+        q0[4]  = -np.pi/6  # left_ankle_pitch_joint
+        q0[6]  = -np.pi/6  # right_hip_pitch_joint
+        q0[9]  = np.pi/3   # right_knee_joint
+        q0[10] = -np.pi/6  # right_ankle_pitch_joint
+        floating_base = np.array([-0.03 + x_pos, y_pos, 0.7, 0., 0., 0., 1.])
+    else:
+        q0[0]  = -np.pi/8  # left_hip_pitch_joint
+        q0[3]  = np.pi/4  # left_knee_joint
+        q0[4]  = -np.pi/8  # left_ankle_pitch_joint
+        q0[6]  = -np.pi/8  # right_hip_pitch_joint
+        q0[9]  = np.pi/4  # right_knee_joint
+        q0[10] =  -np.pi/8  # right_ankle_pitch_joint
+        floating_base = np.array([x_pos, y_pos, 0.75, 0., 0., 0., 1.])
     return np.concatenate((floating_base, q0))
 
 
@@ -218,7 +250,9 @@ def setup_visualizer(rob_model, col_model, vis_model, q0):
     return visualizer
 
 
-def build_knocker_contact_seq(starting_pose: dict, b_use_knees: bool = True):
+def build_knocker_contact_seq(starting_pose: dict, b_use_knees: bool = True,
+                              ft_kn_offset: np.ndarray = None,
+                              dx_final: float = STEP_LENGTH):
     """
     Five-phase contact sequence for the obstructed-hole environment where both
     feet and knees land on the knee-knocker.
@@ -232,21 +266,26 @@ def build_knocker_contact_seq(starting_pose: dict, b_use_knees: bool = True):
     The robot's final standing position is centred at y=0.  RF lands on the
     knocker at the y mid-point between its initial y and 0 (dy_knocker), then
     all frames step to their final y-centred positions (dy_final).
+
+    dx_final is the x-displacement applied to reach the final pose.  Pass
+    STEP_LENGTH - x_pos to make the final world x-position identical across
+    trials regardless of the sampled starting x (the knocker landing x is
+    already world-fixed at KNOCKER_X).
     """
     torso_y0   = starting_pose['torso'][1]  # initial torso y ≈ y_pos
     dy_knocker = -torso_y0 / 2              # half y-shift: knocker step mid-point
     dy_final   = -torso_y0                  # full y-shift: centre torso at y=0
 
     rf_on_knocker  = np.array([KNOCKER_X, starting_pose['RF'][1] + dy_knocker, KNOCKER_Z])
-    rkn_on_knocker = rf_on_knocker + FT_KN_OFFSET
+    rkn_on_knocker = rf_on_knocker + ft_kn_offset
 
-    lf_final    = starting_pose['LF']    + np.array([STEP_LENGTH, dy_final, 0.])
-    rf_final    = starting_pose['RF']    + np.array([STEP_LENGTH, dy_final, 0.])
-    lkn_final   = lf_final + FT_KN_OFFSET
-    rkn_final   = rf_final + FT_KN_OFFSET
-    torso_final = starting_pose['torso'] + np.array([STEP_LENGTH, dy_final, 0.])
-    rh_final    = starting_pose['RH']    + np.array([STEP_LENGTH, dy_final, 0.])
-    lh_final    = starting_pose['LH']    + np.array([STEP_LENGTH, dy_final, 0.])
+    lf_final    = starting_pose['LF']    + np.array([dx_final, dy_final, 0.])
+    rf_final    = starting_pose['RF']    + np.array([dx_final, dy_final, 0.])
+    lkn_final   = lf_final + ft_kn_offset
+    rkn_final   = rf_final + ft_kn_offset
+    torso_final = starting_pose['torso'] + np.array([dx_final, dy_final, 0.])
+    rh_final    = starting_pose['RH']    + np.array([dx_final, dy_final, 0.])
+    lh_final    = starting_pose['LH']    + np.array([dx_final, dy_final, 0.])
 
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
 
@@ -260,7 +299,7 @@ def build_knocker_contact_seq(starting_pose: dict, b_use_knees: bool = True):
     rh_contact = PlannerSurfaceContact('RH', np.array([0,  1, 0]))
     motion_frames_seq.add_contact_surfaces([lh_contact, rh_contact])
 
-    # ---- Phase 2: RF + R_knee onto knocker ----
+    # ---- Phase 2: RF + R_knee on knocker ----
     if b_use_knees:
         fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])
         motion_frames_seq.add_motion_frame({
@@ -273,7 +312,7 @@ def build_knocker_contact_seq(starting_pose: dict, b_use_knees: bool = True):
     rf_contact = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surfaces([rf_contact])
 
-    # ---- Phase 3: LF + L_knee onto knocker ----
+    # ---- Phase 3: LF + L_knee over knocker ----
     if b_use_knees:
         fixed_frames.append(['RF', 'R_knee', 'LH', 'RH'])
         motion_frames_seq.add_motion_frame({
@@ -323,10 +362,11 @@ def build_knocker_contact_seq(starting_pose: dict, b_use_knees: bool = True):
 # One-time robot / environment setup
 # ---------------------------------------------------------------------------
 
-def setup_g1_obstructed_hole():
+def setup_g1_env(env: str):
     """
     Load all static assets (robot model, env, collision model) that are shared
-    across all trials.  Returns a dict of shared objects.
+    across all trials for the given environment ('obstructed_hole' or 'stairs').
+    Returns a dict of shared objects.
     """
     robot_name = 'g1'
     package_dir = cwd + "/robot_model/g1_description"
@@ -367,6 +407,15 @@ def setup_g1_obstructed_hole():
     rob_model, col_model, vis_model, rob_data, col_data, vis_data = \
         load_robot_model(package_dir, robot_urdf_file)
 
+    # Knee-to-ankle offset from the canonical initial configuration
+    q0_default = get_g1_pose_with_xy(rob_model.nq - 7, 0.0, 0.0, env)
+    pin.forwardKinematics(rob_model, rob_data, q0_default)
+    pin.updateFramePlacements(rob_model, rob_data)
+    lf_frame_id  = rob_model.getFrameId('left_ankle_roll_link')
+    lkn_frame_id = rob_model.getFrameId('left_knee_link')
+    ft_kn_offset = (rob_data.oMf[lkn_frame_id].translation
+                    - rob_data.oMf[lf_frame_id].translation).copy()
+
     # Root → torso offset (needed for traversable regions)
     geom_model = pin.buildGeomFromUrdf(rob_model, robot_urdf_file, pin.GeometryType.COLLISION)
     geom_model.addAllCollisionPairs()
@@ -377,9 +426,16 @@ def setup_g1_obstructed_hole():
     for key, frame_name in plan_to_model_frames.items():
         plan_to_model_ids[key] = rob_model.getFrameId(frame_name)
 
-    # Environment
-    door_pos = np.array([KNOCKER_X - 0.03, 0.0, 0.])
-    obstructed_hole = HoleInWallObstructed(door_pos)
+    # Environment + planner parameters
+    if env == 'stairs':
+        environment = TiltedStairs()
+        planner_params = g1_params.MultiContactTiltedStairsConfig()
+        env_viz_shapes = environment.obstacles_vis
+    else:
+        door_pos = np.array([KNOCKER_X - 0.03, 0.0, 0.])
+        environment = HoleInWallObstructed(door_pos)
+        planner_params = g1_params.MultiContactDoorConfig()
+        env_viz_shapes = environment.obstacles
 
     # Refined collision model for dynamics + merge with hole obstacles
     dyn_rob_model, dyn_col_model, dyn_vis_model, dyn_rob_data, dyn_col_data, dyn_vis_data = \
@@ -390,21 +446,33 @@ def setup_g1_obstructed_hole():
 
     door_model, _, __ = load_navy_door_models()
     door_col_model = pin.buildGeomFromUrdf(door_model, env_urdf_path, pin.GeometryType.COLLISION)
-    for i_col, col_obj in enumerate(obstructed_hole.obstacles[1:]):
-        obstacle_geom = hpoly_to_fcl_collision(col_obj)
-        new_geom = create_convex_geom_from_copy(
-            door_col_model.geometryObjects[0],
-            obstacle_geom,
-            'hole_obstacle_' + str(i_col))
-        refined_geom_model.addGeometryObject(new_geom)
+    if env == 'stairs':
+        for i_col, col_obj in enumerate(environment.obstacles_vis):
+            if i_col <= 2:  # skip floor and side-wall collisions
+                continue
+            if not isinstance(col_obj, HPolyhedron):
+                raise NotImplementedError(
+                    "Only HPolyhedron obstacles are supported for stairs environment")
+            obstacle_geom = hpoly_to_fcl_collision(col_obj)
+            new_geom = create_convex_geom_from_copy(
+                door_col_model.geometryObjects[0],
+                obstacle_geom,
+                'stairs_obstacle_' + str(i_col))
+            refined_geom_model.addGeometryObject(new_geom)
+    else:
+        for i_col, col_obj in enumerate(environment.obstacles[1:]):
+            obstacle_geom = hpoly_to_fcl_collision(col_obj)
+            new_geom = create_convex_geom_from_copy(
+                door_col_model.geometryObjects[0],
+                obstacle_geom,
+                'hole_obstacle_' + str(i_col))
+            refined_geom_model.addGeometryObject(new_geom)
     refined_geom_model.addAllCollisionPairs()
 
     # SCA geometry (loaded once, shared across trials)
     sca_geometry = None
     if B_USE_SELF_COLLISION_AVOIDANCE:
         sca_geometry = SCARobotGeometry(package_dir, robot_urdf_file, plan_to_model_frames)
-
-    planner_params = g1_params.MultiContactDoorConfig()
 
     return dict(
         package_dir=package_dir,
@@ -422,10 +490,12 @@ def setup_g1_obstructed_hole():
         dyn_rob_model=dyn_rob_model,
         dyn_vis_model=dyn_vis_model,
         refined_geom_model=refined_geom_model,
-        obstructed_hole=obstructed_hole,
+        environment=environment,
+        env_viz_shapes=env_viz_shapes,
         sca_geometry=sca_geometry,
         planner_params=planner_params,
         joint_names=list(dyn_rob_model.names[2:]),
+        ft_kn_offset=ft_kn_offset,
     )
 
 
@@ -433,10 +503,10 @@ def setup_g1_obstructed_hole():
 # Per-trial planner run
 # ---------------------------------------------------------------------------
 
-def run_trial(y_pos: float, shared: dict,
+def run_trial(x_pos: float, y_pos: float, shared: dict,
               alpha: np.ndarray = None, w_rigid: np.ndarray = None) -> dict:
     """
-    Run a single KIN + DYN feasibility trial for the given floating-base y position.
+    Run a single KIN + DYN feasibility trial for the given floating-base x/y position.
 
     Parameters
     ----------
@@ -446,6 +516,7 @@ def run_trial(y_pos: float, shared: dict,
         Overrides planner_params.W_RIGID_LINK for this trial.
 
     Returns a dict with:
+      - 'x_pos'       : the sampled x starting position
       - 'y_pos'       : the sampled y starting position
       - 'alpha'       : ALPHA values used (list of 3 floats)
       - 'w_rigid'     : W_RIGID_LINK values used (list of 3 floats)
@@ -455,7 +526,7 @@ def run_trial(y_pos: float, shared: dict,
       - 'solve_time'  : total dynamic-planning wall-clock time (seconds)
       - 'error'       : None on success, exception string on failure
     """
-    result = {'y_pos': y_pos, 'is_optimal': False, 'solver_type': None,
+    result = {'x_pos': x_pos, 'y_pos': y_pos, 'is_optimal': False, 'solver_type': None,
               'solve_time': None, 'error': None,
               'alpha': None, 'w_rigid': None}
     try:
@@ -472,25 +543,27 @@ def run_trial(y_pos: float, shared: dict,
         refined_urdf_file    = shared['refined_urdf_file']
         dyn_rob_model        = shared['dyn_rob_model']
         refined_geom_model   = shared['refined_geom_model']
-        obstructed_hole      = shared['obstructed_hole']
+        environment          = shared['environment']
+        env_viz_shapes       = shared['env_viz_shapes']
         sca_geometry         = shared['sca_geometry']
         planner_params       = shared['planner_params']
+        ft_kn_offset         = shared['ft_kn_offset']
         visualizer           = shared.get('visualizer')
 
         # ---- Apply per-trial randomized params (if requested) ----
-        if alpha is not None or w_rigid is not None or B_USE_STABILITY_POLYTOPE:
-            planner_params = copy.copy(planner_params)
-            if alpha is not None:
-                planner_params.ALPHA = alpha.tolist()
-            if w_rigid is not None:
-                planner_params.W_RIGID_LINK = w_rigid.tolist()
-            planner_params.B_USE_STABILITY_POLYTOPE = B_USE_STABILITY_POLYTOPE
+        planner_params = copy.copy(planner_params)
+        if alpha is not None:
+            planner_params.ALPHA = alpha.tolist()
+        if w_rigid is not None:
+            planner_params.W_RIGID_LINK = w_rigid.tolist()
+        planner_params.B_USE_STABILITY_POLYTOPE = B_USE_STABILITY_POLYTOPE
+        planner_params.B_HARD_FRICTION_CONE_SCA = B_USE_HARD_FRICTION_CONE_SCA
 
         result['alpha']   = list(planner_params.ALPHA)
         result['w_rigid'] = list(planner_params.W_RIGID_LINK)
 
         # ---- Initial configuration ----
-        q0 = get_g1_pose_with_y(rob_model.nq - 7, y_pos)
+        q0 = get_g1_pose_with_xy(rob_model.nq - 7, x_pos, y_pos, ENV)
         v0 = np.zeros(rob_model.nv)
         x0 = np.concatenate([q0, v0])
 
@@ -508,21 +581,39 @@ def run_trial(y_pos: float, shared: dict,
             starting_pose[fr] = robot_fwdk.get_link_iso(plan_to_model_frames[fr])[:3, 3]
 
         # ---- Build contact sequence ----
-        if CONTACT_SEQ == 0:
-            final_pose = {fr: pos + np.array([STEP_LENGTH, 0., 0.]) for fr, pos in starting_pose.items()}
-            fixed_frames_seq, motion_frames_seq = get_five_stage_two_hand_contact_sequence(
-                'g1', KNOCKER_X, final_pose)
-        else:  # CONTACT_SEQ == 1: knocker contact sequence
-            fixed_frames_seq, motion_frames_seq = build_knocker_contact_seq(
-                starting_pose, B_USE_KNEES)
+        if ENV == 'stairs':
+            # Stairs step/final targets are world-fixed absolute coordinates inside
+            # the builders, so no correction for the sampled x_pos is needed.
+            if CONTACT_SEQ == 0:
+                fixed_frames_seq, motion_frames_seq = stairs_plan.get_opposing_limbs_contact_sequence(
+                    environment, starting_pose, 'g1', b_use_knees=B_USE_KNEES)
+            else:
+                fixed_frames_seq, motion_frames_seq = stairs_plan.get_fully_opposing_limbs_contact_sequence(
+                    environment, starting_pose, 'g1', b_use_knees=B_USE_KNEES)
+        else:
+            # The sampled x_pos rigidly shifts the whole starting pose, so subtracting
+            # it from the step displacement keeps the intermediate (knocker) and final
+            # x-positions world-fixed across trials.
+            dx_final = STEP_LENGTH - x_pos
+            if CONTACT_SEQ == 0:
+                final_pose = {fr: pos + np.array([dx_final, 0., 0.]) for fr, pos in starting_pose.items()}
+                fixed_frames_seq, motion_frames_seq = get_five_stage_two_hand_contact_sequence(
+                    'g1', KNOCKER_X, final_pose)
+            else:  # CONTACT_SEQ == 1: knocker contact sequence
+                fixed_frames_seq, motion_frames_seq = build_knocker_contact_seq(
+                    starting_pose, B_USE_KNEES, ft_kn_offset, dx_final=dx_final)
 
         contact_seqs = get_contact_seq_from_fixed_frames_seq(fixed_frames_seq)
         contact_seq_planes = get_contact_planes_from_motion_frames_seq(
             contact_seqs, motion_frames_seq)
 
         # ---- IRIS regions ----
-        safe_regions_mgr_dict = hole_plan.compute_iris_regions_mgr(
-            obstructed_hole, starting_pose, motion_frames_seq, b_use_knees=B_USE_KNEES)
+        if ENV == 'stairs':
+            safe_regions_mgr_dict = stairs_plan.compute_stairs_iris_regions_mgr(
+                environment, starting_pose, motion_frames_seq, b_use_knees=B_USE_KNEES)
+        else:
+            safe_regions_mgr_dict = hole_plan.compute_iris_regions_mgr(
+                environment, starting_pose, motion_frames_seq, b_use_knees=B_USE_KNEES)
 
         # ---- IK frame planner ----
         standing_pos = q0[:3]
@@ -563,8 +654,11 @@ def run_trial(y_pos: float, shared: dict,
         ik_cfree_planner.set_planner(frame_planner)
         ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
 
-        env_geom = SCAHPolyhedronGeometry.from_wall_scene(obstructed_hole)
-        ik_cfree_planner.set_env_geometry(env_geom)
+        # Environment SCA geometry: only set for the obstructed-hole env
+        # (cfree_dyn_planner.py sets no env geometry for stairs either).
+        if ENV == 'obstructed_hole':
+            env_geom = SCAHPolyhedronGeometry.from_wall_scene(environment)
+            ik_cfree_planner.set_env_geometry(env_geom)
 
         p_init = {fr: starting_pose[fr] for fr in plan_to_model_frames.keys()}
         T = 3
@@ -583,7 +677,9 @@ def run_trial(y_pos: float, shared: dict,
                                       getattr(planner_params, 'W_STABILITY_POLYTOPE', None))
 
         # ---- Build dynamic planner (needed for lf_targets before plan()) ----
-        N_horizon_lst   = planner_params.N_HORIZON_LST
+        # truncate to the actual number of contact phases (e.g., the "five-stage"
+        # door sequence currently produces only 4 phases)
+        N_horizon_lst   = planner_params.N_HORIZON_LST[:len(contact_seq_planes)]
         contact_sequence = ContactSequence(contact_seq_planes, N_horizon_lst, T)
 
         robot_dyn_plan = G1MulticontactPlanner(
@@ -600,20 +696,7 @@ def run_trial(y_pos: float, shared: dict,
                 rob_model, col_model, vis_model,
                 rob_data, vis_data, col_data,
                 ctrl_freq=N_knots / (n_contacts * T), save_freq=save_freq)
-            kin_display.add_shapes_from(obstructed_hole.obstacles)
-
-            # Static sphere at initial torso position so the polytope scale is clear
-            if B_USE_STABILITY_POLYTOPE:
-                kin_display.add_shape("torso_init",
-                                      Sphere(0.05),
-                                      meshcat_obstacle_obj(color=0x00cc00, opacity=0.8))
-                kin_display.viz.viewer["torso_init"].set_transform(
-                    tf.translation_matrix(starting_pose['torso']))
-                # Animated sphere that follows the torso through the motion
-                kin_display.add_shape("torso_moving",
-                                      Sphere(0.05),
-                                      meshcat_obstacle_obj(color=0xff8800, opacity=0.9))
-
+            kin_display.add_shapes_from(env_viz_shapes)
             kin_display.start_animation()
             for t_anim in np.linspace(0, n_contacts * T, N_knots // save_freq):
                 frame_targets_dict = ik_cfree_planner.get_frame_targets_from_kin_planner(
@@ -771,7 +854,7 @@ def run_trial(y_pos: float, shared: dict,
                     dyn_rob_data_vis, dyn_vis_data_vis, col_data_vis,
                     ctrl_freq=np.average(planner_params.N_HORIZON_LST) / T,
                     save_freq=save_freq)
-                display.add_shapes_from(obstructed_hole.obstacles)
+                display.add_shapes_from(env_viz_shapes)
                 display.display_targets(
                     "lfoot_target", robot_dyn_plan.lf_targets[display_idx], [1, 1, 0])
                 display.display_targets(
@@ -792,7 +875,8 @@ def run_trial(y_pos: float, shared: dict,
 
     except Exception as exc:
         result['error'] = traceback.format_exc()
-        print(f"[y={y_pos:.4f}] Trial FAILED: {exc}")
+        print(f"[x={x_pos:.4f}, y={y_pos:.4f}] Trial FAILED: {exc}")
+        print(result['error'])
 
     return result
 
@@ -803,34 +887,40 @@ def run_trial(y_pos: float, shared: dict,
 
 def main():
     rng = np.random.default_rng(RNG_SEED)
-    y_samples = rng.uniform(Y_LB, Y_UB, size=N_TRIALS)
+    x_lb, x_ub = XY_BOUNDS[ENV]['x']
+    y_lb, y_ub = XY_BOUNDS[ENV]['y']
+    x_samples = rng.uniform(x_lb, x_ub, size=N_TRIALS)
+    y_samples = rng.uniform(y_lb, y_ub, size=N_TRIALS)
 
     print("=" * 60)
-    print(f"G1 obstructed-hole y-robustness test")
+    print(f"G1 {ENV} x/y-robustness test")
     print(f"  Trials          : {N_TRIALS}")
-    print(f"  y range         : [{Y_LB}, {Y_UB}]  (seed={RNG_SEED})")
-    print(f"  Samples         : {np.round(y_samples, 4).tolist()}")
+    print(f"  Contact sequence: {CONTACT_SEQ}")
+    print(f"  x range         : [{x_lb}, {x_ub}]  (seed={RNG_SEED})")
+    print(f"  y range         : [{y_lb}, {y_ub}]")
+    print(f"  x samples       : {np.round(x_samples, 4).tolist()}")
+    print(f"  y samples       : {np.round(y_samples, 4).tolist()}")
     print(f"  Randomize params: {B_RANDOMIZE_PARAMS}")
+    if B_RANDOMIZE_PARAMS:
+        print(f"  alpha bounds    : {ALPHA_BOUNDS[ENV]}")
     print("=" * 60)
 
     # One-time setup
-    shared = setup_g1_obstructed_hole()
+    shared = setup_g1_env(ENV)
 
     if B_VISUALIZE_KIN:
-        q0_default = get_g1_pose_with_y(shared['rob_model'].nq - 7, 0.0)
+        q0_default = get_g1_pose_with_xy(shared['rob_model'].nq - 7, 0.0, 0.0, ENV)
         shared['visualizer'] = setup_visualizer(
             shared['rob_model'], shared['col_model'], shared['vis_model'], q0_default)
     else:
         shared['visualizer'] = None
 
     results = []
-    for trial_idx, y_pos in enumerate(y_samples):
+    for trial_idx, (x_pos, y_pos) in enumerate(zip(x_samples, y_samples)):
         trial_alpha = trial_w_rigid = None
         if B_RANDOMIZE_PARAMS:
             trial_alpha = np.array([
-                rng.uniform(0.0, 1.0),
-                rng.uniform(0.0, 0.5),
-                rng.uniform(0.0, 0.1),
+                rng.uniform(lo, hi) for lo, hi in ALPHA_BOUNDS[ENV]
             ])
             trial_w_rigid = np.array([
                 rng.uniform(0.0, 1.0),
@@ -839,12 +929,13 @@ def main():
             ])
 
         print(f"\n{'─'*60}")
-        print(f"Trial {trial_idx + 1}/{N_TRIALS}  |  y = {y_pos:.4f}")
+        print(f"Trial {trial_idx + 1}/{N_TRIALS}  |  x = {x_pos:.4f}  |  y = {y_pos:.4f}")
         if B_RANDOMIZE_PARAMS:
             print(f"  alpha    = {np.round(trial_alpha, 4).tolist()}")
             print(f"  w_rigid  = {np.round(trial_w_rigid, 4).tolist()}")
         print(f"{'─'*60}")
-        res = run_trial(float(y_pos), shared, alpha=trial_alpha, w_rigid=trial_w_rigid)
+        res = run_trial(float(x_pos), float(y_pos), shared,
+                        alpha=trial_alpha, w_rigid=trial_w_rigid)
         results.append(res)
 
     # ---------------------------------------------------------------------------
@@ -853,7 +944,7 @@ def main():
     print("\n" + "=" * 60)
     print("SUMMARY – optimal solution found (HumanoidMulticontactPlanner)")
     print("=" * 60)
-    print(f"{'Trial':>6}  {'y_pos':>8}  {'Optimal':>8}  {'Solver':>8}  {'Time(s)':>9}  Notes")
+    print(f"{'Trial':>6}  {'x_pos':>8}  {'y_pos':>8}  {'Optimal':>8}  {'Solver':>8}  {'Time(s)':>9}  Notes")
     print("-" * 60)
 
     optimal_trials   = []
@@ -865,7 +956,7 @@ def main():
         stype = res['solver_type'] if res['solver_type'] else "—"
         tstr  = f"{res['solve_time']:.1f}" if res['solve_time'] is not None else "—"
         note  = "EXCEPTION" if res['error'] else ""
-        print(f"{i+1:>6}  {res['y_pos']:>8.4f}  {flag:>8}  {stype:>8}  {tstr:>9}  {note}")
+        print(f"{i+1:>6}  {res['x_pos']:>8.4f}  {res['y_pos']:>8.4f}  {flag:>8}  {stype:>8}  {tstr:>9}  {note}")
         if res['error']:
             failed_trials.append(i + 1)
         elif res['is_optimal']:
@@ -880,6 +971,7 @@ def main():
     print("=" * 60)
 
     if SAVE_DYN_PLAN:
+        dyn_save_path = DYN_SAVE_PATH_TEMPLATE.format(env=ENV, seq=CONTACT_SEQ)
         saved = [r for r in results if r.get('joint_pos') is not None]
         if saved:
             joint_pos_arr           = np.stack([r['joint_pos']            for r in saved], axis=0)
@@ -903,7 +995,7 @@ def main():
             n_steps            = joint_pos_arr.shape[1]
             T_plan_dyn         = dt_arr * (n_steps - 1)
             np.savez(
-                DYN_SAVE_PATH,
+                dyn_save_path,
                 joint_pos=joint_pos_arr.astype(np.float32),
                 joint_vel=joint_vel_arr.astype(np.float32),
                 q_base=q_base_arr.astype(np.float32),
@@ -933,7 +1025,7 @@ def main():
                 alpha=alpha_arr,
                 w_rigid=w_rigid_arr,
             )
-            print(f"\nSaved dynamic dataset → {DYN_SAVE_PATH}  "
+            print(f"\nSaved dynamic dataset → {dyn_save_path}  "
                   f"({len(saved)}/{N_TRIALS} trials, "
                   f"n_steps={n_steps}, dt_mean={float(dt_arr.mean()):.4f}s)")
         else:
@@ -943,9 +1035,15 @@ def main():
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument("--env", type=str, default=ENV,
+                        choices=['obstructed_hole', 'stairs'],
+                        help="Environment: obstructed_hole or tilted stairs")
     parser.add_argument("--sequence", type=int, default=CONTACT_SEQ,
                         choices=[0, 1],
-                        help="Contact sequence: 0=step through door, 1=step on knocker (y-varying)")
+                        help="Contact sequence (env-dependent): "
+                             "obstructed_hole 0=step through door, 1=step on knocker; "
+                             "stairs 0=opposing limbs, 1=fully opposing limbs")
     args = parser.parse_args()
+    ENV = args.env
     CONTACT_SEQ = args.sequence
     main()

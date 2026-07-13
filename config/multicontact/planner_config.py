@@ -9,6 +9,7 @@ class PlannerConfig(ABC):
     N_HORIZON_LST : list[int] = None      # list of horizon lengths for the whole-body planner
     B_USE_STABILITY_POLYTOPE : bool = False   # activate stability-polytope soft constraint
     W_STABILITY_POLYTOPE : float = 1e-3       # weight on the quadratic barrier penalty
+    B_HARD_FRICTION_CONE_SCA : bool = True    # in plan_sca, replace the soft friction-cone cost with a hard constraint
     FOOT_FORCE_LIM : float = 1.5              # per-foot ||f|| limit as fraction of robot weight; ankle gives ~1.46× normal, total vector ~1.78× with μ=0.7 friction
     HAND_FORCE_LIM : float = 0.25             # per-hand ||f|| limit as fraction of robot weight (shoulder limited to ~0.13–0.26× normal)
     WBC_FRAME_TRACKING_GAINS : dict[str: np.ndarray] = {}  # gains for the whole-body planner frame tracking tasks
@@ -29,7 +30,7 @@ class PlannerConfig(ABC):
     # WBP_BAUMGARTE_GAINS3D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [pos ref, velocity]
     # WBP_BAUMGARTE_GAINS6D : list[float] = [1e-6, 1e-6]  # gains for the Baumgarte stabilization of contact constraints in the whole-body planner [rot ref, velocity]
     WBC_COST_WEIGHTS = {
-        'friction': 2e-3,    # step_over, on_balanced, step_on
+        'friction': 2e-1,    # step_over, on_balanced, step_on
         # 'frame_goal': 2e1,  # hole env
         'frame_goal': 4e1,  # stairs env
         'xReg': 1e-1,    # step over
@@ -37,7 +38,7 @@ class PlannerConfig(ABC):
         'xBounds': 1e3,   # step on, step over, on_balanced
     }
     WBC_FINAL_COST_WEIGHTS = {
-        'friction': 2e-3,
+        'friction': 2e-1,
         # 'frame_goal': 1e2,  # hole env
         # 'xReg': 1e0,        # hole env
         'frame_goal': 4e1,  # stairs env

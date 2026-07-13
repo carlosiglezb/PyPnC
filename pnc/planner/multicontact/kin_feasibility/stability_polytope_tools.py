@@ -153,7 +153,7 @@ class StabilityPolytopeManager:
                  robot_mass: float,
                  n_phases_out: int = None,
                  mu: float = 0.7,
-                 radius: float = 1.0,
+                 radius: float = 1.5,
                  margin: float = 0.0,
                  epsilon: float = 1e-2,
                  max_iter: int = 30,

@@ -843,8 +843,12 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         initial_guess['lam_g0'] = np.concatenate(
             (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
 
-        # Repeat for environment
-        for ee_idx in [1, 2, 3, 4]:
+        # Repeat for environment. These constraints are against the door /
+        # knee-knocker boxes ('bottom', 'knee_knocker_lwall', 'knee_knocker_rwall'),
+        # so they are skipped when no env geometry was provided (e.g. stairs).
+        env_ee_indices = [1, 2, 3, 4] if env_geometry is not None else []
+        wall_ee_indices = [3, 4] if env_geometry is not None else []
+        for ee_idx in env_ee_indices:
             print(f'Adding Collision Avoidance between: {frame_list[ee_idx]} and Knee Knocker base')
             # Simplified no self-collision function and constraints bounds for specified index pairs
             mfpp_bezier_data = {'current_frames': (ee_idx, None),  # feet always assumed to have collision body
@@ -878,7 +882,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             initial_guess['lam_g0'] = np.concatenate(
                 (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
 
-        for ee_idx in [3, 4]:
+        for ee_idx in wall_ee_indices:
             print(f'Adding Collision Avoidance between: {frame_list[ee_idx]} and Knee Knocker Left wall')
             # Simplified no self-collision function and constraints bounds for specified index pairs
             mfpp_bezier_data = {'current_frames': (ee_idx, None),  # feet always assumed to have collision body
@@ -912,7 +916,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             initial_guess['lam_g0'] = np.concatenate(
                 (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
 
-        for ee_idx in [3, 4]:
+        for ee_idx in wall_ee_indices:
             print(f'Adding Collision Avoidance between: {frame_list[ee_idx]} and Knee Knocker Right wall')
             # Simplified no self-collision function and constraints bounds for specified index pairs
             mfpp_bezier_data = {'current_frames': (ee_idx, None),  # feet always assumed to have collision body

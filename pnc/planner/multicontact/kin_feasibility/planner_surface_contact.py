@@ -90,10 +90,10 @@ def get_contact_seq_from_fixed_frames_seq(fixed_frames_seq: list[list[str]]) -> 
                 contact_frames_seq[cs_i].append(ccon)
                 b_phase_done = True
 
-    # remove hands from last sequence when added for smoothing
-    if contact_frames_seq[-1] == contact_frames:
-        contact_frames_seq.pop(-1)
-        contact_frames_seq.pop(-1)
+    # The final phase is always a feet-only stance; any hand frames that appear in
+    # fixed_frames (because they were already placed and must not move kinematically)
+    # should not be carried into the dynamic contact sequence.
+    contact_frames_seq[-1] = [f for f in contact_frames_seq[-1] if f not in ('LH', 'RH')]
 
     return contact_frames_seq
 
