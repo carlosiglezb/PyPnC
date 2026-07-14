@@ -89,6 +89,7 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
                                   b_use_knees_in_smooth_plan=True,
                                   stab_poly_manager=None,
                                   w_stability_polytope: float = 0.0,
+                                  containment_margins: dict = None,
                                   n_points=None, **kwargs):
     if weights_rigid_link is None:
         weights_rigid_link = np.array([3500., 0.5, 10.])     # default for g1
@@ -137,8 +138,12 @@ def optimize_multiple_bezier_iris(reach_region: dict[str: np.array, str: np.arra
         sequenced_idx = iris_regions[f_name].iris_idx_seq[seg_idx][fr_seg_k_box]
         A = iris_regions[f_name].iris_list[sequenced_idx].iris_region.A()
         b = iris_regions[f_name].iris_list[sequenced_idx].iris_region.b()
-        b = np.reshape(b, (len(b), 1))
-        b = np.repeat(b, n_points, axis=1)
+        # erode containment by the frame's per-control-point collision-sphere
+        # margins (swept-sphere collision avoidance via the convex-hull property)
+        b = np.repeat(np.reshape(b, (len(b), 1)), n_points, axis=1)
+        if containment_margins and f_name in containment_margins:
+            m_row = containment_margins[f_name][k % num_iris_tot]   # (n_points,)
+            b = b - np.linalg.norm(A, axis=1)[:, None] * m_row[None, :]
         constraints.append(A @ points[k][0].T <= b)
         num_iris_current = len(iris_regions[f_name].iris_idx_seq[seg_idx])
 
@@ -497,6 +502,7 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
                                   b_skip_sca=True,
                                   stab_poly_manager=None,
                                   w_stability_polytope: float = 0.0,
+                                  containment_margins: dict = None,
                                   n_points=None, **kwargs):
     if weights_rigid_link is None:
         weights_rigid_link = np.array([3500., 0.5, 10.])     # default for g1
@@ -547,7 +553,12 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         sequenced_idx = iris_regions[f_name].iris_idx_seq[seg_idx][fr_seg_k_box]
         A = iris_regions[f_name].iris_list[sequenced_idx].iris_region.A()
         b = iris_regions[f_name].iris_list[sequenced_idx].iris_region.b()
-        b = np.reshape(b, (len(b), 1))
+        # erode containment by the frame's per-control-point collision-sphere
+        # margins (swept-sphere collision avoidance via the convex-hull property)
+        b = np.repeat(np.reshape(b, (len(b), 1)), n_points, axis=1)
+        if containment_margins and f_name in containment_margins:
+            m_row = containment_margins[f_name][k % num_iris_tot]   # (n_points,)
+            b = b - np.linalg.norm(A, axis=1)[:, None] * m_row[None, :]
         parse_mat_leq_constr(A, b, points[k], constraints, lbg, ubg)
         num_iris_current = len(iris_regions[f_name].iris_idx_seq[seg_idx])
 
@@ -692,6 +703,11 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
             "max_iter": 100,
             "mu_init": 1e-4,    # *0.1 (applicable if monotone strategy)
             "tol": 1e0,                 # *1e-8
+            # Note: the DCOL alpha collision constraints scale both bodies about
+            # their centers, so for LARGE polytopes a small alpha violation is a
+            # large physical penetration (5e-2 in alpha was ~2.5 cm vs the
+            # stairs center box). Fine for the small self-collision bodies used
+            # here; tighten if large-polytope callback pairs are ever re-added.
             "constr_viol_tol": 5e-2,    # *1e-4
             "dual_inf_tol": 1e1,        # *1.0
             "compl_inf_tol": 1e0,       # *1e-4
@@ -843,112 +859,14 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         initial_guess['lam_g0'] = np.concatenate(
             (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
 
-        # Repeat for environment. These constraints are against the door /
-        # knee-knocker boxes ('bottom', 'knee_knocker_lwall', 'knee_knocker_rwall'),
-        # so they are skipped when no env geometry was provided (e.g. stairs).
-        env_ee_indices = [1, 2, 3, 4] if env_geometry is not None else []
-        wall_ee_indices = [3, 4] if env_geometry is not None else []
-        for ee_idx in env_ee_indices:
-            print(f'Adding Collision Avoidance between: {frame_list[ee_idx]} and Knee Knocker base')
-            # Simplified no self-collision function and constraints bounds for specified index pairs
-            mfpp_bezier_data = {'current_frames': (ee_idx, None),  # feet always assumed to have collision body
-                                'n_points': n_points,
-                                'num_derivatives': D,
-                                'num_iris_per_frame': num_iris_tot,
-                                'num_frames': n_frames
-                                }
-            sca_bez_points = range(0, num_iris_tot * n_points, 1)
-
-            # populate col_pair_geom_data with respective primitive shape pair type information
-            U = robot_geom_data.get_sphere_representation(frame_list[ee_idx])['U']
-            A1 = env_geometry.get_box_representation('bottom')['A']
-            b1 = env_geometry.get_box_representation('bottom')['b']
-            origin = env_geometry.get_shape_origin('bottom')
-            rotation = env_geometry.get_shape_rotation('bottom')
-            col_pair_geom_data = {'A1': A1, 'b1': b1, 'Q': Q, 'U': U, 'polytope_origin': origin, 'polytope_rotation': rotation}
-
-            for i in sca_bez_points:
-                mfpp_bezier_data['current_point'] = i
-                i_name = 'f_dist_' + str(frame_list[ee_idx]) + '_door_frame_0' + str(i)
-                current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-                f_dist[i_name] = IndexedPolytopeEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
-                sca_constraints.append(f_dist[i_name](points_all))
-                lbg.append(1.0)
-                ubg.append(ca.inf)
-            sca_build_time = time.time() - sca_build_start_time
-
-            # assume lagrange multipliers of SCA constraints are zero
-            # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
-            initial_guess['lam_g0'] = np.concatenate(
-                (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
-
-        for ee_idx in wall_ee_indices:
-            print(f'Adding Collision Avoidance between: {frame_list[ee_idx]} and Knee Knocker Left wall')
-            # Simplified no self-collision function and constraints bounds for specified index pairs
-            mfpp_bezier_data = {'current_frames': (ee_idx, None),  # feet always assumed to have collision body
-                                'n_points': n_points,
-                                'num_derivatives': D,
-                                'num_iris_per_frame': num_iris_tot,
-                                'num_frames': n_frames
-                                }
-            sca_bez_points = range(0, num_iris_tot * n_points, 1)
-
-            # populate col_pair_geom_data with respective primitive shape pair type information
-            U = robot_geom_data.get_sphere_representation(frame_list[ee_idx])['U']
-            A1 = env_geometry.get_box_representation('knee_knocker_lwall')['A']
-            b1 = env_geometry.get_box_representation('knee_knocker_lwall')['b']
-            origin = env_geometry.get_shape_origin('knee_knocker_lwall')
-            rotation = env_geometry.get_shape_rotation('knee_knocker_lwall')
-            col_pair_geom_data = {'A1': A1, 'b1': b1, 'Q': Q, 'U': U, 'polytope_origin': origin, 'polytope_rotation': rotation}
-
-            for i in sca_bez_points:
-                mfpp_bezier_data['current_point'] = i
-                i_name = 'f_dist_' + str(frame_list[ee_idx]) + '_door_lwall_0' + str(i)
-                current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-                f_dist[i_name] = IndexedPolytopeEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
-                sca_constraints.append(f_dist[i_name](points_all))
-                lbg.append(1.0)
-                ubg.append(ca.inf)
-            sca_build_time = time.time() - sca_build_start_time
-
-            # assume lagrange multipliers of SCA constraints are zero
-            # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
-            initial_guess['lam_g0'] = np.concatenate(
-                (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
-
-        for ee_idx in wall_ee_indices:
-            print(f'Adding Collision Avoidance between: {frame_list[ee_idx]} and Knee Knocker Right wall')
-            # Simplified no self-collision function and constraints bounds for specified index pairs
-            mfpp_bezier_data = {'current_frames': (ee_idx, None),  # feet always assumed to have collision body
-                                'n_points': n_points,
-                                'num_derivatives': D,
-                                'num_iris_per_frame': num_iris_tot,
-                                'num_frames': n_frames
-                                }
-            sca_bez_points = range(0, num_iris_tot * n_points, 1)
-
-            # populate col_pair_geom_data with respective primitive shape pair type information
-            U = robot_geom_data.get_sphere_representation(frame_list[ee_idx])['U']
-            A1 = env_geometry.get_box_representation('knee_knocker_rwall')['A']
-            b1 = env_geometry.get_box_representation('knee_knocker_rwall')['b']
-            origin = env_geometry.get_shape_origin('knee_knocker_rwall')
-            rotation = env_geometry.get_shape_rotation('knee_knocker_rwall')
-            col_pair_geom_data = {'A1': A1, 'b1': b1, 'Q': Q, 'U': U, 'polytope_origin': origin, 'polytope_rotation': rotation}
-
-            for i in sca_bez_points:
-                mfpp_bezier_data['current_point'] = i
-                i_name = 'f_dist_' + str(frame_list[ee_idx]) + '_door_rwall_0' + str(i)
-                current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-                f_dist[i_name] = IndexedPolytopeEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
-                sca_constraints.append(f_dist[i_name](points_all))
-                lbg.append(1.0)
-                ubg.append(ca.inf)
-            sca_build_time = time.time() - sca_build_start_time
-
-            # assume lagrange multipliers of SCA constraints are zero
-            # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
-            initial_guess['lam_g0'] = np.concatenate(
-                (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
+        # Robot-ENVIRONMENT collision avoidance is NOT handled here: it is
+        # enforced convexly via the sphere-radius containment margins
+        # (containment_margins, computed in plan_multiple_iris), which erode
+        # each sphere-frame's IRIS containment by its sphere radius. The
+        # convex-hull property then keeps the whole swept sphere collision-free
+        # along the curve (not just at control points), at zero callback cost.
+        # The expensive DCOL callback constraints above are used for robot
+        # SELF-collisions only.
 
     opts["ipopt"]["warm_start_init_point"] = "yes"
     opts["ipopt"]["warm_start_mult_bound_push"] = 1e-5

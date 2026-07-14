@@ -257,8 +257,12 @@ def compute_iris_regions_mgr(hole: HoleInWallObstructed,
     # shift (feet) iris seed to get nicer IRIS region
     step_length = 0.46
     side_step = 0.0
-    iris_lf_shift = np.array([0.2, 0., 0.])
-    iris_rf_shift = np.array([0.2, 0., 0.])
+    # Note: the feet start ~5 cm ahead of the base with the asymmetric-pitch
+    # initial stance, so a +0.15 shift places the seed at the same world x
+    # (just before the knee-knocker front face at x=0.26) as +0.2 did with the
+    # old symmetric stance.
+    iris_lf_shift = np.array([0.15, 0., 0.])
+    iris_rf_shift = np.array([0.15, 0., 0.])
     iris_kn_shift = np.array([0.0, 0., 0.0])
     iris_rh_shift = np.array([-0.2, 0., 0.0])
 
@@ -297,8 +301,11 @@ def compute_iris_regions_mgr(hole: HoleInWallObstructed,
                              'RF': IrisRegionsManager(safe_rf_start_region, safe_rf_final_region),
                              'RH': IrisRegionsManager(safe_rh_start_region, safe_rh_final_region)}
     if b_use_knees:
-        safe_lk_start_region = IrisGeomInterface(obstacles, domain, starting_lkn_pos + np.array([0.1, 0., -0.05]))
-        safe_rk_start_region = IrisGeomInterface(obstacles, domain, starting_rkn_pos + np.array([0.1, 0., -0.05]))
+        # knees also start ~8 cm further forward in the asymmetric stance; the
+        # smaller +0.02 x-shift keeps the seed out of the knee-knocker box
+        # (x in [0.26, 0.34], z < 0.4) at the same world x as the old +0.1
+        safe_lk_start_region = IrisGeomInterface(obstacles, domain, starting_lkn_pos + np.array([0.02, 0., -0.05]))
+        safe_rk_start_region = IrisGeomInterface(obstacles, domain, starting_rkn_pos + np.array([0.02, 0., -0.05]))
         safe_lk_final_region = IrisGeomInterface(obstacles, domain, final_lkn_pos + np.array([-0.18, 0., -0.15]))
         safe_rk_final_region = IrisGeomInterface(obstacles, domain, final_rkn_pos + np.array([-0.18, 0., -0.15]))
 

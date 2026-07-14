@@ -551,7 +551,7 @@ def get_five_stage_two_hand_contact_sequence(robot_name, door_x_wall_pos: float,
         fixed_frames.append(['LF', 'L_knee', 'LH', 'RH'])   # frames that must not move
         motion_frames_seq.add_motion_frame({
                             'RF': final_rf_pos,
-                            'torso': final_torso_pos + np.array([0.0, 0., 0.04]),     # good testing
+                            'torso': final_torso_pos,  # rigid translate of the initial stance (a +0.04 z bump here pushes the feet outside their reach polytopes)
                             'R_knee': final_rf_pos + np.array([0.15, 0., 0.28]),
                             # 'R_knee': final_pose['R_knee'] + np.array([-0.05, 0., 0.07]),
                             # 'LH': starting_pose['LH'] + np.array([0.35, 0.0, 0.0])
@@ -560,7 +560,7 @@ def get_five_stage_two_hand_contact_sequence(robot_name, door_x_wall_pos: float,
         fixed_frames.append(['LF', 'LH', 'RH'])   # frames that must not move
         motion_frames_seq.add_motion_frame({
                             'RF': final_rf_pos,
-                            'torso': final_torso_pos + np.array([0.0, 0., 0.04]),     # good testing
+                            'torso': final_torso_pos,  # rigid translate of the initial stance (a +0.04 z bump here pushes the feet outside their reach polytopes)
         })
     rf_contact_over = PlannerSurfaceContact('RF', np.array([0, 0, 1]))
     motion_frames_seq.add_contact_surfaces([rf_contact_over])

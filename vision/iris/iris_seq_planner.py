@@ -61,6 +61,15 @@ class IrisGraph(nx.Graph):
             self.nodes[v]['iris'] = iris_k.Intersection(iris_l)
 
     def optimize_points(self):
+        # Degenerate line graph (e.g. two regions with a single intersection
+        # gives one node and no edges): there is no path length to optimize,
+        # so place each representative point at its intersection's Chebyshev
+        # center instead of building an empty-incidence LP.
+        if self.number_of_edges() == 0:
+            for v in self.nodes:
+                self.nodes[v]['point'] = self.nodes[v]['iris'].ChebyshevCenter()
+            return
+
         d = self.iris_regions_lst[0].iris_region.ambient_dimension()
         x = cp.Variable((self.number_of_nodes(), d))
         x.value = np.array([self.nodes[v]['iris'].ChebyshevCenter() for v in self.nodes])

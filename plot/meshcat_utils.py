@@ -23,7 +23,7 @@ from pydrake.geometry.optimization import HPolyhedron
 from util.pydrake_meshcat_interface import pydrake_geom_to_meshcat
 from util.util import vec_to_roll_pitch
 from visualizer.meshcat_tools.meshcat_palette import meshcat_iris_obj, meshcat_obstacle_obj, meshcat_domain_obj, \
-    meshcat_point_obj, PURPLE, GREEN, GREY, BLUE, YELLOW
+    meshcat_point_obj, PURPLE, GREEN, GREY, BLUE, YELLOW, RED
 
 cwd = os.getcwd()
 sys.path.append(cwd)
@@ -187,6 +187,14 @@ def get_scaled_and_oriented_grf_tf(scale,
 
 
 class MeshcatPinocchioAnimation:
+    # Default colors for reachable-region polytopes, matching the target-sphere
+    # colors used in the planner scripts (feet yellow, knees blue, hands red).
+    REACH_FRAME_COLORS = {
+        'LF': YELLOW, 'RF': YELLOW,
+        'L_knee': BLUE, 'R_knee': BLUE,
+        'LH': RED, 'RH': RED,
+    }
+
     def __init__(self, pin_robot_model, collision_model, visual_model,
                  robot_data, visual_data, collision_data,
                  ctrl_freq=1000, save_freq=50):
@@ -266,6 +274,64 @@ class MeshcatPinocchioAnimation:
         if obj_material is None:
             obj_material = meshcat_iris_obj()
         self.viz.viewer[viewer_name].set_object(meshcat_shape, obj_material)
+
+    def add_polytope(self, viewer_path: str, A: np.ndarray, b: np.ndarray,
+                     material=None, visible=True) -> bool:
+        """Render the H-polytope {x : A x <= b} as a static (non-animated) object.
+
+        Returns False (after printing a warning) if the polytope is empty or
+        unbounded, i.e. no vertex representation exists — useful as a signal
+        when visualizing constraint sets that may be ill-posed.
+        """
+        if material is None:
+            material = meshcat_iris_obj()
+        try:
+            poly_mesh = pydrake_geom_to_meshcat(HPolyhedron(A, b))
+        except Exception as exc:
+            print(f"[MeshcatPinocchioAnimation] Skipping polytope '{viewer_path}': "
+                  f"could not extract vertices ({exc})")
+            return False
+        self.viz.viewer[viewer_path].set_object(poly_mesh, material)
+        if not visible:
+            self.viz.viewer[viewer_path].set_property("visible", False)
+        return True
+
+    def add_reachable_region_set(self, set_name: str,
+                                 reachability_planes: dict,
+                                 torso_pos: np.ndarray,
+                                 frame_names: List[str] = None,
+                                 opacity=0.15, visible=False) -> int:
+        """Add one 'set' of reachable regions: the world-frame reach polytope of
+        every end-effector frame for a single torso position (one contact state).
+
+        reachability_planes follows the LocomanipulationFramePlanner convention
+        {frame: {'H': H, 'd': d}} encoding the constraint H (p_ee - p_torso) <= -d,
+        so the world-frame region drawn per frame is {x : H x <= H torso_pos - d}.
+
+        Sets are hidden by default (visible=False); toggle them manually in the
+        meshcat scene tree under "reachable_sets/<set_name>". A small green
+        sphere marks the torso position the set was evaluated at.
+
+        Returns the number of polytopes successfully rendered.
+        """
+        torso_pos = np.asarray(torso_pos).flatten()
+        if frame_names is None:
+            frame_names = [fr for fr in reachability_planes.keys() if fr != 'torso']
+        set_path = "reachable_sets/" + set_name
+        n_added = 0
+        for fr in frame_names:
+            H = np.asarray(reachability_planes[fr]['H'])
+            d = np.asarray(reachability_planes[fr]['d']).flatten()
+            color = self.REACH_FRAME_COLORS.get(fr, GREY)
+            material = g.MeshLambertMaterial(color=color, opacity=opacity)
+            if self.add_polytope(set_path + "/" + fr, H, H @ torso_pos - d, material):
+                n_added += 1
+        self.viz.viewer[set_path + "/torso_pos"].set_object(
+            g.Sphere(0.02), meshcat_point_obj())
+        self.viz.viewer[set_path + "/torso_pos"].set_transform(
+            tf.translation_matrix(torso_pos))
+        self.viz.viewer[set_path].set_property("visible", visible)
+        return n_added
 
     def displayForcesFromCrocoddylSolver(self, fs_ti, frame):
         for contact in range(len(fs_ti)):

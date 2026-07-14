@@ -52,8 +52,8 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
         starting_lkn_pos = starting_pose['L_knee']
         starting_rkn_pos = starting_pose['R_knee']
 
-    final_lf_pos = np.array([0.25 + 2.5 * box_depth , 0.1, 1. + 0.03])
-    final_rf_pos = np.array([0.25 + 2.5 * box_depth , -0.1, 1. + 0.03])
+    final_lf_pos = np.array([0.25 + 2.5 * box_depth , 0.1, 1. + 0.04])
+    final_rf_pos = np.array([0.25 + 2.5 * box_depth , -0.1, 1. + 0.04])
     final_torso_pos = (final_lf_pos + final_rf_pos) / 2 + np.array([0., 0., starting_torso_pos[2]])
     final_rh_pos = final_torso_pos + np.array([0.3, -0.2, torso_hand_height])
     final_lh_pos = final_torso_pos + np.array([0.3, 0.2, torso_hand_height])
@@ -70,7 +70,7 @@ def get_opposing_limbs_contact_sequence(stairs: TiltedStairs,
     lf_step1 = np.array([0.35, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height + 0.04])
     lh_wall_step_12 = np.array([0.2 + box_depth, box_width - 0.03, lh2_height])
     rh_wall_final_step = np.array([2 * box_depth + 0.1, -(box_width - 0.03), rh3_height])
-    rf_step2 = np.array([0.32+ box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height + 0.01])
+    rf_step2 = np.array([0.32+ box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height + 0.04])
 
     # initialize fixed and motion frame sets
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()
@@ -184,7 +184,10 @@ def get_fully_opposing_limbs_contact_sequence(stairs: TiltedStairs,
         rh1_height = 1.15
         lh2_height = 1.4
         rh3_height = 1.8
-        final_ankle_height = 0.03
+        # ankle exactly one foot-sphere radius (0.04) above the box top, so the
+        # foot-sphere-vs-center-box collision constraint is boundary-feasible
+        # at the pinned final stance (same convention as the knocker landing)
+        final_ankle_height = 0.04
 
         lh1_wall = np.array([0.24, 0.3, lh1_height])
         rh1_wall = np.array([0.28, -0.3, rh1_height])
@@ -222,9 +225,17 @@ def get_fully_opposing_limbs_contact_sequence(stairs: TiltedStairs,
 
     final_lf_pos = np.array([0.32 + 2.5 * box_depth , 0.1, 1. + final_ankle_height])
     final_rf_pos = np.array([0.32 + 2.5 * box_depth , -0.1, 1. + final_ankle_height])
-    final_torso_pos = (final_lf_pos + final_rf_pos) / 2 + np.array([0., 0., starting_torso_pos[2]])
-    final_rh_pos = final_torso_pos + np.array([0.3, -0.2, torso_hand_height])
-    final_lh_pos = final_torso_pos + np.array([0.3, 0.2, torso_hand_height])
+    # Final stance is a rigid translate of the initial one: torso and hands keep
+    # their initial offsets w.r.t. the feet midpoint, so the final stance
+    # satisfies the same reachability margins as the initial stance.  (The old
+    # construction added the full initial torso HEIGHT on top of the feet,
+    # leaving the final torso ~4 cm too high and the feet outside their reach
+    # polytopes.)
+    feet_mid_delta = ((final_lf_pos + final_rf_pos) / 2
+                      - (starting_lf_pos + starting_rf_pos) / 2)
+    final_torso_pos = starting_torso_pos + feet_mid_delta
+    final_rh_pos = starting_rh_pos + feet_mid_delta
+    final_lh_pos = starting_lh_pos + feet_mid_delta
     if b_use_knees:
         rough_knee_pos = (starting_lkn_pos - starting_lf_pos)
         scaled_knee_pos = final_lf_pos + rough_knee_pos * 0.3139 / np.linalg.norm(rough_knee_pos)
@@ -237,7 +248,7 @@ def get_fully_opposing_limbs_contact_sequence(stairs: TiltedStairs,
     lf_step1 = np.array([0.32, box_width/2, (box_h1_left + box_h2_left)/2 + ankle_height + 0.04])
     lh_wall_step_12 = np.array([0.15 + box_depth, box_width - 0.06, lh2_height])
     rh_wall_final_step = np.array([2 * box_depth + 0.05, -(box_width - 0.06), rh3_height])
-    rf_step2 = np.array([0.32 + box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height + 0.01])
+    rf_step2 = np.array([0.32 + box_depth, -box_width/2, (box_h1_right + box_h2_right)/2 + ankle_height + 0.04])
 
     # initialize fixed and motion frame sets
     fixed_frames, motion_frames_seq = [], MotionFrameSequencer()

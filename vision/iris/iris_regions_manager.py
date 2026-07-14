@@ -33,25 +33,16 @@ class IrisRegionsManager:
             ir.computeIris()
 
     def areIrisListSeedsContained(self):
-        # check containment
+        # a "global" IRIS region must contain ALL seeds in the list (start and
+        # every motion target); only such a region can safely replace the
+        # sequenced (per-segment) assignment with a single region
+        self.global_iris = []
         for ir_num, ir in enumerate(self.iris_list):
-            if ir_num < len(self.iris_list) - 1:
-                curr_pos = self.iris_list[ir_num].seed_pos
-                next_pos = self.iris_list[ir_num+1].seed_pos
-                b_goal_pos_in_prev_iris = self.iris_list[ir_num].isPointSafe(next_pos)
-                b_goal_pos_in_next_iris = self.iris_list[ir_num+1].isPointSafe(curr_pos)
-
-                # store index of IRIS region(s) containing both start and goal seeds
-                if b_goal_pos_in_prev_iris:
-                    self.global_iris.append([ir_num])
-                if b_goal_pos_in_next_iris:
-                    self.global_iris.append([ir_num+1])
+            if all(ir.isPointSafe(other.seed_pos) for other in self.iris_list):
+                self.global_iris.append([ir_num])
 
         # return whether a global IRIS region exists
-        if len(self.global_iris) > 0:
-            return True
-        else:
-            return False
+        return len(self.global_iris) > 0
 
     def areIrisSeedsContained(self):
         start_pos = self.iris_start_seed
@@ -101,13 +92,14 @@ class IrisRegionsManager:
         if b_single_iris:
             self.iris_graph = None
 
-            # Prioritize IRIS region already containing both start/goal seeds
+            # Prioritize IRIS region already containing all seeds
             if len(self.global_iris) == 1:
                 self.iris_idx_seq = [self.global_iris[0]]
             elif choose_iris_by == "volume":
-                max_vol, max_idx = 0, 0
-                for ir_num, ir in enumerate(self.iris_list):
-                    curr_vol = ir.iris_region.MaximumVolumeInscribedEllipsoid().CalcVolume()
+                # choose only among global candidates (regions containing all seeds)
+                max_vol, max_idx = 0, self.global_iris[0][0]
+                for ir_num in (gi[0] for gi in self.global_iris):
+                    curr_vol = self.iris_list[ir_num].iris_region.MaximumVolumeInscribedEllipsoid().CalcVolume()
                     if curr_vol > max_vol:
                         max_vol = curr_vol
                         max_idx = ir_num
@@ -132,6 +124,10 @@ class IrisRegionsManager:
         for ir_num, ir in enumerate(self.iris_list):
             if ir_num >= len(self.iris_list) - 1:
                 break
+            # consecutive regions that already overlap need no bridging region
+            if self.iris_list[ir_num].iris_region.IntersectsWith(
+                    self.iris_list[ir_num+1].iris_region):
+                continue
             if hint is not None:
                 new_seed = hint
             else:

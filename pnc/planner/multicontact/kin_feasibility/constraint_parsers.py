@@ -4,15 +4,19 @@ def parse_mat_leq_constr(A, b, points, constraints, lbg, ubg):
     """
     Constraints are of the form:
     lbg <= constraints(x) <= ubg
+    b may be (num_ineq,) / (num_ineq, 1) (same bound for every control point)
+    or (num_ineq, n_points) (per-control-point bounds, e.g. sphere-margin
+    eroded IRIS containment).
     """
     num_ineq = A.shape[0]
     num_points = points[0].shape[0]
+    b_per_point = getattr(b, 'ndim', 1) == 2 and b.shape[1] > 1
     if num_points == 8:
         for k in range(num_ineq):
             for np in range(num_points):
                 constraints.append(points[0][np,:] @ A[k])
                 lbg.append(-ca.inf)
-                ubg.append(b[k])
+                ubg.append(float(b[k, np]) if b_per_point else b[k])
     #FIXME hot fix for reachability constraints
     elif num_points == 1:
         for k in range(num_ineq):

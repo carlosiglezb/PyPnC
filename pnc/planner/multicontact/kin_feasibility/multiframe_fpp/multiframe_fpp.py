@@ -144,12 +144,17 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
     if b_max_new != b_min_new:
         distribute_box_seq(box_seq_lst[-1], b_max_new)
 
-    # check if iris region had global_iris. If so, assign it to contact sequence
+    # check if iris region had global_iris. If so, assign it to contact sequence.
+    # Only flatten to a single region when that region contains EVERY safe point
+    # of the frame; otherwise keep the sequenced (per-segment) assignment.
     for fname in p_init.keys():
-        if len(iris_regions[fname].global_iris):
-            for bs_i in range(len(box_seq_lst)):
-                for ir_region_num in range(len(box_seq_lst[bs_i][fname])):
-                    box_seq_lst[bs_i][fname][ir_region_num] = iris_regions[fname].global_iris[0][0]
+        frame_pts = [sp[fname] for sp in safe_points_lst if fname in sp]
+        for gi in iris_regions[fname].global_iris:
+            if all(iris_regions[fname].iris_list[gi[0]].isPointSafe(p) for p in frame_pts):
+                for bs_i in range(len(box_seq_lst)):
+                    for ir_region_num in range(len(box_seq_lst[bs_i][fname])):
+                        box_seq_lst[bs_i][fname][ir_region_num] = gi[0]
+                break
 
     # throw exception if any frames have un-assigned safe regions
     for f_list in box_seq_lst:
@@ -171,6 +176,142 @@ def plan_multistage_iris_seq(iris_regions: dict[str: IrisRegionsManager],
             ir.iris_idx_seq.append(box_seq_lst[seg][fname])
 
     return box_seq_lst, safe_points_lst
+
+
+def _region_slack(mgr, ridx, p):
+    """Normalized slack of point p inside region ridx (negative = outside)."""
+    A = mgr.iris_list[ridx].iris_region.A()
+    b = mgr.iris_list[ridx].iris_region.b()
+    return float(np.min((b - A @ p) / np.linalg.norm(A, axis=1)))
+
+
+def _junction_depth(mgr, ridx1, ridx2):
+    """Largest t such that some point has >= t normalized slack in BOTH regions.
+
+    Caps the erosion margins of two consecutive boxes with different regions so
+    their eroded intersection stays nonempty (continuity remains feasible).
+    """
+    import cvxpy as cp
+    A1 = mgr.iris_list[ridx1].iris_region.A()
+    b1 = mgr.iris_list[ridx1].iris_region.b()
+    A2 = mgr.iris_list[ridx2].iris_region.A()
+    b2 = mgr.iris_list[ridx2].iris_region.b()
+    n1 = np.linalg.norm(A1, axis=1)
+    n2 = np.linalg.norm(A2, axis=1)
+    x = cp.Variable(3)
+    t = cp.Variable()
+    prob = cp.Problem(cp.Maximize(t),
+                      [A1 @ x + t * n1 <= b1, A2 @ x + t * n2 <= b2])
+    try:
+        prob.solve(solver='CLARABEL')
+        return float(t.value) if t.value is not None else 0.
+    except Exception:
+        return 0.
+
+
+def compute_sphere_containment_margins(iris_regions, safe_points_lst,
+                                       fixed_frames, sca_robot_geometry,
+                                       n_points=8, eps=5e-3):
+    # eps: slack buffer kept at capped (pinned/junction) control points. Too
+    # small (~1e-3) leaves the pins only ~1 mm inside the eroded regions and
+    # makes the warm-start QP numerically degenerate for CLARABEL.
+    """Per-frame, PER-CONTROL-POINT IRIS containment margins for sphere links.
+
+    Eroding the containment of a control point by the frame's collision-sphere
+    radius extends the Bezier convex-hull guarantee to the swept sphere: the
+    IRIS regions exclude all obstacles, and the normalized region slack is
+    concave, so the curve's slack is lower-bounded by the Bernstein-weighted
+    combination of its control points' margins.
+
+    margins[frame] is an (n_boxes, n_points) array, starting at the sphere
+    radius everywhere and capped LOCALLY only where boundary conditions
+    require it (so protection is not lost along whole swing segments):
+      - control points that pin contact/boundary positions (initial/final
+        positions, segment-boundary safe points, all points of fixed
+        segments) are capped by that point's slack in the box's region;
+      - the continuity-tied endpoint pair of consecutive boxes with different
+        regions is capped by the junction depth (largest common slack), so
+        the eroded regions still intersect there.
+    Curve portions near a contact therefore approach the surface as required,
+    while interior control points keep the full sphere-radius margin.
+    """
+    margins = {}
+    if sca_robot_geometry is None:
+        return margins
+    n_seg = len(fixed_frames)
+    for fr, mgr in iris_regions.items():
+        if fr == 'torso' or not sca_robot_geometry.is_link_in_sca_list(fr):
+            continue
+        if sca_robot_geometry.get_primitive_shape_type(fr) != 'sphere':
+            continue
+        U = sca_robot_geometry.get_sphere_representation(fr)['U']
+        radius = 1.0 / U[0, 0]      # sphere radius (U = I / r)
+
+        # global box list: (segment, region index) in traversal order
+        boxes = [(s, int(r)) for s in range(len(mgr.iris_idx_seq))
+                 for r in mgr.iris_idx_seq[s]]
+        n_boxes = len(boxes)
+        m = np.full((n_boxes, n_points), radius)
+        seg_first = {}      # segment -> first global box index
+        seg_last = {}       # segment -> last global box index
+        for k, (s, _) in enumerate(boxes):
+            seg_first.setdefault(s, k)
+            seg_last[s] = k
+
+        def cap(k, j, p):
+            """Cap margin of control point j (or all points, j=None) of box k."""
+            slack = max(_region_slack(mgr, boxes[k][1], np.asarray(p)) - eps, 0.)
+            if j is None:
+                m[k, :] = np.minimum(m[k, :], slack)
+            else:
+                m[k, j] = min(m[k, j], slack)
+
+        # initial / final pinned positions
+        if fr in safe_points_lst[0]:
+            cap(0, 0, safe_points_lst[0][fr])
+        if fr in safe_points_lst[-1]:
+            cap(n_boxes - 1, n_points - 1, safe_points_lst[-1][fr])
+        for s in range(n_seg):
+            b_fixed = fixed_frames[s] is not None and fr in fixed_frames[s]
+            if b_fixed and fr in safe_points_lst[s]:
+                # fixed segments pin the point at every control point
+                for k in range(seg_first[s], seg_last[s] + 1):
+                    cap(k, None, safe_points_lst[s][fr])
+            if s >= 1 and fr in safe_points_lst[s]:
+                # segment-boundary safe point: pinned at the first point of
+                # segment s and, via continuity, the last point of segment s-1
+                cap(seg_first[s], 0, safe_points_lst[s][fr])
+                cap(seg_last[s - 1], n_points - 1, safe_points_lst[s][fr])
+
+        # junction feasibility: the continuity-tied endpoint pair between
+        # consecutive boxes with different regions must fit in both eroded
+        # regions simultaneously
+        for k in range(n_boxes - 1):
+            if boxes[k][1] == boxes[k + 1][1]:
+                continue
+            depth = max(_junction_depth(mgr, boxes[k][1], boxes[k + 1][1]) - eps, 0.)
+            m[k, n_points - 1] = min(m[k, n_points - 1], depth)
+            m[k + 1, 0] = min(m[k + 1, 0], depth)
+
+        # smoothness propagation: derivative continuity (up to order D) into or
+        # out of a FIXED (constant-position) box forces the first/last D+1
+        # control points of the neighboring box to coincide with the shared
+        # pinned point (zero velocity/acc/jerk at the junction), so the
+        # endpoint cap must extend to those control points too
+        D = n_points // 2 - 1
+        fixed_box = np.zeros(n_boxes, dtype=bool)
+        for s in range(n_seg):
+            if fixed_frames[s] is not None and fr in fixed_frames[s] and s in seg_first:
+                fixed_box[seg_first[s]:seg_last[s] + 1] = True
+        for k in range(n_boxes):
+            if k > 0 and fixed_box[k - 1]:
+                m[k, 1:D + 1] = np.minimum(m[k, 1:D + 1], m[k, 0])
+            if k + 1 < n_boxes and fixed_box[k + 1]:
+                m[k, n_points - 1 - D:n_points - 1] = np.minimum(
+                    m[k, n_points - 1 - D:n_points - 1], m[k, n_points - 1])
+
+        margins[fr] = m
+    return margins
 
 
 def pack_box_seq_from_point(b_max, box_seq_dict, box_seq_lst, ff, iris_regions, pf_prev):
@@ -198,7 +339,8 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                   w_stability_polytope=0.0,
                   foot_force_lim=1.5,
                   hand_force_lim=0.25,
-                  stab_poly_callback=None):
+                  stab_poly_callback=None,
+                  b_use_sphere_margins=True):
     solver_stats = {}
     # Find IRIS sequence and minimize length between safe points
     motion_frames_lst = motion_frames_seq.get_motion_frames()
@@ -264,6 +406,22 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
     parsed_contact_seq = get_contact_seq_from_fixed_frames_seq(fixed_frames)
 
     surface_normals_lst = motion_frames_seq.get_contact_surfaces()
+
+    # Robot-environment collision avoidance: sphere-radius containment margins
+    # (swept-sphere avoidance via eroded IRIS containment). Convex, zero solve
+    # cost, and guarantees the whole curve's sphere stays collision-free by the
+    # Bezier convex-hull property. Self-collisions are handled separately by
+    # the DCOL callback constraints in the casadi solve.
+    containment_margins = {}
+    if b_use_sphere_margins:
+        containment_margins = compute_sphere_containment_margins(
+            S, safe_pnt_lst, fixed_frames, sca_robot_geometry,
+            n_points=(max(alpha) + 1) * 2)
+    if containment_margins:
+        print("[Smooth] Sphere containment margins (per box, min/max over ctrl pts): "
+              + str({k: [(round(float(r.min()), 3), round(float(r.max()), 3)) for r in v]
+                     for k, v in containment_margins.items()}))
+
     paths, sol_stats, points, dvars = optimize_multiple_bezier_iris(R, A, S, durations, alpha, safe_pnt_lst,
                                                              fixed_frames=fixed_frames,
                                                              contact_sequence=parsed_contact_seq,
@@ -273,7 +431,8 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                              b_use_knees_in_smooth_plan=b_use_knees_in_smooth_plan,
                                                              b_final_vel_constr=b_final_vel_constr,
                                                              stab_poly_manager=stab_poly_manager,
-                                                             w_stability_polytope=w_stability_polytope)
+                                                             w_stability_polytope=w_stability_polytope,
+                                                             containment_margins=containment_margins)
     solver_stats['multiple_bezier_iris_cvxpy_time'] = sol_stats['runtime']
     for key in ('stab_poly_violation', 'stab_poly_violation_time'):
         if key in sol_stats:
@@ -304,7 +463,8 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                                                                  b_final_vel_constr=b_final_vel_constr,
                                                                  b_skip_sca=b_skip_sca,
                                                                  stab_poly_manager=stab_poly_manager,
-                                                                 w_stability_polytope=w_stability_polytope)
+                                                                 w_stability_polytope=w_stability_polytope,
+                                                                 containment_margins=containment_margins)
         solver_stats['multiple_bezier_iris_sca_casadi_time'] = sol_stats['runtime']
         if not b_skip_sca:
             solver_stats['multiple_bezier_iris_sca_build_time'] = sol_stats['sca_build_time']

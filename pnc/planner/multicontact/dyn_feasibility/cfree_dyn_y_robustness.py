@@ -60,7 +60,7 @@ from pinocchio.visualize import MeshcatVisualizer
 # ---------------------------------------------------------------------------
 # Trial parameters
 # ---------------------------------------------------------------------------
-N_TRIALS    = 6
+N_TRIALS    = 8
 # Per-environment sampling bounds for the floating-base x/y offset from the
 # nominal starting position.  Stairs use a tighter y range: the tilted boxes
 # are only box_width=0.35 wide and their landing targets are world-fixed.
@@ -107,7 +107,7 @@ B_USE_STABILITY_POLYTOPE    = False   # set True to activate stability-polytope 
 B_USE_HARD_FRICTION_CONE_SCA = False  # replace the soft friction-cone cost with a hard constraint in plan_sca
 B_PLOT_STAB_POLY_VIOLATION  = False   # plot unscaled violation per control point after KIN solve
 B_VISUALIZE_KIN             = True
-B_VISUALIZE_DYN             = True
+B_VISUALIZE_DYN             = False
 
 # ---------------------------------------------------------------------------
 # Dataset saving
@@ -217,23 +217,27 @@ def get_g1_pose_with_xy(n_joints: int, x_pos: float, y_pos: float,
     """Default G1 joint configuration for the given environment, with the
     floating base offset by (x_pos, y_pos) from the nominal starting position."""
     q0 = np.zeros(n_joints)
+    # Asymmetric hip/ankle pitch split (hip=-t1, knee=t1+t2, ankle=-t2 keeps
+    # the feet flat and the torso upright).  The former symmetric pi/8 split
+    # left the knees ~1.5 cm BELOW their reach polytopes (violated halfspace
+    # normal ~[0.08, -0.04, -1.0]); a larger hip pitch raises the knees
+    # relative to the torso.  t1=0.70, t2=0.58 keeps the feet only ~5 cm
+    # ahead of the base with the CoM ~1 cm ahead of the ankles, and gives
+    # reach margins: LF -0.079, RF -0.096, L_knee -0.008, R_knee -0.020,
+    # LH -0.108, RH -0.101 (all inside).
+    q0[0]  = -0.70  # left_hip_pitch_joint
+    q0[3]  = 1.28   # left_knee_joint
+    q0[4]  = -0.58  # left_ankle_pitch_joint
+    q0[6]  = -0.70  # right_hip_pitch_joint
+    q0[9]  = 1.28   # right_knee_joint
+    q0[10] = -0.58  # right_ankle_pitch_joint
+    # base height keeps the feet at the same ground height (ankle z 0.0416)
+    floating_base = np.array([x_pos, y_pos, 0.670, 0., 0., 0., 1.])
     if env == 'stairs':
-        # mirrors get_g1_default_initial_pose(env='stairs') in cfree_dyn_planner.py
-        q0[0]  = -np.pi/6  # left_hip_pitch_joint
-        q0[3]  = np.pi/3   # left_knee_joint
-        q0[4]  = -np.pi/6  # left_ankle_pitch_joint
-        q0[6]  = -np.pi/6  # right_hip_pitch_joint
-        q0[9]  = np.pi/3   # right_knee_joint
-        q0[10] = -np.pi/6  # right_ankle_pitch_joint
-        floating_base = np.array([-0.03 + x_pos, y_pos, 0.7, 0., 0., 0., 1.])
-    else:
-        q0[0]  = -np.pi/8  # left_hip_pitch_joint
-        q0[3]  = np.pi/4  # left_knee_joint
-        q0[4]  = -np.pi/8  # left_ankle_pitch_joint
-        q0[6]  = -np.pi/8  # right_hip_pitch_joint
-        q0[9]  = np.pi/4  # right_knee_joint
-        q0[10] =  -np.pi/8  # right_ankle_pitch_joint
-        floating_base = np.array([x_pos, y_pos, 0.75, 0., 0., 0., 1.])
+        # shift the whole stance back so the L-knee collision sphere (r=0.08)
+        # clears the left tilted stair at the initial pose for every sampled
+        # x offset (worst case x=+0.04 leaves ~0.086 m clearance)
+        floating_base[0] -= 0.09
     return np.concatenate((floating_base, q0))
 
 
@@ -654,10 +658,17 @@ def run_trial(x_pos: float, y_pos: float, shared: dict,
         ik_cfree_planner.set_planner(frame_planner)
         ik_cfree_planner.set_plan_to_model_frames(plan_to_model_frames)
 
-        # Environment SCA geometry: only set for the obstructed-hole env
-        # (cfree_dyn_planner.py sets no env geometry for stairs either).
+        # Environment SCA geometry. Note: robot-environment collisions in the
+        # KIN smooth solve are handled by the sphere-radius IRIS containment
+        # margins (see compute_sphere_containment_margins); env_geometry is
+        # currently unused there and kept only for tooling/back-compat.
         if ENV == 'obstructed_hole':
             env_geom = SCAHPolyhedronGeometry.from_wall_scene(environment)
+            ik_cfree_planner.set_env_geometry(env_geom)
+        else:  # stairs: the three step boxes (floor and side walls excluded)
+            env_geom = SCAHPolyhedronGeometry(
+                environment.obstacles[3:],
+                ['tilted_left', 'tilted_right', 'center_box'])
             ik_cfree_planner.set_env_geometry(env_geom)
 
         p_init = {fr: starting_pose[fr] for fr in plan_to_model_frames.keys()}
@@ -697,6 +708,23 @@ def run_trial(x_pos: float, y_pos: float, shared: dict,
                 rob_data, vis_data, col_data,
                 ctrl_freq=N_knots / (n_contacts * T), save_freq=save_freq)
             kin_display.add_shapes_from(env_viz_shapes)
+            # Reachable (polytope) regions at each contact state: one set per
+            # phase boundary (n_contacts + 1 sets total), each containing the
+            # world-frame reach polytope of every end-effector frame for the
+            # planned torso position at that instant. These are exactly the
+            # regions enforced by the H (p_ee - p_torso) <= -d constraints in
+            # optimize_multiple_bezier_iris[_casadi]. Hidden by default —
+            # toggle "reachable_sets/state_<i>" in the meshcat scene tree.
+            reach_planes = frame_planner.reachability_planes
+            for cs_idx in range(n_contacts + 1):
+                t_cs = cs_idx * T
+                cs_targets = ik_cfree_planner.get_frame_targets_from_kin_planner(
+                    cs_idx, t_cs)
+                n_polys = kin_display.add_reachable_region_set(
+                    f"state_{cs_idx}", reach_planes, cs_targets['torso'])
+                print(f"[ReachViz] Contact state {cs_idx} (t={t_cs:.2f}s): "
+                      f"{n_polys}/{len(reach_planes) - 1} reach polytopes rendered "
+                      f"at torso {np.round(cs_targets['torso'], 3)}")
             kin_display.start_animation()
             for t_anim in np.linspace(0, n_contacts * T, N_knots // save_freq):
                 frame_targets_dict = ik_cfree_planner.get_frame_targets_from_kin_planner(
