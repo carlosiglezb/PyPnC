@@ -340,7 +340,7 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
                   foot_force_lim=1.5,
                   hand_force_lim=0.25,
                   stab_poly_callback=None,
-                  b_use_sphere_margins=True):
+                  b_use_sphere_margins=False):
     solver_stats = {}
     # Find IRIS sequence and minimize length between safe points
     motion_frames_lst = motion_frames_seq.get_motion_frames()
@@ -407,11 +407,13 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
 
     surface_normals_lst = motion_frames_seq.get_contact_surfaces()
 
-    # Robot-environment collision avoidance: sphere-radius containment margins
-    # (swept-sphere avoidance via eroded IRIS containment). Convex, zero solve
-    # cost, and guarantees the whole curve's sphere stays collision-free by the
-    # Bezier convex-hull property. Self-collisions are handled separately by
-    # the DCOL callback constraints in the casadi solve.
+    # Robot-environment collision avoidance is handled by per-frame OBSTACLE
+    # INFLATION when building the IRIS regions (see environment_inflator.py),
+    # so the containment constraints Ax <= b already encode swept-sphere
+    # avoidance. The eroded-containment margins below are an alternative
+    # mechanism kept for A/B testing (b_use_sphere_margins) -- do NOT enable
+    # both, they would stack. Self-collisions are handled separately by the
+    # DCOL callback constraints in the casadi solve.
     containment_margins = {}
     if b_use_sphere_margins:
         containment_margins = compute_sphere_containment_margins(

@@ -1,4 +1,6 @@
 from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
+from pnc.planner.multicontact.kin_feasibility.environment_inflator import (
+    EnvironmentInflator, collect_contact_anchors)
 from util.environment_creator import TiltedStairs
 import numpy as np
 
@@ -349,7 +351,8 @@ def get_fully_opposing_limbs_contact_sequence(stairs: TiltedStairs,
 def compute_stairs_iris_regions_mgr(stairs: TiltedStairs,
                                     starting_pose: dict[str, np.ndarray],
                                     motion_frames_seq: MotionFrameSequencer,
-                                    b_use_knees: bool = True):
+                                    b_use_knees: bool = True,
+                                    sca_robot_geometry=None):
     # load obstacle, domain, and start / end seed for IRIS
     obstacles = stairs.obstacles
     domain = stairs.domain
@@ -357,6 +360,20 @@ def compute_stairs_iris_regions_mgr(stairs: TiltedStairs,
     iris_lf_shift = np.array([0.0, 0., 0.])
     iris_rf_shift = np.array([0.0, 0., 0.])
     iris_kn_shift = np.array([0.0, 0., 0.0])
+
+    # per-frame obstacle sets, inflated by each frame's collision-sphere radius
+    # with contact-face exemptions (swept-sphere collision avoidance); frames
+    # without a sphere primitive (e.g. torso capsule) keep the shared obstacles
+    per_frame_obstacles = None
+    if sca_robot_geometry is not None:
+        inflator = EnvironmentInflator(obstacles, sca_robot_geometry)
+        anchors = collect_contact_anchors(starting_pose, motion_frames_seq)
+        per_frame_obstacles = inflator.per_frame_obstacles(anchors)
+
+    def obs_for(fr):
+        if per_frame_obstacles is not None and fr in per_frame_obstacles:
+            return per_frame_obstacles[fr]
+        return obstacles
 
     starting_torso_pos = starting_pose['torso']
     starting_lf_pos = starting_pose['LF']
@@ -368,19 +385,19 @@ def compute_stairs_iris_regions_mgr(stairs: TiltedStairs,
         starting_rkn_pos = starting_pose['R_knee']
 
     # create dictionary of safe regions
-    safe_torso_start_region = IrisGeomInterface(obstacles, domain, starting_torso_pos)
-    safe_lf_start_region = IrisGeomInterface(obstacles, domain, starting_lf_pos + iris_lf_shift)
-    safe_lh_start_region = IrisGeomInterface(obstacles, domain, starting_lh_pos)
-    safe_rf_start_region = IrisGeomInterface(obstacles, domain, starting_rf_pos + iris_rf_shift)
-    safe_rh_start_region = IrisGeomInterface(obstacles, domain, starting_rh_pos)
+    safe_torso_start_region = IrisGeomInterface(obs_for('torso'), domain, starting_torso_pos)
+    safe_lf_start_region = IrisGeomInterface(obs_for('LF'), domain, starting_lf_pos + iris_lf_shift)
+    safe_lh_start_region = IrisGeomInterface(obs_for('LH'), domain, starting_lh_pos)
+    safe_rf_start_region = IrisGeomInterface(obs_for('RF'), domain, starting_rf_pos + iris_rf_shift)
+    safe_rh_start_region = IrisGeomInterface(obs_for('RH'), domain, starting_rh_pos)
     safe_regions_mgr_dict = {'torso': IrisRegionsManager(safe_torso_start_region),
                              'LF': IrisRegionsManager(safe_lf_start_region),
                              'LH': IrisRegionsManager(safe_lh_start_region),
                              'RF': IrisRegionsManager(safe_rf_start_region),
                              'RH': IrisRegionsManager(safe_rh_start_region)}
     if b_use_knees:
-        safe_lk_start_region = IrisGeomInterface(obstacles, domain, starting_lkn_pos + np.array([0.02, 0., -0.05]))
-        safe_rk_start_region = IrisGeomInterface(obstacles, domain, starting_rkn_pos)
+        safe_lk_start_region = IrisGeomInterface(obs_for('L_knee'), domain, starting_lkn_pos + np.array([0.02, 0., -0.05]))
+        safe_rk_start_region = IrisGeomInterface(obs_for('R_knee'), domain, starting_rkn_pos)
 
         safe_regions_mgr_dict['L_knee'] = IrisRegionsManager(safe_lk_start_region)
         safe_regions_mgr_dict['R_knee'] = IrisRegionsManager(safe_rk_start_region)
@@ -388,12 +405,12 @@ def compute_stairs_iris_regions_mgr(stairs: TiltedStairs,
     # loop through each of the planned steps to make sure we have an IRIS regions for each
     for fr_dict in motion_frames_seq.motion_frame_lst:
         for fr_name, pos in fr_dict.items():
-            next_ir = IrisGeomInterface(obstacles, domain, pos)
+            next_ir = IrisGeomInterface(obs_for(fr_name), domain, pos)
             safe_regions_mgr_dict[fr_name].addIris([next_ir])
 
     # compute and connect IRIS from start to goal
-    for _, irm in safe_regions_mgr_dict.items():
+    for fr_name, irm in safe_regions_mgr_dict.items():
         irm.computeIris()
-        irm.connectIrisListSeeds("volume")
+        irm.connectIrisListSeeds("volume", label=fr_name)
 
     return safe_regions_mgr_dict

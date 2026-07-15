@@ -65,8 +65,8 @@ N_TRIALS    = 8
 # nominal starting position.  Stairs use a tighter y range: the tilted boxes
 # are only box_width=0.35 wide and their landing targets are world-fixed.
 XY_BOUNDS = {
-    'obstructed_hole': {'x': (-0.05, 0.05), 'y': (-0.12, 0.12)},
-    'stairs':          {'x': (-0.06, 0.04), 'y': (-0.06, 0.06)},
+    'obstructed_hole': {'x': (-0.16, -0.03), 'y': (-0.15, 0.15)},
+    'stairs':          {'x': (-0.10, 0.04), 'y': (-0.08, 0.08)},
 }
 RNG_SEED    = 2          # set to None for non-reproducible draws
 
@@ -88,7 +88,7 @@ ALPHA_BOUNDS = {
 # Environment selection (overridable via --env):
 #   'obstructed_hole' : knee-knocker door with obstructed hole
 #   'stairs'          : tilted stairs (TiltedStairs)
-ENV                         = 'stairs'
+ENV                         = 'obstructed_hole'
 # Contact sequence selection (env-dependent, matches cfree_dyn_planner.py --sequence):
 #   obstructed_hole — 0: step through door  (get_five_stage_two_hand_contact_sequence)
 #                     1: step on knocker    (build_knocker_contact_seq — this file)
@@ -106,7 +106,7 @@ B_USE_KNEES_IN_SMOOTH_PLAN  = False
 B_USE_STABILITY_POLYTOPE    = False   # set True to activate stability-polytope soft constraint
 B_USE_HARD_FRICTION_CONE_SCA = False  # replace the soft friction-cone cost with a hard constraint in plan_sca
 B_PLOT_STAB_POLY_VIOLATION  = False   # plot unscaled violation per control point after KIN solve
-B_VISUALIZE_KIN             = True
+B_VISUALIZE_KIN             = False
 B_VISUALIZE_DYN             = False
 
 # ---------------------------------------------------------------------------
@@ -612,12 +612,16 @@ def run_trial(x_pos: float, y_pos: float, shared: dict,
             contact_seqs, motion_frames_seq)
 
         # ---- IRIS regions ----
+        # sca_geometry activates per-frame obstacle inflation (swept-sphere
+        # robot-environment collision avoidance with contact-face exemptions)
         if ENV == 'stairs':
             safe_regions_mgr_dict = stairs_plan.compute_stairs_iris_regions_mgr(
-                environment, starting_pose, motion_frames_seq, b_use_knees=B_USE_KNEES)
+                environment, starting_pose, motion_frames_seq, b_use_knees=B_USE_KNEES,
+                sca_robot_geometry=sca_geometry)
         else:
             safe_regions_mgr_dict = hole_plan.compute_iris_regions_mgr(
-                environment, starting_pose, motion_frames_seq, b_use_knees=B_USE_KNEES)
+                environment, starting_pose, motion_frames_seq, b_use_knees=B_USE_KNEES,
+                sca_robot_geometry=sca_geometry)
 
         # ---- IK frame planner ----
         standing_pos = q0[:3]

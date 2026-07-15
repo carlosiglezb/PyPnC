@@ -76,12 +76,20 @@ class IrisRegionsManager:
         return False
 
     def connectIrisListSeeds(self, choose_iris_by: str = None,
-                             hint: np.ndarray = None):
+                             hint: np.ndarray = None,
+                             label: str = None,
+                             max_resample_attempts: int = 20):
         """
         Connect the list of IRIS regions.
         This approach is based on checking if the IRIS region in the iris_list are connected.
         If they are not connected, a new sample is obtained by sampling in between centroids.
         An alternative approach would be to do an RRT-based expansion.
+
+        After building iris_graph, verifies that the start seed (iris_list[0])
+        and goal seed (iris_list[1], if provided) are actually connected via a
+        chain of pairwise-intersecting regions. If not, prints a warning and
+        tries to bridge the gap by resampling random seeds along the segment
+        between the start and goal seed positions (see resampleUntilConnected).
         :return: [None] Stores the new IRIS regions in the iris_list and graph in iris_graph
         """
         if choose_iris_by is None:
@@ -165,6 +173,111 @@ class IrisRegionsManager:
                     self.iris_list[-1].computeIris()
         self.addIris(extended_iris_list)
         self.iris_graph = IrisGraph(self.iris_list)
+
+        if not self.isStartGoalConnected():
+            tag = f" [{label}]" if label is not None else ""
+            print(f"[IRIS WARNING]{tag} Start and goal IRIS regions are NOT "
+                  f"connected (start={self.iris_start_seed}, "
+                  f"goal={getattr(self, 'iris_goal_seed', None)}). "
+                  f"Resampling seeds between start and goal...")
+            if self.resampleUntilConnected(max_resample_attempts):
+                print(f"[IRIS]{tag} Connected start and goal after resampling.")
+            else:
+                print(f"[IRIS WARNING]{tag} Still NOT connected after "
+                      f"{max_resample_attempts} resample attempts.")
+
+    def isStartGoalConnected(self) -> bool:
+        """
+        Check whether the start seed (iris_list[0]) and goal seed
+        (iris_list[1]) belong to the same connected component, i.e. there is
+        a chain of pairwise-intersecting regions in iris_list linking them.
+        Returns True trivially if no goal region was provided, or if a single
+        "global" region already contains every seed (iris_graph is None).
+        """
+        if not hasattr(self, 'iris_goal_seed'):
+            return True
+        if self.iris_graph is None:
+            return True
+
+        start_idx, goal_idx = 0, 1
+        visited = {start_idx}
+        frontier = [start_idx]
+        while frontier:
+            cur = frontier.pop()
+            if cur == goal_idx:
+                return True
+            for nxt in self.iris_graph.iris_intersections.get(cur, ()):
+                if nxt not in visited:
+                    visited.add(nxt)
+                    frontier.append(nxt)
+        return False
+
+    def resampleUntilConnected(self, max_attempts: int = 20,
+                               xy_scale: np.ndarray = None) -> bool:
+        """
+        If the start and goal IRIS regions are not connected, repeatedly
+        sample a random seed and try to grow an IRIS region from it, hoping
+        to land inside a passage (e.g. on top of / through a hole) that
+        bridges the two disconnected regions.
+
+        x/y are interpolated between the start and goal seed positions and
+        jittered by xy_scale. z is drawn independently and uniformly over
+        the domain's full z-extent rather than interpolated between the
+        start/goal heights -- when start and goal are both e.g. near floor
+        height (the common case: a foot stepping over a raised obstacle),
+        interpolating z would almost never probe the passage well above
+        them, so height needs to be explored on its own.
+        :return: [bool] True once start and goal are connected (or already
+                 were / no goal was provided), False if max_attempts is
+                 exhausted without connecting them.
+        """
+        if self.isStartGoalConnected():
+            return True
+
+        obstacles = self.iris_list[0].obstacles_mut
+        domain = self.iris_list[0].domain_mut
+        if xy_scale is None:
+            xy_scale = np.array([0.1, 0.1])
+
+        z_min, z_max = self._domainZBounds()
+        if z_min is None:
+            z_lo = min(self.iris_start_seed[2], self.iris_goal_seed[2]) - 0.1
+            z_hi = max(self.iris_start_seed[2], self.iris_goal_seed[2]) + 0.6
+        else:
+            z_lo, z_hi = z_min, z_max
+
+        for _ in range(max_attempts):
+            t = np.random.uniform(0.0, 1.0)
+            base_xy = (1 - t) * self.iris_start_seed[:2] + t * self.iris_goal_seed[:2]
+            new_seed = np.empty(3)
+            new_seed[:2] = np.random.normal(loc=base_xy, scale=xy_scale)
+            new_seed[2] = np.random.uniform(z_lo, z_hi)
+
+            if self.pointInCollision(new_seed):
+                continue
+
+            new_iris = IrisGeomInterface(obstacles, domain, new_seed)
+            new_iris.computeIris()
+            self.addIris([new_iris])
+            self.iris_graph = IrisGraph(self.iris_list)
+
+            if self.isStartGoalConnected():
+                return True
+
+        return False
+
+    def _domainZBounds(self):
+        """Return (z_min, z_max) of the (assumed axis-aligned box) domain, or
+        (None, None) if the domain isn't expressed with axis-aligned z faces."""
+        domain = self.iris_list[0].domain_mut
+        A_dom, b_dom = domain.A(), domain.b()
+        z_max = z_min = None
+        for row, bi in zip(A_dom, b_dom):
+            if np.allclose(row, [0., 0., 1.]):
+                z_max = float(bi)
+            elif np.allclose(row, [0., 0., -1.]):
+                z_min = float(-bi)
+        return z_min, z_max
 
     def connectIrisSeeds(self):
         """

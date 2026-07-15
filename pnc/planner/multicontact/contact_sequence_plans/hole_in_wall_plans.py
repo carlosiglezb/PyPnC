@@ -1,8 +1,33 @@
 from pnc.planner.multicontact.kin_feasibility.planner_surface_contact import PlannerSurfaceContact, MotionFrameSequencer
+from pnc.planner.multicontact.kin_feasibility.environment_inflator import (
+    EnvironmentInflator, collect_contact_anchors)
 from util.environment_creator import HoleInWallObstructed
 import numpy as np
 
 from vision.iris import IrisGeomInterface, IrisRegionsManager
+
+
+def _clear_seed_of_collisions(seed: np.ndarray, obstacles,
+                              push_dir: np.ndarray = np.array([1., 0., 0.]),
+                              step: float = 0.02, max_iters: int = 100) -> np.ndarray:
+    """Nudge `seed` along push_dir in small increments until it lies outside
+    every obstacle in `obstacles`.
+
+    The hand-tuned IRIS seed offsets below (e.g. pulling a foot's "final"
+    seed back by a fixed x amount) assume a step displacement that doesn't
+    always hold -- e.g. for the on-knocker sequence this used to place the
+    LF/RF final seed squarely inside the knee-knocker base. IRIS silently
+    accepts an in-collision seed (it does not raise) and returns a bogus
+    region that isn't real obstacle-free space, which can make two otherwise
+    disconnected regions appear connected. Nudging the seed clear up front
+    prevents that failure mode.
+    """
+    pos = np.array(seed, dtype=float).copy()
+    for _ in range(max_iters):
+        if not any(obs.PointInSet(pos) for obs in obstacles):
+            return pos
+        pos = pos + step * push_dir
+    return pos
 
 
 def get_on_lf_balanced_contact_seq(hole: HoleInWallObstructed,
@@ -250,10 +275,25 @@ def get_on_rf_balanced_contact_seq(hole: HoleInWallObstructed,
 def compute_iris_regions_mgr(hole: HoleInWallObstructed,
                              starting_pose: dict[str, np.ndarray],
                              motion_frames_seq: MotionFrameSequencer,
-                             b_use_knees: bool = True):
+                             b_use_knees: bool = True,
+                             sca_robot_geometry=None):
     # load obstacle, domain, and start / end seed for IRIS
     obstacles = hole.obstacles
     domain = hole.domain
+
+    # per-frame obstacle sets, inflated by each frame's collision-sphere radius
+    # with contact-face exemptions (swept-sphere collision avoidance); frames
+    # without a sphere primitive (e.g. torso capsule) keep the shared obstacles
+    per_frame_obstacles = None
+    if sca_robot_geometry is not None:
+        inflator = EnvironmentInflator(obstacles, sca_robot_geometry)
+        anchors = collect_contact_anchors(starting_pose, motion_frames_seq)
+        per_frame_obstacles = inflator.per_frame_obstacles(anchors)
+
+    def obs_for(fr):
+        if per_frame_obstacles is not None and fr in per_frame_obstacles:
+            return per_frame_obstacles[fr]
+        return obstacles
     # shift (feet) iris seed to get nicer IRIS region
     step_length = 0.46
     side_step = 0.0
@@ -284,17 +324,29 @@ def compute_iris_regions_mgr(hole: HoleInWallObstructed,
     final_lh_pos = starting_pose['LH'] + np.array([step_length, side_step, 0.])
 
 
-    # create dictionary of safe regions
-    safe_torso_start_region = IrisGeomInterface(obstacles, domain, starting_torso_pos)
-    safe_lf_start_region = IrisGeomInterface(obstacles, domain, starting_lf_pos + iris_lf_shift)
-    safe_lh_start_region = IrisGeomInterface(obstacles, domain, starting_lh_pos)
-    safe_rf_start_region = IrisGeomInterface(obstacles, domain, starting_rf_pos + iris_rf_shift)
-    safe_rh_start_region = IrisGeomInterface(obstacles, domain, starting_rh_pos + iris_rh_shift)
-    safe_torso_final_region = IrisGeomInterface(obstacles, domain, final_torso_pos + np.array([-0.1, 0., 0.]))
-    safe_lf_final_region = IrisGeomInterface(obstacles, domain, final_lf_pos + np.array([-0.1, 0., 0.]))
-    safe_lh_final_region = IrisGeomInterface(obstacles, domain, final_lh_pos)
-    safe_rf_final_region = IrisGeomInterface(obstacles, domain, final_rf_pos + np.array([-0.1, 0., 0.]))
-    safe_rh_final_region = IrisGeomInterface(obstacles, domain, final_rh_pos)
+    # create dictionary of safe regions (seeds are nudged in +x if the hand-tuned
+    # offset above happens to land them inside an obstacle -- see
+    # _clear_seed_of_collisions)
+    safe_torso_start_region = IrisGeomInterface(obs_for('torso'), domain,
+        _clear_seed_of_collisions(starting_torso_pos, obs_for('torso')))
+    safe_lf_start_region = IrisGeomInterface(obs_for('LF'), domain,
+        _clear_seed_of_collisions(starting_lf_pos + iris_lf_shift, obs_for('LF')))
+    safe_lh_start_region = IrisGeomInterface(obs_for('LH'), domain,
+        _clear_seed_of_collisions(starting_lh_pos, obs_for('LH')))
+    safe_rf_start_region = IrisGeomInterface(obs_for('RF'), domain,
+        _clear_seed_of_collisions(starting_rf_pos + iris_rf_shift, obs_for('RF')))
+    safe_rh_start_region = IrisGeomInterface(obs_for('RH'), domain,
+        _clear_seed_of_collisions(starting_rh_pos + iris_rh_shift, obs_for('RH')))
+    safe_torso_final_region = IrisGeomInterface(obs_for('torso'), domain,
+        _clear_seed_of_collisions(final_torso_pos + np.array([-0.1, 0., 0.]), obs_for('torso')))
+    safe_lf_final_region = IrisGeomInterface(obs_for('LF'), domain,
+        _clear_seed_of_collisions(final_lf_pos + np.array([-0.1, 0., 0.]), obs_for('LF')))
+    safe_lh_final_region = IrisGeomInterface(obs_for('LH'), domain,
+        _clear_seed_of_collisions(final_lh_pos, obs_for('LH')))
+    safe_rf_final_region = IrisGeomInterface(obs_for('RF'), domain,
+        _clear_seed_of_collisions(final_rf_pos + np.array([-0.1, 0., 0.]), obs_for('RF')))
+    safe_rh_final_region = IrisGeomInterface(obs_for('RH'), domain,
+        _clear_seed_of_collisions(final_rh_pos, obs_for('RH')))
     safe_regions_mgr_dict = {'torso': IrisRegionsManager(safe_torso_start_region, safe_torso_final_region),
                              'LF': IrisRegionsManager(safe_lf_start_region, safe_lf_final_region),
                              'LH': IrisRegionsManager(safe_lh_start_region, safe_lh_final_region),
@@ -304,10 +356,14 @@ def compute_iris_regions_mgr(hole: HoleInWallObstructed,
         # knees also start ~8 cm further forward in the asymmetric stance; the
         # smaller +0.02 x-shift keeps the seed out of the knee-knocker box
         # (x in [0.26, 0.34], z < 0.4) at the same world x as the old +0.1
-        safe_lk_start_region = IrisGeomInterface(obstacles, domain, starting_lkn_pos + np.array([0.02, 0., -0.05]))
-        safe_rk_start_region = IrisGeomInterface(obstacles, domain, starting_rkn_pos + np.array([0.02, 0., -0.05]))
-        safe_lk_final_region = IrisGeomInterface(obstacles, domain, final_lkn_pos + np.array([-0.18, 0., -0.15]))
-        safe_rk_final_region = IrisGeomInterface(obstacles, domain, final_rkn_pos + np.array([-0.18, 0., -0.15]))
+        safe_lk_start_region = IrisGeomInterface(obs_for('L_knee'), domain,
+            _clear_seed_of_collisions(starting_lkn_pos + np.array([0.02, 0., -0.05]), obs_for('L_knee')))
+        safe_rk_start_region = IrisGeomInterface(obs_for('R_knee'), domain,
+            _clear_seed_of_collisions(starting_rkn_pos + np.array([0.02, 0., -0.05]), obs_for('R_knee')))
+        safe_lk_final_region = IrisGeomInterface(obs_for('L_knee'), domain,
+            _clear_seed_of_collisions(final_lkn_pos + np.array([-0.18, 0., -0.15]), obs_for('L_knee')))
+        safe_rk_final_region = IrisGeomInterface(obs_for('R_knee'), domain,
+            _clear_seed_of_collisions(final_rkn_pos + np.array([-0.18, 0., -0.15]), obs_for('R_knee')))
 
         safe_regions_mgr_dict['L_knee'] = IrisRegionsManager(safe_lk_start_region, safe_lk_final_region)
         safe_regions_mgr_dict['R_knee'] = IrisRegionsManager(safe_rk_start_region, safe_rk_final_region)
@@ -331,14 +387,14 @@ def compute_iris_regions_mgr(hole: HoleInWallObstructed,
                 continue
 
             # add the new IRIS seed
-            next_ir = IrisGeomInterface(obstacles, domain, pos)
+            next_ir = IrisGeomInterface(obs_for(fr_name), domain, pos)
             iris_mgr.addIris([next_ir])
 
     # compute and connect IRIS from start to goal
-    for _, irm in safe_regions_mgr_dict.items():
+    for fr_name, irm in safe_regions_mgr_dict.items():
         irm.computeIris()
         hint_seed = hole.obstacles[1].ChebyshevCenter()
         hint_seed[2] = 0.7
-        irm.connectIrisListSeeds("centroid", hint_seed)
+        irm.connectIrisListSeeds("centroid", hint_seed, label=fr_name)
 
     return safe_regions_mgr_dict
