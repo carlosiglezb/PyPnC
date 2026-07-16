@@ -60,13 +60,17 @@ from pinocchio.visualize import MeshcatVisualizer
 # ---------------------------------------------------------------------------
 # Trial parameters
 # ---------------------------------------------------------------------------
-N_TRIALS    = 8
+N_TRIALS    = 10
 # Per-environment sampling bounds for the floating-base x/y offset from the
 # nominal starting position.  Stairs use a tighter y range: the tilted boxes
 # are only box_width=0.35 wide and their landing targets are world-fixed.
+# Stairs' x range is shifted 0.09 m negative of the "natural" (-0.10, 0.04)
+# offset so the L-knee collision sphere (r=0.08) clears the left tilted stair
+# at the initial pose for every sampled x (worst case, the least-negative
+# bound, leaves ~0.086 m clearance) — see get_g1_pose_with_xy.
 XY_BOUNDS = {
-    'obstructed_hole': {'x': (-0.16, -0.03), 'y': (-0.15, 0.15)},
-    'stairs':          {'x': (-0.10, 0.04), 'y': (-0.08, 0.08)},
+    'obstructed_hole': {'x': (-0.18, -0.03), 'y': (-0.15, 0.15)},
+    'stairs':          {'x': (-0.25, -0.05), 'y': (-0.08, 0.08)},
 }
 RNG_SEED    = 2          # set to None for non-reproducible draws
 
@@ -88,7 +92,7 @@ ALPHA_BOUNDS = {
 # Environment selection (overridable via --env):
 #   'obstructed_hole' : knee-knocker door with obstructed hole
 #   'stairs'          : tilted stairs (TiltedStairs)
-ENV                         = 'obstructed_hole'
+ENV                         = 'stairs'
 # Contact sequence selection (env-dependent, matches cfree_dyn_planner.py --sequence):
 #   obstructed_hole — 0: step through door  (get_five_stage_two_hand_contact_sequence)
 #                     1: step on knocker    (build_knocker_contact_seq — this file)
@@ -106,7 +110,7 @@ B_USE_KNEES_IN_SMOOTH_PLAN  = False
 B_USE_STABILITY_POLYTOPE    = False   # set True to activate stability-polytope soft constraint
 B_USE_HARD_FRICTION_CONE_SCA = False  # replace the soft friction-cone cost with a hard constraint in plan_sca
 B_PLOT_STAB_POLY_VIOLATION  = False   # plot unscaled violation per control point after KIN solve
-B_VISUALIZE_KIN             = False
+B_VISUALIZE_KIN             = True
 B_VISUALIZE_DYN             = False
 
 # ---------------------------------------------------------------------------
@@ -233,11 +237,6 @@ def get_g1_pose_with_xy(n_joints: int, x_pos: float, y_pos: float,
     q0[10] = -0.58  # right_ankle_pitch_joint
     # base height keeps the feet at the same ground height (ankle z 0.0416)
     floating_base = np.array([x_pos, y_pos, 0.670, 0., 0., 0., 1.])
-    if env == 'stairs':
-        # shift the whole stance back so the L-knee collision sphere (r=0.08)
-        # clears the left tilted stair at the initial pose for every sampled
-        # x offset (worst case x=+0.04 leaves ~0.086 m clearance)
-        floating_base[0] -= 0.09
     return np.concatenate((floating_base, q0))
 
 

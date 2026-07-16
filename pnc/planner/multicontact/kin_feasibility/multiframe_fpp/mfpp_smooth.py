@@ -728,136 +728,66 @@ def optimize_multiple_bezier_iris_casadi(reach_region: dict[str: np.array, str: 
         f_dist = {}
         Q = np.eye(3)
 
-        # get indices of links to check for simplified rigid body collisions
-        torso_idx = None
-        sca_col_link_idxs = []
-        for i, fr in enumerate(frame_list):
-            if fr == 'torso':
-                torso_geom_type = robot_geom_data.get_primitive_shape_type(fr)
-                if torso_geom_type == 'box':
-                    A1 = robot_geom_data.get_box_representation(fr)['A']
-                    b1 = robot_geom_data.get_box_representation(fr)['b']
-                elif torso_geom_type == 'capsule':
-                    R = robot_geom_data.get_box_representation(fr)['R']
-                    L = robot_geom_data.get_box_representation(fr)['L']
-                torso_idx = i
-            elif robot_geom_data.is_link_in_sca_list(fr):
-                sca_col_link_idxs.append(i)
-        print(f'Checking for self-collision between torso and: {[frame_list[i] for i in sca_col_link_idxs]}')
+        # Pair selection is shared with SCARobotGeometry.is_trajectory_self_collision_free
+        # (the quick pre-check in plan_multiple_iris) so the two can't drift apart.
+        self_collision_pairs = robot_geom_data.get_self_collision_pairs(frame_list)
+        print('Checking self-collision pairs: '
+              + str([(frame_list[i1], frame_list[i2]) for i1, i2 in self_collision_pairs]))
         sca_build_start_time = time.time()
-        for col_idx in sca_col_link_idxs:
-            # Simplified no self-collision function and constraints bounds for specified index pairs
-            mfpp_bezier_data = {'current_frames': (torso_idx, col_idx),   # make torso and RK frames SCA
+        for idx1, idx2 in self_collision_pairs:
+            fr1, fr2 = frame_list[idx1], frame_list[idx2]
+            type1 = robot_geom_data.get_primitive_shape_type(fr1)
+            type2 = robot_geom_data.get_primitive_shape_type(fr2)
+            shape_types = {type1, type2}
+
+            # populate col_pair_geom_data and pick the matching DCOL constraint
+            # class for this pair's primitive shape types
+            if shape_types == {'box'}:
+                A1, b1 = robot_geom_data.get_box_representation(fr1)['A'], robot_geom_data.get_box_representation(fr1)['b']
+                A2, b2 = robot_geom_data.get_box_representation(fr2)['A'], robot_geom_data.get_box_representation(fr2)['b']
+                col_pair_geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
+                constraint_cls = IndexedPolytopePolytopeConstraint
+            elif shape_types == {'box', 'sphere'}:
+                box_fr, sph_fr = (fr1, fr2) if type1 == 'box' else (fr2, fr1)
+                A1, b1 = robot_geom_data.get_box_representation(box_fr)['A'], robot_geom_data.get_box_representation(box_fr)['b']
+                U = robot_geom_data.get_sphere_representation(sph_fr)['U']
+                col_pair_geom_data = {'A1': A1, 'b1': b1, 'U': U, 'Q': Q}
+                constraint_cls = IndexedPolytopeEllipsoidConstraint
+            elif shape_types == {'capsule', 'sphere'}:
+                cap_fr, sph_fr = (fr1, fr2) if type1 == 'capsule' else (fr2, fr1)
+                R = robot_geom_data.get_capsule_representation(cap_fr)['R']
+                L = robot_geom_data.get_capsule_representation(cap_fr)['L']
+                U = robot_geom_data.get_sphere_representation(sph_fr)['U']
+                col_pair_geom_data = {'A1': None, 'b1': None, 'R': R, 'L': L, 'U': U, 'Q': Q}
+                constraint_cls = IndexedCapsuleEllipsoidConstraint
+            elif shape_types == {'sphere'}:
+                U1 = robot_geom_data.get_sphere_representation(fr1)['U']
+                U2 = robot_geom_data.get_sphere_representation(fr2)['U']
+                col_pair_geom_data = {'A1': None, 'b1': None, 'Q': Q, 'U1': U1, 'U2': U2}
+                constraint_cls = IndexedEllipsoidEllipsoidConstraint
+            else:
+                raise ValueError(f'Invalid primitive shape pair {(type1, type2)} specified for SCA.')
+
+            mfpp_bezier_data = {'current_frames': (idx1, idx2),
                                 'n_points': n_points,
                                 'num_derivatives': D,
                                 'num_iris_per_frame': num_iris_tot,
                                 'num_frames': n_frames
                                 }
             sca_bez_points = range(0, num_iris_tot * n_points, 1)
-
-            # populate col_pair_geom_data with respective primitive shape pair type information
-            ee_geom_type = robot_geom_data.get_primitive_shape_type(frame_list[col_idx])
-            if ee_geom_type == 'box':
-                A2 = robot_geom_data.get_box_representation(frame_list[col_idx])['A']
-                b2 = robot_geom_data.get_box_representation(frame_list[col_idx])['b']
-                col_pair_geom_data = {'A1': A1, 'b1': b1, 'A2': A2, 'b2': b2, 'Q': Q}
-            elif ee_geom_type == 'sphere':
-                U = robot_geom_data.get_sphere_representation(frame_list[col_idx])['U']
-                if torso_geom_type == 'box':
-                    col_pair_geom_data = {'A1': A1, 'b1': b1, 'U': U, 'Q': Q}
-                elif torso_geom_type == 'capsule':
-                    col_pair_geom_data = {'A1': None, 'b1': None, 'R': R, 'L': L, 'U': U, 'Q': Q}
-            else:
-                raise ValueError(f'Invalid primitive shape {ee_geom_type} type specified for SCA.')
-
             for i in sca_bez_points:
                 mfpp_bezier_data['current_point'] = i
-                i_name = 'f_dist_' + str(frame_list[col_idx]) + str(i)
+                i_name = f'f_dist_{fr1}_{fr2}_{i}'
                 current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-                if ee_geom_type == 'box':
-                    f_dist[i_name] = IndexedPolytopePolytopeConstraint(i_name, col_pair_geom_data, current_mfpp_data)
-                elif ee_geom_type == 'sphere':
-                    if torso_geom_type == 'box':
-                        f_dist[i_name] = IndexedPolytopeEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
-                    if torso_geom_type == 'capsule':
-                        f_dist[i_name] = IndexedCapsuleEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
-                else:
-                    raise ValueError(f'Invalid primitive shape type {ee_geom_type} specified for SCA.')
-                # f_dist[i_name] = DColIndexedPolytopesConstraint(i_name, col_pair_geom_data, current_mfpp_data)
+                f_dist[i_name] = constraint_cls(i_name, col_pair_geom_data, current_mfpp_data)
                 sca_constraints.append(f_dist[i_name](points_all))
                 lbg.append(1.0)
                 ubg.append(ca.inf)
 
             # assume lagrange multipliers of SCA constraints are zero
-            # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
-            initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points),1))))
-
-        # sca_build_time = time.time() - sca_build_start_time
-        # Repeat for feet-to-feet collision avoidance
-        first_ee_idx = 1
-        second_ee_idx = 2
-        print(f'Adding self-collision between: {frame_list[first_ee_idx]} and {frame_list[second_ee_idx]}')
-        # Simplified no self-collision function and constraints bounds for specified index pairs
-        mfpp_bezier_data = {'current_frames': (first_ee_idx, second_ee_idx),  # feet always assumed to have collision body
-                            'n_points': n_points,
-                            'num_derivatives': D,
-                            'num_iris_per_frame': num_iris_tot,
-                            'num_frames': n_frames
-                            }
-        sca_bez_points = range(0, num_iris_tot * n_points, 1)
-
-        # populate col_pair_geom_data with respective primitive shape pair type information
-        U1 = robot_geom_data.get_sphere_representation(frame_list[first_ee_idx])['U']
-        U2 = robot_geom_data.get_sphere_representation(frame_list[second_ee_idx])['U']
-        col_pair_geom_data = {'A1': None, 'b1': None, 'Q': Q, 'U1': U1, 'U2': U2}
-
-        for i in sca_bez_points:
-            mfpp_bezier_data['current_point'] = i
-            i_name = 'f_dist_' + str(frame_list[first_ee_idx]) + '_' + str(frame_list[second_ee_idx]) + str(i)
-            current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-            f_dist[i_name] = IndexedEllipsoidEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
-            sca_constraints.append(f_dist[i_name](points_all))
-            lbg.append(1.0)
-            ubg.append(ca.inf)
+            initial_guess['lam_g0'] = np.concatenate(
+                (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
         sca_build_time = time.time() - sca_build_start_time
-
-        # assume lagrange multipliers of SCA constraints are zero
-        # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
-        initial_guess['lam_g0'] = np.concatenate(
-            (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
-
-        # Repeat for knee-to-feet (RK-LF) collision avoidance
-        first_ee_idx = 2
-        second_ee_idx = 3
-        print(f'Adding self-collision between: {frame_list[first_ee_idx]} and {frame_list[second_ee_idx]}')
-        # Simplified no self-collision function and constraints bounds for specified index pairs
-        mfpp_bezier_data = {'current_frames': (first_ee_idx, second_ee_idx),  # feet always assumed to have collision body
-                            'n_points': n_points,
-                            'num_derivatives': D,
-                            'num_iris_per_frame': num_iris_tot,
-                            'num_frames': n_frames
-                            }
-        sca_bez_points = range(0, num_iris_tot * n_points, 1)
-
-        # populate col_pair_geom_data with respective primitive shape pair type information
-        U1 = robot_geom_data.get_sphere_representation(frame_list[first_ee_idx])['U']
-        U2 = robot_geom_data.get_sphere_representation(frame_list[second_ee_idx])['U']
-        col_pair_geom_data = {'A1': None, 'b1': None, 'Q': Q, 'U1': U1, 'U2': U2}
-
-        for i in sca_bez_points:
-            mfpp_bezier_data['current_point'] = i
-            i_name = 'f_dist_' + str(frame_list[first_ee_idx]) + '_' + str(frame_list[second_ee_idx]) + str(i)
-            current_mfpp_data = copy.deepcopy(mfpp_bezier_data)
-            f_dist[i_name] = IndexedEllipsoidEllipsoidConstraint(i_name, col_pair_geom_data, current_mfpp_data)
-            sca_constraints.append(f_dist[i_name](points_all))
-            lbg.append(1.0)
-            ubg.append(ca.inf)
-        # sca_build_time = time.time() - sca_build_start_time
-
-        # assume lagrange multipliers of SCA constraints are zero
-        # initial_guess['lam_g0'] = np.concatenate((initial_guess['lam_g0'], np.zeros((len(sca_bez_points),1))))
-        initial_guess['lam_g0'] = np.concatenate(
-            (initial_guess['lam_g0'].reshape(-1, 1), np.zeros((len(sca_bez_points), 1))))
 
         # Robot-ENVIRONMENT collision avoidance is NOT handled here: it is
         # enforced convexly via the sphere-radius containment margins

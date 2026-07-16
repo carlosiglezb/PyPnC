@@ -444,7 +444,16 @@ def plan_multiple_iris(S, R, p_init, T, alpha,
         print(f"[Compute Time] Bezier solve time: {sol_stats['runtime']}")
 
     if sca_robot_geometry is not None:
-        b_skip_sca = False   # TODO: automate by checking if there are collisions using current solution
+        # Skip the (much more expensive) casadi DCOL self-collision refinement
+        # when the cvxpy candidate already satisfies it -- see
+        # SCARobotGeometry.is_trajectory_self_collision_free.
+        num_iris_tot = sum(len(seg_dur[next(iter(seg_dur))]) for seg_dur in durations)
+        b_skip_sca = sca_robot_geometry.is_trajectory_self_collision_free(
+            points, list(p_init.keys()), num_iris_tot)
+        if verbose:
+            print(f"[MFPP] Candidate cvxpy solution is "
+                  f"{'already self-collision-free' if b_skip_sca else 'in self-collision'}; "
+                  f"{'skipping' if b_skip_sca else 'running'} the casadi SCA refinement.")
         initial_guess = {}
         initial_guess['x0'] = pack_points_for_single_vector(points, 'cvxpy')
         initial_guess['lam_g0'] = pack_points_for_single_vector(dvars['lam_g0'], 'cvxpy')

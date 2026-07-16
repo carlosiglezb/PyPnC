@@ -595,8 +595,8 @@ class G1MulticontactPlanner(HumanoidMulticontactPlanner):
             self.fddp_full_sca.eps_rel = 5e-1
             self.fddp_full_sca.filter_size = 10  # documentation says not to change this!
             self.fddp_full_sca.update_rho_with_heuristic = True
-            self.fddp_full_sca.max_qp_iters = 500
-            self.fddp_full_sca.rho_update_interval = 500
+            self.fddp_full_sca.max_qp_iters = 100
+            self.fddp_full_sca.rho_update_interval = 100
             # self.fddp_full_sca.use_filter_line_search = False   # (default: True)
             # self.fddp_full_sca.mu_dynamic = -1  # Nocedal's L1 merit function
             # self.fddp_full_sca.lag_mul_inf_norm_coef = 10
